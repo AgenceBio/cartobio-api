@@ -15,4 +15,5 @@ jobs:
     - run: npm test
       env:
         CI: true
+        NOTIFICATIONS_AB_ENDPOINT: https://preprod-notifications.agencebio.org:444
         ESPACE_COLLABORATIF_BASIC_AUTH: ${{ secrets.ESPACE_COLLABORATIF_BASIC_AUTH }}

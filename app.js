@@ -7,11 +7,12 @@ const {PORT=8000, IP='127.0.0.1'} = process.env;
 
 // Remote Endpoints Setup
 const {ESPACE_COLLABORATIF_ENDPOINT='https://espacecollaboratif.ign.fr'} = process.env;
+const {NOTIFICATIONS_AB_ENDPOINT='https://notifications.agencebio.org:444'} = process.env;
 
 const proxyRules = new httpProxyRules({
     rules: {
       '/espacecollaboratif': ESPACE_COLLABORATIF_ENDPOINT,
-      // '/notifs': '',
+      '/notifications': NOTIFICATIONS_AB_ENDPOINT,
     },
     // remove this line to drop backward compatibility (eg: front-end app)
     default: ESPACE_COLLABORATIF_ENDPOINT

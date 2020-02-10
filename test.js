@@ -22,4 +22,22 @@ describe('GET /espacecollaboratif/gcms/wfs/cartobio', () => {
   })
 })
 
+describe('GET /notifications/portail/departements', () => {
+  test('responds with JSON', (done) => {
+    request(app)
+      .get('/notifications/portail/departements')
+      .type('json')
+      .expect((response) => {
+        expect(response.status).toBe(200)
+        expect(response.header['content-type']).toContain('application/json')
+        expect(response.body[0]).toMatchObject({
+          id: 1,
+          nom: 'Toute la France',
+          regionId: 1,
+        })
+      })
+      .end(done)
+  })
+})
+
 afterAll(() => app.close())
