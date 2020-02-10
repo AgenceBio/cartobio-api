@@ -10,10 +10,13 @@
   "engines": {
     "node": ">=12"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "jest": "^25.1.0",
+    "supertest": "^4.0.2"
+  },
   "scripts": {
     "start": "node app.js",
-    "test": "npm test"
+    "test": "jest"
   },
   "repository": {
     "type": "git",

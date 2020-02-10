@@ -21,7 +21,7 @@ const proxy = httpProxy.createProxyServer({
     ignorePath: true
 });
 
-http.createServer(function (req, res) {
+module.exports = http.createServer(function (req, res) {
     // Some clients (like curl) do not provide this value by default
     if (req.headers.origin) {
       res.setHeader('access-control-allow-origin', req.headers.origin);
@@ -45,4 +45,4 @@ http.createServer(function (req, res) {
           changeOrigin: true
       });
     }
-}).listen(PORT);
+}).listen(PORT, IP);
