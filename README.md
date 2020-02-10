@@ -11,7 +11,7 @@ npm start
 
 ### Routes
 
-| Chemin                       |
+| Chemin                       | Description
 | ---                          | ---
 | `/espacecollaboratif`        | Redirige vers l'[espace collaboratif IGN][api-ign-collab]
 | `/notifications`             | Redirige vers les [notifications de l'Agence Bio][api-ab]
