@@ -24,7 +24,7 @@ npm start
 | `PORT`                            | `8000`                                    | Port réseau sur lequel exposer l'application
 | `IP`                              | `127.0.0.1`                               | Interface réseau sur laquelle exposer l'application
 | `ESPACE_COLLABORATIF_ENDPOINT`    | `https://espacecollaboratif.ign.fr`       | Point d'accès à l'[API Espace Collaboratif d'IGN][api-ign-collab]
-| `NOTIFICATIONS_AB_ENDPOINT`       | `https://notifications.agencebio.org:444` | Point d'accès aux [notifications de l'Agence Bio][api-ab]
+| `NOTIFICATIONS_AB_ENDPOINT`       | `https://back.agencebio.org` | Point d'accès aux [notifications de l'Agence Bio][api-ab]
 
 
 ## Tests
