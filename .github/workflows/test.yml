@@ -1,11 +1,11 @@
-name: Test the application in a Docker container
+name: Test the application in Node and a Docker container
 
 on: [push]
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
 
+  node-test:
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
     - uses: actions/setup-node@v1
@@ -15,5 +15,16 @@ jobs:
     - run: npm test
       env:
         CI: true
-        NOTIFICATIONS_AB_ENDPOINT: https://preprod-notifications.agencebio.org:444
+        ESPACE_COLLABORATIF_BASIC_AUTH: ${{ secrets.ESPACE_COLLABORATIF_BASIC_AUTH }}
+
+  docker-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build the Docker image
+      run: docker build -t agencebio/cartobio-api .
+    - name: Test the Docker image
+      run: docker run -e ESPACE_COLLABORATIF_BASIC_AUTH agencebio/cartobio-api npm test
+      env:
+        CI: true
         ESPACE_COLLABORATIF_BASIC_AUTH: ${{ secrets.ESPACE_COLLABORATIF_BASIC_AUTH }}
