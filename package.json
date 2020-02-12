@@ -4,11 +4,19 @@
   "description": "api for cartobio",
   "main": "app.js",
   "dependencies": {
-    "http-proxy": "^1.18.0"
+    "http-proxy": "^1.18.0",
+    "http-proxy-rules": "^1.1.3"
   },
-  "devDependencies": {},
+  "engines": {
+    "node": ">=12"
+  },
+  "devDependencies": {
+    "jest": "^25.1.0",
+    "supertest": "^4.0.2"
+  },
   "scripts": {
-    "test": "npm test"
+    "start": "node app.js",
+    "test": "jest"
   },
   "repository": {
     "type": "git",

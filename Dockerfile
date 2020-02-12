@@ -1,4 +1,4 @@
-FROM node:10
+FROM node:12-alpine
 
 # Create app directory
 WORKDIR /usr/src/app
@@ -8,12 +8,15 @@ WORKDIR /usr/src/app
 # where available (npm@5+)
 COPY package*.json ./
 
-RUN npm install
+RUN npm ci
 # If you are building your code for production
 # RUN npm ci --only=production
 
 # Bundle app source
 COPY . .
 
-EXPOSE 8000
-CMD [ "node", "app.js" ]
+EXPOSE  8000
+ENV     PORT  8000
+ENV     HOST  0.0.0.0
+
+CMD [ "npm", "start" ]
