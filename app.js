@@ -4,14 +4,12 @@ const httpProxyRules = require('http-proxy-rules');
 
 // Application is hosted on localhost:8000 by default
 const {
-    PORT = 8000, IP = '127.0.0.1'
+    PORT = 8000, HOST = 'localhost'
 } = process.env;
 
 // Remote Endpoints Setup
 const {
-    ESPACE_COLLABORATIF_ENDPOINT = 'https://espacecollaboratif.ign.fr'
-} = process.env;
-const {
+    ESPACE_COLLABORATIF_ENDPOINT = 'https://espacecollaboratif.ign.fr',
     NOTIFICATIONS_AB_ENDPOINT = 'https://back.agencebio.org'
 } = process.env;
 
@@ -46,9 +44,10 @@ module.exports = http.createServer(function (req, res) {
 
         // match against proxy rules
         const target = proxyRules.match(req)
+
         proxy.web(req, res, {
             target: target + req.url,
             changeOrigin: true
         });
     }
-}).listen(PORT, IP);
+}).listen(PORT, HOST, () => console.log(`Running on http://${HOST}:${PORT}`));
