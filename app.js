@@ -18,12 +18,10 @@ const proxyRules = new httpProxyRules({
         '/espacecollaboratif': ESPACE_COLLABORATIF_ENDPOINT,
         '/notifications': NOTIFICATIONS_AB_ENDPOINT,
     },
-    // remove this line to drop backward compatibility (eg: front-end app)
-    default: ESPACE_COLLABORATIF_ENDPOINT
 });
 
 const proxy = httpProxy.createProxyServer({
-    ignorePath: true
+    ignorePath: false
 });
 
 module.exports = http.createServer(function (req, res) {

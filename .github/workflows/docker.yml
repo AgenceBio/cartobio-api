@@ -1,0 +1,33 @@
+name: Docker Image CI
+
+on:
+  push:
+    paths-ignore:
+    - 'docs/**'
+    branches:
+      - master
+    tags:
+      - v*
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Build the Docker image
+      run: docker build -t agencebio/cartobio-api .
+
+    - name: Test the Docker image
+      run: docker run -e ESPACE_COLLABORATIF_BASIC_AUTH agencebio/cartobio-api npm test
+      env:
+        CI: true
+        ESPACE_COLLABORATIF_BASIC_AUTH: ${{ secrets.ESPACE_COLLABORATIF_BASIC_AUTH }}
+
+    - uses: jerray/publish-docker-action@v1.0.4
+      with:
+        repository: agencebio/cartobio-api
+        username: ${{ secrets.DOCKER_HUB_USERNAME }}
+        password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+        auto_tag: true

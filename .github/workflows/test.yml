@@ -16,15 +16,3 @@ jobs:
       env:
         CI: true
         ESPACE_COLLABORATIF_BASIC_AUTH: ${{ secrets.ESPACE_COLLABORATIF_BASIC_AUTH }}
-
-  docker-test:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: Build the Docker image
-      run: docker build -t agencebio/cartobio-api .
-    - name: Test the Docker image
-      run: docker run -e ESPACE_COLLABORATIF_BASIC_AUTH agencebio/cartobio-api npm test
-      env:
-        CI: true
-        ESPACE_COLLABORATIF_BASIC_AUTH: ${{ secrets.ESPACE_COLLABORATIF_BASIC_AUTH }}
