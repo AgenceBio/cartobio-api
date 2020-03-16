@@ -24,6 +24,7 @@ jobs:
       env:
         CI: true
         ESPACE_COLLABORATIF_BASIC_AUTH: ${{ secrets.ESPACE_COLLABORATIF_BASIC_AUTH }}
+        NOTIFICATIONS_AB_ENDPOINT: https://preprod-notifications.agencebio.org:444/
 
     - uses: jerray/publish-docker-action@v1.0.4
       with:

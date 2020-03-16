@@ -21,7 +21,7 @@ const proxyRules = new httpProxyRules({
 });
 
 const proxy = httpProxy.createProxyServer({
-    ignorePath: false
+    ignorePath: true
 });
 
 module.exports = http.createServer(function (req, res) {
