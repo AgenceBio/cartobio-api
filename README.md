@@ -6,13 +6,14 @@
 ## Fonctionnement
 
 ```shell
-npm start
+npm run watch
 ```
 
 ### Routes
 
 | Chemin                       | Description
 | ---                          | ---
+| `/api/v1`                    | API CartoBio v1 (registre parcellaire bio)
 | `/espacecollaboratif`        | Redirige vers l'[espace collaboratif IGN][api-ign-collab]
 | `/notifications`             | Redirige vers les [notifications de l'Agence Bio][api-ab]
 
@@ -23,6 +24,7 @@ npm start
 | ---                               | ---                                       | ---
 | `PORT`                            | `8000`                                    | Port réseau sur lequel exposer l'application
 | `HOST`                            | `localhost`                               | Interface réseau sur laquelle exposer l'application
+| `CARTOBIO_JWT_SECRET`             | ``                                        | Secret JSON Web Token, pour vérifier l'authenticité des tokens
 | `ESPACE_COLLABORATIF_ENDPOINT`    | `https://espacecollaboratif.ign.fr`       | Point d'accès à l'[API Espace Collaboratif d'IGN][api-ign-collab]
 | `NOTIFICATIONS_AB_ENDPOINT`       | `https://back.agencebio.org` | Point d'accès aux [notifications de l'Agence Bio][api-ab]
 

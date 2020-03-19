@@ -2,6 +2,9 @@ const http = require('http');
 const httpProxy = require('http-proxy');
 const httpProxyRules = require('http-proxy-rules');
 
+const {verify:verifyToken} = require('jsonwebtoken');
+const JWT_SECRET = Buffer.from(process.env.CARTOBIO_JWT_SECRET, 'base64')
+
 // Application is hosted on localhost:8000 by default
 const {
     PORT = 8000, HOST = 'localhost'
@@ -24,6 +27,18 @@ const proxy = httpProxy.createProxyServer({
     ignorePath: true
 });
 
+const verify = (req, res) => {
+  const token = (req.headers['authorization'] || '').replace(/^Bearer /, '')
+
+  try {
+    verifyToken(token, JWT_SECRET)
+  }
+  catch (error) {
+    res.statusCode = 503
+    res.end(JSON.stringify({ error: "We could not verify the provided token." }))
+  }
+}
+
 module.exports = http.createServer(function (req, res) {
     // Some clients (like curl) do not provide this value by default
     if (req.headers.origin) {
@@ -31,6 +46,17 @@ module.exports = http.createServer(function (req, res) {
     }
 
     res.setHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, authorization");
+
+    if (['GET', 'HEAD'].includes(req.method)) {
+      res.setHeader('Content-Type', 'application/json')
+
+      if (req.url === '/api/v1/test') {
+        verify(req, res)
+        res.statusCode = 200
+
+        return res.end(JSON.stringify({ test: 'OK'}))
+      }
+    }
 
     // handle OPTIONS method
     if (req.method === 'OPTIONS') {
