@@ -2,7 +2,8 @@ const http = require('http');
 const httpProxy = require('http-proxy');
 const httpProxyRules = require('http-proxy-rules');
 
-const {verify:verifyToken} = require('jsonwebtoken');
+const parcelsFixture = require('./test/fixtures/parcels.json')
+const {verify:verifyToken} = require('jsonwebtoken')
 const JWT_SECRET = Buffer.from(process.env.CARTOBIO_JWT_SECRET, 'base64')
 
 // Application is hosted on localhost:8000 by default
@@ -55,6 +56,12 @@ module.exports = http.createServer(function (req, res) {
         res.statusCode = 200
 
         return res.end(JSON.stringify({ test: 'OK'}))
+      }
+      else if (req.url === '/api/v1/parcels') {
+        verify(req, res)
+        res.statusCode = 200
+
+        return res.end(JSON.stringify(parcelsFixture))
       }
     }
 
