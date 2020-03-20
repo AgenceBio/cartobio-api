@@ -20,7 +20,7 @@ jobs:
       run: docker build -t agencebio/cartobio-api .
 
     - name: Test the Docker image
-      run: docker run -e ESPACE_COLLABORATIF_BASIC_AUTH agencebio/cartobio-api npm test
+      run: docker run -e ESPACE_COLLABORATIF_BASIC_AUTH -e NOTIFICATIONS_AB_ENDPOINT -e CARTOBIO_JWT_SECRET -e CI agencebio/cartobio-api npm test
       env:
         CI: true
         ESPACE_COLLABORATIF_BASIC_AUTH: ${{ secrets.ESPACE_COLLABORATIF_BASIC_AUTH }}
