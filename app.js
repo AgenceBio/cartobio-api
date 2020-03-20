@@ -48,6 +48,8 @@ module.exports = http.createServer(function (req, res) {
 
     res.setHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, authorization");
 
+    console.log(req.method, req.url)
+
     if (['GET', 'HEAD'].includes(req.method)) {
       res.setHeader('Content-Type', 'application/json')
 
@@ -76,9 +78,16 @@ module.exports = http.createServer(function (req, res) {
         // match against proxy rules
         const target = proxyRules.match(req)
 
-        proxy.web(req, res, {
-            target: target + req.url,
-            changeOrigin: true
-        });
+        if (target) {
+          proxy.web(req, res, {
+              target: target + req.url,
+              changeOrigin: true
+          });
+        }
+        else {
+          res.writeHead(404, {'Content-Type': 'text/plain'})
+          res.end('404 Not Found')
+        }
+
     }
 }).listen(PORT, HOST, () => console.log(`Running on http://${HOST}:${PORT}`));
