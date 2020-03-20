@@ -35,7 +35,7 @@ const verify = (req, res) => {
     verifyToken(token, JWT_SECRET)
   }
   catch (error) {
-    res.statusCode = 503
+    res.statusCode = 401
     res.end(JSON.stringify({ error: "We could not verify the provided token." }))
   }
 }
