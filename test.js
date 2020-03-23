@@ -55,6 +55,7 @@ describe('GET /api/v1/parcels', () => {
         expect(response.status).toBe(200)
         expect(response.header['content-type']).toBe('application/json')
         expect(response.body).toHaveProperty('type', 'FeatureCollection')
+        expect(response.body).toHaveProperty('properties.year', 2020)
         expect(response.body.features).toHaveLength(5)
       })
       .end(done)

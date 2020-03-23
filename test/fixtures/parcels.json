@@ -1,5 +1,6 @@
 {
   "type": "FeatureCollection",
+  "year": 2020,
   "features": [
     {
       "type": "Feature",
@@ -7,8 +8,6 @@
         "operator-id": 0,
         "pacage": "026000001",
         "codecultu": "PPH",
-        "codecultu.2020": "PPH",
-        "codecultu.2019": "PPH",
         "bio": 1,
         "numilot": 1,
         "numparcel": 1
@@ -47,8 +46,6 @@
         "operator-id": 0,
         "pacage": "026000001",
         "codecultu": "PPH",
-        "codecultu.2020": "PPH",
-        "codecultu.2019": "BTH",
         "bio": 1,
         "numilot": 1,
         "numparcel": 2
@@ -135,7 +132,6 @@
         "operator-id": 0,
         "pacage": "026000003",
         "codecultu": "BTH",
-        "codecultu.2020": "BTH",
         "bio": 1,
         "numilot": 1,
         "numparcel": 1
@@ -222,8 +218,6 @@
         "operator-id": 0,
         "pacage": "026000002",
         "codecultu": "SNE",
-        "codecultu.2020": "PPH",
-        "codecultu.2019": "PPH",
         "bio": 0,
         "numilot": 1,
         "numparcel": 1
@@ -282,9 +276,6 @@
         "operator-id": 0,
         "pacage": "026000002",
         "codecultu": "BTH",
-        "codecultu.2020": "BTH",
-        "codecultu.2019": "BTP",
-        "codecultu.2018": "LUZ",
         "bio": 1,
         "numilot": 1,
         "numparcel": 2
