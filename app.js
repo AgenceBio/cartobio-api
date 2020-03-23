@@ -2,6 +2,7 @@ const http = require('http');
 const httpProxy = require('http-proxy');
 const httpProxyRules = require('http-proxy-rules');
 
+const {version:apiVersion} = require('./package.json')
 const parcelsFixture = require('./test/fixtures/parcels.json')
 const {verify:verifyToken} = require('jsonwebtoken')
 const JWT_SECRET = Buffer.from(process.env.CARTOBIO_JWT_SECRET, 'base64')
@@ -33,6 +34,7 @@ const verify = (req, res) => {
 
   try {
     verifyToken(token, JWT_SECRET)
+    res.setHeader("X-Api-Version", apiVersion)
   }
   catch (error) {
     res.statusCode = 401
@@ -47,7 +49,6 @@ module.exports = http.createServer(function (req, res) {
     }
 
     res.setHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, authorization");
-
     console.log(req.method, req.url)
 
     if (['GET', 'HEAD'].includes(req.method)) {
