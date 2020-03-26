@@ -2,6 +2,8 @@ const http = require('http');
 const httpProxy = require('http-proxy');
 const httpProxyRules = require('http-proxy-rules');
 
+const MatomoTracker = require('matomo-tracker')
+
 const {version:apiVersion} = require('./package.json')
 const parcelsFixture = require('./test/fixtures/parcels.json')
 const {verify:verifyToken} = require('jsonwebtoken')
@@ -9,7 +11,10 @@ const JWT_SECRET = Buffer.from(process.env.CARTOBIO_JWT_SECRET, 'base64')
 
 // Application is hosted on localhost:8000 by default
 const {
-    PORT = 8000, HOST = 'localhost'
+    PORT = 8000, HOST = 'localhost',
+    MATOMO_SITE_ID = 116,
+    MATOMO_TRACKER_URL = 'https://stats.data.gouv.fr/piwik.php',
+    NODE_ENV = 'dev'
 } = process.env;
 
 // Remote Endpoints Setup
@@ -17,6 +22,8 @@ const {
     ESPACE_COLLABORATIF_ENDPOINT = 'https://espacecollaboratif.ign.fr',
     NOTIFICATIONS_AB_ENDPOINT = 'https://back.agencebio.org'
 } = process.env;
+
+const matomo = new MatomoTracker(MATOMO_SITE_ID, MATOMO_TRACKER_URL)
 
 const proxyRules = new httpProxyRules({
     rules: {
@@ -29,17 +36,44 @@ const proxy = httpProxy.createProxyServer({
     ignorePath: true
 });
 
+const track = ({req, decodedToken}) => {
+  const {url='/'} = req
+
+  matomo.trackBulk([{
+    ua: apiVersion,
+    cvar: JSON.stringify({ decodedToken, NODE_ENV }),
+    e_c: 'api/v1',
+    e_a: url,
+    e_n: decodedToken.ocId
+  }])
+}
+
 const verify = (req, res) => {
   const token = (req.headers['authorization'] || '').replace(/^Bearer /, '')
-
+  let decodedToken
   try {
-    verifyToken(token, JWT_SECRET)
+    decodedToken = verifyToken(token, JWT_SECRET)
     res.setHeader("X-Api-Version", apiVersion)
   }
   catch (error) {
+    const {url='/'} = req
+    matomo.trackBulk([{
+      ua: apiVersion,
+      cvar: JSON.stringify({ token, error: error.message, NODE_ENV }),
+      e_c: 'api/v1',
+      e_a: 'error',
+      e_n: error.message
+    }])
     res.statusCode = 401
-    res.end(JSON.stringify({ error: "We could not verify the provided token." }))
+
+    res.end(JSON.stringify({
+      error: "We could not verify the provided token."
+    }))
+
+    return false
   }
+
+  return decodedToken
 }
 
 module.exports = http.createServer(function (req, res) {
@@ -49,23 +83,33 @@ module.exports = http.createServer(function (req, res) {
     }
 
     res.setHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, authorization");
-    console.log(req.method, req.url)
 
     if (['GET', 'HEAD'].includes(req.method)) {
       res.setHeader('Content-Type', 'application/json')
 
       if (req.url === '/api/v1/test') {
-        verify(req, res)
-        res.statusCode = 200
+        const decodedToken = verify(req, res, track)
+        if (decodedToken) {
+          track({req, decodedToken})
+          res.statusCode = 200
 
-        return res.end(JSON.stringify({ test: 'OK'}))
+          return res.end(JSON.stringify({ test: 'OK'}))
+        }
       }
       else if (req.url === '/api/v1/parcels') {
-        verify(req, res)
-        res.statusCode = 200
+        const decodedToken = verify(req, res, track)
+        if (decodedToken) {
+          track({req, decodedToken})
+          res.statusCode = 200
 
-        return res.end(JSON.stringify(parcelsFixture))
+          return res.end(JSON.stringify(parcelsFixture))
+        }
       }
+    }
+
+    // do not go any further if a response has been previously sent
+    if (res.writableFinished) {
+      return
     }
 
     // handle OPTIONS method
