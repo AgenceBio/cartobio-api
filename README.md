@@ -20,13 +20,16 @@ npm run watch
 
 ### Variables d'environnement
 
-| Variable                          | Défault                                   | Description
-| ---                               | ---                                       | ---
-| `PORT`                            | `8000`                                    | Port réseau sur lequel exposer l'application
-| `HOST`                            | `localhost`                               | Interface réseau sur laquelle exposer l'application
-| `CARTOBIO_JWT_SECRET`             | ``                                        | Secret JSON Web Token, pour vérifier l'authenticité des tokens
-| `ESPACE_COLLABORATIF_ENDPOINT`    | `https://espacecollaboratif.ign.fr`       | Point d'accès à l'[API Espace Collaboratif d'IGN][api-ign-collab]
-| `NOTIFICATIONS_AB_ENDPOINT`       | `https://back.agencebio.org` | Point d'accès aux [notifications de l'Agence Bio][api-ab]
+| Variable                            | Défault                                   | Description
+| ---                                 | ---                                       | ---
+| `PORT`                              | `8000`                                    | Port réseau sur lequel exposer l'application
+| `HOST`                              | `localhost`                               | Interface réseau sur laquelle exposer l'application
+| `CARTOBIO_JWT_SECRET`               | ``                                        | Secret JSON Web Token, pour vérifier l'authenticité des tokens
+| `ESPACE_COLLABORATIF_BASIC_AUTH`    | ``                                        |
+| `NOTIFICATIONS_AB_CARTOBIO_USER`    | ``                                        |
+| `NOTIFICATIONS_AB_CARTOBIO_PASSWORD`| ``                                        |
+| `ESPACE_COLLABORATIF_ENDPOINT`      | `https://espacecollaboratif.ign.fr`       | Point d'accès à l'[API Espace Collaboratif d'IGN][api-ign-collab]
+| `NOTIFICATIONS_AB_ENDPOINT`         | `https://back.agencebio.org` | Point d'accès aux [notifications de l'Agence Bio][api-ab]
 
 
 ## Tests

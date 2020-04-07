@@ -1,8 +1,8 @@
-const app = require('.');
-const request = require('supertest');
+const app = require('.')
+const request = require('supertest')
 
-const {ESPACE_COLLABORATIF_BASIC_AUTH} = process.env;
-const USER_DOC_AUTH_TOKEN = `Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJvY0lkIjowLCJ0ZXN0Ijp0cnVlfQ.NL050Bt_jMnQ6WLcqIbmwGJkaDvZ0PIAZdCKTNF_-sSTiTw5cijPGm6TwUSCWEyQUMFvI1_La19TDPXsaemDow`
+const { ESPACE_COLLABORATIF_BASIC_AUTH } = require('./lib/app.js').env()
+const USER_DOC_AUTH_TOKEN = 'Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJvY0lkIjowLCJ0ZXN0Ijp0cnVlfQ.NL050Bt_jMnQ6WLcqIbmwGJkaDvZ0PIAZdCKTNF_-sSTiTw5cijPGm6TwUSCWEyQUMFvI1_La19TDPXsaemDow'
 
 describe('GET /', () => {
   test('responds with a 404', (done) => {
@@ -69,7 +69,7 @@ describe('GET /espacecollaboratif/gcms/wfs/cartobio', () => {
       .get('/espacecollaboratif/gcms/wfs/cartobio')
       .query({
         service: 'WFS',
-        request: 'GetCapabilities',
+        request: 'GetCapabilities'
       })
       .set('Authorization', `Basic ${ESPACE_COLLABORATIF_BASIC_AUTH}`)
       .type('xml')
@@ -93,7 +93,7 @@ describe('GET /notifications/portail/departements', () => {
         expect(response.body[0]).toMatchObject({
           id: 1,
           nom: 'Toute la France',
-          regionId: 1,
+          regionId: 1
         })
       })
       .end(done)
