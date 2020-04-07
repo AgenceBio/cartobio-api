@@ -9,6 +9,7 @@ const parcelsFixture = require('./test/fixtures/parcels.json')
 const { verify: verifyToken } = require('jsonwebtoken')
 const JWT_SECRET = Buffer.from(process.env.CARTOBIO_JWT_SECRET, 'base64')
 
+const { getOperatorParcels } = require('./lib/parcels.js')
 const env = require('./lib/app.js').env()
 
 // Application is hosted on localhost:8000 by default
@@ -96,12 +97,27 @@ module.exports = http.createServer(function (req, res) {
 
         return res.end(JSON.stringify({ test: 'OK' }))
       }
-      else if (req.url === '/api/v1/parcels') {
-        const decodedToken = verify(req, res, track)
-        if (decodedToken) {
-          track({req, decodedToken})
+    } else if (req.url === '/api/v1/parcels') {
+      const decodedToken = verify(req, res, track)
+      if (decodedToken) {
+        track({ req, decodedToken })
+        const { test: isTest, ocId } = decodedToken
+
+        // response provided by the test token
+        if (isTest === true) {
           res.statusCode = 200
           return res.end(JSON.stringify(parcelsFixture))
+          // response is conditional to the ocId value
+        } else if (ocId) {
+          res.statusCode = 200
+          getOperatorParcels({ ocId }).then(geojson => {
+            res.end(JSON.stringify(geojson))
+          })
+          return
+          // the token is not "oc" related, hence the "Unprocessable Entity" status
+        } else {
+          res.statusCode = 422
+          return res.end(JSON.stringify({ error: 'Certification body identifier is missing in the token.' }))
         }
       }
     }
