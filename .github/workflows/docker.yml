@@ -26,6 +26,8 @@ jobs:
         ESPACE_COLLABORATIF_BASIC_AUTH: ${{ secrets.ESPACE_COLLABORATIF_BASIC_AUTH }}
         NOTIFICATIONS_AB_ENDPOINT: https://preprod-notifications.agencebio.org:444/
         CARTOBIO_JWT_SECRET: "${{ secrets.CARTOBIO_JWT_SECRET }}"
+        NOTIFICATIONS_AB_CARTOBIO_USER: "${{ secrets.NOTIFICATIONS_AB_CARTOBIO_USER }}"
+        NOTIFICATIONS_AB_CARTOBIO_PASSWORD: "${{ secrets.NOTIFICATIONS_AB_CARTOBIO_USER }}"
 
     - uses: jerray/publish-docker-action@v1.0.4
       with:
