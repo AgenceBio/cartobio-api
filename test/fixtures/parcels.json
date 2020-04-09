@@ -4,14 +4,12 @@
     {
       "type": "Feature",
       "properties": {
-        "operator-id": 0,
         "pacage": "026000001",
         "codecultu": "PPH",
         "bio": 1,
         "numilot": 1,
         "numparcel": 1,
-        "meta.year": 2020,
-        "meta.source": "RPG"
+        "numerobio": 1
       },
       "geometry": {
         "type": "Polygon",
@@ -44,14 +42,12 @@
     {
       "type": "Feature",
       "properties": {
-        "operator-id": 0,
         "pacage": "026000001",
         "codecultu": "PPH",
         "bio": 1,
         "numilot": 1,
         "numparcel": 2,
-        "meta.year": 2020,
-        "meta.source": "RPG"
+        "numerobio": 1
       },
       "geometry": {
         "type": "Polygon",
@@ -132,14 +128,12 @@
     {
       "type": "Feature",
       "properties": {
-        "operator-id": 0,
         "pacage": "026000003",
         "codecultu": "BTH",
         "bio": 1,
         "numilot": 1,
         "numparcel": 1,
-        "meta.year": 2020,
-        "meta.source": "RPG"
+        "numerobio": 11
       },
       "geometry": {
         "type": "Polygon",
@@ -220,14 +214,12 @@
     {
       "type": "Feature",
       "properties": {
-        "operator-id": 0,
         "pacage": "026000002",
         "codecultu": "SNE",
         "bio": 0,
         "numilot": 1,
         "numparcel": 1,
-        "meta.year": 2020,
-        "meta.source": "RPG"
+        "numerobio": 21
       },
       "geometry": {
         "type": "Polygon",
@@ -280,14 +272,12 @@
     {
       "type": "Feature",
       "properties": {
-        "operator-id": 0,
         "pacage": "026000002",
         "codecultu": "BTH",
         "bio": 1,
         "numilot": 1,
         "numparcel": 2,
-        "meta.year": 2020,
-        "meta.source": "RPG"
+        "numerobio": 21
       },
       "geometry": {
         "type": "Polygon",

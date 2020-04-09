@@ -53,8 +53,14 @@ describe('GET /api/v1/parcels', () => {
         expect(response.header['content-type']).toBe('application/json')
         expect(response.body).toHaveProperty('type', 'FeatureCollection')
         expect(response.body.features).toHaveLength(5)
-        expect(response.body.features).toHaveProperty(['0', 'properties', 'meta.year'], 2020)
-        expect(response.body.features).toHaveProperty(['0', 'properties', 'meta.source'], 'RPG')
+        expect(response.body.features[1].properties).toMatchObject({
+          pacage: '026000001',
+          codecultu: 'PPH',
+          bio: 1,
+          numparcel: 2,
+          numilot: 1,
+          numerobio: 1
+        })
       })
   })
 })
