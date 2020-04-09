@@ -94,12 +94,15 @@ module.exports = http.createServer(function (req, res) {
     res.setHeader('access-control-allow-origin', req.headers.origin)
   }
 
-  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, authorization')
+  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Accept-Encoding, authorization')
 
   if (['GET', 'HEAD'].includes(req.method)) {
     res.setHeader('Content-Type', 'application/json')
 
-    if (req.url === '/api/v1/test') {
+    if (req.url === '/api/version') {
+      res.statusCode = 200
+      return res.end(JSON.stringify({ version: apiVersion }))
+    } else if (req.url === '/api/v1/test') {
       const decodedToken = verify(req, res, track)
       if (decodedToken) {
         track({ req, decodedToken })
