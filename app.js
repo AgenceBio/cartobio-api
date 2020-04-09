@@ -24,7 +24,10 @@ const {
 
 // Sentry error reporting setup
 if (SENTRY_DSN) {
-  Sentry.init({ dsn: SENTRY_DSN })
+  Sentry.init({
+    dsn: SENTRY_DSN,
+    release: 'cartobio-api@' + process.env.npm_package_version
+  })
 }
 
 // Remote Endpoints Setup
