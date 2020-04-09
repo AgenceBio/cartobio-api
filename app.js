@@ -1,6 +1,7 @@
 const http = require('http')
 const httpProxy = require('http-proxy')
 const HttpProxyRules = require('http-proxy-rules')
+const Sentry = require('@sentry/node')
 
 const MatomoTracker = require('matomo-tracker')
 
@@ -17,8 +18,14 @@ const {
   PORT, HOST,
   MATOMO_SITE_ID,
   MATOMO_TRACKER_URL,
+  SENTRY_DSN,
   NODE_ENV
 } = env
+
+// Sentry error reporting setup
+if (SENTRY_DSN) {
+  Sentry.init({ dsn: SENTRY_DSN })
+}
 
 // Remote Endpoints Setup
 const {
@@ -48,7 +55,7 @@ const track = NODE_ENV !== 'dev' ? ({ req, decodedToken }) => {
     cvar: JSON.stringify({ decodedToken, NODE_ENV }),
     e_c: 'api/v1',
     e_a: url,
-    e_n: decodedToken.ocId
+    e_n: `oc:${decodedToken.ocId}`
   }])
 } : noop
 

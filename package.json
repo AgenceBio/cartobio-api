@@ -4,6 +4,8 @@
   "description": "api for cartobio",
   "main": "app.js",
   "dependencies": {
+    "@sentry/node": "^5.15.4",
+    "dotenv": "^8.2.0",
     "got": "^10.7.0",
     "http-proxy": "^1.18.0",
     "http-proxy-rules": "^1.1.3",
