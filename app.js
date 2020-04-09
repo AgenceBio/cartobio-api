@@ -109,10 +109,16 @@ module.exports = http.createServer(function (req, res) {
           return res.end(JSON.stringify(parcelsFixture))
           // response is conditional to the ocId value
         } else if (ocId) {
-          res.statusCode = 200
-          getOperatorParcels({ ocId }).then(geojson => {
-            res.end(JSON.stringify(geojson))
-          })
+          getOperatorParcels({ ocId })
+            .then(geojson => {
+              res.statusCode = 200
+              res.end(JSON.stringify(geojson))
+            })
+            .catch(error => {
+              res.statusCode = 500
+              console.error(`Failed to return parcels for OC ${ocId} because of this error "%s" (%o)`, error.message, error)
+              res.end(JSON.stringify({ error: 'Sorry, we failed to assemble parcels data. We have been notified about and will soon start fixing this issue.' }))
+            })
           return
           // the token is not "oc" related, hence the "Unprocessable Entity" status
         } else {
