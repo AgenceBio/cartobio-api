@@ -127,6 +127,7 @@ module.exports = http.createServer(function (req, res) {
             .catch(error => {
               res.statusCode = 500
               console.error(`Failed to return parcels for OC ${ocId} because of this error "%s" (%o)`, error.message, error)
+              SENTRY_DSN && Sentry.captureException(error)
               res.end(JSON.stringify({ error: 'Sorry, we failed to assemble parcels data. We have been notified about and will soon start fixing this issue.' }))
             })
           return
