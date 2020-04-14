@@ -5,6 +5,7 @@
   "main": "app.js",
   "dependencies": {
     "@sentry/node": "^5.15.4",
+    "@turf/helpers": "^6.1.4",
     "cors": "^2.8.5",
     "dotenv": "^8.2.0",
     "fastify": "^2.13.1",
@@ -32,6 +33,8 @@
   },
   "scripts": {
     "start": "node -r dotenv/config app.js",
+    "build": "npm run build:departements-centroids",
+    "build:departements-centroids": "node bin/build-departements-centroids.js",
     "test": "NODE_ENV=test jest --setupFiles dotenv/config",
     "pretest": "geojsonhint ./test/fixtures/parcels.json",
     "posttest": "eslint .",
