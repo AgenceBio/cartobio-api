@@ -12,7 +12,7 @@ const parcelsFixture = require('./test/fixtures/parcels.json')
 const { version: apiVersion } = require('./package.json')
 const JWT_SECRET = Buffer.from(process.env.CARTOBIO_JWT_SECRET, 'base64')
 
-const { verify, track } = require('./lib/middlewares.js')
+const { verify, track, enforceParams } = require('./lib/middlewares.js')
 const { getOperatorParcels } = require('./lib/parcels.js')
 const env = require('./lib/app.js').env()
 
@@ -36,9 +36,8 @@ app.use(cors({
 
 // Routes to protect with a JSON Web Token
 app.decorateRequest('decodedToken', {})
-
 const protectedRouteOptions = {
-  preValidation: [verify({ JWT_SECRET })]
+  preValidation: [verify({ JWT_SECRET }), enforceParams('ocId')]
 }
 
 app.get('/api/v1/version', (request, reply) => {
@@ -62,24 +61,18 @@ app.get('/api/v1/parcels', protectedRouteOptions, (request, reply) => {
     return reply.code(200).send(parcelsFixture)
   }
 
-  if (ocId) {
-    getOperatorParcels({ ocId })
-      .then(geojson => {
-        reply.code(200).send(geojson)
-      })
-      .catch(error => {
-        console.error(`Failed to return parcels for OC ${ocId} because of this error "%s"`, error.message)
-        reportErrors && Sentry.captureException(error)
-
-        reply.code(500).send({
-          error: 'Sorry, we failed to assemble parcels data. We have been notified about and will soon start fixing this issue.'
-        })
-      })
-  } else {
-    return reply.code(422).send({
-      error: 'Certification body identifier is missing in the token.'
+  getOperatorParcels({ ocId })
+    .then(geojson => {
+      reply.code(200).send(geojson)
     })
-  }
+    .catch(error => {
+      request.log.error(`Failed to return parcels for OC ${ocId} because of this error "%s"`, error.message)
+      reportErrors && Sentry.captureException(error)
+
+      reply.code(500).send({
+        error: 'Sorry, we failed to assemble parcels data. We have been notified about and will soon start fixing this issue.'
+      })
+    })
 })
 
 if (require.main === module) {
