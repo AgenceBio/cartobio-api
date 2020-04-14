@@ -5,15 +5,16 @@ const app = require('fastify')({
 })
 
 const cors = require('cors')
-
 const Sentry = require('@sentry/node')
 
 const parcelsFixture = require('./test/fixtures/parcels.json')
+const summaryFixture = require('./test/fixtures/summary.json')
+
 const { version: apiVersion } = require('./package.json')
 const JWT_SECRET = Buffer.from(process.env.CARTOBIO_JWT_SECRET, 'base64')
 
 const { verify, track, enforceParams } = require('./lib/middlewares.js')
-const { getOperatorParcels } = require('./lib/parcels.js')
+const { getOperatorParcels, getOperatorSummary } = require('./lib/parcels.js')
 const env = require('./lib/app.js').env()
 
 // Application is hosted on localhost:8000 by default
@@ -49,6 +50,30 @@ app.get('/api/v1/test', protectedRouteOptions, (request, reply) => {
   track({ request, decodedToken })
 
   return reply.send({ test: 'OK' })
+})
+
+app.get('/api/v1/summary', protectedRouteOptions, (request, reply) => {
+  const { decodedToken } = request
+  const { test: isTest, ocId } = decodedToken
+
+  track({ request, decodedToken })
+
+  if (isTest === true) {
+    return reply.code(200).send(summaryFixture)
+  }
+
+  getOperatorSummary({ ocId })
+    .then(geojson => {
+      reply.code(200).send(geojson)
+    })
+    .catch(error => {
+      request.log.error(`Failed to return summary for OC ${ocId} because of this error "%s"`, error.message)
+      reportErrors && Sentry.captureException(error)
+
+      reply.code(500).send({
+        error: 'Sorry, we failed to assemble summary data. We have been notified about and will soon start fixing this issue.'
+      })
+    })
 })
 
 app.get('/api/v1/parcels', protectedRouteOptions, (request, reply) => {
