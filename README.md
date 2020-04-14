@@ -1,21 +1,31 @@
 # CartoBio-API
 
-> Proxy server is to avoid cors block from espacecollaboratif.ign.fr
-> and Agence Bio notifications.
+> API des données parcellaires bio en France.
+
+Elle a vocation à être intégrée à [CartoBio-Presentation] et aux outils
+métiers des organismes de certification du bio en France.
 
 ## Fonctionnement
 
 ```shell
-npm run watch
+$ npm start
+```
+
+Et en développement :
+
+```shell
+$ npm run watch
 ```
 
 ### Routes
 
 | Chemin                       | Description
 | ---                          | ---
-| `/api/v1`                    | API CartoBio v1 (registre parcellaire bio)
-| `/espacecollaboratif`        | Redirige vers l'[espace collaboratif IGN][api-ign-collab]
-| `/notifications`             | Redirige vers les [notifications de l'Agence Bio][api-ab]
+| `/api/v1/version`            | Affiche la version de l'API.
+| `/api/v1/test`               | Teste le jeton d'authentification.
+| `/api/v1/parcels`            | Retourne la liste des parcelles associées au jeton d'authentification.
+
+L'authentification est assurée grâce à des [jetons JWT][jwt], issus à la main.
 
 
 ### Variables d'environnement
@@ -48,6 +58,9 @@ $ export NOTIFICATIONS_AB_ENDPOINT=https://preprod-notifications.agencebio.org:4
 $ npm test
 ```
 
+
+[CartoBio-Presentation]: https://github.com/entrepreneur-interet-general/CartoBio-Presentation/
+[jwt]: https://jwt.io/
 
 [api-ign-collab]: https://espacecollaboratif.ign.fr/api/doc
 [api-ab]: https://preprod-notification.agencebio.org/
