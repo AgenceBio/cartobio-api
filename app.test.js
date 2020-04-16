@@ -76,7 +76,7 @@ describe('GET /api/v1/summary', () => {
 })
 
 describe('GET /api/v1/parcels', () => {
-  test('responds with hardcoded parels', () => {
+  test('responds with hardcoded parcels', () => {
     return request(app)
       .get('/api/v1/parcels')
       .type('json')
@@ -94,6 +94,42 @@ describe('GET /api/v1/parcels', () => {
           numilot: 1,
           numerobio: 1
         })
+      })
+  })
+})
+
+describe('GET /api/v1/parcels/operator/:numero-bio', () => {
+  test('responds with hardcoded parcels', () => {
+    return request(app)
+      .get('/api/v1/parcels/operator/11')
+      .type('json')
+      .set('Authorization', USER_DOC_AUTH_TOKEN)
+      .then((response) => {
+        expect(response.status).toBe(200)
+        expect(response.header['content-type']).toBe('application/json; charset=utf-8')
+        expect(response.body).toHaveProperty('type', 'FeatureCollection')
+        expect(response.body.features).toHaveLength(1)
+        expect(response.body.features[0].properties).toMatchObject({
+          pacage: '026000003',
+          codecultu: 'BTH',
+          bio: 1,
+          numparcel: 1,
+          numilot: 1,
+          numerobio: 11
+        })
+      })
+  })
+
+  test('responds with an empty GeoJSON FeatureCollection', () => {
+    return request(app)
+      .get('/api/v1/parcels/operator/666')
+      .type('json')
+      .set('Authorization', USER_DOC_AUTH_TOKEN)
+      .then((response) => {
+        expect(response.status).toBe(200)
+        expect(response.header['content-type']).toBe('application/json; charset=utf-8')
+        expect(response.body).toHaveProperty('type', 'FeatureCollection')
+        expect(response.body.features).toHaveLength(0)
       })
   })
 })
