@@ -1,0 +1,39 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "pacage": "026000001",
+        "nom": "Nom Opérateur",
+        "numerobio": 1,
+        "departement": "26",
+        "active": true
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          5.242270244026442,
+          44.6261547076767
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "pacage": "026000002",
+        "numerobio": 12,
+        "nom": "Nom Opérateur 2",
+        "departement": "26",
+        "active": true
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          5.242270244026442,
+          44.6261547076767
+        ]
+      }
+    }
+  ]
+}

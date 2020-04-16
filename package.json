@@ -5,10 +5,11 @@
   "main": "app.js",
   "dependencies": {
     "@sentry/node": "^5.15.4",
+    "@turf/helpers": "^6.1.4",
+    "cors": "^2.8.5",
     "dotenv": "^8.2.0",
+    "fastify": "^2.13.1",
     "got": "^10.7.0",
-    "http-proxy": "^1.18.0",
-    "http-proxy-rules": "^1.1.3",
     "jsonwebtoken": "^8.5.1",
     "matomo-tracker": "^2.2.1",
     "p-limit": "^2.3.0",
@@ -31,11 +32,13 @@
     "supertest": "^4.0.2"
   },
   "scripts": {
-    "start": "node app.js",
-    "test": "NODE_ENV=test jest",
+    "start": "node -r dotenv/config app.js",
+    "build": "npm run build:departements-centroids",
+    "build:departements-centroids": "node bin/build-departements-centroids.js",
+    "test": "NODE_ENV=test jest --setupFiles dotenv/config",
     "pretest": "geojsonhint ./test/fixtures/parcels.json",
     "posttest": "eslint .",
-    "watch": "nodemon app.js"
+    "watch": "nodemon -r dotenv/config app.js"
   },
   "repository": {
     "type": "git",
