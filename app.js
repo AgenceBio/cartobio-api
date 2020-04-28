@@ -9,6 +9,7 @@ const Sentry = require('@sentry/node')
 
 const parcelsFixture = require('./test/fixtures/parcels.json')
 const summaryFixture = require('./test/fixtures/summary.json')
+const { featureCollection } = require('@turf/helpers')
 
 const { version: apiVersion } = require('./package.json')
 const JWT_SECRET = Buffer.from(process.env.CARTOBIO_JWT_SECRET, 'base64')
@@ -63,9 +64,7 @@ app.get('/api/v1/summary', protectedRouteOptions, (request, reply) => {
   }
 
   getOperatorSummary({ ocId })
-    .then(geojson => {
-      reply.code(200).send(geojson)
-    })
+    .then(geojson => reply.code(200).send(geojson))
     .catch(error => {
       request.log.error(`Failed to return summary for OC ${ocId} because of this error "%s"`, error.message)
       reportErrors && Sentry.captureException(error)
@@ -87,9 +86,32 @@ app.get('/api/v1/parcels', protectedRouteOptions, (request, reply) => {
   }
 
   getOperatorParcels({ ocId })
-    .then(geojson => {
-      reply.code(200).send(geojson)
+    .then(geojson => reply.code(200).send(geojson))
+    .catch(error => {
+      request.log.error(`Failed to return parcels for OC ${ocId} because of this error "%s"`, error.message)
+      reportErrors && Sentry.captureException(error)
+
+      reply.code(500).send({
+        error: 'Sorry, we failed to assemble parcels data. We have been notified about and will soon start fixing this issue.'
+      })
     })
+})
+
+app.get('/api/v1/parcels/operator/:numeroBio', protectedRouteOptions, (request, reply) => {
+  const { decodedToken, params } = request
+  const { test: isTest, ocId } = decodedToken
+  const { numeroBio } = params
+
+  track({ request, decodedToken })
+
+  if (isTest === true) {
+    return reply.code(200).send(
+      featureCollection(parcelsFixture.features.filter(({ properties }) => properties.numerobio === Number(numeroBio)))
+    )
+  }
+
+  getOperatorParcels({ ocId, numeroBio })
+    .then(geojson => reply.code(200).send(geojson))
     .catch(error => {
       request.log.error(`Failed to return parcels for OC ${ocId} because of this error "%s"`, error.message)
       reportErrors && Sentry.captureException(error)
