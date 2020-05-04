@@ -1,5 +1,6 @@
 const { server: app, close, ready } = require('.')
 const request = require('supertest')
+const { decode } = require('jsonwebtoken')
 
 const USER_DOC_AUTH_TOKEN = 'Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJvY0lkIjowLCJ0ZXN0Ijp0cnVlfQ.NL050Bt_jMnQ6WLcqIbmwGJkaDvZ0PIAZdCKTNF_-sSTiTw5cijPGm6TwUSCWEyQUMFvI1_La19TDPXsaemDow'
 
@@ -41,6 +42,35 @@ describe('GET /api/v1/test', () => {
         expect(response.status).toBe(200)
         expect(response.header['content-type']).toBe('application/json; charset=utf-8')
         expect(response.body).toHaveProperty('test', 'OK')
+      })
+  })
+})
+
+describe('GET /api/v1/login', () => {
+  test('fails with wrong credentials', () => {
+    return request(app)
+      .post('/api/v1/login')
+      .type('json')
+      .send({ email: 'blah', password: 'blah' })
+      .then((response) => {
+        expect(response.status).toBe(401)
+        expect(response.header['content-type']).toBe('application/json; charset=utf-8')
+        expect(response.body).toHaveProperty('error')
+      })
+  })
+
+  test('succeed with correct credentials', () => {
+    const { NOTIFICATIONS_AB_CARTOBIO_USER: email } = process.env
+    const { NOTIFICATIONS_AB_CARTOBIO_PASSWORD: password } = process.env
+
+    return request(app)
+      .post('/api/v1/login')
+      .type('json')
+      .send({ email, password })
+      .then((response) => {
+        expect(response.status).toBe(200)
+        expect(decode(response.body.cartobio)).toHaveProperty('userId', 1)
+        expect(response.header['content-type']).toBe('application/json; charset=utf-8')
       })
   })
 })
