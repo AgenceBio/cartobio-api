@@ -6,6 +6,7 @@ const app = require('fastify')({
 
 const cors = require('cors')
 const Sentry = require('@sentry/node')
+const { sign, decode } = require('jsonwebtoken')
 
 const parcelsFixture = require('./test/fixtures/parcels.json')
 const summaryFixture = require('./test/fixtures/summary.json')
@@ -16,6 +17,7 @@ const JWT_SECRET = Buffer.from(process.env.CARTOBIO_JWT_SECRET, 'base64')
 
 const { verify, track, enforceParams } = require('./lib/middlewares.js')
 const { getOperatorParcels, getOperatorSummary } = require('./lib/parcels.js')
+const { fetchAuthToken } = require('./lib/providers/agence-bio.js')
 const env = require('./lib/app.js').env()
 
 // Application is hosted on localhost:8000 by default
@@ -73,6 +75,32 @@ app.get('/api/v1/summary', protectedRouteOptions, (request, reply) => {
         error: 'Sorry, we failed to assemble summary data. We have been notified about and will soon start fixing this issue.'
       })
     })
+})
+
+app.post('/api/v1/login', (request, reply) => {
+  const { email, password: motDePasse } = request.body
+
+  const auth = fetchAuthToken({ email, motDePasse })
+
+  auth.catch(error => {
+    reply.code(401).send({ error })
+  })
+
+  auth.then(token => {
+    const decodedToken = decode(token)
+    const { id: userId, organismeCertificateurId: ocId } = decodedToken
+    const { organismeCertificateur = {} } = decodedToken
+
+    reply.code(200).send({
+      agencebio: token,
+      cartobio: sign({
+        userId,
+        ocId,
+        organismeCertificateur,
+        iat: Math.floor(Date.now() / 1000)
+      }, JWT_SECRET, { expiresIn: '14d' })
+    })
+  }, error => reportErrors && Sentry.captureException(error))
 })
 
 app.get('/api/v1/parcels', protectedRouteOptions, (request, reply) => {
