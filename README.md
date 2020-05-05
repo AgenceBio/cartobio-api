@@ -5,6 +5,12 @@
 Elle a vocation à être intégrée à [CartoBio-Presentation] et aux outils
 métiers des organismes de certification du bio en France.
 
+**Table des matières**
+
+- Fonctionnement
+- Variables d'environnement
+- [Générer un token d'API](#generer-un-token-dapi)
+
 ## Fonctionnement
 
 ```shell
@@ -19,11 +25,14 @@ $ npm run watch
 
 ### Routes
 
-| Chemin                       | Description
-| ---                          | ---
-| `/api/v1/version`            | Affiche la version de l'API.
-| `/api/v1/test`               | Teste le jeton d'authentification.
-| `/api/v1/parcels`            | Retourne la liste des parcelles associées au jeton d'authentification.
+| Chemin                          | Description
+| ---                             | ---
+| `/api/v1/version`               | Affiche la version de l'API.
+| `/api/v1/test`                  | Teste le jeton d'authentification.
+| `/api/v1/login`                 | S'authentifie auprès du portail Notification de l'Agence Bio — et de l'API CartoBio.
+| `/api/v1/summary`               | Liste géolocalisée (précision : département) des clients d'un Organisme de Certification.
+| `/api/v1/parcels`               | Liste des parcelles des clients d'un Organisme de Certification.
+| `/api/v1/parcels/operator/:id`  | Liste des parcelles d'un opérateur donné.
 
 L'authentification est assurée grâce à des [jetons JWT][jwt], issus à la main.
 
@@ -56,6 +65,36 @@ $ export ESPACE_COLLABORATIF_BASIC_AUTH=…
 $ export NOTIFICATIONS_AB_ENDPOINT=https://preprod-notifications.agencebio.org:444/
 
 $ npm test
+```
+
+# Manuel d'utilisation
+
+
+## Générer un token d'API
+
+L'`ocId` s'obtient à partir de la route `portail/organismesCertificateurs` de l'API Notification de l'Agence Bio.
+
+1. Se rendre sur [jwt.io](https://jwt.io/) ;
+2. Créer un `payload` qui suit ce schéma :
+```json
+{
+  "ocId": <Number>
+}
+```
+3. Renseigner le "secret" (quelqu'un dans l'équipe l'a), et cocher la case `secret base64 encoded` ;
+4. Renseigner ces éléments dans la feuille `Demandes d'accès aux données (fichiers et API)` ;
+5. Tester ce token avec la route `api/v1/test` pour s'assurer de la qualité du token à transmettre ;
+6. Transmettre le token à l'Organisme Certificateur (via un [lien ](), par exemple).
+
+🙌 Bravo !
+
+## Renouveler le secret 256
+
+**Attention** : changer le secret oblige à émettre de nouveaux tokens pour tous les Organismes de Certification.<br>
+Tous les tokens précédemment émis ne seront plus fonctionnels.
+
+```bash
+$ npx vpg --length 256 | base64
 ```
 
 
