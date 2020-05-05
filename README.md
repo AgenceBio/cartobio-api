@@ -5,11 +5,12 @@
 Elle a vocation à être intégrée à [CartoBio-Presentation] et aux outils
 métiers des organismes de certification du bio en France.
 
-**Table des matières**
+**📚 Table des matières**
 
-- Fonctionnement
-- Variables d'environnement
-- [Générer un token d'API](#generer-un-token-dapi)
+- [Fonctionnement](#fonctionnement)
+- [Variables d'environnement](#variables-denvironnement)
+- [**Manuel d'utilisation**](#manuel-dutilisation)
+  - [Générer un token d'API](#générer-un-token-dapi)
 
 ## Fonctionnement
 
