@@ -6,6 +6,7 @@ const app = require('fastify')({
 
 const cors = require('cors')
 const Sentry = require('@sentry/node')
+const { sign } = require('jsonwebtoken')
 
 const parcelsFixture = require('./test/fixtures/parcels.json')
 const summaryFixture = require('./test/fixtures/summary.json')
@@ -16,6 +17,7 @@ const JWT_SECRET = Buffer.from(process.env.CARTOBIO_JWT_SECRET, 'base64')
 
 const { verify, track, enforceParams } = require('./lib/middlewares.js')
 const { getOperatorParcels, getOperatorSummary } = require('./lib/parcels.js')
+const { fetchAuthToken, fetchUserProfile } = require('./lib/providers/agence-bio.js')
 const env = require('./lib/app.js').env()
 
 // Application is hosted on localhost:8000 by default
@@ -39,7 +41,10 @@ app.use(cors({
 // Routes to protect with a JSON Web Token
 app.decorateRequest('decodedToken', {})
 const protectedRouteOptions = {
-  preValidation: [verify({ JWT_SECRET }), enforceParams('ocId')]
+  preValidation: [
+    verify({ JWT_SECRET }),
+    enforceParams('ocId')
+  ]
 }
 
 app.get('/api/v1/version', (request, reply) => {
@@ -73,6 +78,34 @@ app.get('/api/v1/summary', protectedRouteOptions, (request, reply) => {
         error: 'Sorry, we failed to assemble summary data. We have been notified about and will soon start fixing this issue.'
       })
     })
+})
+
+app.post('/api/v1/login', (request, reply) => {
+  const { email, password: motDePasse } = request.body
+
+  const auth = fetchAuthToken({ email, motDePasse })
+
+  auth.catch(({ message: error }) => reply.code(401).send({ error }))
+
+  auth
+    .then(token => fetchUserProfile(token))
+    .then(({ userProfile, token }) => {
+      reply.code(200).send({
+        // to maintain backwards compat with direct calls to Agence Bio API
+        agencebio: token,
+        // to use user data straight from CartoBio-Presentation
+        // without additional API calls
+        cartobio: sign({
+          ...userProfile,
+          userId: userProfile.id,
+          ocId: userProfile.organismeCertificateurId,
+          organismeCertificateur: userProfile.organismeCertificateur || {}
+        // for now we will bind the token to the AgenceBio expiry
+        //  iat: Math.floor(Date.now() / 1000)
+        // }, JWT_SECRET, { expiresIn: '14d' })
+        }, JWT_SECRET)
+      })
+    }, error => reportErrors && Sentry.captureException(error))
 })
 
 app.get('/api/v1/parcels', protectedRouteOptions, (request, reply) => {
@@ -128,7 +161,7 @@ if (require.main === module) {
       return console.error(error)
     }
 
-    console.log(`Running on http://${address}`)
+    console.log(`Running on ${address}`)
   })
 }
 
