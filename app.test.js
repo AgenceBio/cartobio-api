@@ -33,11 +33,23 @@ describe('GET /api/v1/test', () => {
       })
   })
 
-  test('responds well', () => {
+  test('responds well with an Authorization header', () => {
     return request(app)
       .get('/api/v1/test')
       .type('json')
       .set('Authorization', USER_DOC_AUTH_TOKEN)
+      .then((response) => {
+        expect(response.status).toBe(200)
+        expect(response.header['content-type']).toBe('application/json; charset=utf-8')
+        expect(response.body).toHaveProperty('test', 'OK')
+      })
+  })
+
+  test('responds well with an access_token query string', () => {
+    return request(app)
+      .get('/api/v1/test')
+      .query({ access_token: USER_DOC_AUTH_TOKEN })
+      .type('json')
       .then((response) => {
         expect(response.status).toBe(200)
         expect(response.header['content-type']).toBe('application/json; charset=utf-8')
