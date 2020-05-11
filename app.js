@@ -41,6 +41,11 @@ app.use(cors({
 // Routes to protect with a JSON Web Token
 app.decorateRequest('decodedToken', {})
 const protectedRouteOptions = {
+  schema: {
+    querystring: {
+      access_token: { type: 'string' }
+    }
+  },
   preValidation: [
     verify({ JWT_SECRET }),
     enforceParams('ocId')
