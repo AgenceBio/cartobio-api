@@ -2,7 +2,8 @@ const { server: app, close, ready } = require('.')
 const request = require('supertest')
 const { decode } = require('jsonwebtoken')
 
-const USER_DOC_AUTH_TOKEN = 'Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJvY0lkIjowLCJ0ZXN0Ijp0cnVlfQ.NL050Bt_jMnQ6WLcqIbmwGJkaDvZ0PIAZdCKTNF_-sSTiTw5cijPGm6TwUSCWEyQUMFvI1_La19TDPXsaemDow'
+const USER_DOC_AUTH_TOKEN = 'eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJvY0lkIjowLCJ0ZXN0Ijp0cnVlfQ.NL050Bt_jMnQ6WLcqIbmwGJkaDvZ0PIAZdCKTNF_-sSTiTw5cijPGm6TwUSCWEyQUMFvI1_La19TDPXsaemDow'
+const USER_DOC_AUTH_HEADER = `Bearer ${USER_DOC_AUTH_TOKEN}`
 
 // start and stop server
 beforeAll(() => ready())
@@ -33,11 +34,23 @@ describe('GET /api/v1/test', () => {
       })
   })
 
-  test('responds well', () => {
+  test('responds well with an Authorization header', () => {
     return request(app)
       .get('/api/v1/test')
       .type('json')
-      .set('Authorization', USER_DOC_AUTH_TOKEN)
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+      .then((response) => {
+        expect(response.status).toBe(200)
+        expect(response.header['content-type']).toBe('application/json; charset=utf-8')
+        expect(response.body).toHaveProperty('test', 'OK')
+      })
+  })
+
+  test('responds well with an access_token query string', () => {
+    return request(app)
+      .get('/api/v1/test')
+      .query({ access_token: USER_DOC_AUTH_TOKEN })
+      .type('json')
       .then((response) => {
         expect(response.status).toBe(200)
         expect(response.header['content-type']).toBe('application/json; charset=utf-8')
@@ -80,7 +93,7 @@ describe('GET /api/v1/summary', () => {
     return request(app)
       .get('/api/v1/summary')
       .type('json')
-      .set('Authorization', USER_DOC_AUTH_TOKEN)
+      .set('Authorization', USER_DOC_AUTH_HEADER)
       .then((response) => {
         expect(response.status).toBe(200)
         expect(response.header['content-type']).toBe('application/json; charset=utf-8')
@@ -110,7 +123,7 @@ describe('GET /api/v1/parcels', () => {
     return request(app)
       .get('/api/v1/parcels')
       .type('json')
-      .set('Authorization', USER_DOC_AUTH_TOKEN)
+      .set('Authorization', USER_DOC_AUTH_HEADER)
       .then((response) => {
         expect(response.status).toBe(200)
         expect(response.header['content-type']).toBe('application/json; charset=utf-8')
@@ -133,7 +146,7 @@ describe('GET /api/v1/parcels/operator/:numero-bio', () => {
     return request(app)
       .get('/api/v1/parcels/operator/11')
       .type('json')
-      .set('Authorization', USER_DOC_AUTH_TOKEN)
+      .set('Authorization', USER_DOC_AUTH_HEADER)
       .then((response) => {
         expect(response.status).toBe(200)
         expect(response.header['content-type']).toBe('application/json; charset=utf-8')
@@ -154,7 +167,7 @@ describe('GET /api/v1/parcels/operator/:numero-bio', () => {
     return request(app)
       .get('/api/v1/parcels/operator/666')
       .type('json')
-      .set('Authorization', USER_DOC_AUTH_TOKEN)
+      .set('Authorization', USER_DOC_AUTH_HEADER)
       .then((response) => {
         expect(response.status).toBe(200)
         expect(response.header['content-type']).toBe('application/json; charset=utf-8')
