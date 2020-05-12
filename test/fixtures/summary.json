@@ -7,6 +7,8 @@
         "pacage": "026000001",
         "nom": "Nom Opérateur",
         "numerobio": 1,
+        "date_engagement": "2020-04-28",
+        "date_maj": "2020-05-12",
         "departement": "26",
         "active": true
       },
@@ -24,6 +26,8 @@
         "pacage": "026000002",
         "numerobio": 12,
         "nom": "Nom Opérateur 2",
+        "date_engagement": null,
+        "date_maj": "2020-05-12",
         "departement": "26",
         "active": true
       },

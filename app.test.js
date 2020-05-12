@@ -99,15 +99,17 @@ describe('GET /api/v1/summary', () => {
         expect(response.header['content-type']).toBe('application/json; charset=utf-8')
         expect(response.body).toHaveProperty('type', 'FeatureCollection')
         expect(response.body.features).toHaveLength(2)
-        expect(response.body.features[0].properties).toMatchObject({
+        expect(response.body.features[0].properties).toStrictEqual({
           pacage: '026000001',
           numerobio: 1,
           nom: 'Nom Opérateur',
+          date_engagement: '2020-04-28',
+          date_maj: '2020-05-12',
           departement: '26',
           active: true
         })
 
-        expect(response.body.features[1].geometry).toMatchObject({
+        expect(response.body.features[1].geometry).toStrictEqual({
           type: 'Point',
           coordinates: [
             5.242270244026442,
