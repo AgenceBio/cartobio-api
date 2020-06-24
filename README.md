@@ -40,12 +40,13 @@ L'authentification est assurée grâce à des [jetons JWT][jwt], issus à la mai
 
 ### Variables d'environnement
 
-**Remarque** : l'application sait lire les variables définies dans un fichier `.env`.
+L'application lit les variables définies dans un fichier `.env`.
 
 | Variable                            | Défault                                   | Description
 | ---                                 | ---                                       | ---
 | `PORT`                              | `8000`                                    | Port réseau sur lequel exposer l'application
 | `HOST`                              | `localhost`                               | Interface réseau sur laquelle exposer l'application
+| `DATABASE_URL`                      | `http://localhost:5432/cartobio`          | URL de la base de données PostGIS qui contient les couches géographiques, et les données métiers CartoBio
 | `MATOMO_TRACKER_URL`                | `https://stats.data.gouv.fr/piwik.php`    | Endpoint du suivi statistiques Matomo
 | `MATOMO_SITE_ID`                    | `116`                                     | Identifiant de site, pour le suivi des statistiques
 | `SENTRY_DSN`                        | ``                                        | DSN Sentry pour le suivi des erreurs applicatives
