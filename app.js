@@ -20,6 +20,8 @@ const { getOperatorParcels, getOperatorSummary } = require('./lib/parcels.js')
 const { fetchAuthToken, fetchUserProfile } = require('./lib/providers/agence-bio.js')
 const env = require('./lib/app.js').env()
 
+const db = require('./lib/db.js')
+
 // Application is hosted on localhost:8000 by default
 const { PORT, HOST, SENTRY_DSN, NODE_ENV } = env
 const reportErrors = SENTRY_DSN && NODE_ENV === 'production'
@@ -161,13 +163,18 @@ app.get('/api/v1/parcels/operator/:numeroBio', protectedRouteOptions, (request, 
 })
 
 if (require.main === module) {
-  app.listen(PORT, HOST, (error, address) => {
-    if (error) {
-      return console.error(error)
-    }
+  db.query('SHOW server_version;').then(({ rows }) => {
+    const { server_version: pgVersion } = rows[0]
+    console.log(`Postgres connection established, v${pgVersion}`)
 
-    console.log(`Running on ${address}`)
-  })
+    app.listen(PORT, HOST, (error, address) => {
+      if (error) {
+        return console.error(error)
+      }
+
+      console.log(`Running env:${NODE_ENV} on ${address}`)
+    })
+  }, () => console.error('Failed to connect to database'))
 }
 
 module.exports = app

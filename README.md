@@ -46,7 +46,7 @@ L'application lit les variables définies dans un fichier `.env`.
 | ---                                 | ---                                       | ---
 | `PORT`                              | `8000`                                    | Port réseau sur lequel exposer l'application
 | `HOST`                              | `localhost`                               | Interface réseau sur laquelle exposer l'application
-| `DATABASE_URL`                      | `http://localhost:5432/cartobio`          | URL de la base de données PostGIS qui contient les couches géographiques, et les données métiers CartoBio
+| `DATABASE_URL`                      | `http://docker:docker@api-db:15432/cartobio`| URL de la base de données PostGIS qui contient les couches géographiques, et les données métiers CartoBio
 | `MATOMO_TRACKER_URL`                | `https://stats.data.gouv.fr/piwik.php`    | Endpoint du suivi statistiques Matomo
 | `MATOMO_SITE_ID`                    | `116`                                     | Identifiant de site, pour le suivi des statistiques
 | `SENTRY_DSN`                        | ``                                        | DSN Sentry pour le suivi des erreurs applicatives
@@ -67,6 +67,13 @@ $ export ESPACE_COLLABORATIF_BASIC_AUTH=…
 $ export NOTIFICATIONS_AB_ENDPOINT=https://preprod-notifications.agencebio.org:444/
 
 $ npm test
+```
+
+## Développer localement
+
+```bash
+$ docker-compose run --name api-db --publish=127.0.0.1:15432:5432 --detach db
+$ npm run watch
 ```
 
 # Manuel d'utilisation

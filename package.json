@@ -7,13 +7,16 @@
     "@sentry/node": "^5.15.5",
     "@turf/helpers": "^6.1.4",
     "cors": "^2.8.5",
+    "db-migrate": "^0.11.11",
+    "db-migrate-pg": "^1.2.2",
     "dotenv": "^8.2.0",
     "fastify": "^2.13.1",
     "got": "^10.7.0",
     "jsonwebtoken": "^8.5.1",
     "matomo-tracker": "^2.2.1",
     "p-limit": "^2.3.0",
-    "p-memoize": "^4.0.0"
+    "p-memoize": "^4.0.0",
+    "pg": "^8.2.1"
   },
   "engines": {
     "node": ">=12"
@@ -32,12 +35,14 @@
     "supertest": "^4.0.2"
   },
   "scripts": {
+    "prestart": "node -r dotenv/config ./node_modules/.bin/db-migrate up",
     "start": "node -r dotenv/config app.js",
     "build": "npm run build:departements-centroids",
     "build:departements-centroids": "node bin/build-departements-centroids.js",
     "test": "NODE_ENV=test jest --setupFiles dotenv/config",
     "pretest": "geojsonhint ./test/fixtures/parcels.json",
-    "posttest": "eslint .",
+    "posttest": "eslint --ignore-pattern 'migrations/*' .",
+    "prewatch": "node -r dotenv/config ./node_modules/.bin/db-migrate up",
     "watch": "nodemon -r dotenv/config app.js"
   },
   "repository": {
