@@ -76,6 +76,25 @@ $ docker-compose run --name api-db --publish=127.0.0.1:15432:5432 --detach db
 $ npm run watch
 ```
 
+Le démarrage du serveur lance automatiquement les migrations du schéma de base de données.
+
+---
+
+Pour avoir quelques données en base :
+
+```bash
+$ ./node_modules/.bin/db-migrate up:fixtures
+```
+
+Et pour les retirer :
+
+```bash
+$ ./node_modules/.bin/db-migrate down:fixtures
+```
+
+💡 [**db-migrate**](https://db-migrate.readthedocs.io/en/latest/) : se réferrer
+    à sa documentation pour en savoir plus sur les commandes et les API de migration.
+
 # Manuel d'utilisation
 
 
