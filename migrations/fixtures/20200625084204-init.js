@@ -15,17 +15,17 @@ exports.setup = function (options, seedLink) {
 }
 
 const fixtures = [
-  [270, null],
-  [385, ''],
-  [28, '033167666']
+  [270, {}],
+  [385, { numeroPacage: '' }],
+  [28, { numeroPacage: '033167666' }]
 ]
 
 exports.up = function (db) {
   return Promise.all([
     // ecocert, ocid:1
-    db.insert('cartobio_operators', ['numerobio', 'pacage'], fixtures[0]),
-    db.insert('cartobio_operators', ['numerobio', 'pacage'], fixtures[1]),
-    db.insert('cartobio_operators', ['numerobio', 'pacage'], fixtures[2])
+    db.insert('cartobio_operators', ['numerobio', 'metadata'], fixtures[0]),
+    db.insert('cartobio_operators', ['numerobio', 'metadata'], fixtures[1]),
+    db.insert('cartobio_operators', ['numerobio', 'metadata'], fixtures[2])
   ])
 }
 

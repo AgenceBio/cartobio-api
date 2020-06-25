@@ -18,9 +18,10 @@ exports.up = function (db) {
       unsigned: true,
       notNull: true
     },
-    pacage: {
-      type: 'string',
-      notNull: false
+    metadata: {
+      type: 'jsonb',
+      /* eslint-disable-next-line quotes */
+      defaultValue: String(`'{}'::jsonb`)
     }
   })
 }

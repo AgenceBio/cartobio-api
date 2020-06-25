@@ -22,14 +22,15 @@ services:
     - external
 
   db:
-    image: kartoza/postgis:9.6-2.4
+    image: kartoza/postgis:9.4-2.1
     volumes:
       - geo-db-data:/var/lib/postgresql
     restart: on-failure
     healthcheck:
       test: "exit 0"
-    environment:
-      ALLOW_IP_RANGE: "0.0.0.0/0" # we need that to allow 'geoserver' and 'api' to connect
+    command: sh -c "echo \"host all all 0.0.0.0/0 md5\" >> /etc/postgresql/9.4/main/pg_hba.conf && /start-postgis.sh"
+    # environment:
+    #   ALLOW_IP_RANGE: "0.0.0.0/0" # we need that to allow 'geoserver' and 'api' to connect
     networks:
     - internal
 

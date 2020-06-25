@@ -26,14 +26,15 @@ $ npm run watch
 
 ### Routes
 
-| Chemin                          | Description
-| ---                             | ---
-| `/api/v1/version`               | Affiche la version de l'API.
-| `/api/v1/test`                  | Teste le jeton d'authentification.
-| `/api/v1/login`                 | S'authentifie auprès du portail Notification de l'Agence Bio — et de l'API CartoBio.
-| `/api/v1/summary`               | Liste géolocalisée (précision : département) des clients d'un Organisme de Certification.
-| `/api/v1/parcels`               | Liste des parcelles des clients d'un Organisme de Certification.
-| `/api/v1/parcels/operator/:id`  | Liste des parcelles d'un opérateur donné.
+| Verbe   | Chemin                          | Description
+| ---     | ---                             | ---
+| `GET`   | `/api/v1/version`               | Affiche la version de l'API.
+| `POST`  | `/api/v1/test`                  | Teste le jeton d'authentification.
+| `POST`  | `/api/v1/login`                 | S'authentifie auprès du portail Notification de l'Agence Bio — et de l'API CartoBio.
+| `PATCH` | `/api/v1/operator/:numeroBio`   | Mise à jour partielle des données opérateur (numéro pacage présent/absent, etc.)
+| `GET`   | `/api/v1/summary`               | Liste géolocalisée (précision : département) des clients d'un Organisme de Certification.
+| `GET`   | `/api/v1/parcels`               | Liste des parcelles des clients d'un Organisme de Certification.
+| `GET`   | `/api/v1/parcels/operator/:id`  | Liste des parcelles d'un opérateur donné.
 
 L'authentification est assurée grâce à des [jetons JWT][jwt], issus à la main.
 
@@ -63,8 +64,7 @@ Les test utilisent [Jest] et [supertest] pour leur organisation,
 et pour lancer les appels HTTP.
 
 ```shell
-$ export ESPACE_COLLABORATIF_BASIC_AUTH=…
-$ export NOTIFICATIONS_AB_ENDPOINT=https://preprod-notifications.agencebio.org:444/
+$ export CARTOBIO_JWT_SECRET=…
 
 $ npm test
 ```

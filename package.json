@@ -9,6 +9,7 @@
     "cors": "^2.8.5",
     "db-migrate": "^0.11.11",
     "db-migrate-pg": "^1.2.2",
+    "deepmerge": "^4.2.2",
     "dotenv": "^8.2.0",
     "fastify": "^2.13.1",
     "got": "^10.7.0",

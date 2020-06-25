@@ -7,6 +7,7 @@ const app = require('fastify')({
 const cors = require('cors')
 const Sentry = require('@sentry/node')
 const { sign } = require('jsonwebtoken')
+const deepmerge = require('deepmerge')
 
 const parcelsFixture = require('./test/fixtures/parcels.json')
 const summaryFixture = require('./test/fixtures/summary.json')
@@ -18,7 +19,10 @@ const JWT_SECRET = Buffer.from(process.env.CARTOBIO_JWT_SECRET, 'base64')
 const { verify, track, enforceParams } = require('./lib/middlewares.js')
 const { getOperatorParcels, getOperatorSummary } = require('./lib/parcels.js')
 const { fetchAuthToken, fetchUserProfile } = require('./lib/providers/agence-bio.js')
+const { updateOperator } = require('./lib/providers/cartobio.js')
 const env = require('./lib/app.js').env()
+
+const { operatorSchema } = require('./lib/routes/operators.js')
 
 const db = require('./lib/db.js')
 
@@ -65,30 +69,6 @@ app.get('/api/v1/test', protectedRouteOptions, (request, reply) => {
   return reply.send({ test: 'OK' })
 })
 
-app.get('/api/v1/summary', protectedRouteOptions, (request, reply) => {
-  const { decodedToken } = request
-  const { test: isTest, ocId } = decodedToken
-
-  track({ request, decodedToken })
-
-  if (isTest === true) {
-    return reply.code(200).send(summaryFixture)
-  }
-
-  getOperatorSummary({ ocId })
-    .then(geojson => reply.code(200).send(geojson))
-    .catch(error => {
-      request.log.error(`Failed to return summary for OC ${ocId} because of this error "%s"`, error.message)
-      request.log.debug(error.stack)
-
-      reportErrors && Sentry.captureException(error)
-
-      reply.code(500).send({
-        error: 'Sorry, we failed to assemble summary data. We have been notified about and will soon start fixing this issue.'
-      })
-    })
-})
-
 app.post('/api/v1/login', (request, reply) => {
   const { email, password: motDePasse } = request.body
 
@@ -115,6 +95,50 @@ app.post('/api/v1/login', (request, reply) => {
         }, JWT_SECRET)
       })
     }, error => reportErrors && Sentry.captureException(error))
+})
+
+app.get('/api/v1/summary', protectedRouteOptions, (request, reply) => {
+  const { decodedToken } = request
+  const { test: isTest, ocId } = decodedToken
+
+  // track({ request, decodedToken })
+
+  if (isTest === true) {
+    return reply.code(200).send(summaryFixture)
+  }
+
+  getOperatorSummary({ ocId })
+    .then(geojson => reply.code(200).send(geojson))
+    .catch(error => {
+      request.log.error(`Failed to return summary for OC ${ocId} because of this error "%s"`, error.message)
+      request.log.debug(error.stack)
+
+      reportErrors && Sentry.captureException(error)
+
+      reply.code(500).send({
+        error: 'Sorry, we failed to assemble summary data. We have been notified about and will soon start fixing this issue.'
+      })
+    })
+})
+
+app.patch('/api/v1/operator/:numeroBio', deepmerge(protectedRouteOptions, { schema: operatorSchema }), (request, reply) => {
+  const { decodedToken, body } = request
+  const { ocId } = decodedToken
+  const { numeroBio } = request.params
+
+  // track({ request, decodedToken })
+
+  updateOperator({ numeroBio, ocId }, body)
+    .then(() => getOperatorSummary({ numeroBio, ocId }))
+    .then(geojson => reply.code(200).send(geojson))
+    .catch(error => {
+      request.log.error(`Failed to update operator ${numeroBio} for OC ${ocId} because of this error "%s"`, error.message)
+      reportErrors && Sentry.captureException(error)
+
+      reply.code(500).send({
+        error: 'Sorry, we failed to update operator data. We have been notified about and will soon start fixing this issue.'
+      })
+    })
 })
 
 app.get('/api/v1/parcels', protectedRouteOptions, (request, reply) => {
