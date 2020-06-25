@@ -79,6 +79,8 @@ app.get('/api/v1/summary', protectedRouteOptions, (request, reply) => {
     .then(geojson => reply.code(200).send(geojson))
     .catch(error => {
       request.log.error(`Failed to return summary for OC ${ocId} because of this error "%s"`, error.message)
+      request.log.debug(error.stack)
+
       reportErrors && Sentry.captureException(error)
 
       reply.code(500).send({
