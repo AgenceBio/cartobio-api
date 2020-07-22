@@ -5,12 +5,19 @@
 Elle a vocation à être intégrée à [CartoBio-Presentation] et aux outils
 métiers des organismes de certification du bio en France.
 
+**Pré-requis** : `node@14`, `postgres@9.4`, `postgis@2.1`.
+
 **📚 Table des matières**
 
-- [Fonctionnement](#fonctionnement)
-- [Variables d'environnement](#variables-denvironnement)
-- [**Manuel d'utilisation**](#manuel-dutilisation)
+- [CartoBio-API](#cartobio-api)
+  - [Fonctionnement](#fonctionnement)
+    - [Routes](#routes)
+    - [Variables d'environnement](#variables-denvironnement)
+  - [Tests](#tests)
+  - [Développer localement](#développer-localement)
+- [Manuel d'utilisation](#manuel-dutilisation)
   - [Générer un token d'API](#générer-un-token-dapi)
+  - [Renouveler le secret 256](#renouveler-le-secret-256)
 
 ## Fonctionnement
 
@@ -31,6 +38,7 @@ $ npm run watch
 | `GET`   | `/api/v1/version`               | Affiche la version de l'API.
 | `POST`  | `/api/v1/test`                  | Teste le jeton d'authentification.
 | `POST`  | `/api/v1/login`                 | S'authentifie auprès du portail Notification de l'Agence Bio — et de l'API CartoBio.
+| `GET`   | `/api/v1/pacage/:numeroPacage`  | Vérification de l'existence d'un PACAGE
 | `PATCH` | `/api/v1/operator/:numeroBio`   | Mise à jour partielle des données opérateur (numéro pacage présent/absent, etc.)
 | `GET`   | `/api/v1/summary`               | Liste géolocalisée (précision : département) des clients d'un Organisme de Certification.
 | `GET`   | `/api/v1/parcels`               | Liste des parcelles des clients d'un Organisme de Certification.

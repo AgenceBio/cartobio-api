@@ -20,6 +20,7 @@ const { verify, track, enforceParams } = require('./lib/middlewares.js')
 const { getOperatorParcels, getOperatorSummary } = require('./lib/parcels.js')
 const { fetchAuthToken, fetchUserProfile } = require('./lib/providers/agence-bio.js')
 const { updateOperator } = require('./lib/providers/cartobio.js')
+const { createCard } = require('./lib/services/trello.js')
 const env = require('./lib/app.js').env()
 
 const { operatorSchema } = require('./lib/routes/operators.js')
@@ -29,6 +30,7 @@ const db = require('./lib/db.js')
 // Application is hosted on localhost:8000 by default
 const { PORT, HOST, SENTRY_DSN, NODE_ENV } = env
 const reportErrors = SENTRY_DSN && NODE_ENV === 'production'
+const MEGABYTE = 1048576
 
 // Sentry error reporting setup
 if (SENTRY_DSN) {
@@ -186,6 +188,35 @@ app.get('/api/v1/parcels/operator/:numeroBio', protectedRouteOptions, (request, 
         error: 'Sorry, we failed to assemble parcels data. We have been notified about and will soon start fixing this issue.'
       })
     })
+})
+
+app.post('/api/v1/parcels/operator/:numeroBio', deepmerge(protectedRouteOptions, { bodyLimit: 16 * MEGABYTE }), async (request, reply) => {
+  const { numeroBio } = request.params
+  const { sender, uploads, text } = request.body
+  const { TRELLO_API_KEY: key, TRELLO_API_TOKEN: token, TRELLO_LIST_ID: idList } = env
+
+  try {
+    await createCard({
+      key,
+      token,
+      idList,
+      uploads,
+      name: `Parcelles pour l'opérateur bio n°${numeroBio}`,
+      desc: `Envoyé par ${sender.userName} • OC ${sender.ocId} (#${sender.userId}, ${sender.userEmail})
+  ----
+
+  ${text}`
+    })
+
+    reply.code(204).send()
+  } catch (error) {
+    request.log.error('Failed to send email because of this error "%s"', error.message)
+    reportErrors && Sentry.captureException(error)
+
+    reply.code(500).send({
+      error: 'Sorry, we failed to process your message. We have been notified about and will soon start fixing this issue.'
+    })
+  }
 })
 
 if (require.main === module) {
