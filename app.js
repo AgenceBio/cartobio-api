@@ -17,7 +17,7 @@ const JWT_SECRET = Buffer.from(process.env.CARTOBIO_JWT_SECRET, 'base64')
 
 const { verify, track, enforceParams } = require('./lib/middlewares.js')
 const { getOperatorParcels, getOperatorSummary } = require('./lib/parcels.js')
-const { fetchAuthToken, fetchUserProfile } = require('./lib/providers/agence-bio.js')
+const { fetchAuthToken, fetchUserProfile, getCertificationBodyForPacage } = require('./lib/providers/agence-bio.js')
 const { updateOperator } = require('./lib/providers/cartobio.js')
 const { createCard } = require('./lib/services/trello.js')
 const env = require('./lib/app.js').env()
@@ -118,6 +118,26 @@ app.get('/api/v1/summary', protectedRouteOptions, (request, reply) => {
 
       reply.code(500).send({
         error: 'Sorry, we failed to assemble summary data. We have been notified about and will soon start fixing this issue.'
+      })
+    })
+})
+
+/**
+ * @todo lookup for PACAGE stored in the `cartobio_operators` table
+ */
+app.get('/api/v1/pacage/:numeroPacage', protectedRouteOptions, (request, reply) => {
+  const { numeroPacage } = request.params
+
+  getCertificationBodyForPacage({ numeroPacage })
+    .then(({ ocId, numeroBio } = {}) => {
+      return reply.code(200).send({ numeroPacage, numeroBio, ocId })
+    })
+    .catch(error => {
+      request.log.error(`Failed to fetch ocId for ${numeroPacage} because of this error "%s"`, error.message)
+      reportErrors && Sentry.captureException(error)
+
+      reply.code(500).send({
+        error: 'Sorry, we failed to retrieve operator data. We have been notified about and will soon start fixing this issue.'
       })
     })
 })

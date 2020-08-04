@@ -43,6 +43,7 @@ $ npm run watch
 | `GET`   | `/api/v1/summary`               | Liste géolocalisée (précision : département) des clients d'un Organisme de Certification.
 | `GET`   | `/api/v1/parcels`               | Liste des parcelles des clients d'un Organisme de Certification.
 | `GET`   | `/api/v1/parcels/operator/:id`  | Liste des parcelles d'un opérateur donné.
+| `POST`   | `/api/v1/parcels/operator/:id`  | Réceptionne les parcelles envoyées par les utilisateurs (utilise Trello comme backend et triage des données)
 
 L'authentification est assurée grâce à des [jetons JWT][jwt], issus à la main.
 
@@ -65,6 +66,9 @@ L'application lit les variables définies dans un fichier `.env`.
 | `NOTIFICATIONS_AB_CARTOBIO_PASSWORD`| ``                                        | Mot de passe associé au compte Agence Bio
 | `ESPACE_COLLABORATIF_ENDPOINT`      | `https://espacecollaboratif.ign.fr`       | Point d'accès à l'[API Espace Collaboratif d'IGN][api-ign-collab]
 | `NOTIFICATIONS_AB_ENDPOINT`         | `https://back.agencebio.org`              | Point d'accès aux [notifications de l'Agence Bio][api-ab]
+| `TRELLO_API_KEY`                    | | [Trello Developer API Key]
+| `TRELLO_API_TOKEN`                  | | Trello Developer App token, generated via the above link
+| `TRELLO_LIST_ID`                    | `5f1e8c0f9b9a9a4fd5866a22` | The list Id (according to Trello API) to stash new contact submissions into
 
 ## Tests
 
@@ -139,6 +143,7 @@ $ npx vpg --length 256 | base64
 
 [api-ign-collab]: https://espacecollaboratif.ign.fr/api/doc
 [api-ab]: https://preprod-notification.agencebio.org/
+[Trello Developer API Key]: https://trello.com/app-key
 
 [Jest]: https://jestjs.io/docs/en/getting-started
 [supertest]: https://github.com/visionmedia/supertest#readme
