@@ -4,7 +4,6 @@ const app = require('fastify')({
   logger: true
 })
 
-const cors = require('cors')
 const Sentry = require('@sentry/node')
 const { sign } = require('jsonwebtoken')
 const deepmerge = require('deepmerge')
@@ -41,7 +40,7 @@ if (SENTRY_DSN) {
 }
 
 // Configure server
-app.use(cors({
+app.register(require('fastify-cors'), {
   origin: true,
   allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Accept-Encoding', 'Authorization']
 }))
