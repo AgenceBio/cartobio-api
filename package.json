@@ -8,7 +8,7 @@
     "@turf/helpers": "^6.1.4",
     "cors": "^2.8.5",
     "dotenv": "^8.2.0",
-    "fastify": "^2.13.1",
+    "fastify": "^2.15.1",
     "got": "^10.7.0",
     "jsonwebtoken": "^8.5.1",
     "matomo-tracker": "^2.2.1",
