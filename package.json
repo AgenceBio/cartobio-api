@@ -33,7 +33,7 @@
     "eslint-plugin-node": "^11.1.0",
     "eslint-plugin-promise": "^4.2.1",
     "eslint-plugin-standard": "^4.0.1",
-    "jest": "^25.5.4",
+    "jest": "^26.2.2",
     "nodemon": "^2.0.4",
     "supertest": "^4.0.2"
   },
@@ -42,7 +42,7 @@
     "start": "node -r dotenv/config app.js",
     "build": "npm run build:departements-centroids",
     "build:departements-centroids": "node bin/build-departements-centroids.js",
-    "test": "NODE_ENV=test jest --setupFiles dotenv/config",
+    "test": "NODE_ENV=test jest --setupFiles dotenv/config --collectCoverage --coverageReporters html --coverageReporters text-summary",
     "pretest": "geojsonhint ./test/fixtures/parcels.json",
     "posttest": "eslint --ignore-pattern 'migrations/*' .",
     "prewatch": "node -r dotenv/config ./node_modules/.bin/db-migrate up",
