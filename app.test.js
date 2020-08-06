@@ -1,4 +1,5 @@
 const { server: app, close, ready } = require('.')
+const { version: packageVersion } = require('./package.json')
 const request = require('supertest')
 const { decode, sign } = require('jsonwebtoken')
 
@@ -8,10 +9,12 @@ const USER_DOC_AUTH_HEADER = `Bearer ${USER_DOC_AUTH_TOKEN}`
 jest.mock('./lib/providers/agence-bio.js')
 jest.mock('./lib/providers/cartobio.js')
 jest.mock('./lib/parcels.js')
+jest.mock('./lib/services/trello.js')
 
-const { fetchAuthToken, fetchUserProfile } = require('./lib/providers/agence-bio.js')
+const { fetchAuthToken, fetchUserProfile, getCertificationBodyForPacage } = require('./lib/providers/agence-bio.js')
 const { updateOperator } = require('./lib/providers/cartobio.js')
 const { getOperatorSummary } = require('./lib/parcels.js')
+const { createCard } = require('./lib/services/trello.js')
 
 // start and stop server
 beforeAll(() => ready())
@@ -26,6 +29,17 @@ describe('GET /', () => {
         expect(response.status).toBe(404)
         expect(response.header['content-type']).toBe('application/json; charset=utf-8')
         expect(response.body).toHaveProperty('error', 'Not Found')
+      })
+  })
+})
+
+describe('GET /api/v1/version', () => {
+  test('responds with package.json version value', () => {
+    return request(app)
+      .get('/api/v1/version')
+      .type('json')
+      .then((response) => {
+        expect(response.body).toHaveProperty('version', packageVersion)
       })
   })
 })
@@ -74,7 +88,7 @@ describe('GET /api/v1/login', () => {
     return request(app)
       .post('/api/v1/login')
       .type('json')
-      .send({ email: 'blah', password: 'blah' })
+      .send({ email: 'blah@example.org', password: 'blah' })
       .then((response) => {
         expect(response.status).toBe(401)
         expect(response.header['content-type']).toBe('application/json; charset=utf-8')
@@ -248,7 +262,48 @@ describe('GET /api/v1/parcels', () => {
   })
 })
 
-describe('GET /api/v1/parcels/operator/:numero-bio', () => {
+describe('GET /api/v1/pacage/:numeroPacage', () => {
+  test('PACAGE exists, thus is associated with a numeroBio', () => {
+    getCertificationBodyForPacage.mockResolvedValueOnce({ numeroBio: 100, ocId: 1 })
+
+    return request(app)
+      .get('/api/v1/pacage/024014889')
+      .type('json')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+      .then((response) => {
+        expect(response.status).toBe(200)
+        expect(response.body).toEqual({ numeroBio: 100, numeroPacage: '024014889', ocId: 1 })
+      })
+  })
+
+  test('PACAGE does not exist, hence not being associated with a numeroBio', () => {
+    getCertificationBodyForPacage.mockResolvedValueOnce({ numeroBio: null, ocId: null })
+
+    return request(app)
+      .get('/api/v1/pacage/024014889')
+      .type('json')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+      .then((response) => {
+        expect(response.status).toBe(200)
+        expect(response.body).toEqual({ numeroBio: null, numeroPacage: '024014889', ocId: null })
+      })
+  })
+
+  test('fails if something goes wrong', () => {
+    getCertificationBodyForPacage.mockRejectedValueOnce(new Error('API unreachable'))
+
+    return request(app)
+      .get('/api/v1/pacage/024014889')
+      .type('json')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+      .then((response) => {
+        expect(response.status).toBe(500)
+        expect(response.body).toHaveProperty('error', 'Sorry, we failed to retrieve operator data. We have been notified about and will soon start fixing this issue.')
+      })
+  })
+})
+
+describe('GET /api/v1/parcels/operator/:numeroBio', () => {
   test('responds with hardcoded parcels', () => {
     return request(app)
       .get('/api/v1/parcels/operator/11')
@@ -280,6 +335,83 @@ describe('GET /api/v1/parcels/operator/:numero-bio', () => {
         expect(response.header['content-type']).toBe('application/json; charset=utf-8')
         expect(response.body).toHaveProperty('type', 'FeatureCollection')
         expect(response.body.features).toHaveLength(0)
+      })
+  })
+})
+
+describe('POST /api/v1/parcels/operator/:numeroBio', () => {
+  // it is not very accurate, as it does not stand for a real Trello error
+  test('it handles when Trello fails processing the entity', () => {
+    createCard.mockRejectedValueOnce(new Error('Trello API unreachable'))
+
+    return request(app)
+      .post('/api/v1/parcels/operator/11')
+      .type('json')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+      .send({
+        sender: {
+          userId: 10,
+          userName: 'Camille Durand',
+          userEmail: 'test@example.org',
+          ocId: 1
+        },
+        text: 'Un CSV à la main :\n\na,b,c\n1,2,3',
+        uploads: []
+      })
+      .then((response) => {
+        expect(response.status).toBe(500)
+        expect(response.body).toHaveProperty('error', 'Sorry, we failed to process your message. We have been notified about and will soon start fixing this issue.')
+      })
+  })
+
+  test('manual text entry is being sent to Trello', () => {
+    return request(app)
+      .post('/api/v1/parcels/operator/11')
+      .type('json')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+      .send({
+        sender: {
+          userId: 10,
+          userName: 'Camille Durand',
+          userEmail: 'test@example.org',
+          ocId: 1
+        },
+        text: 'Un CSV à la main :\n\na,b,c\n1,2,3',
+        uploads: []
+      })
+      .then((response) => {
+        expect(response.status).toBe(204)
+        expect(createCard).toHaveBeenCalled()
+      })
+  })
+
+  test('upload files are being sent to Trello', () => {
+    const content = Buffer.from('a,b,c\n1,2,3').toString('base64')
+
+    return request(app)
+      .post('/api/v1/parcels/operator/11')
+      .type('json')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+      .send({
+        sender: {
+          userId: 10,
+          userName: 'Camille Durand',
+          userEmail: 'test@example.org',
+          ocId: 1
+        },
+        text: '',
+        uploads: [
+          {
+            content,
+            size: content.length,
+            type: 'text/csv',
+            filename: 'ruchers.csv'
+          }
+        ]
+      })
+      .then((response) => {
+        expect(response.status).toBe(204)
+        expect(createCard).toHaveBeenCalled()
       })
   })
 })
