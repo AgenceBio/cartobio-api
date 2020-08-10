@@ -47,9 +47,10 @@ jobs:
         command: |
           docker pull ${{ steps.publish.outputs.tag }} \
           && docker stop cartobioapi \
-          && docker image remove --no-prune cartobioapi \
+          && docker container rm cartobioapi \
           && docker run -d --restart unless-stopped \
             -p 127.0.0.1:8000:8000 \
             --env-file=.env.cartobio-api \
+            --add-host=postgis:$(ip -4 addr show scope global dev eth0 | grep inet | awk '{print $2}' | cut -d / -f 1 | sed -n 1p) \
             --name cartobioapi \
             ${{ steps.publish.outputs.tag }}

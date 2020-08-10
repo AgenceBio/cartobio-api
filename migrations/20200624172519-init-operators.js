@@ -20,8 +20,8 @@ exports.up = function (db) {
     },
     metadata: {
       type: 'jsonb',
-      /* eslint-disable-next-line quotes */
-      defaultValue: String(`'{}'::jsonb`)
+      /* eslint-disable-next-line no-new-wrappers,quotes */
+      defaultValue: new String(`'{}'::jsonb`)
     }
   })
 }
