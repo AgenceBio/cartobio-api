@@ -23,6 +23,7 @@ const { createCard } = require('./lib/services/trello.js')
 const env = require('./lib/app.js').env()
 
 const { sandboxSchema, ocSchema, internalSchema } = require('./lib/routes/index.js')
+const { routeWithNumeroBio, routeWithPacage } = require('./lib/routes/index.js')
 const { loginSchema } = require('./lib/routes/login.js')
 const { operatorSchema } = require('./lib/routes/operators.js')
 const { parcelsOperatorSchema } = require('./lib/routes/parcels.js')
@@ -56,7 +57,7 @@ app.register(require('fastify-swagger'), {
       title: 'CartBio API',
       version: apiVersion
     },
-    host: [NODE_ENV === 'production' ? 'cartobio.org' : `${HOST}:${PORT}`],
+    host: NODE_ENV === 'production' ? 'cartobio.org' : `${HOST}:${PORT}`,
     schemes: [NODE_ENV === 'production' ? 'https' : 'http'],
     externalDocs: {
       url: 'https://cartobio.org/#/api',
@@ -158,7 +159,7 @@ app.get('/api/v1/parcels', deepmerge([ocSchema, protectedRouteOptions]), (reques
     })
 })
 
-app.get('/api/v1/parcels/operator/:numeroBio', deepmerge([ocSchema, protectedRouteOptions]), (request, reply) => {
+app.get('/api/v1/parcels/operator/:numeroBio', deepmerge([ocSchema, protectedRouteOptions, routeWithNumeroBio]), (request, reply) => {
   const { decodedToken, params } = request
   const { test: isTest, ocId } = decodedToken
   const { numeroBio } = params
@@ -217,7 +218,7 @@ app.post('/api/v1/login', deepmerge([internalSchema, loginSchema]), (request, re
  * @todo lookup for PACAGE stored in the `cartobio_operators` table
  * @private
  */
-app.get('/api/v1/pacage/:numeroPacage', deepmerge([internalSchema, protectedRouteOptions]), (request, reply) => {
+app.get('/api/v1/pacage/:numeroPacage', deepmerge([internalSchema, protectedRouteOptions, routeWithPacage]), (request, reply) => {
   const { numeroPacage } = request.params
 
   getCertificationBodyForPacage({ numeroPacage })
