@@ -4,40 +4,48 @@
   "description": "api for cartobio",
   "main": "app.js",
   "dependencies": {
-    "@sentry/node": "^5.15.5",
+    "@sentry/node": "^5.20.1",
     "@turf/helpers": "^6.1.4",
-    "cors": "^2.8.5",
+    "db-migrate": "^0.11.11",
+    "db-migrate-pg": "^1.2.2",
+    "deepmerge": "^4.2.2",
     "dotenv": "^8.2.0",
-    "fastify": "^2.13.1",
+    "fastify": "^3.1.1",
+    "fastify-cors": "^4.1.0",
+    "fastify-swagger": "^3.2.0",
+    "form-data": "^3.0.0",
     "got": "^10.7.0",
     "jsonwebtoken": "^8.5.1",
-    "matomo-tracker": "^2.2.1",
+    "matomo-tracker": "^2.2.2",
     "p-limit": "^2.3.0",
-    "p-memoize": "^4.0.0"
+    "p-memoize": "^4.0.0",
+    "pg": "^8.3.0"
   },
   "engines": {
-    "node": ">=12"
+    "node": ">=14"
   },
   "devDependencies": {
     "@mapbox/geojsonhint": "^3.0.0",
-    "eslint": "^6.8.0",
+    "eslint": "^7.6.0",
     "eslint-config-standard": "^14.1.1",
-    "eslint-plugin-import": "^2.20.2",
-    "eslint-plugin-jest": "^23.8.2",
+    "eslint-plugin-import": "^2.22.0",
+    "eslint-plugin-jest": "^23.20.0",
     "eslint-plugin-node": "^11.1.0",
     "eslint-plugin-promise": "^4.2.1",
     "eslint-plugin-standard": "^4.0.1",
-    "jest": "^25.4.0",
-    "nodemon": "^2.0.3",
+    "jest": "^26.2.2",
+    "nodemon": "^2.0.4",
     "supertest": "^4.0.2"
   },
   "scripts": {
+    "prestart": "node -r dotenv/config ./node_modules/.bin/db-migrate up",
     "start": "node -r dotenv/config app.js",
     "build": "npm run build:departements-centroids",
     "build:departements-centroids": "node bin/build-departements-centroids.js",
-    "test": "NODE_ENV=test jest --setupFiles dotenv/config",
+    "test": "NODE_ENV=test jest --setupFiles dotenv/config --collectCoverage --coverageReporters html --coverageReporters text-summary",
     "pretest": "geojsonhint ./test/fixtures/parcels.json",
-    "posttest": "eslint .",
+    "posttest": "eslint --ignore-pattern 'migrations/*' .",
+    "prewatch": "node -r dotenv/config ./node_modules/.bin/db-migrate up",
     "watch": "nodemon -r dotenv/config app.js"
   },
   "repository": {

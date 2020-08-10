@@ -10,7 +10,7 @@ jobs:
     - uses: actions/checkout@v2
     - uses: actions/setup-node@v1
       with:
-        node-version: '12'
+        node-version: '14'
     - run: npm ci
     - run: npm test -- --collectCoverage --coverageReporters text
       env:
@@ -18,5 +18,3 @@ jobs:
         ESPACE_COLLABORATIF_BASIC_AUTH: ${{ secrets.ESPACE_COLLABORATIF_BASIC_AUTH }}
         NOTIFICATIONS_AB_ENDPOINT: https://preprod-notifications.agencebio.org:444
         CARTOBIO_JWT_SECRET: "${{ secrets.CARTOBIO_JWT_SECRET }}"
-        NOTIFICATIONS_AB_CARTOBIO_USER: "${{ secrets.NOTIFICATIONS_AB_CARTOBIO_USER }}"
-        NOTIFICATIONS_AB_CARTOBIO_PASSWORD: "${{ secrets.NOTIFICATIONS_AB_CARTOBIO_PASSWORD }}"

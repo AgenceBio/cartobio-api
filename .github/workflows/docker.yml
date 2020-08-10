@@ -4,10 +4,11 @@ on:
   push:
     paths-ignore:
     - 'docs/**'
+    - 'bin/**'
     branches:
-      - master
+    - master
     tags:
-      - v*
+    - v*
 
 jobs:
 
@@ -26,12 +27,29 @@ jobs:
         ESPACE_COLLABORATIF_BASIC_AUTH: ${{ secrets.ESPACE_COLLABORATIF_BASIC_AUTH }}
         NOTIFICATIONS_AB_ENDPOINT: https://preprod-notifications.agencebio.org:444
         CARTOBIO_JWT_SECRET: "${{ secrets.CARTOBIO_JWT_SECRET }}"
-        NOTIFICATIONS_AB_CARTOBIO_USER: "${{ secrets.NOTIFICATIONS_AB_CARTOBIO_USER }}"
-        NOTIFICATIONS_AB_CARTOBIO_PASSWORD: "${{ secrets.NOTIFICATIONS_AB_CARTOBIO_PASSWORD }}"
 
-    - uses: jerray/publish-docker-action@v1.0.4
+    - name: Publish to Docker Hub
+      uses: jerray/publish-docker-action@v1.0.5
+      id: publish
       with:
         repository: agencebio/cartobio-api
         username: ${{ secrets.DOCKER_HUB_USERNAME }}
         password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
         auto_tag: true
+
+    - name: Deploy in production (when Git tagged)
+      uses: garygrossgarten/github-action-ssh@v0.5.0
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        host: ${{ secrets.AGENCEBIO_SSH_HOST }}
+        username: ${{ secrets.AGENCEBIO_SSH_USERNAME }}
+        privateKey: ${{ secrets.AGENCEBIO_SSH_PRIVATE_KEY }}
+        command: |
+          docker pull ${{ steps.publish.outputs.tag }} \
+          && docker stop cartobioapi \
+          && docker image remove --no-prune cartobioapi \
+          && docker run -d --restart unless-stopped \
+            -p 127.0.0.1:8000:8000 \
+            --env-file=.env.cartobio-api \
+            --name cartobioapi \
+            ${{ steps.publish.outputs.tag }}
