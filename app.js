@@ -273,10 +273,10 @@ app.post('/api/v1/parcels/operator/:numeroBio', deepmerge([internalSchema, prote
       idList,
       uploads,
       name: `Parcelles pour l'opérateur bio n°${numeroBio}`,
-      desc: `Envoyé par ${sender.userName} • OC ${sender.ocId} (#${sender.userId}, ${sender.userEmail})
-  ----
+      desc: `Envoyé par ${sender.userName} • OC n°${sender.ocId} • User n°${sender.userId} • ${sender.userEmail}
+----
 
-  ${text}`
+    ${text}`
     })
 
     reply.code(204).send()

@@ -381,7 +381,17 @@ describe('POST /api/v1/parcels/operator/:numeroBio', () => {
       })
       .then((response) => {
         expect(response.status).toBe(204)
-        expect(createCard).toHaveBeenCalled()
+        expect(createCard).toHaveBeenCalledWith({
+          key: process.env.TRELLO_API_KEY,
+          token: process.env.TRELLO_API_TOKEN,
+          idList: '5f1e8c0f9b9a9a4fd5866a22',
+          name: 'Parcelles pour l\'opérateur bio n°11',
+          desc: `Envoyé par Camille Durand • OC n°1 • User n°10 • test@example.org
+----
+
+    Un CSV à la main :\n\na,b,c\n1,2,3`,
+          uploads: []
+        })
       })
   })
 
