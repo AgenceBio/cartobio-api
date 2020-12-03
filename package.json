@@ -4,37 +4,37 @@
   "description": "api for cartobio",
   "main": "app.js",
   "dependencies": {
-    "@sentry/node": "^5.20.1",
+    "@sentry/node": "^5.28.0",
     "@turf/helpers": "^6.1.4",
     "db-migrate": "^0.11.11",
     "db-migrate-pg": "^1.2.2",
     "deepmerge": "^4.2.2",
     "dotenv": "^8.2.0",
-    "fastify": "^3.2.0",
+    "fastify": "^3.9.1",
     "fastify-cors": "^4.1.0",
-    "fastify-swagger": "^3.2.0",
+    "fastify-swagger": "^3.5.0",
     "form-data": "^3.0.0",
     "got": "^10.7.0",
     "jsonwebtoken": "^8.5.1",
-    "matomo-tracker": "^2.2.2",
+    "matomo-tracker": "^2.2.4",
     "p-limit": "^2.3.0",
-    "p-memoize": "^4.0.0",
-    "pg": "^8.3.0"
+    "p-memoize": "^4.0.1",
+    "pg": "^8.5.1"
   },
   "engines": {
     "node": ">=14"
   },
   "devDependencies": {
     "@mapbox/geojsonhint": "^3.0.0",
-    "eslint": "^7.6.0",
+    "eslint": "^7.14.0",
     "eslint-config-standard": "^14.1.1",
-    "eslint-plugin-import": "^2.22.0",
+    "eslint-plugin-import": "^2.22.1",
     "eslint-plugin-jest": "^23.20.0",
     "eslint-plugin-node": "^11.1.0",
     "eslint-plugin-promise": "^4.2.1",
-    "eslint-plugin-standard": "^4.0.1",
-    "jest": "^26.2.2",
-    "nodemon": "^2.0.4",
+    "eslint-plugin-standard": "^4.1.0",
+    "jest": "^26.6.3",
+    "nodemon": "^2.0.6",
     "supertest": "^4.0.2"
   },
   "scripts": {
