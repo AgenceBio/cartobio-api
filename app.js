@@ -15,7 +15,7 @@ const { featureCollection } = require('@turf/helpers')
 const { version: apiVersion } = require('./package.json')
 const JWT_SECRET = Buffer.from(process.env.CARTOBIO_JWT_SECRET, 'base64')
 
-const { verify, track, enforceParams } = require('./lib/middlewares.js')
+const { verify, track: _track, enforceParams } = require('./lib/middlewares.js')
 const { getOperatorParcels, getOperatorSummary } = require('./lib/parcels.js')
 const { fetchAuthToken, fetchUserProfile, getCertificationBodyForPacage } = require('./lib/providers/agence-bio.js')
 const { updateOperator } = require('./lib/providers/cartobio.js')
@@ -35,12 +35,15 @@ const { PORT, HOST, SENTRY_DSN, NODE_ENV } = env
 const reportErrors = SENTRY_DSN && NODE_ENV === 'production'
 
 // Sentry error reporting setup
-if (SENTRY_DSN) {
+if (reportErrors) {
   Sentry.init({
     dsn: SENTRY_DSN,
     release: 'cartobio-api@' + process.env.npm_package_version
   })
 }
+
+// Track events in Matomo in production only
+const track = reportErrors ? _track : () => {}
 
 // Configure server
 app.register(require('fastify-cors'), {
