@@ -339,6 +339,20 @@ describe('GET /api/v1/parcels/operator/:numeroBio', () => {
   })
 })
 
+describe('POST /api/v1/convert/shapefile/geojson', () => {
+  test('it converts a L93 zipped archive into WGS84 GeoJSON', () => {
+    return request(app)
+      .post('/api/v1/convert/shapefile/geojson')
+      .type('json')
+      .attach('archive', 'test/fixtures/telepac-parcelles.zip')
+      .send()
+      .then((response) => {
+        expect(response.status).toBe(200)
+        expect(response.body).toHaveProperty('features.0.type', 'Feature')
+      })
+  })
+})
+
 describe('POST /api/v1/parcels/operator/:numeroBio', () => {
   // it is not very accurate, as it does not stand for a real Trello error
   test('it handles when Trello fails processing the entity', () => {

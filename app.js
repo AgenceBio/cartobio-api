@@ -19,6 +19,7 @@ const { verify, track: _track, enforceParams } = require('./lib/middlewares.js')
 const { getOperatorParcels, getOperatorSummary } = require('./lib/parcels.js')
 const { fetchAuthToken, fetchUserProfile, getCertificationBodyForPacage } = require('./lib/providers/agence-bio.js')
 const { updateOperator } = require('./lib/providers/cartobio.js')
+const { parseShapefileArchive } = require('./lib/providers/telepac.js')
 const { createCard } = require('./lib/services/trello.js')
 const env = require('./lib/app.js').env()
 
@@ -87,6 +88,9 @@ app.register(require('fastify-swagger'), {
     }
   }
 })
+
+// Enable file upload
+app.register(require('fastify-multipart'))
 
 // Routes to protect with a JSON Web Token
 app.decorateRequest('decodedToken', {})
@@ -257,6 +261,22 @@ app.patch('/api/v1/operator/:numeroBio', deepmerge([internalSchema, protectedRou
 
       reply.code(500).send({
         error: 'Sorry, we failed to update operator data. We have been notified about and will soon start fixing this issue.'
+      })
+    })
+})
+
+/**
+ * @private
+ */
+app.post('/api/v1/convert/shapefile/geojson', async (request, reply) => {
+  parseShapefileArchive(request.file())
+    .then(geojson => reply.send(geojson))
+    .catch(error => {
+      request.log.error('Failed to parse Shapefile archive because of this error "%s"', error.message)
+      reportErrors && Sentry.captureException(error)
+
+      reply.code(500).send({
+        error: 'Sorry, we failed to transform the Shapefile into GeoJSON. We have been notified about and will soon start fixing this issue.'
       })
     })
 })
