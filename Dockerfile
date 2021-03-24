@@ -1,6 +1,6 @@
-FROM node:14-alpine
+FROM node:14-slim
 
-RUN apk update && apk install libc6-compat
+RUN apt update && apt install -y unzip
 
 # Create app directory
 WORKDIR /usr/src/app
