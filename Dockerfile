@@ -1,5 +1,7 @@
 FROM node:14-alpine
 
+RUN apk update && apk install libc6-compat
+
 # Create app directory
 WORKDIR /usr/src/app
 
