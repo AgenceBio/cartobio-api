@@ -52,6 +52,6 @@ jobs:
           && docker run -d --restart unless-stopped \
             -p 127.0.0.1:8000:8000 \
             --env-file=.env.cartobio-api \
-            --add-host=postgis:$(ip -4 addr show scope global dev eth0 | grep inet | awk '{print $2}' | cut -d / -f 1 | sed -n 1p) \
+            --add-host=postgres:$(docker inspect -f '{{.NetworkSettings.IPAddress}}' postgres) \
             --name cartobioapi \
             ${{ steps.publish.outputs.tag }}
