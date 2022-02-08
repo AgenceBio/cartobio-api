@@ -17,15 +17,16 @@ const JWT_SECRET = Buffer.from(process.env.CARTOBIO_JWT_SECRET, 'base64')
 
 const { verify, track: _track, enforceParams } = require('./lib/middlewares.js')
 const { getOperatorParcels, getOperatorSummary } = require('./lib/parcels.js')
-const { fetchAuthToken, fetchUserProfile, getCertificationBodyForPacage } = require('./lib/providers/agence-bio.js')
+const { fetchAuthToken, fetchUserProfile, operatorLookup, getCertificationBodyForPacage } = require('./lib/providers/agence-bio.js')
 const { updateOperator } = require('./lib/providers/cartobio.js')
 const { parseShapefileArchive } = require('./lib/providers/telepac.js')
+const { parseGeofoliaArchive } = require('./lib/providers/geofolia.js')
 const { createCard } = require('./lib/services/trello.js')
 const env = require('./lib/app.js').env()
 
 const { sandboxSchema, ocSchema, internalSchema } = require('./lib/routes/index.js')
 const { routeWithNumeroBio, routeWithPacage } = require('./lib/routes/index.js')
-const { loginSchema } = require('./lib/routes/login.js')
+const { loginSchema, tryLoginSchema } = require('./lib/routes/login.js')
 const { operatorSchema } = require('./lib/routes/operators.js')
 const { parcelsOperatorSchema } = require('./lib/routes/parcels.js')
 
@@ -93,7 +94,7 @@ app.register(require('fastify-swagger'), {
 app.register(require('fastify-multipart'))
 
 // Routes to protect with a JSON Web Token
-app.decorateRequest('decodedToken', {})
+app.decorateRequest('decodedToken', null)
 const protectedRouteOptions = {
   schema: {
     security: [
@@ -221,6 +222,17 @@ app.post('/api/v1/login', deepmerge([internalSchema, loginSchema]), (request, re
       })
     }, error => reportErrors && Sentry.captureException(error))
 })
+
+/**
+ * @private
+ */
+app.post('/api/v1/tryLogin', deepmerge([internalSchema, tryLoginSchema]), (request, reply) => {
+  const { q } = request.body
+
+  return operatorLookup({ q })
+    .then(userProfiles => reply.code(200).send(userProfiles))
+    .catch(error => reportErrors && Sentry.captureException(error))
+})
 /**
  * @todo lookup for PACAGE stored in the `cartobio_operators` table
  * @private
@@ -273,6 +285,22 @@ app.post('/api/v1/convert/shapefile/geojson', async (request, reply) => {
     .then(geojson => reply.send(geojson))
     .catch(error => {
       request.log.error('Failed to parse Shapefile archive because of this error "%s"', error.message)
+      reportErrors && Sentry.captureException(error)
+
+      reply.code(500).send({
+        error: 'Sorry, we failed to transform the Shapefile into GeoJSON. We have been notified about and will soon start fixing this issue.'
+      })
+    })
+})
+
+/**
+ * @private
+ */
+app.post('/api/v1/convert/geofolia/geojson', async (request, reply) => {
+  parseGeofoliaArchive(request.file())
+    .then(geojson => reply.send(geojson))
+    .catch(error => {
+      request.log.error('Failed to parse Geofolia archive because of this error "%s"', error.message)
       reportErrors && Sentry.captureException(error)
 
       reply.code(500).send({
