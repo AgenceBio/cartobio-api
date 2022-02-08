@@ -345,97 +345,9 @@ describe('POST /api/v1/convert/shapefile/geojson', () => {
       .post('/api/v1/convert/shapefile/geojson')
       .type('json')
       .attach('archive', 'test/fixtures/telepac-parcelles.zip')
-      .send()
       .then((response) => {
         expect(response.status).toBe(200)
         expect(response.body).toHaveProperty('features.0.type', 'Feature')
-      })
-  })
-})
-
-describe('POST /api/v1/parcels/operator/:numeroBio', () => {
-  // it is not very accurate, as it does not stand for a real Trello error
-  test('it handles when Trello fails processing the entity', () => {
-    createCard.mockRejectedValueOnce(new Error('Trello API unreachable'))
-
-    return request(app)
-      .post('/api/v1/parcels/operator/11')
-      .type('json')
-      .set('Authorization', USER_DOC_AUTH_HEADER)
-      .send({
-        sender: {
-          userId: 10,
-          userName: 'Camille Durand',
-          userEmail: 'test@example.org',
-          ocId: 1
-        },
-        text: 'Un CSV à la main :\n\na,b,c\n1,2,3',
-        uploads: []
-      })
-      .then((response) => {
-        expect(response.status).toBe(500)
-        expect(response.body).toHaveProperty('error', 'Sorry, we failed to process your message. We have been notified about and will soon start fixing this issue.')
-      })
-  })
-
-  test('manual text entry is being sent to Trello', () => {
-    return request(app)
-      .post('/api/v1/parcels/operator/11')
-      .type('json')
-      .set('Authorization', USER_DOC_AUTH_HEADER)
-      .send({
-        sender: {
-          userId: 10,
-          userName: 'Camille Durand',
-          userEmail: 'test@example.org',
-          ocId: 1
-        },
-        text: 'Un CSV à la main :\n\na,b,c\n1,2,3',
-        uploads: []
-      })
-      .then((response) => {
-        expect(response.status).toBe(204)
-        expect(createCard).toHaveBeenCalledWith({
-          key: process.env.TRELLO_API_KEY,
-          token: process.env.TRELLO_API_TOKEN,
-          idList: '5f1e8c0f9b9a9a4fd5866a22',
-          name: 'Parcelles pour l\'opérateur bio n°11',
-          desc: `Envoyé par Camille Durand • OC n°1 • User n°10 • test@example.org
-----
-
-    Un CSV à la main :\n\na,b,c\n1,2,3`,
-          uploads: []
-        })
-      })
-  })
-
-  test('upload files are being sent to Trello', () => {
-    const content = Buffer.from('a,b,c\n1,2,3').toString('base64')
-
-    return request(app)
-      .post('/api/v1/parcels/operator/11')
-      .type('json')
-      .set('Authorization', USER_DOC_AUTH_HEADER)
-      .send({
-        sender: {
-          userId: 10,
-          userName: 'Camille Durand',
-          userEmail: 'test@example.org',
-          ocId: 1
-        },
-        text: '',
-        uploads: [
-          {
-            content,
-            size: content.length,
-            type: 'text/csv',
-            filename: 'ruchers.csv'
-          }
-        ]
-      })
-      .then((response) => {
-        expect(response.status).toBe(204)
-        expect(createCard).toHaveBeenCalled()
       })
   })
 })
