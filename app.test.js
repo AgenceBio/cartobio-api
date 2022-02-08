@@ -14,7 +14,6 @@ jest.mock('./lib/services/trello.js')
 const { fetchAuthToken, fetchUserProfile, getCertificationBodyForPacage } = require('./lib/providers/agence-bio.js')
 const { updateOperator } = require('./lib/providers/cartobio.js')
 const { getOperatorSummary } = require('./lib/parcels.js')
-const { createCard } = require('./lib/services/trello.js')
 
 // start and stop server
 beforeAll(() => ready())
