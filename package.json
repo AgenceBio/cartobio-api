@@ -4,6 +4,7 @@
   "description": "api for cartobio",
   "main": "app.js",
   "dependencies": {
+    "@etalab/decoupage-administratif": "^1.0.2",
     "@sentry/node": "^6.17.5",
     "@turf/helpers": "^6.5.0",
     "adm-zip": "^0.5.9",
@@ -24,6 +25,7 @@
     "p-memoize": "^4.0.4",
     "pg": "^8.7.3",
     "reproject": "^1.2.6",
+    "through2": "^4.0.2",
     "verrazzano": "^2.2.3",
     "wkt": "^0.1.1"
   },
