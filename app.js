@@ -18,7 +18,7 @@ const JWT_SECRET = Buffer.from(process.env.CARTOBIO_JWT_SECRET, 'base64')
 const { verify, track: _track, enforceParams } = require('./lib/middlewares.js')
 const { getOperatorParcels, getOperatorSummary } = require('./lib/parcels.js')
 const { fetchAuthToken, fetchUserProfile, operatorLookup, getCertificationBodyForPacage } = require('./lib/providers/agence-bio.js')
-const { updateOperator } = require('./lib/providers/cartobio.js')
+const { updateOperator, updateOperatorParcels, getOperator } = require('./lib/providers/cartobio.js')
 const { parseShapefileArchive } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive } = require('./lib/providers/geofolia.js')
 const { createCard } = require('./lib/services/trello.js')
@@ -269,6 +269,47 @@ app.patch('/api/v1/operator/:numeroBio', deepmerge([internalSchema, protectedRou
     .then(geojson => reply.code(200).send(geojson))
     .catch(error => {
       request.log.error(`Failed to update operator ${numeroBio} for OC ${ocId} because of this error "%s"`, error.message)
+      reportErrors && Sentry.captureException(error)
+
+      reply.code(500).send({
+        error: 'Sorry, we failed to update operator data. We have been notified about and will soon start fixing this issue.'
+      })
+    })
+})
+
+/**
+ * @private
+ */
+app.get('/api/v2/operator/:numeroBio', (request, reply) => {
+  const { numeroBio } = request.params
+
+  // track({ request, decodedToken })
+
+  getOperator({ numeroBio })
+    .then(result => reply.code(200).send(result))
+    .catch(error => {
+      request.log.error(`Failed to fetch ocId for ${numeroBio} because of this error "%s"`, error.message)
+      reportErrors && Sentry.captureException(error)
+
+      reply.code(500).send({
+        error: 'Sorry, we failed to retrieve operator data. We have been notified about and will soon start fixing this issue.'
+      })
+    })
+})
+
+/**
+ * @private
+ */
+app.post('/api/v2/operator/:numeroBio/parcelles', (request, reply) => {
+  const { body } = request
+  const { numeroBio } = request.params
+
+  // track({ request, decodedToken })
+
+  updateOperatorParcels({ numeroBio }, body)
+    .then(({ parcelles, metadata }) => reply.code(200).send({ parcelles, metadata }))
+    .catch(error => {
+      request.log.error(`Failed to update operator ${numeroBio} parcels because of this error "%s"`, error.message)
       reportErrors && Sentry.captureException(error)
 
       reply.code(500).send({
