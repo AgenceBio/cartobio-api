@@ -3,6 +3,16 @@
 
 ## Obtention du token
 
+```bash
+❯ curl -v -sSL -XPOST "https://cas.mesparcelles.fr/cas/oauth2.0/accessToken?grant_type=password&client_id=sigaweb" -F "username=$CARTOBIO_MP_EMAIL" -F "password=$CARTOBIO_MP_PASSWORD"
+```
+
+Réponse
+
+```json
+{"access_token":"AT-…","token_type":"bearer","expires_in":345600,"scope":""}
+```
+
 ## Liste des exploitations
 
 ```bash
@@ -17,7 +27,7 @@ Réponse
 
 ## Liste des parcelles d'une exploitation
 ```bash
-curl -v -XGET -H 'Content-Type: application/json' -H 'Accept: application/json' -H "Authorization: Bearer $CARTOBIO_MP_TOKEN" 'https://rhone-alpes.mesparcelles.fr/api/parcelles?idexploitation={exploitationId}&millesime=2022'
+curl -v -XGET -H 'Content-Type: application/json' -H 'Accept: application/json' -H "Authorization: Bearer $CARTOBIO_MP_TOKEN" 'https://rhone-alpes.mesparcelles.fr/api/parcelles?idexploitation={exploitationId}'
 ```
 
 Réponse

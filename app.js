@@ -21,6 +21,7 @@ const { fetchAuthToken, fetchUserProfile, operatorLookup, getCertificationBodyFo
 const { updateOperator, updateOperatorParcels, getOperator } = require('./lib/providers/cartobio.js')
 const { parseShapefileArchive } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive } = require('./lib/providers/geofolia.js')
+const { getMesParcellesOperator } = require('./lib/providers/mes-parcelles.js')
 const { createCard } = require('./lib/services/trello.js')
 const env = require('./lib/app.js').env()
 
@@ -231,7 +232,14 @@ app.post('/api/v1/tryLogin', deepmerge([internalSchema, tryLoginSchema]), (reque
 
   return operatorLookup({ q })
     .then(userProfiles => reply.code(200).send(userProfiles))
-    .catch(error => reportErrors && Sentry.captureException(error))
+    .catch(error => {
+      request.log.error(`Failed to login with ${q} because of this error "%s"`, error.message)
+      reportErrors && Sentry.captureException(error)
+
+      reply.code(500).send({
+        error: 'Sorry, we failed to retrieve operator data. We have been notified about and will soon start fixing this issue.'
+      })
+    })
 })
 /**
  * @todo lookup for PACAGE stored in the `cartobio_operators` table
@@ -342,6 +350,24 @@ app.post('/api/v1/convert/geofolia/geojson', async (request, reply) => {
     .then(geojson => reply.send(geojson))
     .catch(error => {
       request.log.error('Failed to parse Geofolia archive because of this error "%s"', error.message)
+      reportErrors && Sentry.captureException(error)
+
+      reply.code(500).send({
+        error: 'Sorry, we failed to transform the Shapefile into GeoJSON. We have been notified about and will soon start fixing this issue.'
+      })
+    })
+})
+
+/**
+ * @private
+ */
+app.post('/api/v2/import/mesparcelles/login', async (request, reply) => {
+  const { email, password, server } = request.body
+
+  getMesParcellesOperator({ email, password, server })
+    .then(geojson => reply.send(geojson))
+    .catch(error => {
+      request.log.error('Failed to import MesParcelles data because of this error "%o"', error)
       reportErrors && Sentry.captureException(error)
 
       reply.code(500).send({
