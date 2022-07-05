@@ -3,17 +3,20 @@
 const app = require('fastify')({
   logger: true
 })
+const oauthPlugin = require('fastify-oauth2')
+const corsPlugin = require('fastify-cors')
 
 const Sentry = require('@sentry/node')
 const { sign } = require('jsonwebtoken')
 const { all: deepmerge } = require('deepmerge')
+const env = require('./lib/app.js').env()
 
 const parcelsFixture = require('./test/fixtures/parcels.json')
 const summaryFixture = require('./test/fixtures/summary.json')
 const { featureCollection } = require('@turf/helpers')
 
 const { version: apiVersion } = require('./package.json')
-const JWT_SECRET = Buffer.from(process.env.CARTOBIO_JWT_SECRET, 'base64')
+const JWT_SECRET = Buffer.from(env.CARTOBIO_JWT_SECRET, 'base64')
 
 const { verify, track: _track, enforceParams } = require('./lib/middlewares.js')
 const { getOperatorParcels, getOperatorSummary } = require('./lib/parcels.js')
@@ -23,7 +26,6 @@ const { parseShapefileArchive } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive } = require('./lib/providers/geofolia.js')
 const { getMesParcellesOperator } = require('./lib/providers/mes-parcelles.js')
 const { createCard } = require('./lib/services/trello.js')
-const env = require('./lib/app.js').env()
 
 const { sandboxSchema, ocSchema, internalSchema } = require('./lib/routes/index.js')
 const { routeWithNumeroBio, routeWithPacage } = require('./lib/routes/index.js')
@@ -49,7 +51,7 @@ if (reportErrors) {
 const track = reportErrors ? _track : () => {}
 
 // Configure server
-app.register(require('fastify-cors'), {
+app.register(corsPlugin, {
   origin: true,
   allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Accept-Encoding', 'Authorization']
 })
@@ -109,6 +111,40 @@ const protectedRouteOptions = {
     enforceParams('ocId')
   ]
 }
+
+// Register Oauth2 Plugin
+
+app.register(oauthPlugin, {
+  name: 'geofoliaOauth2',
+  scope: 'https://b2cprodgeofolink.onmicrosoft.com/prod-geofolink/.default',
+  credentials: {
+    client: {
+      id: env.GEOFOLIA_OAUTH_CLIENT_ID,
+      secret: env.GEOFOLIA_OAUTH_CLIENT_SECRET
+    },
+    auth: {
+      authorizeHost: env.GEOFOLIA_OAUTH_HOST,
+      authorizePath: `/${env.GEOFOLIA_OAUTH_TENANT}/oauth2/v2.0/auth`,
+      tokenHost: env.GEOFOLIA_OAUTH_HOST,
+      tokenPath: `/${env.GEOFOLIA_OAUTH_TENANT}/oauth2/v2.0/token`
+    }
+  },
+  // register a fastify url to start the redirect flow
+  startRedirectPath: '/api/login/geofolia',
+  // facebook redirect here after the user login
+  callbackUri: 'http://localhost:3000/login/geofolia/callback'
+})
+
+app.get('/api/login/geofolia/callback', async function (request, reply) {
+  const token = await this.geofoliaOauth2.getAccessTokenFromAuthorizationCodeFlow(request)
+
+  console.log(token.access_token)
+
+  // if later you need to refresh the token you can use
+  // const newToken = await this.getNewAccessTokenUsingRefreshToken(token.refresh_token)
+
+  reply.send({ access_token: token.access_token })
+})
 
 // Begin Public API routes
 app.get('/api/v1/version', sandboxSchema, (request, reply) => {
