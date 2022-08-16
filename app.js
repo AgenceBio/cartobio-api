@@ -285,10 +285,15 @@ app.patch('/api/v1/operator/:numeroBio', deepmerge([internalSchema, protectedRou
     })
 })
 
+app.get('/api/v2/stats', internalSchema, (request, reply) => {
+  return db.query("SELECT COUNT(parcelles) as count, SUM(JSONB_ARRAY_LENGTH(parcelles->'features')::bigint) as parcelles_count FROM cartobio_operators WHERE metadata->>'source' != '';")
+    .then(({ rows }) => reply.code(200).send({ stats: rows[0] }))
+})
+
 /**
  * @private
  */
-app.get('/api/v2/operator/:numeroBio', (request, reply) => {
+app.get('/api/v2/operator/:numeroBio', internalSchema, (request, reply) => {
   const { numeroBio } = request.params
 
   // track({ request, decodedToken })
