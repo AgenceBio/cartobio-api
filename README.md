@@ -19,6 +19,7 @@ métiers des organismes de certification du bio en France.
 - [Manuel d'utilisation](#manuel-dutilisation)
   - [Générer un token d'API](#générer-un-token-dapi)
   - [Renouveler le secret 256](#renouveler-le-secret-256)
+  - [Sauvegarder et restaurer la base de données](#sauvegarder-et-restaurer-la-base-de-données)
   - [Déployer en production](#deployer-en-production)
   - [Générer les fonds de carte](#générer-les-fonds-de-carte)
 
@@ -131,6 +132,18 @@ Tous les tokens précédemment émis ne seront plus fonctionnels.
 
 ```bash
 $ npx vpg --length 256 | base64
+```
+
+## Sauvegarder et restaurer la base de données
+
+```bash
+docker exec -i postgres pg_dump --data-only -U docker -h localhost gis > dump.sql
+```
+
+Puis restaurer :
+
+```bash
+docker exec -i postgres psql -U docker -h localhost gis < dump.sql
 ```
 
 ## Déployer en production
