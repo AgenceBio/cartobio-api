@@ -149,13 +149,7 @@ docker exec -i postgres psql -U docker -h localhost gis < dump.sql
 ## Déployer en production
 
 ```bash
-docker run -d --name postgres -p 127.0.0.1:5432:5432 -v "$(pwd)/postgres_data/postgresql:/var/lib/postgresql" kartoza/postgis:14-3.3
-```
-
-Anciennement, le Geoserver était lancé avec cette commande :
-
-```bash
-docker run -d --name geoserver -p 127.0.0.1:8088:8080 --env-file=.env.cartobio-api --add-host=postgres:$(docker inspect -f '{{.NetworkSettings.IPAddress}}' postgres)  kartoza/geoserver:2.20.1
+docker run -d --name postgres -p 127.0.0.1:5432:5432 --env-file=.env.cartobio-api -v "$(pwd)/postgres_data/postgresql:/var/lib/postgresql" kartoza/postgis:14-3.3
 ```
 
 ## Générer les fonds de carte
