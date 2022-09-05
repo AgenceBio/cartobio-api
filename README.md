@@ -2,10 +2,11 @@
 
 > API des données parcellaires bio en France.
 
-Elle a vocation à être intégrée à [CartoBio-Presentation] et aux outils
+Elle a vocation à être intégrée à [`cartobio-front`][cartobio-front] et aux outils
 métiers des organismes de certification du bio en France.
 
-**Pré-requis** : `node@14`, `postgres@9.4`, `postgis@2.1`.
+
+**Pré-requis** : `node@14`, `postgres@14`, `postgis@3.3`.
 
 **📚 Table des matières**
 
@@ -18,6 +19,8 @@ métiers des organismes de certification du bio en France.
 - [Manuel d'utilisation](#manuel-dutilisation)
   - [Générer un token d'API](#générer-un-token-dapi)
   - [Renouveler le secret 256](#renouveler-le-secret-256)
+  - [Déployer en production](#deployer-en-production)
+  - [Générer les fonds de carte](#générer-les-fonds-de-carte)
 
 ## Fonctionnement
 
@@ -43,7 +46,6 @@ $ npm run watch
 | `GET`   | `/api/v1/summary`               | Liste géolocalisée (précision : département) des clients d'un Organisme de Certification.
 | `GET`   | `/api/v1/parcels`               | Liste des parcelles des clients d'un Organisme de Certification.
 | `GET`   | `/api/v1/parcels/operator/:id`  | Liste des parcelles d'un opérateur donné.
-| `POST`   | `/api/v1/parcels/operator/:id`  | Réceptionne les parcelles envoyées par les utilisateurs (utilise Trello comme backend et triage des données)
 
 L'authentification est assurée grâce à des [jetons JWT][jwt], issus à la main.
 
@@ -64,11 +66,7 @@ L'application lit les variables définies dans un fichier `.env`.
 | `ESPACE_COLLABORATIF_BASIC_AUTH`    | ``                                        | Authentification à l'[espace collaboratif IGN][api-ign-collab] (depuis un navigateur: `btoa('username:password')`).
 | `NOTIFICATIONS_AB_CARTOBIO_USER`    | ``                                        | Adresse email de connexion à l'espace Notifications de l'Agence Bio
 | `NOTIFICATIONS_AB_CARTOBIO_PASSWORD`| ``                                        | Mot de passe associé au compte Agence Bio
-| `ESPACE_COLLABORATIF_ENDPOINT`      | `https://espacecollaboratif.ign.fr`       | Point d'accès à l'[API Espace Collaboratif d'IGN][api-ign-collab]
 | `NOTIFICATIONS_AB_ENDPOINT`         | `https://back.agencebio.org`              | Point d'accès aux [notifications de l'Agence Bio][api-ab]
-| `TRELLO_API_KEY`                    |                                           | [Trello Developer API Key]
-| `TRELLO_API_TOKEN`                  |                                           | Trello Developer App token, generated via the above link
-| `TRELLO_LIST_ID`                    | `5f1e8c0f9b9a9a4fd5866a22`                | The list Id (according to Trello API) to stash new contact submissions into
 
 ## Tests
 
@@ -135,13 +133,36 @@ Tous les tokens précédemment émis ne seront plus fonctionnels.
 $ npx vpg --length 256 | base64
 ```
 
+## Déployer en production
 
-[CartoBio-Presentation]: https://github.com/entrepreneur-interet-general/CartoBio-Presentation/
+```bash
+docker run -d --name postgres -p 127.0.0.1:5432:5432 -v "$(pwd)/postgres_data/postgresql:/var/lib/postgresql" kartoza/postgis:14-3.3
+```
+
+Anciennement, le Geoserver était lancé avec cette commande :
+
+```bash
+docker run -d --name geoserver -p 127.0.0.1:8088:8080 --env-file=.env.cartobio-api --add-host=postgres:$(docker inspect -f '{{.NetworkSettings.IPAddress}}' postgres)  kartoza/geoserver:2.20.1
+```
+
+## Générer les fonds de carte
+
+**Remarque** : Les fonds de carte étaient auparavant servis avec le logiciel Geoserver.
+
+Les fonds de carte sont servis statiquement, et générés à l'aide de l'outil en ligne de commande [tippecanoe] :
+
+```bash
+rm rpg.geojson
+
+for FILE in $(ls *.zip); do ogr2ogr -update -append -t_srs EPSG:3857 -nln rpg rpg.geojson "/vsizip/${FILE}"; done
+
+tippecanoe -Z10 -z14 --extend-zooms-if-still-dropping --no-tile-compression --simplify-only-low-zooms --drop-densest-as-needed --output-to-directory rpg-2019 --projection EPSG:3857 --name "RPG 2019" --layer "rpg2019" --exclude NUM_ILOT --exclude NUM_PARCEL --exclude PACAGE --force rpg.geojson
+```
+
+[cartobio-front]: https://github.com/agencebio/cartobio-front
 [jwt]: https://jwt.io/
 
-[api-ign-collab]: https://espacecollaboratif.ign.fr/api/doc
 [api-ab]: https://preprod-notification.agencebio.org/
-[Trello Developer API Key]: https://trello.com/app-key
 
 [Jest]: https://jestjs.io/docs/en/getting-started
 [supertest]: https://github.com/visionmedia/supertest#readme
