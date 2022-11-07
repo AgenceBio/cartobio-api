@@ -7,6 +7,7 @@ const app = require('fastify')({
 const Sentry = require('@sentry/node')
 const { sign } = require('jsonwebtoken')
 const { all: deepmerge } = require('deepmerge')
+const pick = require('lodash/pick')
 
 const parcelsFixture = require('./test/fixtures/parcels.json')
 const summaryFixture = require('./test/fixtures/summary.json')
@@ -17,7 +18,7 @@ const JWT_SECRET = Buffer.from(process.env.CARTOBIO_JWT_SECRET, 'base64')
 
 const { verify, track: _track, enforceParams } = require('./lib/middlewares.js')
 const { getOperatorParcels, getOperatorSummary } = require('./lib/parcels.js')
-const { fetchAuthToken, fetchUserProfile, operatorLookup, getCertificationBodyForPacage } = require('./lib/providers/agence-bio.js')
+const { fetchAuthToken, fetchUserProfile, fetchCustomersByOperator, operatorLookup, getCertificationBodyForPacage } = require('./lib/providers/agence-bio.js')
 const { updateOperator, updateOperatorParcels, getOperator } = require('./lib/providers/cartobio.js')
 const { parseShapefileArchive } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive } = require('./lib/providers/geofolia.js')
@@ -288,6 +289,24 @@ app.patch('/api/v1/operator/:numeroBio', deepmerge([internalSchema, protectedRou
 app.get('/api/v2/stats', internalSchema, (request, reply) => {
   return db.query("SELECT COUNT(parcelles) as count, SUM(JSONB_ARRAY_LENGTH(parcelles->'features')::bigint) as parcelles_count FROM cartobio_operators WHERE metadata->>'source' != '';")
     .then(({ rows }) => reply.code(200).send({ stats: rows[0] }))
+})
+
+/**
+ * @private
+ */
+app.get('/api/v2/certification/operators/:ocId', internalSchema, (request, reply) => {
+  const { ocId } = request.params
+
+  fetchCustomersByOperator({ ocId })
+    .then(operators => reply.code(200).send({ operators: operators.map(o => pick(o, ['id', 'nom', 'dateEngagement'])) }))
+    .catch(error => {
+      request.log.error(`Failed to fetch operators for ${ocId} because of this error "%s"`, error.message)
+      reportErrors && Sentry.captureException(error)
+
+      reply.code(500).send({
+        error: 'Sorry, we failed to retrieve certification data. We have been notified about and will soon start fixing this issue.'
+      })
+    })
 })
 
 /**

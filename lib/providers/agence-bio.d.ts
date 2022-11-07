@@ -1,4 +1,15 @@
 import { EventStatus } from "@sentry/node"
+import { fetchCustomersByOperator } from './agence-bio.js'
+
+interface ocId {
+  ocId?: number
+}
+
+interface operatorId {
+  operatorId?: number
+}
+
+// declare function fetchCustomersByOperator (options: ocId | operatorId): Array.<Operateur>
 
 export type Catégorie = {
   id: number,
