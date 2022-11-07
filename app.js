@@ -18,7 +18,7 @@ const JWT_SECRET = Buffer.from(process.env.CARTOBIO_JWT_SECRET, 'base64')
 
 const { verify, track: _track, enforceParams } = require('./lib/middlewares.js')
 const { getOperatorParcels, getOperatorSummary } = require('./lib/parcels.js')
-const { fetchAuthToken, fetchUserProfile, fetchCustomersByOperator, operatorLookup, getCertificationBodyForPacage } = require('./lib/providers/agence-bio.js')
+const { fetchAuthToken, fetchUserProfile, operatorLookup, fetchCustomersByOperator, getCertificationBodyForPacage } = require('./lib/providers/agence-bio.js')
 const { updateOperator, updateOperatorParcels, getOperator } = require('./lib/providers/cartobio.js')
 const { parseShapefileArchive } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive } = require('./lib/providers/geofolia.js')
@@ -57,8 +57,9 @@ app.register(require('fastify-cors'), {
 
 // Expose OpenAPI schema and Swagger documentation
 app.register(require('fastify-swagger'), {
-  routePrefix: '/api/v1/documentation',
+  routePrefix: '/api/documentation',
   exposeRoute: true,
+  hideUntagged: true,
   swagger: {
     info: {
       title: 'CartBio API',
@@ -294,10 +295,10 @@ app.get('/api/v2/stats', internalSchema, (request, reply) => {
 /**
  * @private
  */
-app.get('/api/v2/certification/operators/:ocId', internalSchema, (request, reply) => {
-  const { ocId } = request.params
+app.post('/api/v2/certification/operators/search', internalSchema, (request, reply) => {
+  const { ocId, input: nom } = request.body
 
-  fetchCustomersByOperator({ ocId })
+  fetchCustomersByOperator({ ocId, nom })
     .then(operators => reply.code(200).send({ operators: operators.map(o => pick(o, ['id', 'nom', 'dateEngagement'])) }))
     .catch(error => {
       request.log.error(`Failed to fetch operators for ${ocId} because of this error "%s"`, error.message)
