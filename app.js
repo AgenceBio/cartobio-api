@@ -313,15 +313,15 @@ app.post('/api/v2/certification/operators/search', internalSchema, (request, rep
 /**
  * @private
  */
-app.get('/api/v2/operator/:numeroBio', internalSchema, (request, reply) => {
-  const { numeroBio } = request.params
+app.get('/api/v2/operator/:operatorId', internalSchema, (request, reply) => {
+  const { operatorId } = request.params
 
   // track({ request, decodedToken })
 
-  getOperator({ numeroBio })
+  getOperator({ operatorId })
     .then(result => reply.code(200).send(result))
     .catch(error => {
-      request.log.error(`Failed to fetch ocId for ${numeroBio} because of this error "%s"`, error.message)
+      request.log.error(`Failed to fetch operator #${operatorId} because of this error "%s"`, error.message)
       reportErrors && Sentry.captureException(error)
 
       reply.code(500).send({
@@ -333,16 +333,16 @@ app.get('/api/v2/operator/:numeroBio', internalSchema, (request, reply) => {
 /**
  * @private
  */
-app.post('/api/v2/operator/:numeroBio/parcelles', (request, reply) => {
+app.post('/api/v2/operator/:operatorId/parcelles', (request, reply) => {
   const { body } = request
-  const { numeroBio } = request.params
+  const { operatorId } = request.params
 
   // track({ request, decodedToken })
 
-  updateOperatorParcels({ numeroBio }, body)
-    .then(({ parcelles, metadata }) => reply.code(200).send({ parcelles, metadata }))
+  updateOperatorParcels({ operatorId }, body)
+    .then(result => reply.code(200).send(result))
     .catch(error => {
-      request.log.error(`Failed to update operator ${numeroBio} parcels because of this error "%s"`, error.message)
+      request.log.error(`Failed to update operator ${operatorId} parcels because of this error "%s"`, error.message)
       reportErrors && Sentry.captureException(error)
 
       reply.code(500).send({

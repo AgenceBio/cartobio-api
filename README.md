@@ -81,9 +81,9 @@ $ npm test
 ## Développer localement
 
 ```bash
-$ docker-compose run --name api-db --publish=127.0.0.1:15432:5432 --detach db
+$ docker compose run --name api-db --publish=127.0.0.1:15432:5432 --detach db
 $ # ou
-$ # docker-compose run --rm --name api-db --publish=127.0.0.1:15432:5432 db
+$ # docker compose run --rm --name api-db --publish=127.0.0.1:15432:5432 db
 $ npm run watch
 ```
 
