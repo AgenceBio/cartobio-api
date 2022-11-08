@@ -1,6 +1,6 @@
 FROM node:14-slim
 
-RUN apt update && apt install -y unzip
+RUN apt update && apt install -y unzip && npm i -g npm@8
 
 # Create app directory
 WORKDIR /usr/src/app
