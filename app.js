@@ -7,7 +7,6 @@ const app = require('fastify')({
 const Sentry = require('@sentry/node')
 const { sign } = require('jsonwebtoken')
 const { all: deepmerge } = require('deepmerge')
-const pick = require('lodash/pick')
 
 const parcelsFixture = require('./test/fixtures/parcels.json')
 const summaryFixture = require('./test/fixtures/summary.json')

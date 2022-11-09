@@ -21,7 +21,6 @@
     "get-stream": "^6.0.0",
     "got": "^11.8.5",
     "jsonwebtoken": "^8.5.1",
-    "lodash": "^4.17.21",
     "matomo-tracker": "^2.2.4",
     "p-limit": "^3.1.0",
     "p-memoize": "^4.0.4",
