@@ -299,7 +299,7 @@ app.post('/api/v2/certification/operators/search', internalSchema, (request, rep
   const { ocId, input: nom } = request.body
 
   fetchCustomersByOperator({ ocId, nom })
-    .then(operators => reply.code(200).send({ operators: operators.map(o => pick(o, ['id', 'nom', 'dateEngagement'])) }))
+    .then(operators => reply.code(200).send({ operators }))
     .catch(error => {
       request.log.error(`Failed to fetch operators for ${ocId} because of this error "%s"`, error.message)
       reportErrors && Sentry.captureException(error)
