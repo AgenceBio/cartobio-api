@@ -9,7 +9,6 @@ const USER_DOC_AUTH_HEADER = `Bearer ${USER_DOC_AUTH_TOKEN}`
 jest.mock('./lib/providers/agence-bio.js')
 jest.mock('./lib/providers/cartobio.js')
 jest.mock('./lib/parcels.js')
-jest.mock('./lib/services/trello.js')
 
 const { fetchAuthToken, fetchUserProfile, getCertificationBodyForPacage } = require('./lib/providers/agence-bio.js')
 const { updateOperator } = require('./lib/providers/cartobio.js')

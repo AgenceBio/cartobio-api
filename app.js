@@ -22,14 +22,12 @@ const { updateOperator, updateOperatorParcels, getOperator, fetchLatestCustomers
 const { parseShapefileArchive } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive } = require('./lib/providers/geofolia.js')
 const { getMesParcellesOperator } = require('./lib/providers/mes-parcelles.js')
-const { createCard } = require('./lib/services/trello.js')
 const env = require('./lib/app.js').env()
 
 const { sandboxSchema, ocSchema, internalSchema } = require('./lib/routes/index.js')
 const { routeWithNumeroBio, routeWithPacage } = require('./lib/routes/index.js')
 const { loginSchema, tryLoginSchema } = require('./lib/routes/login.js')
 const { operatorSchema } = require('./lib/routes/operators.js')
-const { parcelsOperatorSchema } = require('./lib/routes/parcels.js')
 
 const db = require('./lib/db.js')
 
@@ -418,38 +416,6 @@ app.post('/api/v2/import/mesparcelles/login', async (request, reply) => {
         error: 'Sorry, we failed to transform the Shapefile into GeoJSON. We have been notified about and will soon start fixing this issue.'
       })
     })
-})
-
-/**
- * @private
- */
-app.post('/api/v1/parcels/operator/:numeroBio', deepmerge([internalSchema, protectedRouteOptions, parcelsOperatorSchema]), async (request, reply) => {
-  const { numeroBio } = request.params
-  const { sender, uploads, text } = request.body
-  const { TRELLO_API_KEY: key, TRELLO_API_TOKEN: token, TRELLO_LIST_ID: idList } = env
-
-  try {
-    await createCard({
-      key,
-      token,
-      idList,
-      uploads,
-      name: `Parcelles pour l'opérateur bio n°${numeroBio}`,
-      desc: `Envoyé par ${sender.userName} • OC n°${sender.ocId} • User n°${sender.userId} • ${sender.userEmail}
-----
-
-    ${text}`
-    })
-
-    reply.code(204).send()
-  } catch (error) {
-    request.log.error('Failed to send email because of this error "%s"', error.message)
-    reportErrors && Sentry.captureException(error)
-
-    reply.code(500).send({
-      error: 'Sorry, we failed to process your message. We have been notified about and will soon start fixing this issue.'
-    })
-  }
 })
 
 if (require.main === module) {
