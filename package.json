@@ -5,7 +5,7 @@
   "main": "app.js",
   "dependencies": {
     "@etalab/decoupage-administratif": "^1.1.1",
-    "@sentry/node": "^6.19.7",
+    "@sentry/node": "^7.21.1",
     "@turf/helpers": "^6.5.0",
     "adm-zip": "^0.5.9",
     "db-migrate": "^0.11.12",
