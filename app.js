@@ -18,7 +18,7 @@ const JWT_SECRET = Buffer.from(process.env.CARTOBIO_JWT_SECRET, 'base64')
 const { verify, track: _track, enforceParams } = require('./lib/middlewares.js')
 const { getOperatorParcels, getOperatorSummary } = require('./lib/parcels.js')
 const { fetchAuthToken, fetchUserProfile, operatorLookup, fetchCustomersByOperator, getCertificationBodyForPacage } = require('./lib/providers/agence-bio.js')
-const { updateOperator, updateOperatorParcels, getOperator, fetchLatestCustomersByControlBody } = require('./lib/providers/cartobio.js')
+const { updateOperator, updateOperatorParcels, getOperator, updateAuditRecordState, fetchLatestCustomersByControlBody } = require('./lib/providers/cartobio.js')
 const { parseShapefileArchive } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive } = require('./lib/providers/geofolia.js')
 const { getMesParcellesOperator } = require('./lib/providers/mes-parcelles.js')
@@ -300,6 +300,22 @@ app.post('/api/v2/certification/operators/search', internalSchema, (request, rep
     .then(operators => reply.code(200).send({ operators }))
     .catch(error => {
       request.log.error(`Failed to fetch operators for ${ocId} because of this error "%s"`, error.message)
+      reportErrors && Sentry.captureException(error)
+
+      reply.code(500).send({
+        error: 'Sorry, we failed to retrieve certification data. We have been notified about and will soon start fixing this issue.'
+      })
+    })
+})
+
+app.patch('/api/v2/certification/audits/:recordId', internalSchema, (request, reply) => {
+  const { ...patch } = request.body
+  const { recordId } = request.params
+
+  updateAuditRecordState(recordId, patch)
+    .then(record => reply.code(200).send(record))
+    .catch(error => {
+      request.log.error(`Failed to update audit state for record ${recordId} because of this error "%s"`, error.message)
       reportErrors && Sentry.captureException(error)
 
       reply.code(500).send({
