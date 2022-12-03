@@ -34,13 +34,23 @@ describe('GET /', () => {
   })
 })
 
-describe('GET /api/v1/version', () => {
+describe('GET /api/version', () => {
   test('responds with package.json version value', () => {
+    return request(app)
+      .get('/api/version')
+      .type('json')
+      .then((response) => {
+        expect(response.body).toHaveProperty('version', packageVersion)
+      })
+  })
+
+  test('responds with redirect', () => {
     return request(app)
       .get('/api/v1/version')
       .type('json')
       .then((response) => {
-        expect(response.body).toHaveProperty('version', packageVersion)
+        expect(response.status).toBe(301)
+        expect(response.header.location).toBe('/api/version')
       })
   })
 })

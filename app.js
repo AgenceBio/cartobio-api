@@ -151,7 +151,7 @@ app.get('/api/version', sandboxSchema, (request, reply) => {
   return reply.send({ version: apiVersion })
 })
 
-app.get('/api/v1/version', deepmerge([sandboxSchema, deprecatedSchema]), (request, reply) => reply.redirect('/api/version'))
+app.get('/api/v1/version', deepmerge([sandboxSchema, deprecatedSchema]), (request, reply) => reply.code(301).redirect('/api/version'))
 
 app.get('/api/v1/test', deepmerge([sandboxSchema, protectedRouteOptions]), (request, reply) => {
   const { decodedToken } = request
