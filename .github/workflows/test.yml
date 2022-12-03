@@ -18,3 +18,5 @@ jobs:
         CI: true
         NOTIFICATIONS_AB_ENDPOINT: https://preprod-notifications.agencebio.org:444
         CARTOBIO_JWT_SECRET: "${{ secrets.CARTOBIO_JWT_SECRET }}"
+        NOTIFICATIONS_AB_SSO_CLIENT_ID: "test"
+        NOTIFICATIONS_AB_SSO_CLIENT_SECRET: "test"

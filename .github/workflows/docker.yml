@@ -21,11 +21,13 @@ jobs:
       run: docker build -t agencebio/cartobio-api .
 
     - name: Test the Docker image
-      run: docker run -e NOTIFICATIONS_AB_CARTOBIO_USER -e NOTIFICATIONS_AB_CARTOBIO_PASSWORD -e NOTIFICATIONS_AB_ENDPOINT -e CARTOBIO_JWT_SECRET -e CI agencebio/cartobio-api npm test
+      run: docker run -e NOTIFICATIONS_AB_CARTOBIO_USER -e NOTIFICATIONS_AB_CARTOBIO_PASSWORD -e NOTIFICATIONS_AB_SSO_CLIENT_ID -e NOTIFICATIONS_AB_SSO_CLIENT_SECRET -e NOTIFICATIONS_AB_ENDPOINT -e CARTOBIO_JWT_SECRET -e CI agencebio/cartobio-api npm test
       env:
         CI: true
         NOTIFICATIONS_AB_ENDPOINT: https://preprod-notifications.agencebio.org:444
         CARTOBIO_JWT_SECRET: "${{ secrets.CARTOBIO_JWT_SECRET }}"
+        NOTIFICATIONS_AB_SSO_CLIENT_ID: "test"
+        NOTIFICATIONS_AB_SSO_CLIENT_SECRET: "test"
 
     - name: Publish to Docker Hub
       uses: jerray/publish-docker-action@v1.0.5
