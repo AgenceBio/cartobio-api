@@ -27,7 +27,7 @@ const { parseGeofoliaArchive } = require('./lib/providers/geofolia.js')
 const { getMesParcellesOperator } = require('./lib/providers/mes-parcelles.js')
 const env = require('./lib/app.js').env()
 
-const { sandboxSchema, ocSchema, internalSchema } = require('./lib/routes/index.js')
+const { sandboxSchema, deprecatedSchema, ocSchema, internalSchema } = require('./lib/routes/index.js')
 const { routeWithNumeroBio, routeWithPacage } = require('./lib/routes/index.js')
 const { loginSchema, tryLoginSchema } = require('./lib/routes/login.js')
 const { operatorSchema } = require('./lib/routes/operators.js')
@@ -147,9 +147,11 @@ const enforceSameCertificationBody = {
 }
 
 // Begin Public API routes
-app.get('/api/v1/version', sandboxSchema, (request, reply) => {
+app.get('/api/version', sandboxSchema, (request, reply) => {
   return reply.send({ version: apiVersion })
 })
+
+app.get('/api/v1/version', deepmerge([sandboxSchema, deprecatedSchema]), (request, reply) => reply.redirect('/api/version'))
 
 app.get('/api/v1/test', deepmerge([sandboxSchema, protectedRouteOptions]), (request, reply) => {
   const { decodedToken } = request
