@@ -1,6 +1,6 @@
 {
   "name": "cartobio-api",
-  "version": "1.22.3",
+  "version": "1.22.4",
   "description": "api for cartobio",
   "main": "app.js",
   "dependencies": {
