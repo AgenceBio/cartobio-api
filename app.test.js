@@ -1,10 +1,13 @@
 const { server: app, close, ready } = require('.')
 const { version: packageVersion } = require('./package.json')
 const request = require('supertest')
-const { decode, sign } = require('jsonwebtoken')
+const { createDecoder, createSigner } = require('fast-jwt')
 
 const USER_DOC_AUTH_TOKEN = 'eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJvY0lkIjowLCJ0ZXN0Ijp0cnVlfQ.NL050Bt_jMnQ6WLcqIbmwGJkaDvZ0PIAZdCKTNF_-sSTiTw5cijPGm6TwUSCWEyQUMFvI1_La19TDPXsaemDow'
 const USER_DOC_AUTH_HEADER = `Bearer ${USER_DOC_AUTH_TOKEN}`
+
+const decode = createDecoder()
+const sign = createSigner({ algorithm: 'none' })
 
 jest.mock('./lib/providers/agence-bio.js')
 jest.mock('./lib/providers/cartobio.js')
@@ -137,7 +140,7 @@ describe('PATCH /api/v1/operator/:numeroBio', () => {
       .send({})
       .then((response) => {
         expect(response.status).toBe(401)
-        expect(response.body.error).toBe('We could not verify the provided token.')
+        expect(response.body.error).toBe('An API token must be provided.')
       })
   })
 
@@ -149,7 +152,7 @@ describe('PATCH /api/v1/operator/:numeroBio', () => {
       .send({ numeroPacage: '000000000' })
       .then((response) => {
         expect(response.status).toBe(400)
-        expect(response.body.message).toMatch('params.numeroBio should be integer')
+        expect(response.body.message).toMatch('params/numeroBio must be integer')
       })
   })
 
@@ -161,7 +164,7 @@ describe('PATCH /api/v1/operator/:numeroBio', () => {
       .send({ numeroPacage: '12345678' })
       .then((response) => {
         expect(response.status).toBe(400)
-        expect(response.body.message).toMatch('body.numeroPacage should match pattern')
+        expect(response.body.message).toMatch('body/numeroPacage must match pattern')
       })
   })
 

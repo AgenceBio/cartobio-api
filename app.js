@@ -1,11 +1,13 @@
 'use strict'
 
-const app = require('fastify')({
-  logger: true
-})
+const app = require('fastify')({ logger: true })
+const fastifySwagger = require('@fastify/swagger')
+const fastifyCors = require('@fastify/cors')
+const fastifyMultipart = require('@fastify/multipart')
+const fastifyOauth = require('@fastify/oauth2')
 
 const Sentry = require('@sentry/node')
-const { sign } = require('jsonwebtoken')
+const { createSigner } = require('fast-jwt')
 const { all: deepmerge } = require('deepmerge')
 
 const parcelsFixture = require('./test/fixtures/parcels.json')
@@ -14,10 +16,11 @@ const { featureCollection } = require('@turf/helpers')
 
 const { version: apiVersion } = require('./package.json')
 const JWT_SECRET = Buffer.from(process.env.CARTOBIO_JWT_SECRET, 'base64')
+const sign = createSigner({ key: JWT_SECRET })
 
-const { verify, track: _track, enforceParams } = require('./lib/middlewares.js')
+const { decodeToken, enforceToken, track: _track, compareOperatorOutputAndToken } = require('./lib/middlewares.js')
 const { getOperatorParcels, getOperatorSummary } = require('./lib/parcels.js')
-const { fetchAuthToken, fetchUserProfile, operatorLookup, fetchCustomersByOperator, getCertificationBodyForPacage } = require('./lib/providers/agence-bio.js')
+const { fetchAuthToken, fetchUserProfile, getUserProfileFromSSOToken, operatorLookup, fetchCustomersByOperator, getCertificationBodyForPacage } = require('./lib/providers/agence-bio.js')
 const { updateOperator, updateOperatorParcels, getOperator, updateAuditRecordState, fetchLatestCustomersByControlBody } = require('./lib/providers/cartobio.js')
 const { parseShapefileArchive } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive } = require('./lib/providers/geofolia.js')
@@ -32,7 +35,9 @@ const { operatorSchema } = require('./lib/routes/operators.js')
 const db = require('./lib/db.js')
 
 // Application is hosted on localhost:8000 by default
-const { PORT, HOST, SENTRY_DSN, NODE_ENV } = env
+const { PORT: port, HOST: host, SENTRY_DSN, NODE_ENV } = env
+const { FRONTEND_URL, NOTIFICATIONS_AB_SSO_CALLBACK_URI: callbackUri } = env
+const { NOTIFICATIONS_AB_SSO_CLIENT_ID: agenceBioOAuth2ClientId, NOTIFICATIONS_AB_SSO_CLIENT_SECRET: agenceBioOAuth2ClientSecret } = env
 const reportErrors = SENTRY_DSN && NODE_ENV === 'production'
 
 // Sentry error reporting setup
@@ -47,22 +52,23 @@ if (reportErrors) {
 const track = reportErrors ? _track : () => {}
 
 // Configure server
-app.register(require('fastify-cors'), {
+app.register(fastifyCors, {
   origin: true,
   allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Accept-Encoding', 'Authorization']
 })
 
+// Accept incoming files (GeoJSON, ZIP files, etc.)
+app.register(fastifyMultipart)
+
 // Expose OpenAPI schema and Swagger documentation
-app.register(require('fastify-swagger'), {
-  routePrefix: '/api/documentation',
-  exposeRoute: true,
+app.register(fastifySwagger, {
   hideUntagged: true,
   swagger: {
     info: {
       title: 'CartBio API',
       version: apiVersion
     },
-    host: NODE_ENV === 'production' ? 'cartobio.org' : `${HOST}:${PORT}`,
+    host: NODE_ENV === 'production' ? 'cartobio.org' : `${host}:${port}`,
     schemes: [NODE_ENV === 'production' ? 'https' : 'http'],
     externalDocs: {
       url: 'https://cartobio.agencebio.org/api',
@@ -90,8 +96,29 @@ app.register(require('fastify-swagger'), {
   }
 })
 
-// Enable file upload
-app.register(require('fastify-multipart'))
+// SSO Agence Bio
+app.register(fastifyOauth, {
+  name: 'agenceBioOAuth2',
+  scope: ['openid'],
+  credentials: {
+    client: {
+      id: agenceBioOAuth2ClientId,
+      secret: agenceBioOAuth2ClientSecret
+    },
+    auth: {
+      authorizeHost: 'https://oauth.agencebio.ateliom.fr',
+      authorizePath: '/oauth2/auth',
+      tokenHost: 'https://oauth.agencebio.ateliom.fr',
+      tokenPath: '/oauth2/token',
+      revokePath: '/oauth2/revoke'
+    },
+    options: {
+      authorizationMethod: 'body'
+    }
+  },
+  startRedirectPath: '/auth-provider/agencebio/login',
+  callbackUri
+})
 
 // Routes to protect with a JSON Web Token
 app.decorateRequest('decodedToken', null)
@@ -104,8 +131,18 @@ const protectedRouteOptions = {
   },
 
   preValidation: [
-    verify({ JWT_SECRET }),
-    enforceParams('ocId')
+    decodeToken({ name: 'decodedToken', JWT_SECRET }),
+    enforceToken({ name: 'decodedToken' })
+  ]
+}
+
+const enforceSameCertificationBody = {
+  preValidation: [
+    decodeToken({ name: 'decodedToken', JWT_SECRET })
+  ],
+
+  preSerialization: [
+    compareOperatorOutputAndToken({ name: 'decodedToken' })
   ]
 }
 
@@ -131,7 +168,7 @@ app.get('/api/v1/summary', deepmerge([ocSchema, protectedRouteOptions]), (reques
     return reply.code(200).send(summaryFixture)
   }
 
-  getOperatorSummary({ ocId })
+  return getOperatorSummary({ ocId })
     .then(geojson => reply.code(200).send(geojson))
     .catch(error => {
       request.log.error(`Failed to return summary for OC ${ocId} because of this error "%s"`, error.message)
@@ -139,7 +176,7 @@ app.get('/api/v1/summary', deepmerge([ocSchema, protectedRouteOptions]), (reques
 
       reportErrors && Sentry.captureException(error)
 
-      reply.code(500).send({
+      return reply.code(500).send({
         error: 'Sorry, we failed to assemble summary data. We have been notified about and will soon start fixing this issue.'
       })
     })
@@ -155,13 +192,13 @@ app.get('/api/v1/parcels', deepmerge([ocSchema, protectedRouteOptions]), (reques
     return reply.code(200).send(parcelsFixture)
   }
 
-  getOperatorParcels({ ocId })
+  return getOperatorParcels({ ocId })
     .then(geojson => reply.code(200).send(geojson))
     .catch(error => {
       request.log.error(`Failed to return parcels for OC ${ocId} because of this error "%s"`, error.message)
       reportErrors && Sentry.captureException(error)
 
-      reply.code(500).send({
+      return reply.code(500).send({
         error: 'Sorry, we failed to assemble parcels data. We have been notified about and will soon start fixing this issue.'
       })
     })
@@ -180,13 +217,13 @@ app.get('/api/v1/parcels/operator/:numeroBio', deepmerge([ocSchema, protectedRou
     )
   }
 
-  getOperatorParcels({ ocId, numeroBio })
+  return getOperatorParcels({ ocId, numeroBio })
     .then(geojson => reply.code(200).send(geojson))
     .catch(error => {
       request.log.error(`Failed to return parcels for OC ${ocId} because of this error "%s"`, error.message)
       reportErrors && Sentry.captureException(error)
 
-      reply.code(500).send({
+      return reply.code(500).send({
         error: 'Sorry, we failed to assemble parcels data. We have been notified about and will soon start fixing this issue.'
       })
     })
@@ -202,10 +239,10 @@ app.post('/api/v1/login', deepmerge([internalSchema, loginSchema]), (request, re
 
   auth.catch(({ message: error }) => reply.code(401).send({ error }))
 
-  auth
+  return auth
     .then(token => fetchUserProfile(token))
     .then(({ userProfile, token }) => {
-      reply.code(200).send({
+      return reply.code(200).send({
         // to maintain backwards compat with direct calls to Agence Bio API
         agencebio: token,
         // to use user data straight from CartoBio-Presentation
@@ -235,7 +272,7 @@ app.post('/api/v1/tryLogin', deepmerge([internalSchema, tryLoginSchema]), (reque
       request.log.error(`Failed to login with ${q} because of this error "%s"`, error.message)
       reportErrors && Sentry.captureException(error)
 
-      reply.code(500).send({
+      return reply.code(500).send({
         error: 'Sorry, we failed to retrieve operator data. We have been notified about and will soon start fixing this issue.'
       })
     })
@@ -247,7 +284,7 @@ app.post('/api/v1/tryLogin', deepmerge([internalSchema, tryLoginSchema]), (reque
 app.get('/api/v1/pacage/:numeroPacage', deepmerge([internalSchema, protectedRouteOptions, routeWithPacage]), (request, reply) => {
   const { numeroPacage } = request.params
 
-  getCertificationBodyForPacage({ numeroPacage })
+  return getCertificationBodyForPacage({ numeroPacage })
     .then(({ ocId, numeroBio } = {}) => {
       return reply.code(200).send({ numeroPacage, numeroBio, ocId })
     })
@@ -255,7 +292,7 @@ app.get('/api/v1/pacage/:numeroPacage', deepmerge([internalSchema, protectedRout
       request.log.error(`Failed to fetch ocId for ${numeroPacage} because of this error "%s"`, error.message)
       reportErrors && Sentry.captureException(error)
 
-      reply.code(500).send({
+      return reply.code(500).send({
         error: 'Sorry, we failed to retrieve operator data. We have been notified about and will soon start fixing this issue.'
       })
     })
@@ -271,14 +308,14 @@ app.patch('/api/v1/operator/:numeroBio', deepmerge([internalSchema, protectedRou
 
   // track({ request, decodedToken })
 
-  updateOperator({ numeroBio, ocId }, body)
+  return updateOperator({ numeroBio, ocId }, body)
     .then(() => getOperatorSummary({ numeroBio, ocId }))
     .then(geojson => reply.code(200).send(geojson))
     .catch(error => {
       request.log.error(`Failed to update operator ${numeroBio} for OC ${ocId} because of this error "%s"`, error.message)
       reportErrors && Sentry.captureException(error)
 
-      reply.code(500).send({
+      return reply.code(500).send({
         error: 'Sorry, we failed to update operator data. We have been notified about and will soon start fixing this issue.'
       })
     })
@@ -293,32 +330,33 @@ app.get('/api/v2/stats', internalSchema, (request, reply) => {
  * @private
  * @TODO control and derive ocId credentials
  */
-app.post('/api/v2/certification/operators/search', internalSchema, (request, reply) => {
-  const { ocId, input: nom } = request.body
+app.post('/api/v2/certification/operators/search', deepmerge([internalSchema, protectedRouteOptions]), (request, reply) => {
+  const { input: nom } = request.body
+  const { organismeCertificateurId: ocId } = request.decodedToken
 
-  fetchCustomersByOperator({ ocId, nom })
+  return fetchCustomersByOperator({ ocId, nom })
     .then(operators => reply.code(200).send({ operators }))
     .catch(error => {
       request.log.error(`Failed to fetch operators for ${ocId} because of this error "%s"`, error.message)
       reportErrors && Sentry.captureException(error)
 
-      reply.code(500).send({
+      return reply.code(500).send({
         error: 'Sorry, we failed to retrieve certification data. We have been notified about and will soon start fixing this issue.'
       })
     })
 })
 
-app.patch('/api/v2/certification/audits/:recordId', internalSchema, (request, reply) => {
+app.patch('/api/v2/certification/audits/:recordId', deepmerge([internalSchema, protectedRouteOptions]), (request, reply) => {
   const { ...patch } = request.body
   const { recordId } = request.params
 
-  updateAuditRecordState(recordId, patch)
+  return updateAuditRecordState(recordId, patch)
     .then(record => reply.code(200).send(record))
     .catch(error => {
       request.log.error(`Failed to update audit state for record ${recordId} because of this error "%s"`, error.message)
       reportErrors && Sentry.captureException(error)
 
-      reply.code(500).send({
+      return reply.code(500).send({
         error: 'Sorry, we failed to retrieve certification data. We have been notified about and will soon start fixing this issue.'
       })
     })
@@ -328,16 +366,16 @@ app.patch('/api/v2/certification/audits/:recordId', internalSchema, (request, re
  * @private
  * @TODO control and derive ocId credentials
  */
-app.get('/api/v2/certification/operators/latest', internalSchema, (request, reply) => {
-  const { ocId } = request.query
+app.get('/api/v2/certification/operators/latest', deepmerge([internalSchema, protectedRouteOptions]), (request, reply) => {
+  const { organismeCertificateurId: ocId } = request.decodedToken
 
-  fetchLatestCustomersByControlBody({ ocId })
+  return fetchLatestCustomersByControlBody({ ocId })
     .then(operators => reply.code(200).send({ operators }))
     .catch(error => {
       request.log.error(`Failed to fetch operators for ${ocId} because of this error "%s"`, error.message)
       reportErrors && Sentry.captureException(error)
 
-      reply.code(500).send({
+      return reply.code(500).send({
         error: 'Sorry, we failed to retrieve certification data. We have been notified about and will soon start fixing this issue.'
       })
     })
@@ -346,18 +384,18 @@ app.get('/api/v2/certification/operators/latest', internalSchema, (request, repl
 /**
  * @private
  */
-app.get('/api/v2/operator/:operatorId', internalSchema, (request, reply) => {
+app.get('/api/v2/operator/:operatorId', deepmerge([internalSchema, enforceSameCertificationBody/*, protectedRouteOptions */]), (request, reply) => {
   const { operatorId } = request.params
 
   // track({ request, decodedToken })
 
-  getOperator({ operatorId })
+  return getOperator({ operatorId })
     .then(result => reply.code(200).send(result))
     .catch(error => {
       request.log.error(`Failed to fetch operator #${operatorId} because of this error "%s"`, error.message)
       reportErrors && Sentry.captureException(error)
 
-      reply.code(500).send({
+      return reply.code(500).send({
         error: 'Sorry, we failed to retrieve operator data. We have been notified about and will soon start fixing this issue.'
       })
     })
@@ -372,13 +410,13 @@ app.post('/api/v2/operator/:operatorId/parcelles', (request, reply) => {
 
   // track({ request, decodedToken })
 
-  updateOperatorParcels({ operatorId }, body)
+  return updateOperatorParcels({ operatorId }, body)
     .then(result => reply.code(200).send(result))
     .catch(error => {
       request.log.error(`Failed to update operator ${operatorId} parcels because of this error "%s"`, error.message)
       reportErrors && Sentry.captureException(error)
 
-      reply.code(500).send({
+      return reply.code(500).send({
         error: 'Sorry, we failed to update operator data. We have been notified about and will soon start fixing this issue.'
       })
     })
@@ -388,13 +426,13 @@ app.post('/api/v2/operator/:operatorId/parcelles', (request, reply) => {
  * @private
  */
 app.post('/api/v1/convert/shapefile/geojson', async (request, reply) => {
-  parseShapefileArchive(request.file())
+  return parseShapefileArchive(request.file())
     .then(geojson => reply.send(geojson))
     .catch(error => {
       request.log.error('Failed to parse Shapefile archive because of this error "%s"', error.message)
       reportErrors && Sentry.captureException(error)
 
-      reply.code(500).send({
+      return reply.code(500).send({
         error: 'Sorry, we failed to transform the Shapefile into GeoJSON. We have been notified about and will soon start fixing this issue.'
       })
     })
@@ -404,13 +442,13 @@ app.post('/api/v1/convert/shapefile/geojson', async (request, reply) => {
  * @private
  */
 app.post('/api/v1/convert/geofolia/geojson', async (request, reply) => {
-  parseGeofoliaArchive(request.file())
+  return parseGeofoliaArchive(request.file())
     .then(geojson => reply.send(geojson))
     .catch(error => {
       request.log.error('Failed to parse Geofolia archive because of this error "%s"', error.message)
       reportErrors && Sentry.captureException(error)
 
-      reply.code(500).send({
+      return reply.code(500).send({
         error: 'Sorry, we failed to transform the Shapefile into GeoJSON. We have been notified about and will soon start fixing this issue.'
       })
     })
@@ -422,16 +460,44 @@ app.post('/api/v1/convert/geofolia/geojson', async (request, reply) => {
 app.post('/api/v2/import/mesparcelles/login', async (request, reply) => {
   const { email, password, server } = request.body
 
-  getMesParcellesOperator({ email, password, server })
+  return getMesParcellesOperator({ email, password, server })
     .then(geojson => reply.send(geojson))
     .catch(error => {
       request.log.error('Failed to import MesParcelles data because of this error "%o"', error)
       reportErrors && Sentry.captureException(error)
 
-      reply.code(500).send({
+      return reply.code(500).send({
         error: 'Sorry, we failed to transform the Shapefile into GeoJSON. We have been notified about and will soon start fixing this issue.'
       })
     })
+})
+
+app.post('/api/v2/user/verify', deepmerge([sandboxSchema, protectedRouteOptions]), (request, reply) => {
+  const { decodedToken } = request
+
+  track({ request, decodedToken })
+
+  return reply.send(decodedToken)
+})
+
+app.get('/auth-provider/agencebio/callback', async (request, reply) => {
+  const { token } = await app.agenceBioOAuth2.getAccessTokenFromAuthorizationCodeFlow(request)
+
+  const userProfile = await getUserProfileFromSSOToken(token.access_token)
+
+  const cartobioToken = sign({
+    id: userProfile.id,
+    prenom: userProfile.prenom,
+    nom: userProfile.nom,
+    organismeCertificateurId: userProfile.organismeCertificateurId,
+    organismeCertificateur: userProfile.organismeCertificateur ?? {},
+    mainGroup: {
+      id: userProfile.groupes[0].id,
+      nom: userProfile.groupes[0].nom
+    }
+  }, JWT_SECRET, { expiresIn: '10d' })
+
+  return reply.redirect(`${FRONTEND_URL}/login#token=${cartobioToken}`)
 })
 
 if (require.main === module) {
@@ -439,7 +505,7 @@ if (require.main === module) {
     const { server_version: pgVersion } = rows[0]
     console.log(`Postgres connection established, v${pgVersion}`)
 
-    app.listen(PORT, HOST, (error, address) => {
+    app.listen({ host, port }, (error, address) => {
       if (error) {
         return console.error(error)
       }
