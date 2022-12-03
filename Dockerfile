@@ -1,6 +1,6 @@
-FROM node:14-slim
+FROM node:14-alpine
 
-RUN apt update && apt install -y unzip && npm i -g npm@8
+RUN apk add --update python3 make g++ unzip gdal gdal-dev && npm i -g npm@8
 
 # Create app directory
 WORKDIR /usr/src/app
@@ -10,7 +10,7 @@ WORKDIR /usr/src/app
 # where available (npm@5+)
 COPY package*.json ./
 
-RUN npm ci
+RUN npm ci  --build-from-source --shared_gdal
 # If you are building your code for production
 # RUN npm ci --only=production
 

@@ -7,7 +7,7 @@ jobs:
   node-test:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - uses: actions/setup-node@v3
       with:
         node-version: '14'
@@ -16,6 +16,5 @@ jobs:
     - run: npm test -- --collectCoverage --coverageReporters text
       env:
         CI: true
-        ESPACE_COLLABORATIF_BASIC_AUTH: ${{ secrets.ESPACE_COLLABORATIF_BASIC_AUTH }}
         NOTIFICATIONS_AB_ENDPOINT: https://preprod-notifications.agencebio.org:444
         CARTOBIO_JWT_SECRET: "${{ secrets.CARTOBIO_JWT_SECRET }}"

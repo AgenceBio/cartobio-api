@@ -64,7 +64,6 @@ L'application lit les variables définies dans un fichier `.env`.
 | `MATOMO_SITE_ID`                    | `116`                                     | Identifiant de site, pour le suivi des statistiques
 | `SENTRY_DSN`                        | ``                                        | DSN Sentry pour le suivi des erreurs applicatives
 | `CARTOBIO_JWT_SECRET`               | ``                                        | Secret JSON Web Token, pour vérifier l'authenticité des tokens
-| `ESPACE_COLLABORATIF_BASIC_AUTH`    | ``                                        | Authentification à l'[espace collaboratif IGN][api-ign-collab] (depuis un navigateur: `btoa('username:password')`).
 | `NOTIFICATIONS_AB_CARTOBIO_USER`    | ``                                        | Adresse email de connexion à l'espace Notifications de l'Agence Bio
 | `NOTIFICATIONS_AB_CARTOBIO_PASSWORD`| ``                                        | Mot de passe associé au compte Agence Bio
 | `NOTIFICATIONS_AB_ENDPOINT`         | `https://back.agencebio.org`              | Point d'accès aux [notifications de l'Agence Bio][api-ab]
