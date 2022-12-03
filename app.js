@@ -69,7 +69,7 @@ app.register(fastifySwagger, {
       title: 'CartoBio API',
       version: apiVersion
     },
-    host: NODE_ENV === 'production' ? 'cartobio.org' : `${host}:${port}`,
+    host: NODE_ENV === 'production' ? 'cartobio.agencebio.org' : `${host}:${port}`,
     schemes: [NODE_ENV === 'production' ? 'https' : 'http'],
     externalDocs: {
       url: 'https://cartobio.agencebio.org/api',
