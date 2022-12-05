@@ -40,7 +40,7 @@ jobs:
         auto_tag: true
 
     - name: Deploy in production (when Git tagged)
-      uses: garygrossgarten/github-action-ssh@v0.5.0
+      uses: garygrossgarten/github-action-ssh@v0.7.0
       if: startsWith(github.ref, 'refs/tags/')
       with:
         host: ${{ secrets.AGENCEBIO_SSH_HOST }}
