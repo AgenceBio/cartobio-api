@@ -5,10 +5,13 @@ module.exports = {
     node: true
   },
   plugins: [
-    'jest'
+    'jest',
+    '@typescript-eslint'
   ],
   extends: [
     'standard',
+    'eslint:recommended',
+    'plugin:@typescript-eslint/recommended',
     'plugin:jest/recommended',
     'plugin:jest/style'
   ],
@@ -16,10 +19,13 @@ module.exports = {
     Atomics: 'readonly',
     SharedArrayBuffer: 'readonly'
   },
+  // parser: '@typescript-eslint/parser',
   parserOptions: {
     ecmaVersion: 2020
   },
+  root: true,
   rules: {
-    'vue/multi-word-component-names': 'off'
+    'vue/multi-word-component-names': 'off',
+    '@typescript-eslint/no-var-requires': 'off'
   }
 }

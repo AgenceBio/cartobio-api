@@ -15,11 +15,6 @@ const parcelsFixture = require('./test/fixtures/parcels.json')
 const summaryFixture = require('./test/fixtures/summary.json')
 const { featureCollection } = require('@turf/helpers')
 
-const { version: apiVersion } = require('./package.json')
-const JWT_SECRET = Buffer.from(process.env.CARTOBIO_JWT_SECRET, 'base64')
-const sign = createSigner({ key: JWT_SECRET })
-
-const { decodeToken, enforceToken, track: _track, compareOperatorOutputAndToken } = require('./lib/middlewares.js')
 const { getOperatorParcels, getOperatorSummary } = require('./lib/parcels.js')
 const { fetchAuthToken, fetchUserProfile, getUserProfileFromSSOToken, operatorLookup, fetchCustomersByOperator, getCertificationBodyForPacage } = require('./lib/providers/agence-bio.js')
 const { updateOperator, updateOperatorParcels, getOperator, updateAuditRecordState, fetchLatestCustomersByControlBody } = require('./lib/providers/cartobio.js')
@@ -28,18 +23,21 @@ const { parseGeofoliaArchive } = require('./lib/providers/geofolia.js')
 const { getMesParcellesOperator } = require('./lib/providers/mes-parcelles.js')
 const env = require('./lib/app.js').env()
 
-const { sandboxSchema, deprecatedSchema, ocSchema, internalSchema, hiddenSchema, routeWithOperatorId, routeWithRecordId } = require('./lib/routes/index.js')
-const { routeWithNumeroBio, routeWithPacage } = require('./lib/routes/index.js')
+const { swaggerConfig } = require('./lib/routes/index.js')
+const { sandboxSchema, deprecatedSchema, ocSchema, internalSchema, hiddenSchema } = require('./lib/routes/index.js')
+const { protectedRouteOptions, trackableRoute, enforceSameCertificationBody } = require('./lib/routes/index.js')
+const { routeWithOperatorId, routeWithRecordId, routeWithNumeroBio, routeWithPacage } = require('./lib/routes/index.js')
 const { loginSchema, tryLoginSchema } = require('./lib/routes/login.js')
 const { operatorSchema } = require('./lib/routes/operators.js')
 
-const db = require('./lib/db.js')
-
 // Application is hosted on localhost:8000 by default
-const { PORT: port, HOST: host, SENTRY_DSN, NODE_ENV } = env
+const { PORT: port, HOST: host, SENTRY_DSN, NODE_ENV, JWT_SECRET, version: apiVersion } = env
 const { FRONTEND_URL, NOTIFICATIONS_AB_SSO_CALLBACK_URI: callbackUri } = env
 const { NOTIFICATIONS_AB_SSO_CLIENT_ID: agenceBioOAuth2ClientId, NOTIFICATIONS_AB_SSO_CLIENT_SECRET: agenceBioOAuth2ClientSecret } = env
 const reportErrors = SENTRY_DSN && NODE_ENV === 'production'
+
+const db = require('./lib/db.js')
+const sign = createSigner({ key: JWT_SECRET })
 
 // Sentry error reporting setup
 if (reportErrors) {
@@ -48,9 +46,6 @@ if (reportErrors) {
     release: 'cartobio-api@' + process.env.npm_package_version
   })
 }
-
-// Track events in Matomo in production only
-const track = reportErrors ? _track : () => {}
 
 // Configure server
 app.register(fastifyCors, {
@@ -62,40 +57,7 @@ app.register(fastifyCors, {
 app.register(fastifyMultipart)
 
 // Expose OpenAPI schema and Swagger documentation
-app.register(fastifySwagger, {
-  exposeRoute: true,
-  swagger: {
-    info: {
-      title: 'CartoBio API',
-      version: apiVersion
-    },
-    host: NODE_ENV === 'production' ? 'cartobio.agencebio.org' : `${host}:${port}`,
-    schemes: [NODE_ENV === 'production' ? 'https' : 'http'],
-    externalDocs: {
-      url: 'https://cartobio.agencebio.org/api',
-      description: 'Consulter le guide d\'utilisation de l\'API CartoBio'
-    },
-    tags: [
-      { name: 'Bac à sable', description: 'Pour s\'entraîner à utiliser l\'API' },
-      { name: 'Organisme de certification', description: 'Données géographiques à destination des organismes de certification' },
-      { name: 'CartoBio', description: 'Interactions avec l\'application cartobio.agencebio.org' }
-    ],
-    securityDefinitions: {
-      bearerAuth: {
-        type: 'apiKey',
-        name: 'Authorization',
-        in: 'header',
-        description: 'Token JWT passé en tant qu\'entête HTTP (donc préfixé par `Bearer `).'
-      },
-      tokenAuth: {
-        type: 'apiKey',
-        name: 'access_token',
-        in: 'query',
-        description: 'Token JWT passé en tant que paramètre d\'URL.'
-      }
-    }
-  }
-})
+app.register(fastifySwagger, swaggerConfig)
 
 app.register(fastifySwaggerUi, {
   baseDir: '/api',
@@ -129,50 +91,22 @@ app.register(fastifyOauth, {
 
 // Routes to protect with a JSON Web Token
 app.decorateRequest('decodedToken', null)
-const protectedRouteOptions = {
-  schema: {
-    securitySchemes: [
-      { bearerAuth: [] },
-      { tokenAuth: [] }
-    ]
-  },
-
-  preValidation: [
-    decodeToken({ name: 'decodedToken', JWT_SECRET }),
-    enforceToken({ name: 'decodedToken' })
-  ]
-}
-
-const enforceSameCertificationBody = {
-  preValidation: [
-    decodeToken({ name: 'decodedToken', JWT_SECRET })
-  ],
-
-  preSerialization: [
-    compareOperatorOutputAndToken({ name: 'decodedToken' })
-  ]
-}
 
 app.register(async (app) => {
   // Begin Public API routes
-  app.get('/api/version', sandboxSchema, (request, reply) => {
+  app.get('/api/version', deepmerge([sandboxSchema, trackableRoute]), (request, reply) => {
     return reply.send({ version: apiVersion })
   })
 
   app.get('/api/v1/version', deepmerge([sandboxSchema, deprecatedSchema]), (request, reply) => reply.code(301).redirect('/api/version'))
 
-  app.get('/api/v1/test', deepmerge([sandboxSchema, protectedRouteOptions]), (request, reply) => {
-    const { decodedToken } = request
-    track({ request, decodedToken })
-
+  app.get('/api/v1/test', deepmerge([sandboxSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
     return reply.send({ test: 'OK' })
   })
 
-  app.get('/api/v1/summary', deepmerge([ocSchema, protectedRouteOptions]), (request, reply) => {
+  app.get('/api/v1/summary', deepmerge([hiddenSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
     const { decodedToken } = request
     const { test: isTest, ocId } = decodedToken
-
-    // track({ request, decodedToken })
 
     if (isTest === true) {
       return reply.code(200).send(summaryFixture)
@@ -192,13 +126,11 @@ app.register(async (app) => {
       })
   })
 
-  app.get('/api/v1/parcels', deepmerge([ocSchema, protectedRouteOptions]), (request, reply) => {
+  app.get('/api/v1/parcels', deepmerge([hiddenSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
     const { decodedToken } = request
-    const { test: isTest, ocId } = decodedToken
+    const { ocId } = decodedToken
 
-    track({ request, decodedToken })
-
-    if (isTest === true) {
+    if (NODE_ENV === 'test') {
       return reply.code(200).send(parcelsFixture)
     }
 
@@ -214,14 +146,12 @@ app.register(async (app) => {
       })
   })
 
-  app.get('/api/v1/parcels/operator/:numeroBio', deepmerge([ocSchema, protectedRouteOptions, routeWithNumeroBio]), (request, reply) => {
+  app.get('/api/v1/parcels/operator/:numeroBio', deepmerge([hiddenSchema, protectedRouteOptions, routeWithNumeroBio, trackableRoute]), (request, reply) => {
     const { decodedToken, params } = request
-    const { test: isTest, ocId } = decodedToken
+    const { ocId } = decodedToken
     const { numeroBio } = params
 
-    track({ request, decodedToken })
-
-    if (isTest === true) {
+    if (NODE_ENV === 'test') {
       return reply.code(200).send(
         featureCollection(parcelsFixture.features.filter(({ properties }) => properties.numerobio === Number(numeroBio)))
       )
@@ -311,12 +241,10 @@ app.register(async (app) => {
   /**
    * @private
    */
-  app.patch('/api/v1/operator/:numeroBio', deepmerge([internalSchema, routeWithNumeroBio, protectedRouteOptions, operatorSchema]), (request, reply) => {
+  app.patch('/api/v1/operator/:numeroBio', deepmerge([internalSchema, routeWithNumeroBio, protectedRouteOptions, operatorSchema, trackableRoute]), (request, reply) => {
     const { decodedToken, body } = request
     const { ocId } = decodedToken
     const { numeroBio } = request.params
-
-    // track({ request, decodedToken })
 
     return updateOperator({ numeroBio, ocId }, body)
       .then(() => getOperatorSummary({ numeroBio, ocId }))
@@ -340,7 +268,7 @@ app.register(async (app) => {
    * @private
    * @TODO control and derive ocId credentials
    */
-  app.post('/api/v2/certification/operators/search', deepmerge([internalSchema, protectedRouteOptions]), (request, reply) => {
+  app.post('/api/v2/certification/operators/search', deepmerge([internalSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
     const { input: nom } = request.body
     const { organismeCertificateurId: ocId } = request.decodedToken
 
@@ -356,7 +284,7 @@ app.register(async (app) => {
       })
   })
 
-  app.patch('/api/v2/certification/audits/:recordId', deepmerge([internalSchema, routeWithRecordId, protectedRouteOptions, ocSchema]), (request, reply) => {
+  app.patch('/api/v2/certification/audits/:recordId', deepmerge([internalSchema, routeWithRecordId, protectedRouteOptions, ocSchema, trackableRoute]), (request, reply) => {
     const { ...patch } = request.body
     const { recordId } = request.params
 
@@ -394,10 +322,8 @@ app.register(async (app) => {
   /**
    * @private
    */
-  app.get('/api/v2/operator/:operatorId', deepmerge([internalSchema, routeWithOperatorId, enforceSameCertificationBody, ocSchema/*, protectedRouteOptions */]), (request, reply) => {
+  app.get('/api/v2/operator/:operatorId', deepmerge([internalSchema, routeWithOperatorId, enforceSameCertificationBody, ocSchema, trackableRoute/*, protectedRouteOptions */]), (request, reply) => {
     const { operatorId } = request.params
-
-    // track({ request, decodedToken })
 
     return getOperator({ operatorId })
       .then(result => reply.code(200).send(result))
@@ -414,11 +340,9 @@ app.register(async (app) => {
   /**
    * @private
    */
-  app.post('/api/v2/operator/:operatorId/parcelles', deepmerge([internalSchema, routeWithOperatorId, ocSchema]), (request, reply) => {
+  app.post('/api/v2/operator/:operatorId/parcelles', deepmerge([internalSchema, routeWithOperatorId, ocSchema, trackableRoute]), (request, reply) => {
     const { body } = request
     const { operatorId } = request.params
-
-    // track({ request, decodedToken })
 
     return updateOperatorParcels({ operatorId }, body)
       .then(result => reply.code(200).send(result))
@@ -482,10 +406,8 @@ app.register(async (app) => {
       })
   })
 
-  app.get('/api/v2/user/verify', deepmerge([sandboxSchema, internalSchema, protectedRouteOptions]), (request, reply) => {
+  app.get('/api/v2/user/verify', deepmerge([sandboxSchema, internalSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
     const { decodedToken } = request
-
-    track({ request, decodedToken })
 
     return reply.send(decodedToken)
   })

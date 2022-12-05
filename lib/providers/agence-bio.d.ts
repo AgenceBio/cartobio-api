@@ -1,6 +1,3 @@
-import { EventStatus } from "@sentry/node"
-import { fetchCustomersByOperator } from './agence-bio.js'
-
 interface ocId {
   ocId?: number
 }
@@ -25,6 +22,59 @@ export type Image = {
 
 export type SiteWeb = {
   url: string
+}
+
+export type Production = {
+  id: number,
+  /** Code Insee CPF (Classification des Produits Français) */
+  code: string,
+  nom: string,
+}
+
+export type Activité = {
+  id: number,
+  nom: string,
+  active: boolean
+}
+
+export type Département = {
+  id: number,
+  nom: string
+}
+
+export type AdresseOperateur = {
+  id: number,
+  codePostal: string,
+  codeCommune: string,
+  ville: string,
+  lat: number,
+  long: number,
+  departementId: Département.id
+}
+
+export enum CertificatStatut {
+  Active = 'ACTIVE'
+}
+
+export enum CertificationStatut {
+  Engagée = 'ENGAGEE'
+}
+
+export type Certificat = {
+  id: number,
+  numeroNotification: number | null,
+  commentaire: string | null,
+  organisme: string,
+  date: string | null,
+  status: CertificatStatut,
+  etatCertification: CertificationStatut,
+  dateSuspension: string | null,
+  dateDemarrage: string | null,
+  numeroClient: string | null,
+  operateurId: number,
+  organismeCertificateurId: number,
+  productionId: number,
+  url: string | null
 }
 
 export type Operateur = {
@@ -69,57 +119,4 @@ export type Operateur = {
   magasinSpecialise: boolean,
   artisanCommercant: boolean,
   grandeSurfaceGeneraliste: boolean
-}
-
-export type AdresseOperateur = {
-  id: number,
-  codePostal: string,
-  codeCommune: string,
-  ville: string,
-  lat: number,
-  long: number,
-  departementId: Département.id
-}
-
-export type Département = {
-  id: number,
-  nom: string
-}
-
-export type Production = {
-  id: number,
-  /** Code Insee CPF (Classification des Produits Français) */
-  code: string,
-  nom: string,
-}
-
-export type Activité = {
-  id: number,
-  nom: string,
-  active: boolean
-}
-
-export type Certificat = {
-  id: number,
-  numeroNotification: number | null,
-  commentaire: string | null,
-  organisme: string,
-  date: string | null,
-  status: CertificatStatut,
-  etatCertification: CertificationStatut,
-  dateSuspension: string | null,
-  dateDemarrage: string | null,
-  numeroClient: string | null,
-  operateurId: number,
-  organismeCertificateurId: number,
-  productionId: number,
-  url: string | null
-}
-
-export enum CertificatStatut {
-  Active = 'ACTIVE'
-}
-
-export enum CertificationStatut {
-  Engagée = 'ENGAGEE'
 }
