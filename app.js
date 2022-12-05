@@ -492,7 +492,7 @@ app.register(async (app) => {
 
   // usefull only in dev mode
   app.get('/auth-provider/agencebio/login', hiddenSchema, (request, reply) => reply.redirect('/api/auth-provider/agencebio/login'))
-  app.get('/auth-provider/agencebio/callback', deepmerge([sandboxSchema, hiddenSchema]), async (request, reply) => {
+  app.get('/api/auth-provider/agencebio/callback', deepmerge([sandboxSchema, hiddenSchema]), async (request, reply) => {
     const { token } = await app.agenceBioOAuth2.getAccessTokenFromAuthorizationCodeFlow(request)
 
     const userProfile = await getUserProfileFromSSOToken(token.access_token)
