@@ -482,7 +482,7 @@ app.register(async (app) => {
       })
   })
 
-  app.get('/api/v2/user/verify', deepmerge([sandboxSchema, internalSchema]), (request, reply) => {
+  app.get('/api/v2/user/verify', deepmerge([sandboxSchema, internalSchema, protectedRouteOptions]), (request, reply) => {
     const { decodedToken } = request
 
     track({ request, decodedToken })
