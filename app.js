@@ -17,14 +17,14 @@ const { featureCollection } = require('@turf/helpers')
 
 const { getOperatorParcels, getOperatorSummary } = require('./lib/parcels.js')
 const { fetchAuthToken, fetchUserProfile, getUserProfileFromSSOToken, operatorLookup, fetchCustomersByOperator, getCertificationBodyForPacage } = require('./lib/providers/agence-bio.js')
-const { updateOperator, updateOperatorParcels, getOperator, updateAuditRecordState, fetchLatestCustomersByControlBody } = require('./lib/providers/cartobio.js')
+const { updateOperator, updateOperatorParcels, getOperator, updateAuditRecordState, fetchLatestCustomersByControlBody, pacageLookup } = require('./lib/providers/cartobio.js')
 const { parseShapefileArchive } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive } = require('./lib/providers/geofolia.js')
 const { getMesParcellesOperator } = require('./lib/providers/mes-parcelles.js')
 const env = require('./lib/app.js').env()
 
 const { swaggerConfig } = require('./lib/routes/index.js')
-const { sandboxSchema, deprecatedSchema, ocSchema, internalSchema, hiddenSchema } = require('./lib/routes/index.js')
+const { sandboxSchema, deprecatedSchema, ocSchema, internalSchema, hiddenSchema, protectedWithTokenRoute } = require('./lib/routes/index.js')
 const { protectedRouteOptions, trackableRoute, enforceSameCertificationBody } = require('./lib/routes/index.js')
 const { routeWithOperatorId, routeWithRecordId, routeWithNumeroBio, routeWithPacage } = require('./lib/routes/index.js')
 const { loginSchema, tryLoginSchema } = require('./lib/routes/login.js')
@@ -384,6 +384,21 @@ app.register(async (app) => {
 
         return reply.code(500).send({
           error: 'Sorry, we failed to transform the Shapefile into GeoJSON. We have been notified about and will soon start fixing this issue.'
+        })
+      })
+  })
+
+  app.get('/api/v2/import/pacage/:numeroPacage', deepmerge([internalSchema, ocSchema, protectedRouteOptions, routeWithPacage]), async (request, reply) => {
+    const { numeroPacage } = request.params
+
+    return pacageLookup({ numeroPacage })
+      .then(featureCollection => reply.send(featureCollection))
+      .catch(error => {
+        request.log.error('Failed to retrieve operator features with PACAGE number because of this error "%s"', error.message)
+        reportErrors && Sentry.captureException(error)
+
+        return reply.code(500).send({
+          error: 'Sorry, we failed to fetch features with this number. We have been notified about and will soon start fixing this issue.'
         })
       })
   })

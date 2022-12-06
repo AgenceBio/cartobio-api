@@ -147,6 +147,22 @@ Puis restaurer :
 docker exec -i postgres psql -U docker -h localhost gis < dump.sql
 ```
 
+## Intégration des données du RPG bio
+
+Ces données sont utilisées pour la fonctionnalité d'import en un clic.
+Elles sont basées sur le [dump statique](#générer-les-fonds-de-carte) utilisé pour le fond de carte.
+
+```sh
+# Import des données (idempotant)
+ogr2ogr -f PostgreSQL \
+  PG:'postgresql://docker:docker@localhost:15432/gis' rpg.gpkg \
+  -nln rpg_bio -nlt POLYGON \
+  --config PG_USE_COPY YES --config OGR_TRUNCATE YES
+
+# Création d'un index
+ogrinfo -f PostgreSQL PG:'postgresql://docker:docker@localhost:15432/gis' -sql "CREATE INDEX IF NOT EXISTS pacage ON rpg_bio (pacage);"
+```
+
 ## Déployer en production
 
 ```bash
@@ -162,9 +178,11 @@ Les fonds de carte sont servis statiquement, et générés à l'aide de l'outil 
 ```bash
 rm rpg.geojson
 
-for FILE in $(ls *.zip); do ogr2ogr -update -append -t_srs EPSG:3857 -nln rpg rpg.geojson "/vsizip/${FILE}"; done
+for FILE in $(ls *.zip); do ogr2ogr -update -append -t_srs EPSG:3857 -nln rpg rpg.gpkg "/vsizip/${FILE}"; done
 
-tippecanoe -Z10 -z14 --extend-zooms-if-still-dropping --no-tile-compression --simplify-only-low-zooms --drop-densest-as-needed --output-to-directory rpg-2019 --projection EPSG:3857 --name "RPG 2019" --layer "rpg2019" --exclude NUM_ILOT --exclude NUM_PARCEL --exclude PACAGE --force rpg.geojson
+ogr2ogr rpg.geojson rpg.gpkg
+
+tippecanoe -Z10 -z14 --extend-zooms-if-still-dropping --no-tile-compression --simplify-only-low-zooms --drop-densest-as-needed --output-to-directory rpg-2021 --projection EPSG:3857 --name "RPG 2021" --layer "rpg2021" --exclude NUM_ILOT --exclude NUM_PARCEL --exclude PACAGE --force rpg.geojson
 ```
 
 [cartobio-front]: https://github.com/agencebio/cartobio-front
