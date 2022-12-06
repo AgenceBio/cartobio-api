@@ -153,14 +153,10 @@ Ces données sont utilisées pour la fonctionnalité d'import en un clic.
 Elles sont basées sur le [dump statique](#générer-les-fonds-de-carte) utilisé pour le fond de carte.
 
 ```sh
-# Import des données (idempotant)
 ogr2ogr -f PostgreSQL \
   PG:'postgresql://docker:docker@localhost:15432/gis' rpg.gpkg \
   -nln rpg_bio -nlt POLYGON \
   --config PG_USE_COPY YES --config OGR_TRUNCATE YES
-
-# Création d'un index
-ogrinfo -f PostgreSQL PG:'postgresql://docker:docker@localhost:15432/gis' -sql "CREATE INDEX IF NOT EXISTS pacage ON rpg_bio (pacage);"
 ```
 
 ## Déployer en production

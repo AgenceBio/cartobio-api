@@ -19,7 +19,13 @@ exports.up = async function (db) {
     pacage: {
       type: 'string',
       length: 9
-    }
+    },
+    geom: 'geometry',
+    num_ilot: 'int',
+    num_parcel: 'int',
+    bio: 'int',
+    code_cultu: 'string',
+    fid: 'bigint'
   })
 
   return db.addIndex('rpg_bio', 'pacage_idx', ['pacage'], false)
