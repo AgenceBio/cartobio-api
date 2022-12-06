@@ -6,6 +6,7 @@
   "dependencies": {
     "@etalab/decoupage-administratif": "^1.1.1",
     "@fastify/cors": "^8.2.0",
+    "@fastify/formbody": "^7.4.0",
     "@fastify/multipart": "^7.3.0",
     "@fastify/oauth2": "^7.0.0",
     "@fastify/swagger": "^8.2.0",

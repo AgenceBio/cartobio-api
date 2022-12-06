@@ -5,6 +5,7 @@ const fastifySwagger = require('@fastify/swagger')
 const fastifySwaggerUi = require('@fastify/swagger-ui')
 const fastifyCors = require('@fastify/cors')
 const fastifyMultipart = require('@fastify/multipart')
+const fastifyFormBody = require('@fastify/formbody')
 const fastifyOauth = require('@fastify/oauth2')
 
 const Sentry = require('@sentry/node')
@@ -53,8 +54,9 @@ app.register(fastifyCors, {
   allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Accept-Encoding', 'Authorization']
 })
 
-// Accept incoming files (GeoJSON, ZIP files, etc.)
+// Accept incoming files and forms (GeoJSON, ZIP files, etc.)
 app.register(fastifyMultipart)
+app.register(fastifyFormBody)
 
 // Expose OpenAPI schema and Swagger documentation
 app.register(fastifySwagger, swaggerConfig)
