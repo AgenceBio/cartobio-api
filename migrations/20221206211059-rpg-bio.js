@@ -16,6 +16,12 @@ exports.setup = function (options, seedLink) {
 
 exports.up = async function (db) {
   await db.createTable('rpg_bio', {
+    fid: {
+      type: 'int',
+      primaryKey: true,
+      notNull: true,
+      unsigned: true
+    },
     pacage: {
       type: 'string',
       length: 9
@@ -24,8 +30,7 @@ exports.up = async function (db) {
     num_ilot: 'int',
     num_parcel: 'int',
     bio: 'int',
-    code_cultu: 'string',
-    fid: 'bigint'
+    code_cultu: 'string'
   })
 
   return db.addIndex('rpg_bio', 'pacage_idx', ['pacage'], false)

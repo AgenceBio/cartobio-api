@@ -408,7 +408,7 @@ app.register(async (app) => {
   app.post('/api/webhooks/mattermost', deepmerge([internalSchema, protectedWithTokenRoute]), async (request, reply) => {
     const { user_name: userName, command } = request.body
 
-    request.log.info('Incoming mattermost command', command)
+    request.log.info('Incoming mattermost command (%s)', command)
 
     reply.send({
       response_type: 'ephemeral',
