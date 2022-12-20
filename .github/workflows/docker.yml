@@ -11,7 +11,6 @@ on:
     - v*
 
 jobs:
-
   build:
     runs-on: ubuntu-latest
     steps:
@@ -39,8 +38,30 @@ jobs:
         password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
         auto_tag: true
 
-    - name: Deploy in production (when Git tagged)
-      uses: garygrossgarten/github-action-ssh@0.7.0
+  deploy-staging:
+    environment: staging
+    steps:
+    - uses: garygrossgarten/github-action-ssh@0.7.0
+      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+      with:
+        host: ${{ secrets.AGENCEBIO_SSH_HOST }}
+        username: ${{ secrets.AGENCEBIO_SSH_USERNAME }}
+        privateKey: ${{ secrets.AGENCEBIO_SSH_PRIVATE_KEY }}
+        command: |
+          docker pull ${{ steps.publish.outputs.tag }} \
+          && docker stop cartobio-api-staging \
+          && docker container rm cartobio-api-staging \
+          && docker run -d --restart unless-stopped \
+            -p 127.0.0.1:7500:8000 \
+            --env-file=.env.cartobio-api-staging \
+            --add-host=postgres:$(docker inspect -f '{{.NetworkSettings.IPAddress}}' postgres-staging) \
+            --name cartobio-api-staging \
+            ${{ steps.publish.outputs.tag }}
+
+  deploy-production:
+    environment: production
+    steps:
+    - uses: garygrossgarten/github-action-ssh@0.7.0
       if: startsWith(github.ref, 'refs/tags/')
       with:
         host: ${{ secrets.AGENCEBIO_SSH_HOST }}
@@ -48,11 +69,11 @@ jobs:
         privateKey: ${{ secrets.AGENCEBIO_SSH_PRIVATE_KEY }}
         command: |
           docker pull ${{ steps.publish.outputs.tag }} \
-          && docker stop cartobioapi \
-          && docker container rm cartobioapi \
+          && docker stop cartobio-api-production \
+          && docker container rm cartobio-api-production \
           && docker run -d --restart unless-stopped \
             -p 127.0.0.1:8000:8000 \
-            --env-file=.env.cartobio-api \
-            --add-host=postgres:$(docker inspect -f '{{.NetworkSettings.IPAddress}}' postgres) \
-            --name cartobioapi \
+            --env-file=.env.cartobio-api-production \
+            --add-host=postgres:$(docker inspect -f '{{.NetworkSettings.IPAddress}}' postgres-production) \
+            --name cartobio-api-production \
             ${{ steps.publish.outputs.tag }}

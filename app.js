@@ -34,7 +34,7 @@ const { operatorSchema } = require('./lib/routes/operators.js')
 // Application is hosted on localhost:8000 by default
 const { PORT: port, HOST: host, SENTRY_DSN, NODE_ENV, JWT_SECRET, version: apiVersion } = env
 const { FRONTEND_URL, NOTIFICATIONS_AB_SSO_CALLBACK_URI: callbackUri } = env
-const { NOTIFICATIONS_AB_SSO_CLIENT_ID: agenceBioOAuth2ClientId, NOTIFICATIONS_AB_SSO_CLIENT_SECRET: agenceBioOAuth2ClientSecret } = env
+const { NOTIFICATIONS_AB_SSO_CLIENT_ID: agenceBioOAuth2ClientId, NOTIFICATIONS_AB_SSO_CLIENT_SECRET: agenceBioOAuth2ClientSecret, NOTIFICATIONS_AB_SSO_HOST: agenceBioOAuth2Host } = env
 const reportErrors = SENTRY_DSN && NODE_ENV === 'production'
 
 const db = require('./lib/db.js')
@@ -77,9 +77,9 @@ app.register(fastifyOauth, {
       secret: agenceBioOAuth2ClientSecret
     },
     auth: {
-      authorizeHost: 'https://oauth.agencebio.ateliom.fr',
+      authorizeHost: agenceBioOAuth2Host,
       authorizePath: '/oauth2/auth',
-      tokenHost: 'https://oauth.agencebio.ateliom.fr',
+      tokenHost: agenceBioOAuth2Host,
       tokenPath: '/oauth2/token',
       revokePath: '/oauth2/revoke'
     },

@@ -155,14 +155,18 @@ Elles sont basées sur le [dump statique](#générer-les-fonds-de-carte) utilis�
 ```sh
 ogr2ogr -f PostgreSQL \
   PG:'postgresql://docker:docker@localhost:15432/gis' rpg.gpkg \
-  -nln rpg_bio -nlt POLYGON \
+  -preserve_fid -nln rpg_bio -nlt POLYGON \
   --config PG_USE_COPY YES --config OGR_TRUNCATE YES
 ```
 
 ## Déployer en production
 
 ```bash
-docker run -d --name postgres -p 127.0.0.1:5432:5432 --env-file=.env.cartobio-api -v "$(pwd)/postgres_data/postgresql:/var/lib/postgresql" kartoza/postgis:14-3.3
+# Staging
+docker run -d --name postgres-staging --env-file=.env.cartobio-api-staging -v "$(pwd)/postgres_data_staging/postgresql:/var/lib/postgresql" kartoza/postgis:14-3.3
+
+# Production
+docker run -d --name postgres-production -p 127.0.0.1:5432:5432 --env-file=.env.cartobio-api-production -v "$(pwd)/postgres_data_production/postgresql:/var/lib/postgresql" kartoza/postgis:14-3.3
 ```
 
 ## Générer les fonds de carte
