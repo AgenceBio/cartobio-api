@@ -34,6 +34,7 @@ jobs:
       id: publish
       if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/master'
       with:
+        cache: agencebio/cartobio-api
         repository: agencebio/cartobio-api
         username: ${{ secrets.DOCKER_HUB_USERNAME }}
         password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}

@@ -84,7 +84,8 @@ app.register(fastifyOauth, {
       revokePath: '/oauth2/revoke'
     },
     options: {
-      authorizationMethod: 'body'
+      // uncomment if 'client_secret_post' is required instead of 'client_secret_basic'
+      // authorizationMethod: 'body'
     }
   },
   startRedirectPath: '/api/auth-provider/agencebio/login',
