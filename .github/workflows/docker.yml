@@ -39,11 +39,12 @@ jobs:
         auto_tag: true
 
   deploy-staging:
+    needs: [build]
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
     environment: staging
     runs-on: ubuntu-latest
     steps:
     - uses: garygrossgarten/github-action-ssh@0.7.0
-      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
       with:
         host: ${{ secrets.AGENCEBIO_SSH_HOST }}
         username: ${{ secrets.AGENCEBIO_SSH_USERNAME }}
@@ -60,11 +61,12 @@ jobs:
             ${{ steps.publish.outputs.tag }}
 
   deploy-production:
+    needs: [build]
+    if: startsWith(github.ref, 'refs/tags/')
     environment: production
     runs-on: ubuntu-latest
     steps:
     - uses: garygrossgarten/github-action-ssh@0.7.0
-      if: startsWith(github.ref, 'refs/tags/')
       with:
         host: ${{ secrets.AGENCEBIO_SSH_HOST }}
         username: ${{ secrets.AGENCEBIO_SSH_USERNAME }}
