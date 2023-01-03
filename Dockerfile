@@ -20,7 +20,13 @@ COPY package*.json ./
 RUN if [ "arm64" = "$TARGETARCH" ] ; then npm ci --build-from-source --shared_gdal ; else npm ci ; fi
 
 # Bundle app source
-COPY . .
+COPY ./data ./data
+COPY ./lib ./lib
+COPY ./migrations ./migrations
+COPY ./test ./test
+COPY ./*.js ./*.js
+COPY ./.eslintrc.js ./.eslintrc.js
+COPY ./jsconfig.json ./jsconfig.json
 
 EXPOSE  8000
 ENV     NODE_ENV  production
