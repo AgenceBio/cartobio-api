@@ -2,7 +2,7 @@ FROM node:14-bullseye-slim
 
 ARG TARGETARCH
 
-RUN apt update && apt install -y unzip libgdal-dev python3 python build-essential
+RUN apt update && apt install -y unzip libgdal-dev python3 python build-essential cmake
 
 # Create app directory
 WORKDIR /usr/src/app
