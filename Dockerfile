@@ -23,7 +23,7 @@ COPY ./data ./data
 COPY ./lib ./lib
 COPY ./migrations ./migrations
 COPY ./test ./test
-COPY ./*.js ./*.js
+COPY ./*.js ./
 COPY ./.eslintrc.js ./.eslintrc.js
 COPY ./jsconfig.json ./jsconfig.json
 
