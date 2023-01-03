@@ -28,6 +28,8 @@ jobs:
         CARTOBIO_JWT_SECRET: "${{ secrets.CARTOBIO_JWT_SECRET }}"
         NOTIFICATIONS_AB_SSO_CLIENT_ID: "test"
         NOTIFICATIONS_AB_SSO_CLIENT_SECRET: "test"
+        NOTIFICATIONS_AB_CARTOBIO_USER: "test"
+        NOTIFICATIONS_AB_CARTOBIO_PASSWORD: "test"
 
     - name: Publish to Docker Hub
       uses: jerray/publish-docker-action@v1.0.5
