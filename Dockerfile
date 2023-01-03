@@ -2,8 +2,7 @@ FROM node:14-bullseye-slim
 
 ARG TARGETARCH
 
-RUN apt update && apt install -y unzip
-RUN if [ "arm64" = "$TARGETARCH" ] ; then apt install -y libgdal-dev python3 python build-essential ; fi
+RUN apt update && apt install -y unzip libgdal-dev python3 python build-essential
 
 # Create app directory
 WORKDIR /usr/src/app
