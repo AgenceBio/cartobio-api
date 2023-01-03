@@ -1,5 +1,8 @@
 'use strict'
 
+const config = require('./lib/config.js')
+config.validate({ allowed: 'strict' })
+
 const app = require('fastify')({ logger: true })
 const fastifySwagger = require('@fastify/swagger')
 const fastifySwaggerUi = require('@fastify/swagger-ui')
@@ -22,7 +25,6 @@ const { updateOperator, updateOperatorParcels, getOperator, updateAuditRecordSta
 const { parseShapefileArchive } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive } = require('./lib/providers/geofolia.js')
 const { getMesParcellesOperator } = require('./lib/providers/mes-parcelles.js')
-const env = require('./lib/app.js').env()
 
 const { swaggerConfig } = require('./lib/routes/index.js')
 const { sandboxSchema, deprecatedSchema, ocSchema, internalSchema, hiddenSchema, protectedWithTokenRoute } = require('./lib/routes/index.js')
@@ -32,19 +34,16 @@ const { loginSchema, tryLoginSchema } = require('./lib/routes/login.js')
 const { operatorSchema } = require('./lib/routes/operators.js')
 
 // Application is hosted on localhost:8000 by default
-const { PORT: port, HOST: host, SENTRY_DSN, NODE_ENV, JWT_SECRET, version: apiVersion } = env
-const { FRONTEND_URL, NOTIFICATIONS_AB_SSO_CALLBACK_URI: callbackUri } = env
-const { NOTIFICATIONS_AB_SSO_CLIENT_ID: agenceBioOAuth2ClientId, NOTIFICATIONS_AB_SSO_CLIENT_SECRET: agenceBioOAuth2ClientSecret, NOTIFICATIONS_AB_SSO_HOST: agenceBioOAuth2Host } = env
-const reportErrors = SENTRY_DSN && NODE_ENV === 'production'
+const reportErrors = config.get('reportErrors')
 
 const db = require('./lib/db.js')
-const sign = createSigner({ key: JWT_SECRET })
+const sign = createSigner({ key: config.get('jwtSecret') })
 
 // Sentry error reporting setup
 if (reportErrors) {
   Sentry.init({
-    dsn: SENTRY_DSN,
-    release: 'cartobio-api@' + process.env.npm_package_version
+    dsn: config.get('sentry.dsn'),
+    release: 'cartobio-api@' + config.get('version')
   })
 }
 
@@ -73,13 +72,13 @@ app.register(fastifyOauth, {
   tags: ['X-HIDDEN'],
   credentials: {
     client: {
-      id: agenceBioOAuth2ClientId,
-      secret: agenceBioOAuth2ClientSecret
+      id: config.get('notifications.sso.clientId'),
+      secret: config.get('notifications.sso.clientSecret')
     },
     auth: {
-      authorizeHost: agenceBioOAuth2Host,
+      authorizeHost: config.get('notifications.sso.host'),
       authorizePath: '/oauth2/auth',
-      tokenHost: agenceBioOAuth2Host,
+      tokenHost: config.get('notifications.sso.host'),
       tokenPath: '/oauth2/token',
       revokePath: '/oauth2/revoke'
     },
@@ -89,7 +88,7 @@ app.register(fastifyOauth, {
     }
   },
   startRedirectPath: '/api/auth-provider/agencebio/login',
-  callbackUri
+  callbackUri: config.get('notifications.sso.callbackUri')
 })
 
 // Routes to protect with a JSON Web Token
@@ -98,7 +97,7 @@ app.decorateRequest('decodedToken', null)
 app.register(async (app) => {
   // Begin Public API routes
   app.get('/api/version', deepmerge([sandboxSchema, trackableRoute]), (request, reply) => {
-    return reply.send({ version: apiVersion })
+    return reply.send({ version: config.get('version') })
   })
 
   app.get('/api/v1/version', deepmerge([sandboxSchema, deprecatedSchema]), (request, reply) => reply.code(301).redirect('/api/version'))
@@ -133,7 +132,7 @@ app.register(async (app) => {
     const { decodedToken } = request
     const { ocId } = decodedToken
 
-    if (NODE_ENV === 'test') {
+    if (config.get('env') === 'test') {
       return reply.code(200).send(parcelsFixture)
     }
 
@@ -154,7 +153,7 @@ app.register(async (app) => {
     const { ocId } = decodedToken
     const { numeroBio } = params
 
-    if (NODE_ENV === 'test') {
+    if (config.get('env') === 'test') {
       return reply.code(200).send(
         featureCollection(parcelsFixture.features.filter(({ properties }) => properties.numerobio === Number(numeroBio)))
       )
@@ -197,8 +196,8 @@ app.register(async (app) => {
             organismeCertificateur: userProfile.organismeCertificateur || {}
             // for now we will bind the token to the AgenceBio expiry
             //  iat: Math.floor(Date.now() / 1000)
-            // }, JWT_SECRET, { expiresIn: '14d' })
-          }, JWT_SECRET)
+            // }, config.get('jwtSecret'), { expiresIn: '14d' })
+          }, config.get('jwtSecret'))
         })
       }, error => reportErrors && Sentry.captureException(error))
   })
@@ -443,7 +442,7 @@ app.register(async (app) => {
 
   // usefull only in dev mode
   app.get('/auth-provider/agencebio/login', hiddenSchema, (request, reply) => reply.redirect('/api/auth-provider/agencebio/login'))
-  app.get(`${NODE_ENV === 'dev' ? '' : '/api'}/auth-provider/agencebio/callback`, deepmerge([sandboxSchema, hiddenSchema]), async (request, reply) => {
+  app.get(`${config.get('env') === 'dev' ? '' : '/api'}/auth-provider/agencebio/callback`, deepmerge([sandboxSchema, hiddenSchema]), async (request, reply) => {
     const { token } = await app.agenceBioOAuth2.getAccessTokenFromAuthorizationCodeFlow(request)
 
     const userProfile = await getUserProfileFromSSOToken(token.access_token)
@@ -458,9 +457,9 @@ app.register(async (app) => {
         id: userProfile.groupes[0].id,
         nom: userProfile.groupes[0].nom
       }
-    }, JWT_SECRET, { expiresIn: '10d' })
+    }, config.get('jwtSecret'), { expiresIn: '10d' })
 
-    return reply.redirect(`${FRONTEND_URL}/login#token=${cartobioToken}`)
+    return reply.redirect(`${config.get('frontendUrl')}/login#token=${cartobioToken}`)
   })
 })
 
@@ -471,9 +470,12 @@ if (require.main === module) {
     const { server_version: pgVersion } = rows[0]
     console.log(`Postgres connection established, v${pgVersion}`)
 
-    const address = await app.listen({ host, port })
+    const address = await app.listen({
+      host: config.get('host'),
+      port: config.get('port')
+    })
 
-    console.log(`Running env:${NODE_ENV} on ${address}`)
+    console.log(`Running env:${config.get('env')} on ${address}`)
   }, () => console.error('Failed to connect to database'))
 }
 

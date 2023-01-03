@@ -1,13 +1,12 @@
-const { server: app, close, ready } = require('.')
-const { version: packageVersion } = require('./package.json')
+const { server: app, close, ready } = require('./server')
+const config = require('./lib/config.js')
 const request = require('supertest')
 const { createDecoder, createSigner } = require('fast-jwt')
 
-const USER_DOC_AUTH_TOKEN = 'eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJvY0lkIjowLCJ0ZXN0Ijp0cnVlfQ.NL050Bt_jMnQ6WLcqIbmwGJkaDvZ0PIAZdCKTNF_-sSTiTw5cijPGm6TwUSCWEyQUMFvI1_La19TDPXsaemDow'
-const USER_DOC_AUTH_HEADER = `Bearer ${USER_DOC_AUTH_TOKEN}`
-
 const decode = createDecoder()
-const sign = createSigner({ algorithm: 'none' })
+const sign = createSigner({ key: config.get('jwtSecret') })
+const USER_DOC_AUTH_TOKEN = sign({ ocId: 0, test: true })
+const USER_DOC_AUTH_HEADER = `Bearer ${USER_DOC_AUTH_TOKEN}`
 
 jest.mock('./lib/providers/agence-bio.js')
 jest.mock('./lib/providers/cartobio.js')
@@ -40,7 +39,7 @@ describe('GET /api/version', () => {
       .get('/api/version')
       .type('json')
       .then((response) => {
-        expect(response.body).toHaveProperty('version', packageVersion)
+        expect(response.body).toHaveProperty('version', config.get('version'))
       })
   })
 
@@ -342,6 +341,7 @@ describe('GET /api/v1/parcels/operator/:numeroBio', () => {
       .type('json')
       .set('Authorization', USER_DOC_AUTH_HEADER)
       .then((response) => {
+        console.log(response.body)
         expect(response.status).toBe(200)
         expect(response.header['content-type']).toBe('application/json; charset=utf-8')
         expect(response.body).toHaveProperty('type', 'FeatureCollection')
