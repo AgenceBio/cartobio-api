@@ -34,8 +34,8 @@
     "wkt": "^0.1.1"
   },
   "engines": {
-    "node": ">=14",
-    "npm": ">=9"
+    "node": ">=18",
+    "npm": ">=8"
   },
   "devDependencies": {
     "@types/geojson": "^7946.0.10",

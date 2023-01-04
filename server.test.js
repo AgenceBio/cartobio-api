@@ -341,7 +341,6 @@ describe('GET /api/v1/parcels/operator/:numeroBio', () => {
       .type('json')
       .set('Authorization', USER_DOC_AUTH_HEADER)
       .then((response) => {
-        console.log(response.body)
         expect(response.status).toBe(200)
         expect(response.header['content-type']).toBe('application/json; charset=utf-8')
         expect(response.body).toHaveProperty('type', 'FeatureCollection')

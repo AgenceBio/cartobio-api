@@ -1,8 +1,6 @@
-FROM node:14-bullseye-slim
+FROM node:18-alpine
 
-ARG TARGETARCH
-
-RUN apt update && apt install -y unzip libgdal-dev python3 python build-essential cmake
+RUN apk add --update unzip gdal-dev build-base python3
 
 # Create app directory
 WORKDIR /usr/src/app
@@ -16,7 +14,7 @@ COPY package*.json ./
 # https://www.npmjs.com/package/gdal-async#user-content-unit-tested-platforms-with-pre-built-binaries
 # And until arm64 prebuilt images are provided, we branch out
 # https://github.com/mmomtchev/node-gdal-async/issues/30#issuecomment-1275888379
-RUN if [ "arm64" = "$TARGETARCH" ] ; then npm ci --build-from-source --shared_gdal ; else npm ci ; fi
+RUN npm ci --build-from-source --shared_gdal
 
 # Bundle app source
 COPY ./data ./data
