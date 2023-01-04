@@ -18,7 +18,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+    - uses: docker/setup-buildx-action@v2
     - run: docker build -t agencebio/cartobio-api .
+      env:
+        DOCKER_BUILDKIT: 1
 
     - name: Test the Docker image
       run: docker run -e NOTIFICATIONS_AB_CARTOBIO_USER -e NOTIFICATIONS_AB_CARTOBIO_PASSWORD -e NOTIFICATIONS_AB_SSO_CLIENT_ID -e NOTIFICATIONS_AB_SSO_CLIENT_SECRET -e NOTIFICATIONS_AB_ENDPOINT -e CARTOBIO_JWT_SECRET -e CI agencebio/cartobio-api npm test
