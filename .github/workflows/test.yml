@@ -1,4 +1,4 @@
-name: Test the application in Node and a Docker container
+name: Test the application in Node
 
 on: [push]
 
