@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
 
     outputs:
-      tag: ${{ steps.publish.outputs.tag }}
+      image: "agencebio/cartobio-api:${{ steps.publish.outputs.tag }}"
 
     steps:
     - uses: actions/checkout@v3
@@ -65,7 +65,7 @@ jobs:
         username: ${{ secrets.AGENCEBIO_SSH_USERNAME }}
         privateKey: ${{ secrets.AGENCEBIO_SSH_PRIVATE_KEY }}
         command: |
-          docker pull ${{ needs.build.outputs.tag }} \
+          docker pull ${{ needs.build.outputs.image }} \
           && docker stop cartobio-api-staging \
           && docker container rm cartobio-api-staging \
           && docker run -d --restart unless-stopped \
@@ -73,7 +73,7 @@ jobs:
             --env-file=.env.cartobio-api-staging \
             --add-host=postgres:$(docker inspect -f '{{.NetworkSettings.IPAddress}}' postgres-staging) \
             --name cartobio-api-staging \
-            ${{ needs.build.outputs.tag }}
+            ${{ needs.build.outputs.image }}
 
   deploy-production:
     needs: [build]
@@ -87,7 +87,7 @@ jobs:
         username: ${{ secrets.AGENCEBIO_SSH_USERNAME }}
         privateKey: ${{ secrets.AGENCEBIO_SSH_PRIVATE_KEY }}
         command: |
-          docker pull ${{ needs.build.outputs.tag }} \
+          docker pull ${{ needs.build.outputs.image }} \
           && docker stop cartobio-api-production \
           && docker container rm cartobio-api-production \
           && docker run -d --restart unless-stopped \
@@ -95,4 +95,4 @@ jobs:
             --env-file=.env.cartobio-api-production \
             --add-host=postgres:$(docker inspect -f '{{.NetworkSettings.IPAddress}}' postgres-production) \
             --name cartobio-api-production \
-            ${{ needs.build.outputs.tag }}
+            ${{ needs.build.outputs.image }}
