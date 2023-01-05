@@ -42,8 +42,7 @@ jobs:
     - name: Assign Docker ref
       id: publish
       run: |
-        if [$GITHUB_ == 'refs/heads/main']
-        then
+        if [[ $GITHUB_REF == 'refs/heads/main' ]]; then
           echo "tag=latest" >> $GITHUB_OUTPUT
         else
           echo "tag=${GITHUB_REF_NAME#v*}" >> $GITHUB_OUTPUT
