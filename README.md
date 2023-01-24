@@ -6,7 +6,7 @@ Elle a vocation à être intégrée à [`cartobio-front`][cartobio-front] et aux
 métiers des organismes de certification du bio en France.
 
 
-**Pré-requis** : `node@14`, `postgres@14`, `postgis@3.3`.
+**Pré-requis** : `node@18`, `postgres@14`, `postgis@3.3`.
 
 **📚 Table des matières**
 
