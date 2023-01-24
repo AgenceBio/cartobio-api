@@ -1,6 +1,6 @@
 FROM node:18-alpine
 
-RUN apk add --update unzip gdal-dev build-base python3
+RUN apk add --update unzip gdal-dev cmake build-base python3
 
 # Create app directory
 WORKDIR /usr/src/app
@@ -14,12 +14,13 @@ COPY package*.json ./
 # https://www.npmjs.com/package/gdal-async#user-content-unit-tested-platforms-with-pre-built-binaries
 # And until arm64 prebuilt images are provided, we branch out
 # https://github.com/mmomtchev/node-gdal-async/issues/30#issuecomment-1275888379
-RUN npm ci --ignore-scripts --build-from-source --shared_gdal
 
 # Build geo data files
 COPY ./bin ./bin
 COPY ./data ./data
-RUN npm run build:communes-centroids
+
+RUN npm ci --build-from-source --shared_gdal
+
 
 # Bundle app source
 COPY ./lib ./lib
