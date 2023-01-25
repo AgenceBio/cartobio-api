@@ -1,8 +1,11 @@
 {
-  "name": "cartobio-api",
+  "name": "@agencebio/cartobio-api",
   "version": "2.1.1",
   "description": "api for cartobio",
   "main": "app.js",
+  "bin": {
+    "cartobio-export-asp": "./bin/export-asp.js"
+  },
   "dependencies": {
     "@fastify/cors": "^8.2.0",
     "@fastify/formbody": "^7.4.0",
@@ -29,6 +32,7 @@
     "matomo-tracker": "^2.2.4",
     "p-memoize": "^4.0.4",
     "pg": "^8.7.3",
+    "pg-query-stream": "^4.2.4",
     "reproject": "^1.2.6",
     "through2": "^4.0.2",
     "validator": "^13.7.0",
@@ -56,6 +60,7 @@
     "typescript": "^4.9.4"
   },
   "scripts": {
+    "export-asp": "node bin/export-asp.js | jq '.[0]' | ogr2ogr cartobio-asp.gpkg /vsistdin/",
     "prestart": "./node_modules/.bin/db-migrate up",
     "build": "npm run build:departements-centroids",
     "build:communes-centroids": "node bin/build-communes-centroids.js",

@@ -185,6 +185,14 @@ ogr2ogr rpg.geojson rpg.gpkg
 tippecanoe -Z10 -z14 --extend-zooms-if-still-dropping --no-tile-compression --simplify-only-low-zooms --drop-densest-as-needed --output-to-directory rpg-2021 --projection EPSG:3857 --name "RPG 2021" --layer "rpg2021" --exclude NUM_ILOT --exclude NUM_PARCEL --exclude PACAGE --force rpg.geojson
 ```
 
+## Exporter pour l'ASP
+
+```
+npm run export-asp
+```
+
+La base générée se trouve sous le nom de `cartobio-asp-MILLESIME.gpkg`.
+
 [cartobio-front]: https://github.com/agencebio/cartobio-front
 [jwt]: https://jwt.io/
 
