@@ -26,7 +26,7 @@ FROM (
     -- (certification_date OR created_at) AS certification_date_debut,
     -- (certification_date OR created_at) + '18 months' AS certification_date_fin,
     -- on ne les gère pas encore
-    CASE WHEN feature->'properties'->'declassements' IS NULL THEN '[]'::jsonb else feature->'properties'->'declassements' END AS declassements,
+    CASE WHEN feature->'properties'->'declassement' IS NULL THEN '{}'::jsonb else feature->'properties'->'declassement' END AS declassement,
     -- on ne gère pas encore cette distinction
     false as maraichage_diversifie,
     ST_Transform(ST_GeomFromGeoJSON(feature->'geometry'), 4326) AS geom

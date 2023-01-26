@@ -8,6 +8,8 @@ lors d'audits en Agriculture Biologique.
 
 **Période concernée** : du 15 mai de l'année N-1 ↦ 15 mai de l'année N.
 
+![Capture d'écran du logiciel QGIS](export-cartobio-asp.png)
+
 ## Propriétés des _features_
 
 | Clé                         | Type                | Exemple
