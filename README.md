@@ -159,6 +159,15 @@ ogr2ogr -f PostgreSQL \
   --config PG_USE_COPY YES --config OGR_TRUNCATE YES
 ```
 
+## Intégration de la table de conversion PAC/CPF
+
+```
+in2csv Correspondance_PAC_CPFBIO_ONAB.xlsx --sheet 'PAC->BIO' \
+  | csvsql --query 'SELECT CODE_PAC as pac, CODE_CPF_BIO as cpf FROM stdin' \
+  | csvsql --db 'postgresql://docker:docker@127.0.0.1:15432/gis' \
+     --tables correspondance_pac_cpf --insert --no-create
+```
+
 ## Déployer en production
 
 ```bash

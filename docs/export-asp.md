@@ -11,10 +11,12 @@ lors d'audits en Agriculture Biologique.
 
 | Clé                         | Type                | Exemple
 | ---                         | ---                 | ---
-| `id`                        | Integer             | `910177`
+| `id`                        | Integer [^1]        | `910177`
+| `culture`                   | String              | `01.28.30.99`
+| `maraichage_diversifie`     | Boolean             | `false`
 | `numerobio`                 | String              | `34857`
 | `engagement_date`           | Date                | `2022-01-01`
-| `conversion_niveau`         | Enum (`C1`, ou `C2`, ou `C3` ou `BIO` ou `CONV`)
+| `conversion_niveau`         | Enum [^2]           | `C1`
 | `surface_ha`                | Float               | `5.16100`
 | `surface_m2`                | Float               | `51601.0`
 | `certification_date_debut`  | DateTime            | `2022-01-01T10:00:00Z`
@@ -26,9 +28,14 @@ lors d'audits en Agriculture Biologique.
 
 Cette cellule contient les informations du déclassement le plus récent.
 
-| Clé                 | Type                            | Exemple
-| ---                 | ---                             | ---
-| `date`              | Date (`YYYY-MM-DD`)             | `2022-01-01`
-| `codeManquement`    | Enum (défini par l'Agence Bio)  | `22`
-| `codeMesure`        | Enum (défini par l'Agence Bio)  | `DAC`
-| `raison`            | Texte                           | `Utilisation de semence non-bio`
+| Clé                 | Type          | Exemple
+| ---                 | ---           | ---
+| `date`              | Date          | `2022-01-01`
+| `codeManquement`    | Enum [^3]     | `22`
+| `codeMesure`        | Enum [^4]     | `DAC`
+| `raison`            | Text          | `Utilisation de semence non-bio`
+
+[^1]: Nomenclature CPF amendée par l'Agence Bio
+[^2]: `C1`, ou `C2`, ou `C3` ou `BIO` ou `CONV`
+[^3]: Nomenclature de manquement définie par l'Agence Bio/INAO
+[^4]: Nomenclature des codes définie par l'Agence Bio/INAO
