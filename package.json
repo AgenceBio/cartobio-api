@@ -30,6 +30,7 @@
     "got": "^11.8.6",
     "jsonstream-next": "^3.0.0",
     "matomo-tracker": "^2.2.4",
+    "mnemonist": "^0.39.5",
     "p-memoize": "^4.0.4",
     "pg": "^8.7.3",
     "pg-query-stream": "^4.2.4",

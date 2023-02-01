@@ -10,6 +10,8 @@ const fastifyCors = require('@fastify/cors')
 const fastifyMultipart = require('@fastify/multipart')
 const fastifyFormBody = require('@fastify/formbody')
 const fastifyOauth = require('@fastify/oauth2')
+const LRUCache = require('mnemonist/lru-map-with-delete')
+const { randomUUID } = require('node:crypto')
 
 const Sentry = require('@sentry/node')
 const { createSigner } = require('fast-jwt')
@@ -66,6 +68,7 @@ app.register(fastifySwaggerUi, {
 })
 
 // SSO Agence Bio
+const stateCache = new LRUCache(50)
 app.register(fastifyOauth, {
   name: 'agenceBioOAuth2',
   scope: ['openid'],
@@ -88,7 +91,18 @@ app.register(fastifyOauth, {
     }
   },
   startRedirectPath: '/api/auth-provider/agencebio/login',
-  callbackUri: config.get('notifications.sso.callbackUri')
+  callbackUri: config.get('notifications.sso.callbackUri'),
+  generateStateFunction () {
+    const state = randomUUID()
+    stateCache.set(state, true)
+    return state
+  },
+  checkStateFunction (state, next) {
+    if (stateCache.has(state)) {
+      return next()
+    }
+    next(new Error('Invalid state'))
+  }
 })
 
 // Routes to protect with a JSON Web Token
