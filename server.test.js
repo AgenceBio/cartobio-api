@@ -102,7 +102,7 @@ describe('GET /api/v1/login', () => {
       .then((response) => {
         expect(response.status).toBe(401)
         expect(response.header['content-type']).toBe('application/json; charset=utf-8')
-        expect(response.body).toHaveProperty('error', 'mot de passe incorrect')
+        expect(response.body.error).toMatch('Failed to authenticate user')
       })
   })
 
@@ -161,7 +161,8 @@ describe('PATCH /api/v1/operator/:numeroBio', () => {
       .send({ numeroPacage: '000000000' })
       .then((response) => {
         expect(response.status).toBe(400)
-        expect(response.body.message).toMatch('params/numeroBio must be integer')
+        expect(response.body.error).toMatch('Bad Request')
+        expect(response.body.message).toMatch(/params\/numeroBio must be integer/)
       })
   })
 
@@ -173,7 +174,8 @@ describe('PATCH /api/v1/operator/:numeroBio', () => {
       .send({ numeroPacage: '12345678' })
       .then((response) => {
         expect(response.status).toBe(400)
-        expect(response.body.message).toMatch('body/numeroPacage must match pattern')
+        expect(response.body.error).toMatch('Bad Request')
+        expect(response.body.message).toMatch(/body\/numeroPacage must match pattern/)
       })
   })
 
@@ -187,7 +189,7 @@ describe('PATCH /api/v1/operator/:numeroBio', () => {
       .send({ numeroPacage: '123456789' })
       .then((response) => {
         expect(response.status).toBe(500)
-        expect(response.body.error).toMatch('Sorry, we failed to update operator data.')
+        expect(response.body.error).toMatch(/^Failed to update operator 1234 for OC 0/)
       })
   })
 
@@ -308,7 +310,7 @@ describe('GET /api/v1/pacage/:numeroPacage', () => {
       .set('Authorization', USER_DOC_AUTH_HEADER)
       .then((response) => {
         expect(response.status).toBe(500)
-        expect(response.body).toHaveProperty('error', 'Sorry, we failed to retrieve operator data. We have been notified about and will soon start fixing this issue.')
+        expect(response.body).toHaveProperty('error', 'Failed to fetch ocId for 024014889. We have been notified about and will soon start fixing this issue.')
       })
   })
 })

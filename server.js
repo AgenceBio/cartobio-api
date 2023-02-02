@@ -3,7 +3,7 @@
 const config = require('./lib/config.js')
 config.validate({ allowed: 'strict' })
 
-const app = require('fastify')({ logger: true })
+const app = require('fastify')({ logger: config.get('env') !== 'test' })
 const fastifySwagger = require('@fastify/swagger')
 const fastifySwaggerUi = require('@fastify/swagger-ui')
 const fastifyCors = require('@fastify/cors')
@@ -39,6 +39,7 @@ const { operatorSchema } = require('./lib/routes/operators.js')
 const reportErrors = config.get('reportErrors')
 
 const db = require('./lib/db.js')
+const { ApiError, FastifyErrorHandler, InvalidRequestApiError } = require('./lib/errors.js')
 const sign = createSigner({ key: config.get('jwtSecret') })
 
 // Sentry error reporting setup
@@ -48,6 +49,10 @@ if (reportErrors) {
     release: 'cartobio-api@' + config.get('version')
   })
 }
+
+app.setErrorHandler(new FastifyErrorHandler({
+  sentryClient: reportErrors ? Sentry : null
+}))
 
 // Configure server
 app.register(fastifyCors, {
@@ -130,16 +135,7 @@ app.register(async (app) => {
 
     return getOperatorSummary({ ocId })
       .then(geojson => reply.code(200).send(geojson))
-      .catch(error => {
-        request.log.error(`Failed to return summary for OC ${ocId} because of this error "%s"`, error.message)
-        request.log.debug(error.stack)
-
-        reportErrors && Sentry.captureException(error)
-
-        return reply.code(500).send({
-          error: 'Sorry, we failed to assemble summary data. We have been notified about and will soon start fixing this issue.'
-        })
-      })
+      .catch(error => new ApiError(`Failed to return summary for OC ${ocId}`, error))
   })
 
   app.get('/api/v1/parcels', deepmerge([hiddenSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
@@ -152,14 +148,7 @@ app.register(async (app) => {
 
     return getOperatorParcels({ ocId })
       .then(geojson => reply.code(200).send(geojson))
-      .catch(error => {
-        request.log.error(`Failed to return parcels for OC ${ocId} because of this error "%s"`, error.message)
-        reportErrors && Sentry.captureException(error)
-
-        return reply.code(500).send({
-          error: 'Sorry, we failed to assemble parcels data. We have been notified about and will soon start fixing this issue.'
-        })
-      })
+      .catch(error => new ApiError(`Failed to return parcels for OC ${ocId}`, error))
   })
 
   app.get('/api/v1/parcels/operator/:numeroBio', deepmerge([hiddenSchema, protectedRouteOptions, routeWithNumeroBio, trackableRoute]), (request, reply) => {
@@ -175,14 +164,7 @@ app.register(async (app) => {
 
     return getOperatorParcels({ ocId, numeroBio })
       .then(geojson => reply.code(200).send(geojson))
-      .catch(error => {
-        request.log.error(`Failed to return parcels for OC ${ocId} because of this error "%s"`, error.message)
-        reportErrors && Sentry.captureException(error)
-
-        return reply.code(500).send({
-          error: 'Sorry, we failed to assemble parcels data. We have been notified about and will soon start fixing this issue.'
-        })
-      })
+      .catch(error => new ApiError(`Failed to return parcels for OC ${ocId}`, error))
   })
 
   /**
@@ -193,7 +175,7 @@ app.register(async (app) => {
 
     const auth = fetchAuthToken({ email, motDePasse })
 
-    auth.catch(({ message: error }) => reply.code(401).send({ error }))
+    auth.catch(({ message: error }) => new InvalidRequestApiError(401, 'Invalid email/password', error))
 
     return auth
       .then(token => fetchUserProfile(token))
@@ -213,7 +195,7 @@ app.register(async (app) => {
             // }, config.get('jwtSecret'), { expiresIn: '14d' })
           }, config.get('jwtSecret'))
         })
-      }, error => reportErrors && Sentry.captureException(error))
+      }, error => new InvalidRequestApiError(401, 'Failed to authenticate user', error))
   })
 
   /**
@@ -224,14 +206,7 @@ app.register(async (app) => {
 
     return operatorLookup({ q })
       .then(userProfiles => reply.code(200).send(userProfiles))
-      .catch(error => {
-        request.log.error(`Failed to login with ${q} because of this error "%s"`, error.message)
-        reportErrors && Sentry.captureException(error)
-
-        return reply.code(500).send({
-          error: 'Sorry, we failed to retrieve operator data. We have been notified about and will soon start fixing this issue.'
-        })
-      })
+      .catch(error => new ApiError(`Failed to login with ${q}`, error))
   })
   /**
    * @todo lookup for PACAGE stored in the `cartobio_operators` table
@@ -244,14 +219,7 @@ app.register(async (app) => {
       .then(({ ocId, numeroBio } = {}) => {
         return reply.code(200).send({ numeroPacage, numeroBio, ocId })
       })
-      .catch(error => {
-        request.log.error(`Failed to fetch ocId for ${numeroPacage} because of this error "%s"`, error.message)
-        reportErrors && Sentry.captureException(error)
-
-        return reply.code(500).send({
-          error: 'Sorry, we failed to retrieve operator data. We have been notified about and will soon start fixing this issue.'
-        })
-      })
+      .catch(error => new ApiError(`Failed to fetch ocId for ${numeroPacage}`, error))
   })
 
   /**
@@ -265,14 +233,7 @@ app.register(async (app) => {
     return updateOperator({ numeroBio, ocId }, body)
       .then(() => getOperatorSummary({ numeroBio, ocId }))
       .then(geojson => reply.code(200).send(geojson))
-      .catch(error => {
-        request.log.error(`Failed to update operator ${numeroBio} for OC ${ocId} because of this error "%s"`, error.message)
-        reportErrors && Sentry.captureException(error)
-
-        return reply.code(500).send({
-          error: 'Sorry, we failed to update operator data. We have been notified about and will soon start fixing this issue.'
-        })
-      })
+      .catch(error => new ApiError(`Failed to update operator ${numeroBio} for OC ${ocId}`, error))
   })
 
   app.get('/api/v2/stats', internalSchema, (request, reply) => {
@@ -290,14 +251,7 @@ app.register(async (app) => {
 
     return fetchCustomersByOperator({ ocId, nom })
       .then(operators => reply.code(200).send({ operators }))
-      .catch(error => {
-        request.log.error(`Failed to fetch operators for ${ocId} because of this error "%s"`, error.message)
-        reportErrors && Sentry.captureException(error)
-
-        return reply.code(500).send({
-          error: 'Sorry, we failed to retrieve certification data. We have been notified about and will soon start fixing this issue.'
-        })
-      })
+      .catch(error => new ApiError(`Failed to fetch operators for ${ocId}`, error))
   })
 
   app.patch('/api/v2/certification/audits/:recordId', deepmerge([internalSchema, routeWithRecordId, protectedRouteOptions, ocSchema, trackableRoute]), (request, reply) => {
@@ -306,14 +260,7 @@ app.register(async (app) => {
 
     return updateAuditRecordState(recordId, patch)
       .then(record => reply.code(200).send(record))
-      .catch(error => {
-        request.log.error(`Failed to update audit state for record ${recordId} because of this error "%s"`, error.message)
-        reportErrors && Sentry.captureException(error)
-
-        return reply.code(500).send({
-          error: 'Sorry, we failed to retrieve certification data. We have been notified about and will soon start fixing this issue.'
-        })
-      })
+      .catch(error => new ApiError(`Failed to update audit state for record ${recordId}`, error))
   })
 
   /**
@@ -325,14 +272,7 @@ app.register(async (app) => {
 
     return fetchLatestCustomersByControlBody({ ocId })
       .then(operators => reply.code(200).send({ operators }))
-      .catch(error => {
-        request.log.error(`Failed to fetch operators for ${ocId} because of this error "%s"`, error.message)
-        reportErrors && Sentry.captureException(error)
-
-        return reply.code(500).send({
-          error: 'Sorry, we failed to retrieve certification data. We have been notified about and will soon start fixing this issue.'
-        })
-      })
+      .catch(error => new ApiError(`Failed to fetch operators for ${ocId}`, error))
   })
 
   /**
@@ -343,14 +283,7 @@ app.register(async (app) => {
 
     return getOperator({ operatorId })
       .then(result => reply.code(200).send(result))
-      .catch(error => {
-        request.log.error(`Failed to fetch operator #${operatorId} because of this error "%s"`, error.message)
-        reportErrors && Sentry.captureException(error)
-
-        return reply.code(500).send({
-          error: 'Sorry, we failed to retrieve operator data. We have been notified about and will soon start fixing this issue.'
-        })
-      })
+      .catch(error => new ApiError(`Failed to fetch operator #${operatorId}`, error))
   })
 
   /**
@@ -362,14 +295,7 @@ app.register(async (app) => {
 
     return updateOperatorParcels({ operatorId }, body)
       .then(result => reply.code(200).send(result))
-      .catch(error => {
-        request.log.error(`Failed to update operator ${operatorId} parcels because of this error "%s"`, error.message)
-        reportErrors && Sentry.captureException(error)
-
-        return reply.code(500).send({
-          error: 'Sorry, we failed to update operator data. We have been notified about and will soon start fixing this issue.'
-        })
-      })
+      .catch(error => new ApiError(`Failed to update operator ${operatorId} parcels`, error))
   })
 
   /**
@@ -378,14 +304,7 @@ app.register(async (app) => {
   app.post('/api/v1/convert/shapefile/geojson', deepmerge([hiddenSchema, internalSchema]), async (request, reply) => {
     return parseShapefileArchive(request.file())
       .then(geojson => reply.send(geojson))
-      .catch(error => {
-        request.log.error('Failed to parse Shapefile archive because of this error "%s"', error.message)
-        reportErrors && Sentry.captureException(error)
-
-        return reply.code(500).send({
-          error: 'Sorry, we failed to transform the Shapefile into GeoJSON. We have been notified about and will soon start fixing this issue.'
-        })
-      })
+      .catch(error => new ApiError('Failed to parse Shapefile archive', error))
   })
 
   /**
@@ -394,14 +313,7 @@ app.register(async (app) => {
   app.post('/api/v1/convert/geofolia/geojson', deepmerge([hiddenSchema, internalSchema]), async (request, reply) => {
     return parseGeofoliaArchive(request.file())
       .then(geojson => reply.send(geojson))
-      .catch(error => {
-        request.log.error('Failed to parse Geofolia archive because of this error "%s"', error.message)
-        reportErrors && Sentry.captureException(error)
-
-        return reply.code(500).send({
-          error: 'Sorry, we failed to transform the Shapefile into GeoJSON. We have been notified about and will soon start fixing this issue.'
-        })
-      })
+      .catch(error => new ApiError('Failed to parse Geofolia archive', error))
   })
 
   app.get('/api/v2/import/pacage/:numeroPacage', deepmerge([internalSchema, ocSchema, protectedRouteOptions, routeWithPacage]), async (request, reply) => {
@@ -409,14 +321,7 @@ app.register(async (app) => {
 
     return pacageLookup({ numeroPacage })
       .then(featureCollection => reply.send(featureCollection))
-      .catch(error => {
-        request.log.error('Failed to retrieve operator features with PACAGE number because of this error "%s"', error.message)
-        reportErrors && Sentry.captureException(error)
-
-        return reply.code(500).send({
-          error: 'Sorry, we failed to fetch features with this number. We have been notified about and will soon start fixing this issue.'
-        })
-      })
+      .catch(error => new ApiError(`Failed to retrieve PACAGE #${numeroPacage} features`, error))
   })
 
   app.post('/api/webhooks/mattermost', deepmerge([internalSchema, protectedWithTokenRoute]), async (request, reply) => {
@@ -438,14 +343,7 @@ app.register(async (app) => {
 
     return getMesParcellesOperator({ email, password, server })
       .then(geojson => reply.send(geojson))
-      .catch(error => {
-        request.log.error('Failed to import MesParcelles data because of this error "%o"', error)
-        reportErrors && Sentry.captureException(error)
-
-        return reply.code(500).send({
-          error: 'Sorry, we failed to transform the Shapefile into GeoJSON. We have been notified about and will soon start fixing this issue.'
-        })
-      })
+      .catch(error => new ApiError('Failed to import MesParcelles features', error))
   })
 
   app.get('/api/v2/user/verify', deepmerge([sandboxSchema, internalSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
