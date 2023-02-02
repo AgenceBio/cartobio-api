@@ -31,7 +31,7 @@ const { getMesParcellesOperator } = require('./lib/providers/mes-parcelles.js')
 
 const { swaggerConfig } = require('./lib/routes/index.js')
 const { sandboxSchema, deprecatedSchema, ocSchema, internalSchema, hiddenSchema, protectedWithTokenRoute } = require('./lib/routes/index.js')
-const { protectedRouteOptions, trackableRoute, enforceSameCertificationBody } = require('./lib/routes/index.js')
+const { notificationRouteOptions, protectedRouteOptions, trackableRoute, enforceSameCertificationBody } = require('./lib/routes/index.js')
 const { routeWithOperatorId, routeWithRecordId, routeWithNumeroBio, routeWithPacage } = require('./lib/routes/index.js')
 const { loginSchema, tryLoginSchema } = require('./lib/routes/login.js')
 const { operatorSchema } = require('./lib/routes/operators.js')
@@ -358,6 +358,19 @@ app.register(async (app) => {
     const { decodedToken } = request
 
     return reply.send(decodedToken)
+  })
+
+  app.get('/api/v2/user/exchangeToken', deepmerge([sandboxSchema, internalSchema, notificationRouteOptions, trackableRoute]), async (request, reply) => {
+    const { notificationToken } = request
+    const token = request.headers.authorization.replace('Bearer ', '')
+
+    console.log({ notificationToken, token })
+
+    const userProfile = await getUserProfileFromSSOToken(token)
+
+    console.log({ userProfile })
+
+    return reply.send({ userProfile })
   })
 
   // usefull only in dev mode
