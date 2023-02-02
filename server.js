@@ -47,7 +47,8 @@ if (reportErrors) {
   Sentry.init({
     dsn: config.get('sentry.dsn'),
     includeLocalVariables: true,
-    release: 'cartobio-api@' + config.get('version')
+    release: 'cartobio-api@' + config.get('version'),
+    environment: config.get('environment')
   })
 }
 
