@@ -46,12 +46,13 @@ const sign = createSigner({ key: config.get('jwtSecret') })
 if (reportErrors) {
   Sentry.init({
     dsn: config.get('sentry.dsn'),
+    includeLocalVariables: true,
     release: 'cartobio-api@' + config.get('version')
   })
 }
 
 app.setErrorHandler(new FastifyErrorHandler({
-  sentryClient: reportErrors ? Sentry : null
+  sentryClient: Sentry
 }))
 
 // Configure server
