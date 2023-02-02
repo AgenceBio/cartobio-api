@@ -15,6 +15,7 @@ const { randomUUID } = require('node:crypto')
 
 const rookout = require('rookout')
 const Sentry = require('@sentry/node')
+const { ExtraErrorData } = require('@sentry/integrations')
 const { createSigner } = require('fast-jwt')
 const { all: deepmerge } = require('deepmerge')
 
@@ -47,9 +48,12 @@ const sign = createSigner({ key: config.get('jwtSecret') })
 if (reportErrors) {
   Sentry.init({
     dsn: config.get('sentry.dsn'),
+    environment: config.get('environment'),
     includeLocalVariables: true,
-    release: 'cartobio-api@' + config.get('version'),
-    environment: config.get('environment')
+    integrations: [
+      new ExtraErrorData()
+    ],
+    release: 'cartobio-api@' + config.get('version')
   })
   rookout.start({
     token: config.get('rookout.token'),
