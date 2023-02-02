@@ -13,6 +13,7 @@ const fastifyOauth = require('@fastify/oauth2')
 const LRUCache = require('mnemonist/lru-map-with-delete')
 const { randomUUID } = require('node:crypto')
 
+const rookout = require('rookout')
 const Sentry = require('@sentry/node')
 const { createSigner } = require('fast-jwt')
 const { all: deepmerge } = require('deepmerge')
@@ -49,6 +50,12 @@ if (reportErrors) {
     includeLocalVariables: true,
     release: 'cartobio-api@' + config.get('version'),
     environment: config.get('environment')
+  })
+  rookout.start({
+    token: config.get('rookout.token'),
+    labels: {
+      env: config.get('environment')
+    }
   })
 }
 

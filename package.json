@@ -35,6 +35,7 @@
     "pg": "^8.7.3",
     "pg-query-stream": "^4.2.4",
     "reproject": "^1.2.6",
+    "rookout": "^0.108.0",
     "through2": "^4.0.2",
     "validator": "^13.7.0",
     "verrazzano": "^2.3.0",
