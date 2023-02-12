@@ -28,7 +28,7 @@
     "fastify": "^4.11.0",
     "form-data": "^4.0.0",
     "get-stream": "^6.0.0",
-    "got": "^11.8.6",
+    "got": "^12.5.3",
     "jsonstream-next": "^3.0.0",
     "matomo-tracker": "^2.2.4",
     "mnemonist": "^0.39.5",
