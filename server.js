@@ -367,22 +367,10 @@ app.register(async (app) => {
 
   // usefull only in dev mode
   app.get('/auth-provider/agencebio/login', hiddenSchema, (request, reply) => reply.redirect('/api/auth-provider/agencebio/login'))
-  app.get(`${config.get('env') === 'dev' ? '' : '/api'}/auth-provider/agencebio/callback`, deepmerge([sandboxSchema, hiddenSchema]), async (request, reply) => {
+  app.get('/api/auth-provider/agencebio/callback', deepmerge([sandboxSchema, hiddenSchema]), async (request, reply) => {
     const { token } = await app.agenceBioOAuth2.getAccessTokenFromAuthorizationCodeFlow(request)
-
     const userProfile = await getUserProfileFromSSOToken(token.access_token)
-
-    const cartobioToken = sign({
-      id: userProfile.id,
-      prenom: userProfile.prenom,
-      nom: userProfile.nom,
-      organismeCertificateurId: userProfile.organismeCertificateurId,
-      organismeCertificateur: userProfile.organismeCertificateur ?? {},
-      mainGroup: {
-        id: userProfile.groupes[0].id,
-        nom: userProfile.groupes[0].nom
-      }
-    }, config.get('jwtSecret'), { expiresIn: '10d' })
+    const cartobioToken = sign(userProfile, config.get('jwtSecret'), { expiresIn: '10d' })
 
     return reply.redirect(`${config.get('frontendUrl')}/login#token=${cartobioToken}`)
   })
