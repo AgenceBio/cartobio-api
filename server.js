@@ -105,7 +105,8 @@ app.register(fastifyOauth, {
     },
     options: {
       // uncomment if 'client_secret_post' is required instead of 'client_secret_basic'
-      // authorizationMethod: 'body'
+      // which is common when we get a '401 Unauthorized' response from SSO
+      authorizationMethod: 'body'
     }
   },
   startRedirectPath: '/api/auth-provider/agencebio/login',
@@ -370,7 +371,7 @@ app.register(async (app) => {
   app.get('/api/auth-provider/agencebio/callback', deepmerge([sandboxSchema, hiddenSchema]), async (request, reply) => {
     const { token } = await app.agenceBioOAuth2.getAccessTokenFromAuthorizationCodeFlow(request)
     const userProfile = await getUserProfileFromSSOToken(token.access_token)
-    const cartobioToken = sign(userProfile, config.get('jwtSecret'), { expiresIn: '10d' })
+    const cartobioToken = sign(userProfile, config.get('jwtSecret'), { expiresIn: '30d' })
 
     return reply.redirect(`${config.get('frontendUrl')}/login#token=${cartobioToken}`)
   })
