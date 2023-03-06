@@ -10,14 +10,10 @@ const query = new QueryStream(`-- pg
 SELECT 'FeatureCollection' as type, json_agg(ST_AsGeoJSON(properties)::json) features
 FROM (
   SELECT
-    feature->'properties'->'id' AS id,
-    "correspondance_pac_cpf".cpf as culture,
-    cast(numerobio AS text),
-    feature->'properties'->'engagement_date' AS engagement_date,
     feature->'properties'->'conversion_niveau' AS conversion_niveau,
-    /* https://gis.stackexchange.com/a/297289 */
-    ST_Area(ST_Transform(ST_GeomFromGeoJSON(feature->'geometry'), 4326)::geography) / 10000 as surface_ha,
-    ST_Area(ST_Transform(ST_GeomFromGeoJSON(feature->'geometry'), 4326)::geography) as surface_m2,
+    -- https://gis.stackexchange.com/a/297289
+    -- ST_Area(ST_Transform(ST_GeomFromGeoJSON(feature->'geometry'), 4326)::geography) / 10000 as surface_ha,
+    -- ST_Area(ST_Transform(ST_GeomFromGeoJSON(feature->'geometry'), 4326)::geography) as surface_m2,
     -- https://www.postgresql.org/docs/9.1/functions-datetime.html
     created_at AS certification_date_debut,
     created_at + '18 months' AS certification_date_fin,
@@ -25,7 +21,8 @@ FROM (
     -- cf. https://trello.com/c/KLblWZ4H
     -- (certification_date OR created_at) AS certification_date_debut,
     -- (certification_date OR created_at) + '18 months' AS certification_date_fin,
-    -- on ne les gère pas encore
+    --
+    -- on ne gère pas encore les déclassements
     CASE WHEN feature->'properties'->'declassement' IS NULL THEN '{}'::jsonb else feature->'properties'->'declassement' END AS declassement,
     -- on ne gère pas encore cette distinction
     false as maraichage_diversifie,
@@ -43,7 +40,6 @@ FROM (
 
 ;(async function main () {
   const client = await db.connect()
-
   const stream = client.query(query)
 
   stream.on('error', (error) => {
