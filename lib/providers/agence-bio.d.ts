@@ -83,7 +83,12 @@ export type Notification = {
   url: string | null
   active: boolean,
   operateurId: number,
-  productionId: number,
+  productionId: number
+}
+
+export type OrganismeCertificateur = {
+  id: number,
+  nom: string
 }
 
 export type Certificat = {

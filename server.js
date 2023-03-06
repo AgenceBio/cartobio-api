@@ -23,7 +23,7 @@ const summaryFixture = require('./test/fixtures/summary.json')
 const { featureCollection } = require('@turf/helpers')
 
 const { getOperatorParcels, getOperatorSummary } = require('./lib/parcels.js')
-const { fetchAuthToken, fetchUserProfile, getUserProfileFromSSOToken, operatorLookup, fetchCustomersByOperator, getCertificationBodyForPacage } = require('./lib/providers/agence-bio.js')
+const { fetchAuthToken, fetchOperatorById, fetchUserProfile, getUserProfileFromSSOToken, operatorLookup, fetchCustomersByOperator, getCertificationBodyForPacage, verifyNotificationAuthorization } = require('./lib/providers/agence-bio.js')
 const { updateOperator, updateOperatorParcels, getOperator, updateAuditRecordState, fetchLatestCustomersByControlBody, pacageLookup } = require('./lib/providers/cartobio.js')
 const { parseShapefileArchive } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive } = require('./lib/providers/geofolia.js')
@@ -31,7 +31,7 @@ const { getMesParcellesOperator } = require('./lib/providers/mes-parcelles.js')
 
 const { swaggerConfig } = require('./lib/routes/index.js')
 const { sandboxSchema, deprecatedSchema, ocSchema, internalSchema, hiddenSchema, protectedWithTokenRoute } = require('./lib/routes/index.js')
-const { notificationRouteOptions, protectedRouteOptions, trackableRoute, enforceSameCertificationBody } = require('./lib/routes/index.js')
+const { protectedRouteOptions, trackableRoute, enforceSameCertificationBody } = require('./lib/routes/index.js')
 const { routeWithOperatorId, routeWithRecordId, routeWithNumeroBio, routeWithPacage } = require('./lib/routes/index.js')
 const { loginSchema, tryLoginSchema } = require('./lib/routes/login.js')
 const { operatorSchema } = require('./lib/routes/operators.js')
@@ -122,6 +122,8 @@ app.register(fastifyOauth, {
 app.decorateRequest('decodedToken', null)
 
 app.register(async (app) => {
+  app.get('/api', (request, reply) => reply.status(404))
+
   // Begin Public API routes
   app.get('/api/version', deepmerge([sandboxSchema, trackableRoute]), (request, reply) => {
     return reply.send({ version: config.get('version') })
@@ -200,8 +202,8 @@ app.register(async (app) => {
             organismeCertificateur: userProfile.organismeCertificateur || {}
             // for now we will bind the token to the AgenceBio expiry
             //  iat: Math.floor(Date.now() / 1000)
-            // }, config.get('jwtSecret'), { expiresIn: '14d' })
-          }, config.get('jwtSecret'))
+            // }, { expiresIn: '14d' })
+          })
         })
       }, error => new InvalidRequestApiError(401, 'Failed to authenticate user', error))
   })
@@ -211,11 +213,27 @@ app.register(async (app) => {
    */
   app.post('/api/v1/tryLogin', deepmerge([internalSchema, tryLoginSchema]), (request, reply) => {
     const { q } = request.body
+    const sign = createSigner({ key: config.get('jwtSecret'), expiresIn: 1000 * 60 * 8 })
 
     return operatorLookup({ q })
+      .then(operators => operators.map(operator => ({
+        ...operator,
+        // @todo remove this when moving to SSO login
+        temporaryLoginToken: sign(operator)
+      })))
       .then(userProfiles => reply.code(200).send(userProfiles))
       .catch(error => new ApiError(`Failed to login with ${q}`, error))
   })
+
+  /**
+   * @private
+   */
+  app.post('/api/v2/temporaryLoginWithToken', deepmerge([internalSchema, protectedRouteOptions]), (request, reply) => {
+    const { decodedToken } = request
+
+    return reply.code(200).send(sign(decodedToken))
+  })
+
   /**
    * @todo lookup for PACAGE stored in the `cartobio_operators` table
    * @private
@@ -255,7 +273,7 @@ app.register(async (app) => {
    */
   app.post('/api/v2/certification/operators/search', deepmerge([internalSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
     const { input: nom } = request.body
-    const { organismeCertificateurId: ocId } = request.decodedToken
+    const { id: ocId } = request.decodedToken.organismeCertificateur
 
     return fetchCustomersByOperator({ ocId, nom })
       .then(operators => reply.code(200).send({ operators }))
@@ -276,7 +294,7 @@ app.register(async (app) => {
    * @TODO control and derive ocId credentials
    */
   app.get('/api/v2/certification/operators/latest', deepmerge([internalSchema, protectedRouteOptions]), (request, reply) => {
-    const { organismeCertificateurId: ocId } = request.decodedToken
+    const { id: ocId } = request.decodedToken.organismeCertificateur
 
     return fetchLatestCustomersByControlBody({ ocId })
       .then(operators => reply.code(200).send({ operators }))
@@ -286,7 +304,7 @@ app.register(async (app) => {
   /**
    * @private
    */
-  app.get('/api/v2/operator/:operatorId', deepmerge([internalSchema, routeWithOperatorId, enforceSameCertificationBody, ocSchema, trackableRoute/*, protectedRouteOptions */]), (request, reply) => {
+  app.get('/api/v2/operator/:operatorId', deepmerge([internalSchema, routeWithOperatorId, enforceSameCertificationBody, ocSchema, trackableRoute, protectedRouteOptions]), (request, reply) => {
     const { operatorId } = request.params
 
     return getOperator({ operatorId })
@@ -297,7 +315,7 @@ app.register(async (app) => {
   /**
    * @private
    */
-  app.post('/api/v2/operator/:operatorId/parcelles', deepmerge([internalSchema, routeWithOperatorId, ocSchema, trackableRoute]), (request, reply) => {
+  app.post('/api/v2/operator/:operatorId/parcelles', deepmerge([internalSchema, routeWithOperatorId, ocSchema, trackableRoute, protectedRouteOptions]), (request, reply) => {
     const { body } = request
     const { operatorId } = request.params
 
@@ -360,17 +378,11 @@ app.register(async (app) => {
     return reply.send(decodedToken)
   })
 
-  app.get('/api/v2/user/exchangeToken', deepmerge([sandboxSchema, internalSchema, notificationRouteOptions, trackableRoute]), async (request, reply) => {
-    const { notificationToken } = request
-    const token = request.headers.authorization.replace('Bearer ', '')
+  app.get('/api/v2/user/exchangeToken', deepmerge([sandboxSchema, internalSchema, protectedRouteOptions, trackableRoute]), async (request, reply) => {
+    const { payload: decodedToken } = verifyNotificationAuthorization(request.headers.authorization)
+    const operator = await fetchOperatorById(decodedToken.operateurId)
 
-    console.log({ notificationToken, token })
-
-    const userProfile = await getUserProfileFromSSOToken(token)
-
-    console.log({ userProfile })
-
-    return reply.send({ userProfile })
+    return reply.send(operator)
   })
 
   // usefull only in dev mode
