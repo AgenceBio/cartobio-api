@@ -13,7 +13,6 @@ const fastifyOauth = require('@fastify/oauth2')
 const LRUCache = require('mnemonist/lru-map-with-delete')
 const { randomUUID } = require('node:crypto')
 
-const rookout = require('rookout')
 const Sentry = require('@sentry/node')
 const { ExtraErrorData } = require('@sentry/integrations')
 const { createSigner } = require('fast-jwt')
@@ -54,12 +53,6 @@ if (reportErrors) {
       new ExtraErrorData()
     ],
     release: 'cartobio-api@' + config.get('version')
-  })
-  rookout.start({
-    token: config.get('rookout.token'),
-    labels: {
-      env: config.get('environment')
-    }
   })
 }
 
