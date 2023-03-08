@@ -99,7 +99,7 @@ app.register(fastifyOauth, {
     options: {
       // uncomment if 'client_secret_post' is required instead of 'client_secret_basic'
       // which is common when we get a '401 Unauthorized' response from SSO
-      authorizationMethod: 'body'
+      authorizationMethod: config.get('notifications.sso.authorizationMethod')
     }
   },
   startRedirectPath: '/api/auth-provider/agencebio/login',
