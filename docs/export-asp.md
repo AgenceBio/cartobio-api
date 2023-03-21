@@ -1,6 +1,6 @@
 ---
 title: Export ASP
-version: 2023-02-08
+version: 2023-03-21
 ---
 
 L'export contient les données des parcellaires validés
@@ -14,7 +14,6 @@ lors d'audits en Agriculture Biologique.
 
 | Clé                         | Type                | Exemple
 | ---                         | ---                 | ---
-| `maraichage_diversifie`     | Boolean             | `false`
 | `engagement_date`           | Date                | `2022-01-01`
 | `conversion_niveau`         | Enum [^2]           | `BIO`
 | `certification_date_debut`  | DateTime            | `2022-01-01T10:00:00Z`

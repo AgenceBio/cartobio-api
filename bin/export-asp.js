@@ -25,7 +25,7 @@ FROM (
     -- on ne gère pas encore les déclassements
     CASE WHEN feature->'properties'->'declassement' IS NULL THEN '{}'::jsonb else feature->'properties'->'declassement' END AS declassement,
     -- on ne gère pas encore cette distinction
-    false as maraichage_diversifie,
+    -- false as maraichage_diversifie,
     ST_Transform(ST_GeomFromGeoJSON(feature->'geometry'), 4326) AS geom
     FROM (
       SELECT
