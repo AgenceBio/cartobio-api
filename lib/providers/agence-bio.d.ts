@@ -60,6 +60,32 @@ export enum CertificationStatut {
   Engagée = 'ENGAGEE'
 }
 
+export enum NotificationStatut {
+  ÀValider = 'A VALIDER',
+  Validée = 'VALIDEE'
+}
+
+export type Notification = {
+  id: number,
+  numeroNotification: number | null,
+  status: NotificationStatut,
+  etatCertification: CertificationStatut,
+  dateChangementEffet: string | null,
+  dateSuspension: string | null,
+  dateFinSuspension: string | null,
+  dateArret: string | null,
+  dateDemarrage: string | null,
+  dateRetrait: string | null,
+  dateFinRetrait: string | null,
+  dateHabilitation: string | null,
+  dateSignatureContrat: string | null,
+  numeroClient: string | null,
+  url: string | null
+  active: boolean,
+  operateurId: number,
+  productionId: number,
+}
+
 export type Certificat = {
   id: number,
   numeroNotification: number | null,
@@ -111,6 +137,7 @@ export type Operateur = {
   adressesOperateurs: Array.<AdresseOperateur>,
   productions: Array.<Production>,
   activites: Array.<Activité>,
+  notifications: Array.<Notification>,
   certificats: Array.<Certificat>,
   venteDetail: boolean,
   restaurant: boolean,
