@@ -52,7 +52,8 @@ if (reportErrors) {
     integrations: [
       new ExtraErrorData()
     ],
-    release: 'cartobio-api@' + config.get('version')
+    release: 'cartobio-api@' + config.get('version'),
+    tracesSampleRate: config.get('environment') === 'production' ? 0.2 : 1
   })
 }
 
