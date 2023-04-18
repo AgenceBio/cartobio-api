@@ -16,7 +16,6 @@
     "@fastify/swagger-ui": "^1.3.0",
     "@sentry/integrations": "^7.36.0",
     "@sentry/node": "^7.28.1",
-    "@turf/centroid": "^6.5.0",
     "@turf/helpers": "^6.5.0",
     "adm-zip": "^0.5.10",
     "convict": "^6.2.3",
@@ -46,6 +45,7 @@
     "npm": ">=8"
   },
   "devDependencies": {
+    "@turf/centroid": "^6.5.0",
     "@types/geojson": "^7946.0.10",
     "@types/node": "^18.11.18",
     "@typescript-eslint/eslint-plugin": "^5.47.1",
@@ -62,11 +62,9 @@
     "typescript": "^4.9.4"
   },
   "scripts": {
+    "build:communes-centroids": "node bin/build-communes-centroids.js",
     "export-asp": "node bin/export-asp.js | jq '.[0]' | ogr2ogr cartobio-asp.gpkg /vsistdin/",
     "prestart": "./node_modules/.bin/db-migrate up",
-    "build": "npm run build:departements-centroids",
-    "build:communes-centroids": "node bin/build-communes-centroids.js",
-    "build:departements-centroids": "node bin/build-departements-centroids.js",
     "test": "NODE_ENV=test jest --detectOpenHandles --collectCoverage --coverageReporters html --coverageReporters text-summary",
     "postinstall": "npm run build:communes-centroids",
     "posttest": "eslint --ignore-pattern 'migrations/*' .",

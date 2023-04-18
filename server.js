@@ -18,29 +18,23 @@ const { ExtraErrorData } = require('@sentry/integrations')
 const { createSigner } = require('fast-jwt')
 const { all: deepmerge } = require('deepmerge')
 
-const parcelsFixture = require('./test/fixtures/parcels.json')
-const summaryFixture = require('./test/fixtures/summary.json')
-const { featureCollection } = require('@turf/helpers')
-
-const { getOperatorParcels, getOperatorSummary } = require('./lib/parcels.js')
-const { fetchAuthToken, fetchOperatorById, fetchUserProfile, getUserProfileFromSSOToken, operatorLookup, fetchCustomersByOperator, getCertificationBodyForPacage, verifyNotificationAuthorization } = require('./lib/providers/agence-bio.js')
-const { updateOperator, updateOperatorParcels, getOperator, updateAuditRecordState, fetchLatestCustomersByControlBody, pacageLookup } = require('./lib/providers/cartobio.js')
+const { fetchOperatorById, getUserProfileFromSSOToken, operatorLookup, fetchCustomersByOperator, verifyNotificationAuthorization } = require('./lib/providers/agence-bio.js')
+const { updateOperatorParcels, getOperator, updateAuditRecordState, fetchLatestCustomersByControlBody, pacageLookup } = require('./lib/providers/cartobio.js')
 const { parseShapefileArchive } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive } = require('./lib/providers/geofolia.js')
 const { getMesParcellesOperator } = require('./lib/providers/mes-parcelles.js')
 
 const { swaggerConfig } = require('./lib/routes/index.js')
-const { sandboxSchema, deprecatedSchema, ocSchema, internalSchema, hiddenSchema, protectedWithTokenRoute } = require('./lib/routes/index.js')
+const { sandboxSchema, ocSchema, internalSchema, hiddenSchema, protectedWithTokenRoute } = require('./lib/routes/index.js')
 const { protectedRouteOptions, trackableRoute, enforceSameCertificationBody } = require('./lib/routes/index.js')
-const { routeWithOperatorId, routeWithRecordId, routeWithNumeroBio, routeWithPacage } = require('./lib/routes/index.js')
-const { loginSchema, tryLoginSchema } = require('./lib/routes/login.js')
-const { operatorSchema } = require('./lib/routes/operators.js')
+const { routeWithOperatorId, routeWithRecordId, routeWithPacage } = require('./lib/routes/index.js')
+const { tryLoginSchema } = require('./lib/routes/login.js')
 
 // Application is hosted on localhost:8000 by default
 const reportErrors = config.get('reportErrors')
 
 const db = require('./lib/db.js')
-const { ApiError, FastifyErrorHandler, InvalidRequestApiError } = require('./lib/errors.js')
+const { ApiError, FastifyErrorHandler } = require('./lib/errors.js')
 const sign = createSigner({ key: config.get('jwtSecret') })
 
 // Sentry error reporting setup
@@ -70,14 +64,6 @@ app.register(fastifyCors, {
 // Accept incoming files and forms (GeoJSON, ZIP files, etc.)
 app.register(fastifyMultipart)
 app.register(fastifyFormBody)
-
-// Expose OpenAPI schema and Swagger documentation
-app.register(fastifySwagger, swaggerConfig)
-
-app.register(fastifySwaggerUi, {
-  baseDir: '/api',
-  routePrefix: '/api/documentation'
-})
 
 // SSO Agence Bio
 const stateCache = new LRUCache(50)
@@ -122,103 +108,28 @@ app.register(fastifyOauth, {
 app.decorateRequest('decodedToken', null)
 
 app.register(async (app) => {
-  app.get('/api', (request, reply) => reply.status(404))
-
   // Begin Public API routes
   app.get('/api/version', deepmerge([sandboxSchema, trackableRoute]), (request, reply) => {
     return reply.send({ version: config.get('version') })
   })
 
-  app.get('/api/v1/version', deepmerge([sandboxSchema, deprecatedSchema]), (request, reply) => reply.code(301).redirect('/api/version'))
-
-  app.get('/api/v1/test', deepmerge([sandboxSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
-    return reply.send({ test: 'OK' })
-  })
-
-  app.get('/api/v1/summary', deepmerge([hiddenSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
-    const { decodedToken } = request
-    const { test: isTest, ocId } = decodedToken
-
-    if (isTest === true) {
-      return reply.code(200).send(summaryFixture)
-    }
-
-    return getOperatorSummary({ ocId })
-      .then(geojson => reply.code(200).send(geojson))
-      .catch(error => new ApiError(`Failed to return summary for OC ${ocId}`, error))
-  })
-
-  app.get('/api/v1/parcels', deepmerge([hiddenSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
-    const { decodedToken } = request
-    const { ocId } = decodedToken
-
-    if (config.get('env') === 'test') {
-      return reply.code(200).send(parcelsFixture)
-    }
-
-    return getOperatorParcels({ ocId })
-      .then(geojson => reply.code(200).send(geojson))
-      .catch(error => new ApiError(`Failed to return parcels for OC ${ocId}`, error))
-  })
-
-  app.get('/api/v1/parcels/operator/:numeroBio', deepmerge([hiddenSchema, protectedRouteOptions, routeWithNumeroBio, trackableRoute]), (request, reply) => {
-    const { decodedToken, params } = request
-    const { ocId } = decodedToken
-    const { numeroBio } = params
-
-    if (config.get('env') === 'test') {
-      return reply.code(200).send(
-        featureCollection(parcelsFixture.features.filter(({ properties }) => properties.numerobio === Number(numeroBio)))
-      )
-    }
-
-    return getOperatorParcels({ ocId, numeroBio })
-      .then(geojson => reply.code(200).send(geojson))
-      .catch(error => new ApiError(`Failed to return parcels for OC ${ocId}`, error))
+  app.get('/api/v2/test', deepmerge([sandboxSchema, protectedRouteOptions]), (request, reply) => {
+    return reply.send({ message: 'OK' })
   })
 
   /**
    * @private
    */
-  app.post('/api/v1/login', deepmerge([internalSchema, loginSchema]), (request, reply) => {
-    const { email, password: motDePasse } = request.body
-
-    const auth = fetchAuthToken({ email, motDePasse })
-
-    auth.catch(({ message: error }) => new InvalidRequestApiError(401, 'Invalid email/password', error))
-
-    return auth
-      .then(token => fetchUserProfile(token))
-      .then(({ userProfile, token }) => {
-        return reply.code(200).send({
-          // to maintain backwards compat with direct calls to Agence Bio API
-          agencebio: token,
-          // to use user data straight from CartoBio-Presentation
-          // without additional API calls
-          cartobio: sign({
-            ...userProfile,
-            userId: userProfile.id,
-            ocId: userProfile.organismeCertificateurId,
-            organismeCertificateur: userProfile.organismeCertificateur || {}
-            // for now we will bind the token to the AgenceBio expiry
-            //  iat: Math.floor(Date.now() / 1000)
-            // }, { expiresIn: '14d' })
-          })
-        })
-      }, error => new InvalidRequestApiError(401, 'Failed to authenticate user', error))
-  })
-
-  /**
-   * @private
-   */
-  app.post('/api/v1/tryLogin', deepmerge([internalSchema, tryLoginSchema]), (request, reply) => {
+  app.post('/api/v2/tryLogin', deepmerge([internalSchema, tryLoginSchema]), (request, reply) => {
     const { q } = request.body
     const sign = createSigner({ key: config.get('jwtSecret'), expiresIn: 1000 * 60 * 8 })
 
     return operatorLookup({ q })
       .then(operators => operators.map(operator => ({
         ...operator,
-        // @todo remove this when moving to SSO login
+        // @todo remove this when we move to SSO login
+        // token is valid for 8 minutes
+        // wich means a user has 8 minutes to search, and click on "identify as…" button
         temporaryLoginToken: sign(operator)
       })))
       .then(userProfiles => reply.code(200).send(userProfiles))
@@ -232,34 +143,6 @@ app.register(async (app) => {
     const { decodedToken } = request
 
     return reply.code(200).send(sign(decodedToken))
-  })
-
-  /**
-   * @todo lookup for PACAGE stored in the `cartobio_operators` table
-   * @private
-   */
-  app.get('/api/v1/pacage/:numeroPacage', deepmerge([internalSchema, protectedRouteOptions, routeWithPacage]), (request, reply) => {
-    const { numeroPacage } = request.params
-
-    return getCertificationBodyForPacage({ numeroPacage })
-      .then(({ ocId, numeroBio } = {}) => {
-        return reply.code(200).send({ numeroPacage, numeroBio, ocId })
-      })
-      .catch(error => new ApiError(`Failed to fetch ocId for ${numeroPacage}`, error))
-  })
-
-  /**
-   * @private
-   */
-  app.patch('/api/v1/operator/:numeroBio', deepmerge([internalSchema, routeWithNumeroBio, protectedRouteOptions, operatorSchema, trackableRoute]), (request, reply) => {
-    const { decodedToken, body } = request
-    const { ocId } = decodedToken
-    const { numeroBio } = request.params
-
-    return updateOperator({ numeroBio, ocId }, body)
-      .then(() => getOperatorSummary({ numeroBio, ocId }))
-      .then(geojson => reply.code(200).send(geojson))
-      .catch(error => new ApiError(`Failed to update operator ${numeroBio} for OC ${ocId}`, error))
   })
 
   app.get('/api/v2/stats', internalSchema, (request, reply) => {
@@ -327,7 +210,7 @@ app.register(async (app) => {
   /**
    * @private
    */
-  app.post('/api/v1/convert/shapefile/geojson', deepmerge([hiddenSchema, internalSchema]), async (request, reply) => {
+  app.post('/api/v2/convert/shapefile/geojson', deepmerge([hiddenSchema, internalSchema]), async (request, reply) => {
     return parseShapefileArchive(request.file())
       .then(geojson => reply.send(geojson))
       .catch(error => new ApiError('Failed to parse Shapefile archive', error))
@@ -336,7 +219,7 @@ app.register(async (app) => {
   /**
    * @private
    */
-  app.post('/api/v1/convert/geofolia/geojson', deepmerge([hiddenSchema, internalSchema]), async (request, reply) => {
+  app.post('/api/v2/convert/geofolia/geojson', deepmerge([hiddenSchema, internalSchema]), async (request, reply) => {
     return parseGeofoliaArchive(request.file())
       .then(geojson => reply.send(geojson))
       .catch(error => new ApiError('Failed to parse Geofolia archive', error))
@@ -394,6 +277,14 @@ app.register(async (app) => {
 
     return reply.redirect(`${config.get('frontendUrl')}/login#token=${cartobioToken}`)
   })
+})
+
+// Expose OpenAPI schema and Swagger documentation
+app.register(fastifySwagger, swaggerConfig)
+
+app.register(fastifySwaggerUi, {
+  baseDir: '/api',
+  routePrefix: '/api/documentation'
 })
 
 app.ready().then(() => app.swagger())
