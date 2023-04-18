@@ -99,6 +99,7 @@ Ce même jeton fonctionne également avec l'API CartoBio.
        "etatProduction": "AB",
        "numeroIlot": "28",
        "numeroParcelle": "1",
+       "commentaire": "à revisiter l'année prochaine\nun saut de ligne",
        "geom": "[[[4.8740990843182042,44.255949709765304],[4.8739614029301244,44.255016135661734],[4.8736532263747678,44.255001848456033],[4.8738004728368587,44.255928756333255],[4.8740990843182042,44.255949709765304]]]",
        "cultures": [
          {
@@ -125,7 +126,8 @@ Ce même jeton fonctionne également avec l'API CartoBio.
          {
            "codeCPF": "01.19.10.8",
            "quantite": 0.5,
-           "unite": "ha"
+           "unite": "ha",
+           "commentaire": "pâturé par des moutons en été"
          }
        ]
     }
