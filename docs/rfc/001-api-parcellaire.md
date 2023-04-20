@@ -57,30 +57,40 @@ Ce même jeton fonctionne également avec l'API CartoBio.
 
 ### Structure de fichier
 
-| Chemin                        | Type        | Description
-| ---                           | ---         | ---
-| `typeEnvoi`                   | enum        | `M` pour modification, `I` pour ajout
-| `numeroBio`                   | string      | numéro bio de l'opérateur
-| `numeroClient`                | string      | numéro client de l'opérateur
-| `anneeReferenceControle`      | integer     | année de référence de l'audit AB
-| `dateAudit`                   | string      | date d'audit au format [ISO 8601] (`YYYY-MM-DD`)
-| `numeroPacage`                | string      | numéro pacage de l'opérateur (si applicable)
-| `commentaire`                 | string      | notes d'audit=> Ne pas envoyer pour Ecocert
-| `parcelles`                   | array       | liste des parcelles
-| `parcelles.id`                | string      | identifiant unique de parcelle (=pk Parcelle)
-| `parcelles.cultures`          | array       | code culture (nomenclature CPF Bio)
-| `parcelles.cultures.codeCPF`  | string      | code culture (nomenclature CPF Bio)
-| `parcelles.cultures.variete`  | string      | variété de culture (si présent) 
-| `parcelles.cultures.quantite` | float       | surface de la parcelle
-| `parcelles.cultures.unite`    | enum        | `ha` (hectare)
-| `parcelles.etatProduction`    | enum        | `AB`, `C1`, `C2`, `C3` ou `NB`
-| `parcelles.dateEngagement`    | string      | date d'engagement au format [ISO 8601] (`YYYY-MM-DD`)=> uniquement pour les parcelles en conversion (voir si on peut avoir                                              la date d'import et la date de conversion différencier
-| `parcelles.numeroIlot`        | string      | numéro d'ilot PAC (si applicable)
-| `parcelles.numeroParcelle`    | string      | numéro de parcelle PAC (si applicable)
-| `parcelles.geom`              | string      | équivalent du champ `geometry.coordinates` d'une _feature_ [GeoJSON] (si applicable: ok pour ce format pour Ecocert)
-| `parcelles.commentaire`       | string      | notes d'audit spécifiques à la parcelle (=> Pas disponible pour Ecocert)
+#### Audit
 
-**Exemple** :
+| Chemin                        | Type        | Obligatoire | Description
+| ---                           | ---         | ---         | ---
+| `typeEnvoi`                   | enum        | non         | `M` pour modification, `I` pour ajout
+| `numeroBio`                   | string      | oui         | numéro bio de l'opérateur
+| `numeroClient`                | string      | oui         | numéro client de l'opérateur
+| `anneeReferenceControle`      | integer     | oui         | année de référence de l'audit AB
+| `dateAudit`                   | string      | oui         | date d'audit au format [ISO 8601] (`YYYY-MM-DD`)
+| `numeroPacage`                | string      | non         | numéro pacage de l'opérateur (si applicable)
+| `commentaire`                 | string      | non         | notes d'audit
+| `parcelles`                   | array       | oui         | liste des [Parcelles](#parcelles)
+
+#### Parcelles
+
+| `parcelles.id`                | string      | oui         | identifiant unique de parcelle (souvent appelé `PK`, `Primary Key` ou `Clé primaire`)
+| `parcelles.etatProduction`    | enum        | oui         | `AB`, `C1`, `C2`, `C3` ou `NB`
+| `parcelles.dateEngagement`    | string      | non         | date d'engagement (si connue) au format [ISO 8601] (`YYYY-MM-DD`)=> uniquement pour les parcelles en conversion (voir si on peut avoir                                              la date d'import et la date de conversion différencier
+| `parcelles.numeroIlot`        | string      | non         | numéro d'ilot PAC (si applicable)
+| `parcelles.numeroParcelle`    | string      | non         | numéro de parcelle PAC (si applicable)
+| `parcelles.geom`              | string      | non         | coordonnées géographiques — équivalent du champ `geometry.coordinates` d'une _feature_ [GeoJSON] (si applicable)
+| `parcelles.commentaire`       | string      | non         | notes d'audit spécifiques à la parcelle
+| `parcelles.cultures`          | array       | oui         | liste de 1 à _n_ [Cultures](#cultures) sur la parcelle
+
+#### Cultures
+
+| `parcelles.cultures.codeCPF`  | string      | oui         | code culture (nomenclature CPF Bio)
+| `parcelles.cultures.variete`  | string      | non         | variété de culture (si présent) 
+| `parcelles.cultures.quantite` | float       | non         | surface de la parcelle
+| `parcelles.cultures.unite`    | enum        | non         | `ha` (hectare)
+
+#### Exemple
+
+Audit contenant 2 parcelles de, respectivement, 1 et 2 cultures.
 
 ```json
 [
@@ -132,8 +142,7 @@ Ce même jeton fonctionne également avec l'API CartoBio.
        ]
     }
    ]
-  },
-  // …
+  }
 ]
 ```
 
