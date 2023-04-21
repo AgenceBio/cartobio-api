@@ -1,9 +1,11 @@
 ---
 title: API Parcellaire
 date: 2023-04-12
+updated_at: 2023-04-21
 contributors:
-- Thomas P (CartoBio)
 - Laetita L (Ecocert)
+- Maud R (CartoBio)
+- Thomas P (CartoBio)
 ---
 
 # Mise en place d'une API Parcellaire
@@ -14,20 +16,19 @@ La mise en place de cette API constitue une première étape pour échanger auto
 
 ## Proposition
 
-### Prototypage : import/export à intervalle régulier
+### Prototypage : envoi par fichier
 
 Pour prototyper un import à grande échelle, nous convenons :
 
 - de la production d'un fichier d'export, au format JSON, compressé en ZIP
-- en fin de mois
 - transmis de manière sécurisée (via https://drop.infini.fr/ si inférieur à 1Go)
 - importé manuellement par l'équipe CartoBio
 
-Cette période permettra d'ajuster le format de fichier sous forme de dialogues entre OC et CartoBio.
+Cette période permettra d'ajuster le format de fichier sous forme de dialogues entre Organisme de Certification et CartoBio.
 
 ### Envoi via API
 
-Dans un second temps, lorsque le format d'import sera stabilisé, les parcellaires seront télétransmis
+Dans un second temps, lorsque le format d'import sera stabilisé, les parcellaires seront télétransmis à un rythme hebdomadaire voire journalier, sauf dérogation auprès de l'INAO.
 
 ```bash
 curl --data-binary '@/chemin/vers/parcellaire.json' \
@@ -38,7 +39,7 @@ curl --data-binary '@/chemin/vers/parcellaire.json' \
 ```
 
 L'entête `Authorization` contient un jeton de service fourni par l'Agence Bio.\
-Ce même jeton fonctionne également avec l'API CartoBio.
+Ce même jeton fonctionne avec l'API CartoBio.
 
 #### Codes HTTP
 
