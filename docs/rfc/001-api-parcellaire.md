@@ -42,18 +42,37 @@ Ce même jeton fonctionne également avec l'API CartoBio.
 
 #### Codes HTTP
 
-| Code HTTP                   | Signification
-| ---                         | ---
-| `202 Accepted`              | Les données sont acceptées. Leur traitement se fera en traitement différé de plusieurs minutes.
-| `400 Bad Request`           | La requête contient des données qui ne sont pas structurées tel que décrit ci-dessus.
-| `401 Unauthorized`          | Le jeton d'`Authorization` est manquant.
-| `403 Forbidden`             | Ce jeton d'`Authorization` n'est pas attribué, ou a expiré.
-| `405 Method Not Allowed`    | L'appel utilise un autre verbe HTTP que `POST`.
-| `500 Internal Server Error` | Une erreur inattendue s'est produite de notre côté — un bug doit être résolu pour qu'une nouvelle requête puisse aboutir.
+| Code HTTP | Message HTTP           | Signification
+| ---       | ---                    | ---
+| `202`     | `Accepted`             | Les données sont acceptées. Leur traitement se fera en traitement différé de plusieurs minutes.
+| `400`     | `Bad Request`          | La requête contient des paramètres qui ne permettent pas de la comprendre.
+| `401`     | `Unauthorized`         | Le jeton d'`Authorization` est manquant.
+| `403`     | `Forbidden`            | Ce jeton d'`Authorization` n'est pas attribué, ou a expiré.
+| `405`     | `Method Not Allowed`   | L'appel utilise un autre verbe HTTP que `POST`.
+| `500`     | `Internal Server Error`| Une erreur inattendue s'est produite de notre côté — un bug doit être résolu pour qu'une nouvelle requête puisse aboutir.
 
-## Implémentation technique
+#### Réponse
 
-[`parseAPIParcellaireStream()` dans `lib/providers/agence-bio.js`](../../lib/providers/agence-bio.js).
+En cas de statut `202`, un objet représente l'état du traitement.
+
+| Chemin                        | Type        | Description
+| ---                           | ---         | ---
+| `nbObjetTraites`              | integer     | nombre d'objets reçus
+| `nbObjectAcceptes`            | integer     | nombre d'objets validés pour traitement
+| `nbObjetRefuses`              | integer     | nombre d'objets refusés pour cause d'erreur
+| `listeProblemes`              | array       | année de référence de l'audit AB
+
+```json
+{
+  "nbObjetTraites": 3,
+  "nbObjectAcceptes": 1,
+  "nbObjetRefuses": 2,
+  "listeProblemes": [
+    "[#2] Numéro bio manquant pour le numéro client XYZ",
+    "[#3] Numéro CPF invalide pour la parcelle 2"
+  ]
+}
+```
 
 ### Structure de fichier
 
@@ -68,29 +87,33 @@ Ce même jeton fonctionne également avec l'API CartoBio.
 | `dateAudit`                   | string      | oui         | date d'audit au format [ISO 8601] (`YYYY-MM-DD`)
 | `numeroPacage`                | string      | non         | numéro pacage de l'opérateur (si applicable)
 | `commentaire`                 | string      | non         | notes d'audit
-| `parcelles`                   | array       | oui         | liste des [Parcelles](#parcelles)
+| `parcelles`                   | array       | oui         | liste d'éléments de type [Parcelle](#parcelle)
 
-#### Parcelles
+#### Parcelle
 
-| `parcelles.id`                | string      | oui         | identifiant unique de parcelle (souvent appelé `PK`, `Primary Key` ou `Clé primaire`)
-| `parcelles.etatProduction`    | enum        | oui         | `AB`, `C1`, `C2`, `C3` ou `NB`
-| `parcelles.dateEngagement`    | string      | non         | date d'engagement (si connue) au format [ISO 8601] (`YYYY-MM-DD`)=> uniquement pour les parcelles en conversion (voir si on peut avoir                                              la date d'import et la date de conversion différencier
-| `parcelles.numeroIlot`        | string      | non         | numéro d'ilot PAC (si applicable)
-| `parcelles.numeroParcelle`    | string      | non         | numéro de parcelle PAC (si applicable)
-| `parcelles.geom`              | string      | non         | coordonnées géographiques — équivalent du champ `geometry.coordinates` d'une _feature_ [GeoJSON] (si applicable)
-| `parcelles.commentaire`       | string      | non         | notes d'audit spécifiques à la parcelle
-| `parcelles.cultures`          | array       | oui         | liste de 1 à _n_ [Cultures](#cultures) sur la parcelle
+| Chemin              | Type        | Obligatoire | Description
+| ---                 | ---         | ---         | ---
+| `id`                | string      | oui         | identifiant unique de parcelle (souvent appelé `PK`, `Primary Key` ou `Clé primaire`)
+| `etatProduction`    | enum        | oui         | `AB`, `C1`, `C2`, `C3` ou `NB`
+| `dateEngagement`    | string      | non         | date d'engagement (si connue) au format [ISO 8601] (`YYYY-MM-DD`)=> uniquement pour les parcelles en conversion (voir si on peut avoir                                              la date d'import et la date de conversion différencier
+| `numeroIlot`        | string      | non         | numéro d'ilot PAC (si applicable)
+| `numeroParcelle`    | string      | non         | numéro de parcelle PAC (si applicable)
+| `geom`              | string      | non         | coordonnées géographiques (si applicable). Équivalent du champ `geometry.coordinates` d'une [_feature_ GeoJSON]
+| `commentaire`       | string      | non         | notes d'audit spécifiques à la parcelle
+| `cultures`          | array       | oui         | liste d'éléments de type [Culture](#culture)
 
-#### Cultures
+#### Culture
 
-| `parcelles.cultures.codeCPF`  | string      | oui         | code culture (nomenclature CPF Bio)
-| `parcelles.cultures.variete`  | string      | non         | variété de culture (si présent) 
-| `parcelles.cultures.quantite` | float       | non         | surface de la parcelle
-| `parcelles.cultures.unite`    | enum        | non         | `ha` (hectare)
+| Chemin     | Type        | Obligatoire | Description
+| ---        | ---         | ---         | ---
+| `codeCPF`  | string      | oui         | code culture (nomenclature CPF Bio)
+| `variete`  | string      | non         | variété de culture (si présent) 
+| `quantite` | float       | non         | surface de la parcelle
+| `unite`    | enum        | non         | `ha` (hectare)
 
 #### Exemple
 
-Audit contenant 2 parcelles de, respectivement, 1 et 2 cultures.
+Exemple de fichier JSON relatif à un audit de 2 parcelles. Elles comportent respectivement 1 et 2 cultures.
 
 ```json
 [
@@ -109,7 +132,7 @@ Audit contenant 2 parcelles de, respectivement, 1 et 2 cultures.
        "etatProduction": "AB",
        "numeroIlot": "28",
        "numeroParcelle": "1",
-       "commentaire": "à revisiter l'année prochaine\nun saut de ligne",
+       "commentaire": "à revisiter l'année prochaine\nune autre ligne",
        "geom": "[[[4.8740990843182042,44.255949709765304],[4.8739614029301244,44.255016135661734],[4.8736532263747678,44.255001848456033],[4.8738004728368587,44.255928756333255],[4.8740990843182042,44.255949709765304]]]",
        "cultures": [
          {
@@ -149,6 +172,11 @@ Audit contenant 2 parcelles de, respectivement, 1 et 2 cultures.
 ### Algorithme de résolution
 
 TBD.
+
+
+## Implémentation technique
+
+[`parseAPIParcellaireStream()` dans `lib/providers/agence-bio.js`](../../lib/providers/agence-bio.js).
 
 [GeoJSON]: https://geojson.org/
 [ISO 8601]: https://www.iso.org/iso-8601-date-and-time-format.html
