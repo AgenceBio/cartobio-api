@@ -1,7 +1,7 @@
 ---
 title: API Parcellaire
 date: 2023-04-12
-updated_at: 2023-04-21
+updated_at: 2023-05-03
 contributors:
 - Laetita L (Ecocert)
 - Maud R (CartoBio)
@@ -105,12 +105,13 @@ En cas de statut `202`, un objet représente l'état du traitement.
 
 #### Culture
 
-| Chemin     | Type        | Obligatoire | Description
-| ---        | ---         | ---         | ---
-| `codeCPF`  | string      | oui         | code culture (nomenclature CPF Bio)
-| `variete`  | string      | non         | variété de culture (si présent) 
-| `quantite` | float       | non         | surface de la parcelle
-| `unite`    | enum        | non         | `ha` (hectare)
+| Chemin       | Type        | Obligatoire | Description
+| ---          | ---         | ---         | ---
+| `codeCPF`    | string      | oui         | code culture (nomenclature CPF Bio)
+| `variete`    | string      | non         | variété de culture (si applicable)
+| `dateSemis`  | string      | oui         | date de semis au format [ISO 8601] (`YYYY-MM-DD`) (si applicable)
+| `quantite`   | float       | non         | surface de la parcelle
+| `unite`      | enum        | non         | `ha` (hectare)
 
 #### Exemple
 
@@ -162,6 +163,27 @@ Exemple de fichier JSON relatif à un audit de 2 parcelles. Elles comportent res
            "quantite": 0.5,
            "unite": "ha",
            "commentaire": "pâturé par des moutons en été"
+         }
+       ]
+    },
+    {
+       "id": "45744",
+       "etatProduction": "AB",
+       "numeroIlot": "28",
+       "numeroParcelle": "3",
+       "cultures": [
+         {
+           "codeCPF": "01.11.12",
+           "variete": "rieti, mottet blanc",
+           "dateSemis": "2023-10-10",
+           "quantite": 10,
+           "unite": "ha"
+         },
+         {
+           "codeCPF": "01.11.95",
+           "dateSemis": "2023-07-01",
+           "quantite": 10,
+           "unite": "ha"
          }
        ]
     }
