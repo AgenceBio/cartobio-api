@@ -81,7 +81,6 @@ En cas de statut `202`, un objet représente l'état du traitement.
 
 | Chemin                        | Type        | Obligatoire     | Description
 | ---                           | ---         | ---             | ---
-| `typeEnvoi`                   | enum        | non             | `M` pour modification, `I` pour ajout
 | `numeroBio`                   | string      | **oui**         | numéro bio de l'opérateur
 | `numeroClient`                | string      | **oui**         | numéro client de l'opérateur
 | `anneeReferenceControle`      | integer     | **oui**         | année de référence de l'audit AB
@@ -120,7 +119,6 @@ Exemple de fichier JSON relatif à un audit de 2 parcelles. Elles comportent res
 ```json
 [
   {
-   "typeEnvoi": "M",
    "numeroBio": "110994",
    "numeroClient": "100012",
    "anneeReferenceControle": 2022,
