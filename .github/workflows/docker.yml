@@ -49,6 +49,7 @@ jobs:
         fi
 
     - name: Publish to Docker Hub
+      if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
       run: |
         docker tag agencebio/cartobio-api agencebio/cartobio-api:${{ steps.publish.outputs.tag }}
         docker push agencebio/cartobio-api:${{ steps.publish.outputs.tag }}
