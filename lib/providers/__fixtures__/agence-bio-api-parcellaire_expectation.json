@@ -38,7 +38,7 @@
         "properties": {
           "CAMPAGNE": 2022,
           "culture_cpf": "01.92",
-          "TYPE": null,
+          "TYPE": "ROS",
           "NUMERO_I": "28",
           "NUMERO_P": "1",
           "PACAGE": "084012821",
@@ -109,7 +109,7 @@
         "properties": {
           "CAMPAGNE": 2022,
           "culture_cpf": "01.92",
-          "TYPE": null,
+          "TYPE": "ROS",
           "NUMERO_I": "49",
           "NUMERO_P": "1",
           "PACAGE": "084012821",
@@ -148,7 +148,7 @@
         "properties": {
           "CAMPAGNE": 2022,
           "culture_cpf": "01.21.12",
-          "TYPE": "VRN",
+          "TYPE": "VRC",
           "NUMERO_I": "13",
           "NUMERO_P": "1",
           "PACAGE": "084012821",
