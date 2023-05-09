@@ -85,11 +85,22 @@ describe('POST /api/v2/convert/shapefile/geojson', () => {
   test('it converts a L93 zipped archive into WGS84 GeoJSON', () => {
     return request(app)
       .post('/api/v2/convert/shapefile/geojson')
+      .query({ access_token: USER_DOC_AUTH_TOKEN })
       .type('json')
       .attach('archive', 'test/fixtures/telepac-parcelles.zip')
       .then((response) => {
         expect(response.status).toBe(200)
         expect(response.body).toHaveProperty('features.0.type', 'Feature')
+      })
+  })
+
+  test('it fails without auth', () => {
+    return request(app)
+      .post('/api/v2/convert/shapefile/geojson')
+      .type('json')
+      .attach('archive', 'test/fixtures/telepac-parcelles.zip')
+      .then((response) => {
+        expect(response.status).toBe(401)
       })
   })
 })
