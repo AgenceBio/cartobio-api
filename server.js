@@ -18,7 +18,7 @@ const { ExtraErrorData } = require('@sentry/integrations')
 const { createSigner } = require('fast-jwt')
 const { all: deepmerge } = require('deepmerge')
 
-const { fetchOperatorById, getUserProfileFromSSOToken, operatorLookup, fetchCustomersByOperator, verifyNotificationAuthorization } = require('./lib/providers/agence-bio.js')
+const { fetchOperatorById, getUserProfileFromSSOToken, getUserProfileById, operatorLookup, fetchCustomersByOperator, verifyNotificationAuthorization } = require('./lib/providers/agence-bio.js')
 const { updateOperatorParcels, getOperator, updateAuditRecordState, fetchLatestCustomersByControlBody, pacageLookup } = require('./lib/providers/cartobio.js')
 const { parseShapefileArchive } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive } = require('./lib/providers/geofolia.js')
@@ -201,8 +201,9 @@ app.register(async (app) => {
   app.post('/api/v2/operator/:operatorId/parcelles', deepmerge([internalSchema, routeWithOperatorId, ocSchema, trackableRoute, protectedRouteOptions]), (request, reply) => {
     const { body } = request
     const { operatorId } = request.params
+    const { id: ocId, nom: ocLabel } = request.decodedToken.organismeCertificateur
 
-    return updateOperatorParcels({ operatorId }, body)
+    return updateOperatorParcels({ operatorId }, { ...body, ocId, ocLabel })
       .then(result => reply.code(200).send(result))
       .catch(error => new ApiError(`Failed to update operator ${operatorId} parcels`, error))
   })
@@ -210,7 +211,7 @@ app.register(async (app) => {
   /**
    * @private
    */
-  app.post('/api/v2/convert/shapefile/geojson', deepmerge([hiddenSchema, internalSchema]), async (request, reply) => {
+  app.post('/api/v2/convert/shapefile/geojson', deepmerge([protectedRouteOptions, internalSchema]), async (request, reply) => {
     return parseShapefileArchive(request.file())
       .then(geojson => reply.send(geojson))
       .catch(error => new ApiError('Failed to parse Shapefile archive', error))
@@ -219,7 +220,7 @@ app.register(async (app) => {
   /**
    * @private
    */
-  app.post('/api/v2/convert/geofolia/geojson', deepmerge([hiddenSchema, internalSchema]), async (request, reply) => {
+  app.post('/api/v2/convert/geofolia/geojson', deepmerge([protectedRouteOptions, internalSchema]), async (request, reply) => {
     return parseGeofoliaArchive(request.file())
       .then(geojson => reply.send(geojson))
       .catch(error => new ApiError('Failed to parse Geofolia archive', error))
@@ -262,10 +263,21 @@ app.register(async (app) => {
   })
 
   app.get('/api/v2/user/exchangeToken', deepmerge([sandboxSchema, internalSchema, protectedRouteOptions, trackableRoute]), async (request, reply) => {
-    const { payload: decodedToken } = verifyNotificationAuthorization(request.headers.authorization)
-    const operator = await fetchOperatorById(decodedToken.operateurId)
+    const { payload: decodedToken, token } = verifyNotificationAuthorization(request.headers.authorization)
+    const [operator, userProfile] = await Promise.all([
+      fetchOperatorById(decodedToken.operateurId),
+      getUserProfileById(decodedToken.userId, token)
+    ])
 
-    return reply.send(operator)
+    // dirty hack as long as we don't clearly separate operator/user in the client side authentication
+    userProfile.id = operator.id
+    userProfile.numeroBio = String(operator.numeroBio)
+
+    return reply.send({
+      operator,
+      // @todo use Notification pubkey and time based token to passthrough the requests to both Agence Bio and CartoBio APIs
+      token: sign(userProfile, config.get('jwtSecret'), { expiresIn: '2h' })
+    })
   })
 
   // usefull only in dev mode
