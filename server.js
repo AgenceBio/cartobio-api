@@ -18,8 +18,8 @@ const { ExtraErrorData } = require('@sentry/integrations')
 const { createSigner } = require('fast-jwt')
 const { all: deepmerge } = require('deepmerge')
 
-const { fetchOperatorById, getUserProfileFromSSOToken, getUserProfileById, operatorLookup, fetchCustomersByOperator, verifyNotificationAuthorization } = require('./lib/providers/agence-bio.js')
-const { updateOperatorParcels, getOperator, updateAuditRecordState, fetchLatestCustomersByControlBody, pacageLookup } = require('./lib/providers/cartobio.js')
+const { fetchOperatorById, fetchCustomersByOperator, getUserProfileById, getUserProfileFromSSOToken, operatorLookup, verifyNotificationAuthorization } = require('./lib/providers/agence-bio.js')
+const { addNewOperatorParcel, fetchLatestCustomersByControlBody, getOperator, pacageLookup, updateAuditRecordState, updateOperatorParcels } = require('./lib/providers/cartobio.js')
 const { parseShapefileArchive } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive } = require('./lib/providers/geofolia.js')
 const { getMesParcellesOperator } = require('./lib/providers/mes-parcelles.js')
@@ -198,7 +198,7 @@ app.register(async (app) => {
   /**
    * @private
    */
-  app.post('/api/v2/operator/:operatorId/parcelles', deepmerge([internalSchema, routeWithOperatorId, ocSchema, trackableRoute, protectedRouteOptions]), (request, reply) => {
+  app.put('/api/v2/operator/:operatorId/parcelles', deepmerge([internalSchema, routeWithOperatorId, ocSchema, trackableRoute]), (request, reply) => {
     const { body } = request
     const { operatorId } = request.params
     const { id: ocId, nom: ocLabel } = request.decodedToken.organismeCertificateur
@@ -206,6 +206,15 @@ app.register(async (app) => {
     return updateOperatorParcels({ operatorId }, { ...body, ocId, ocLabel })
       .then(result => reply.code(200).send(result))
       .catch(error => new ApiError(`Failed to update operator ${operatorId} parcels`, error))
+  })
+
+  app.post('/api/v2/operator/:operatorId/parcelles', deepmerge([internalSchema, routeWithOperatorId, ocSchema, trackableRoute]), (request, reply) => {
+    const { feature } = request.body
+    const { operatorId } = request.params
+
+    return addNewOperatorParcel({ operatorId }, feature)
+      .then(result => reply.code(200).send(result))
+      .catch(error => new ApiError(`Failed to add new operator ${operatorId} parcel`, error))
   })
 
   /**
