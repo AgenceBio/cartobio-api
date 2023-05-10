@@ -43,16 +43,23 @@ const sign = createSigner({ key: config.get('jwtSecret'), expiresIn: DURATION_ON
 
 // Sentry error reporting setup
 if (reportErrors) {
-  Sentry.init({
+  const sentryOptions = {
     dsn: config.get('sentry.dsn'),
     environment: config.get('environment'),
     includeLocalVariables: true,
     integrations: [
       new ExtraErrorData()
     ],
-    release: 'cartobio-api@' + config.get('version'),
     tracesSampleRate: config.get('environment') === 'production' ? 0.2 : 1
-  })
+  }
+
+  if (config.get('environment') === 'production') {
+    sentryOptions.release = config.get('version')
+  } else if (config.get('environment') === 'staging') {
+    sentryOptions.release = process.env.SENTRY_RELEASE
+  }
+
+  Sentry.init(sentryOptions)
 }
 
 app.setErrorHandler(new FastifyErrorHandler({
