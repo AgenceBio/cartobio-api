@@ -34,7 +34,7 @@ const { tryLoginSchema } = require('./lib/routes/login.js')
 const reportErrors = config.get('reportErrors')
 
 const db = require('./lib/db.js')
-const { ApiError, FastifyErrorHandler } = require('./lib/errors.js')
+const { ApiError, FastifyErrorHandler, UnauthorizedApiError } = require('./lib/errors.js')
 const sign = createSigner({ key: config.get('jwtSecret') })
 
 // Sentry error reporting setup
@@ -262,8 +262,13 @@ app.register(async (app) => {
     return reply.send(decodedToken)
   })
 
-  app.get('/api/v2/user/exchangeToken', deepmerge([sandboxSchema, internalSchema, protectedRouteOptions, trackableRoute]), async (request, reply) => {
-    const { payload: decodedToken, token } = verifyNotificationAuthorization(request.headers.authorization)
+  app.get('/api/v2/user/exchangeToken', deepmerge([sandboxSchema, internalSchema, protectedRouteOptions]), async (request, reply) => {
+    const { error, payload: decodedToken, token } = verifyNotificationAuthorization(request.headers.authorization)
+
+    if (error) {
+      return new UnauthorizedApiError('Unable to verify the provided token', error)
+    }
+
     const [operator, userProfile] = await Promise.all([
       fetchOperatorById(decodedToken.operateurId),
       getUserProfileById(decodedToken.userId, token)
