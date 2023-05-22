@@ -1,7 +1,7 @@
 ---
 title: API Parcellaire
 date: 2023-04-12
-updated_at: 2023-05-03
+updated_at: 2023-05-22
 contributors:
 - Laetita L (Ecocert)
 - Maud R (CartoBio)
@@ -84,6 +84,7 @@ En cas de statut `202`, un objet représente l'état du traitement.
 | `numeroBio`                   | string      | **oui**         | numéro bio de l'opérateur
 | `numeroClient`                | string      | **oui**         | numéro client de l'opérateur
 | `anneeReferenceControle`      | integer     | **oui**         | année de référence de l'audit AB
+| `anneeAssolement`             | integer     | non             | année de l'assolement concerné [^assolement]
 | `dateAudit`                   | string      | **oui**         | date d'audit au format [ISO 8601] (`YYYY-MM-DD`)
 | `numeroPacage`                | string      | non             | numéro pacage de l'opérateur (si applicable)
 | `commentaire`                 | string      | non             | notes d'audit
@@ -122,6 +123,7 @@ Exemple de fichier JSON relatif à un audit de 2 parcelles. Elles comportent res
    "numeroBio": "110994",
    "numeroClient": "100012",
    "anneeReferenceControle": 2022,
+   "anneeAssolement": 2022,
    "dateAudit": "2023-02-23",
    "numeroPacage": "084012821",
    "commentaire": "",
@@ -201,3 +203,5 @@ TBD.
 
 [GeoJSON]: https://geojson.org/
 [ISO 8601]: https://www.iso.org/iso-8601-date-and-time-format.html
+
+[^anneeAssolement]: si cette valeur n'est pas renseignée, on considère qu'elle équivaut à `anneeReferenceControle`.
