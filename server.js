@@ -198,7 +198,7 @@ app.register(async (app) => {
   /**
    * @private
    */
-  app.put('/api/v2/operator/:operatorId/parcelles', deepmerge([internalSchema, routeWithOperatorId, ocSchema, trackableRoute]), (request, reply) => {
+  app.put('/api/v2/operator/:operatorId/parcelles', deepmerge([internalSchema, routeWithOperatorId, ocSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
     const { body } = request
     const { operatorId } = request.params
     const { id: ocId, nom: ocLabel } = request.decodedToken.organismeCertificateur
@@ -208,7 +208,7 @@ app.register(async (app) => {
       .catch(error => new ApiError(`Failed to update operator ${operatorId} parcels`, error))
   })
 
-  app.post('/api/v2/operator/:operatorId/parcelles', deepmerge([internalSchema, routeWithOperatorId, ocSchema, trackableRoute]), (request, reply) => {
+  app.post('/api/v2/operator/:operatorId/parcelles', deepmerge([internalSchema, routeWithOperatorId, ocSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
     const { feature } = request.body
     const { operatorId } = request.params
 
