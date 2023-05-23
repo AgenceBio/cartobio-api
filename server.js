@@ -286,6 +286,7 @@ app.register(async (app) => {
     // dirty hack as long as we don't clearly separate operator/user in the client side authentication
     userProfile.id = operator.id
     userProfile.numeroBio = String(operator.numeroBio)
+    userProfile.organismeCertificateur = operator.organismeCertificateur
 
     return reply.send({
       operator,
