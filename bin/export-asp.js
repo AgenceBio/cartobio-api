@@ -35,7 +35,6 @@ FROM (
       FROM "cartobio_operators"
       WHERE certification_state IN (/*'OPERATOR_DRAFT', */'AUDITED', 'CERTIFIED')
     ) features
-  LEFT JOIN correspondance_pac_cpf ON (feature->'properties'->>'TYPE' = correspondance_pac_cpf.pac)
 ) properties;`, [], { singleRowMode: true, rowMode: 'one' })
 
 ;(async function main () {
