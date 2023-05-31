@@ -261,9 +261,9 @@ app.register(async (app) => {
    * @private
    */
   app.post('/api/v2/import/mesparcelles/login', deepmerge([hiddenSchema, internalSchema]), async (request, reply) => {
-    const { email, password, server } = request.body
+    const { email, millesime, password, server } = request.body
 
-    return getMesParcellesOperator({ email, password, server })
+    return getMesParcellesOperator({ email, millesime, password, server })
       .then(geojson => reply.send(geojson))
       .catch(error => new ApiError('Failed to import MesParcelles features', error))
   })
