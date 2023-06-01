@@ -33,9 +33,13 @@ const { tryLoginSchema } = require('./lib/routes/login.js')
 // Application is hosted on localhost:8000 by default
 const reportErrors = config.get('reportErrors')
 
+const DURATION_ONE_MINUTE = 1000 * 60
+const DURATION_ONE_HOUR = DURATION_ONE_MINUTE * 60
+const DURATION_ONE_DAY = DURATION_ONE_HOUR * 24
+
 const db = require('./lib/db.js')
 const { ApiError, FastifyErrorHandler, UnauthorizedApiError } = require('./lib/errors.js')
-const sign = createSigner({ key: config.get('jwtSecret') })
+const sign = createSigner({ key: config.get('jwtSecret'), expiresIn: DURATION_ONE_DAY * 30 })
 
 // Sentry error reporting setup
 if (reportErrors) {
@@ -125,7 +129,7 @@ app.register(async (app) => {
    */
   app.post('/api/v2/tryLogin', deepmerge([internalSchema, tryLoginSchema]), (request, reply) => {
     const { q } = request.body
-    const sign = createSigner({ key: config.get('jwtSecret'), expiresIn: 1000 * 60 * 8 })
+    const sign = createSigner({ key: config.get('jwtSecret'), expiresIn: DURATION_ONE_MINUTE * 8 })
 
     return operatorLookup({ q })
       .then(operators => operators.map(operator => ({
@@ -144,6 +148,8 @@ app.register(async (app) => {
    */
   app.post('/api/v2/temporaryLoginWithToken', deepmerge([internalSchema, protectedRouteOptions]), (request, reply) => {
     const { decodedToken } = request
+
+    delete decodedToken.exp
 
     return reply.code(200).send(sign(decodedToken))
   })
@@ -286,6 +292,8 @@ app.register(async (app) => {
       getUserProfileById(decodedToken.userId, token)
     ])
 
+    const sign = createSigner({ key: config.get('jwtSecret'), expiresIn: DURATION_ONE_HOUR * 2 })
+
     // dirty hack as long as we don't clearly separate operator/user in the client side authentication
     userProfile.id = operator.id
     userProfile.numeroBio = String(operator.numeroBio)
@@ -294,7 +302,7 @@ app.register(async (app) => {
     return reply.send({
       operator,
       // @todo use Notification pubkey and time based token to passthrough the requests to both Agence Bio and CartoBio APIs
-      token: sign(userProfile, config.get('jwtSecret'), { expiresIn: '2h' })
+      token: sign(userProfile)
     })
   })
 
@@ -305,7 +313,7 @@ app.register(async (app) => {
     const { mode = '', returnto = '' } = stateCache.get(request.query.state)
     const { token } = await app.agenceBioOAuth2.getAccessTokenFromAuthorizationCodeFlow(request)
     const userProfile = await getUserProfileFromSSOToken(token.access_token)
-    const cartobioToken = sign(userProfile, config.get('jwtSecret'), { expiresIn: '30d' })
+    const cartobioToken = sign(userProfile)
 
     return reply.redirect(`${config.get('frontendUrl')}/login?mode=${mode}&returnto=${returnto}#token=${cartobioToken}`)
   })
