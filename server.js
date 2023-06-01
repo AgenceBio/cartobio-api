@@ -91,9 +91,12 @@ app.register(fastifyOauth, {
   },
   startRedirectPath: '/api/auth-provider/agencebio/login',
   callbackUri: config.get('notifications.sso.callbackUri'),
-  generateStateFunction () {
+  generateStateFunction (request) {
     const state = randomUUID()
-    stateCache.set(state, true)
+    stateCache.set(state, {
+      mode: request.query?.mode,
+      returnto: request.query?.returnto
+    })
     return state
   },
   checkStateFunction (state, next) {
@@ -258,9 +261,9 @@ app.register(async (app) => {
    * @private
    */
   app.post('/api/v2/import/mesparcelles/login', deepmerge([hiddenSchema, internalSchema]), async (request, reply) => {
-    const { email, password, server } = request.body
+    const { email, millesime, password, server } = request.body
 
-    return getMesParcellesOperator({ email, password, server })
+    return getMesParcellesOperator({ email, millesime, password, server })
       .then(geojson => reply.send(geojson))
       .catch(error => new ApiError('Failed to import MesParcelles features', error))
   })
@@ -298,11 +301,13 @@ app.register(async (app) => {
   // usefull only in dev mode
   app.get('/auth-provider/agencebio/login', hiddenSchema, (request, reply) => reply.redirect('/api/auth-provider/agencebio/login'))
   app.get('/api/auth-provider/agencebio/callback', deepmerge([sandboxSchema, hiddenSchema]), async (request, reply) => {
+    // forwards to the UI the user-selected tab
+    const { mode = '', returnto = '' } = stateCache.get(request.query.state)
     const { token } = await app.agenceBioOAuth2.getAccessTokenFromAuthorizationCodeFlow(request)
     const userProfile = await getUserProfileFromSSOToken(token.access_token)
     const cartobioToken = sign(userProfile, config.get('jwtSecret'), { expiresIn: '30d' })
 
-    return reply.redirect(`${config.get('frontendUrl')}/login#token=${cartobioToken}`)
+    return reply.redirect(`${config.get('frontendUrl')}/login?mode=${mode}&returnto=${returnto}#token=${cartobioToken}`)
   })
 })
 
