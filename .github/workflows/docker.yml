@@ -58,6 +58,36 @@ jobs:
         docker tag agencebio/cartobio-api agencebio/cartobio-api:${{ steps.publish.outputs.tag }}
         docker push agencebio/cartobio-api:${{ steps.publish.outputs.tag }}
 
+  create-sentry:
+    if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
+    runs-on: ubuntu-latest
+    steps:
+    - name: Assign sentry environment
+      id: sentry
+      run: |
+        if [[ $GITHUB_REF == 'refs/heads/main' ]]; then
+          echo "environment=staging" >> $GITHUB_OUTPUT
+          echo "version=$(node -p "require('./package.json').version")-dev-${{ github.sha }}" >> $GITHUB_OUTPUT
+        else
+          echo "environment=production" >> $GITHUB_OUTPUT
+          echo "version=${GITHUB_REF_NAME#v*}" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Create Sentry release
+      uses: getsentry/action-release@v1
+      env:
+        SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        SENTRY_ORG: betagouv
+        SENTRY_PROJECT: cartobio-api
+        SENTRY_URL: https://sentry.incubateur.net/
+        SENTRY_LOG_LEVEL: debug
+      with:
+        environment: ${{ steps.sentry.outputs.environment }}
+        version: ${{ steps.sentry.outputs.version }}
+        # On a pas l'intégration GitHub qui permet que Sentry récupère dans
+        # l'autre sens les commits liés à la release, donc on skip
+        set_commits: skip
+
   deploy-staging:
     needs: [build]
     if: github.ref == 'refs/heads/main'
@@ -76,6 +106,7 @@ jobs:
           && docker run -d --restart unless-stopped \
             -p 127.0.0.1:7500:8000 \
             --env-file=.env.cartobio-api-staging \
+            --env SENTRY_RELEASE=$(node -p "require('./package.json').version")-dev-${{ github.sha }} \
             --add-host=postgres:$(docker inspect -f '{{.NetworkSettings.IPAddress}}' postgres-staging) \
             --name cartobio-api-staging \
             ${{ needs.build.outputs.image }}
