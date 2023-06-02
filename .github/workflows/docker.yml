@@ -79,6 +79,21 @@ jobs:
             --add-host=postgres:$(docker inspect -f '{{.NetworkSettings.IPAddress}}' postgres-staging) \
             --name cartobio-api-staging \
             ${{ needs.build.outputs.image }}
+    - name: Create Sentry staging release
+      uses: getsentry/action-release@v1
+      env:
+        SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        SENTRY_ORG: betagouv
+        SENTRY_PROJECT: cartobio-api
+        SENTRY_URL: https://sentry.incubateur.net/
+        SENTRY_LOG_LEVEL: debug
+      with:
+        environment: staging
+        # On a pas l'intégration GitHub qui permet que Sentry récupère dans
+        # l'autre sens les commits liés à la release, donc on skip
+        set_commits: skip
+        # Le tag de la release est le nom du tag git
+        version: "${{ steps.publish.outputs.tag }}-dev-${{ github.sha }}"
 
   deploy-production:
     needs: [build]
@@ -101,3 +116,19 @@ jobs:
             --add-host=postgres:$(docker inspect -f '{{.NetworkSettings.IPAddress}}' postgres-production) \
             --name cartobio-api-production \
             ${{ needs.build.outputs.image }}
+
+    - name: Create Sentry production release
+      uses: getsentry/action-release@v1
+      env:
+        SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        SENTRY_ORG: betagouv
+        SENTRY_PROJECT: cartobio-api
+        SENTRY_URL: https://sentry.incubateur.net/
+        SENTRY_LOG_LEVEL: debug
+      with:
+        environment: production
+        # On a pas l'intégration GitHub qui permet que Sentry récupère dans
+        # l'autre sens les commits liés à la release, donc on skip
+        set_commits: skip
+        # Le tag de la release est le nom du tag git
+        version: ${{ github.ref }}
