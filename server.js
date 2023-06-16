@@ -19,7 +19,7 @@ const { createSigner } = require('fast-jwt')
 const { all: deepmerge } = require('deepmerge')
 
 const { fetchOperatorById, fetchCustomersByOperator, getUserProfileById, getUserProfileFromSSOToken, operatorLookup, verifyNotificationAuthorization } = require('./lib/providers/agence-bio.js')
-const { addNewOperatorParcel, fetchLatestCustomersByControlBody, getOperator, pacageLookup, updateAuditRecordState, updateOperatorParcels } = require('./lib/providers/cartobio.js')
+const { addNewOperatorParcel, fetchLatestCustomersByControlBody, getOperator, deleteRecord, pacageLookup, updateAuditRecordState, updateOperatorParcels } = require('./lib/providers/cartobio.js')
 const { parseShapefileArchive } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive } = require('./lib/providers/geofolia.js')
 const { getMesParcellesOperator } = require('./lib/providers/mes-parcelles.js')
@@ -231,6 +231,17 @@ app.register(async (app) => {
     return addNewOperatorParcel({ operatorId }, feature)
       .then(result => reply.code(200).send(result))
       .catch(error => new ApiError(`Failed to add new operator ${operatorId} parcel`, error))
+  })
+
+  /**
+   * @private
+   */
+  app.delete('/api/v2/operator/:operatorId', deepmerge([internalSchema, routeWithOperatorId, ocSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
+    const { operatorId } = request.params
+
+    return deleteRecord({ operatorId })
+      .then(() => reply.code(200).send())
+      .catch(error => new ApiError(`Failed to delete operator #${operatorId}`, error))
   })
 
   /**
