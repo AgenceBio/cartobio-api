@@ -276,8 +276,8 @@ app.register(async (app) => {
   app.post('/api/v2/import/mesparcelles/login', deepmerge([hiddenSchema, internalSchema]), async (request, reply) => {
     const { email, millesime, password, server } = request.body
 
-    return getMesParcellesOperator({ email, millesime, password, server })
-      .then(geojson => reply.send(geojson))
+    const geojson = await getMesParcellesOperator({ email, millesime, password, server })
+    reply.send(geojson)
   })
 
   app.get('/api/v2/user/verify', deepmerge([sandboxSchema, internalSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
