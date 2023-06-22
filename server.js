@@ -38,7 +38,7 @@ const DURATION_ONE_HOUR = DURATION_ONE_MINUTE * 60
 const DURATION_ONE_DAY = DURATION_ONE_HOUR * 24
 
 const db = require('./lib/db.js')
-const { ApiError, FastifyErrorHandler, UnauthorizedApiError } = require('./lib/errors.js')
+const { FastifyErrorHandler, UnauthorizedApiError } = require('./lib/errors.js')
 const sign = createSigner({ key: config.get('jwtSecret'), expiresIn: DURATION_ONE_DAY * 30 })
 
 // Sentry error reporting setup
@@ -147,7 +147,6 @@ app.register(async (app) => {
         temporaryLoginToken: sign(operator)
       })))
       .then(userProfiles => reply.code(200).send(userProfiles))
-      .catch(error => new ApiError(`Failed to login with ${q}`, error))
   })
 
   /**
@@ -176,7 +175,6 @@ app.register(async (app) => {
 
     return fetchCustomersByOperator({ ocId, nom })
       .then(operators => reply.code(200).send({ operators }))
-      .catch(error => new ApiError(`Failed to fetch operators for ${ocId}`, error))
   })
 
   app.patch('/api/v2/certification/audits/:recordId', deepmerge([internalSchema, routeWithRecordId, protectedRouteOptions, ocSchema, trackableRoute]), (request, reply) => {
@@ -185,7 +183,6 @@ app.register(async (app) => {
 
     return updateAuditRecordState(recordId, patch)
       .then(record => reply.code(200).send(record))
-      .catch(error => new ApiError(`Failed to update audit state for record ${recordId}`, error))
   })
 
   /**
@@ -197,7 +194,6 @@ app.register(async (app) => {
 
     return fetchLatestCustomersByControlBody({ ocId })
       .then(operators => reply.code(200).send({ operators }))
-      .catch(error => new ApiError(`Failed to fetch operators for ${ocId}`, error))
   })
 
   /**
@@ -208,7 +204,6 @@ app.register(async (app) => {
 
     return getOperator({ operatorId })
       .then(result => reply.code(200).send(result))
-      .catch(error => new ApiError(`Failed to fetch operator #${operatorId}`, error))
   })
 
   /**
@@ -221,7 +216,6 @@ app.register(async (app) => {
 
     return updateOperatorParcels({ operatorId }, { ...body, ocId, ocLabel })
       .then(result => reply.code(200).send(result))
-      .catch(error => new ApiError(`Failed to update operator ${operatorId} parcels`, error))
   })
 
   app.post('/api/v2/operator/:operatorId/parcelles', deepmerge([internalSchema, routeWithOperatorId, ocSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
@@ -230,7 +224,6 @@ app.register(async (app) => {
 
     return addNewOperatorParcel({ operatorId }, feature)
       .then(result => reply.code(200).send(result))
-      .catch(error => new ApiError(`Failed to add new operator ${operatorId} parcel`, error))
   })
 
   /**
@@ -241,7 +234,6 @@ app.register(async (app) => {
 
     return deleteRecord({ operatorId })
       .then(() => reply.code(200).send())
-      .catch(error => new ApiError(`Failed to delete operator #${operatorId}`, error))
   })
 
   /**
@@ -250,7 +242,6 @@ app.register(async (app) => {
   app.post('/api/v2/convert/shapefile/geojson', deepmerge([protectedRouteOptions, internalSchema]), async (request, reply) => {
     return parseShapefileArchive(request.file())
       .then(geojson => reply.send(geojson))
-      .catch(error => new ApiError('Failed to parse Shapefile archive', error))
   })
 
   /**
@@ -259,7 +250,6 @@ app.register(async (app) => {
   app.post('/api/v2/convert/geofolia/geojson', deepmerge([protectedRouteOptions, internalSchema]), async (request, reply) => {
     return parseGeofoliaArchive(request.file())
       .then(geojson => reply.send(geojson))
-      .catch(error => new ApiError('Failed to parse Geofolia archive', error))
   })
 
   app.get('/api/v2/import/pacage/:numeroPacage', deepmerge([internalSchema, ocSchema, protectedRouteOptions, routeWithPacage]), async (request, reply) => {
@@ -267,7 +257,6 @@ app.register(async (app) => {
 
     return pacageLookup({ numeroPacage })
       .then(featureCollection => reply.send(featureCollection))
-      .catch(error => new ApiError(`Failed to retrieve PACAGE #${numeroPacage} features`, error))
   })
 
   app.post('/api/webhooks/mattermost', deepmerge([internalSchema, protectedWithTokenRoute]), async (request, reply) => {
@@ -289,7 +278,6 @@ app.register(async (app) => {
 
     return getMesParcellesOperator({ email, millesime, password, server })
       .then(geojson => reply.send(geojson))
-      .catch(error => new ApiError('Failed to import MesParcelles features', error))
   })
 
   app.get('/api/v2/user/verify', deepmerge([sandboxSchema, internalSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
