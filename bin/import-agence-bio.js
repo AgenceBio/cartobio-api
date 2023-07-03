@@ -2,6 +2,7 @@
 
 const { createReadStream } = require('node:fs')
 const { parseArgs } = require('node:util')
+const stripBom = require('strip-bom-stream')
 const db = require('../lib/db.js')
 const { auth, fetchCertificationBody, fetchOperatorByNumeroBio, parseAPIParcellaireStream } = require('../lib/providers/agence-bio.js')
 const { updateOperatorParcels, updateAuditRecordState } = require('../lib/providers/cartobio.js')
@@ -22,7 +23,7 @@ db.connect().then(async (client) => {
   const { values } = parseArgs({ options: CLI_OPTIONS })
 
   const organismeCertificateur = OCs.find(({ id }) => String(id) === values.ocId)
-  const stream = createReadStream(values.file)
+  const stream = createReadStream(values.file).pipe(stripBom())
   const generator = parseAPIParcellaireStream(stream, { organismeCertificateur })
 
   for await (const { geojson, ocId, ocLabel, numeroBio } of generator) {
