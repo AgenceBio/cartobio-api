@@ -19,7 +19,7 @@ const { createSigner } = require('fast-jwt')
 const { all: deepmerge } = require('deepmerge')
 
 const { fetchOperatorById, fetchCustomersByOperator, getUserProfileById, getUserProfileFromSSOToken, operatorLookup, verifyNotificationAuthorization } = require('./lib/providers/agence-bio.js')
-const { addNewOperatorParcel, fetchLatestCustomersByControlBody, getOperator, deleteRecord, pacageLookup, updateAuditRecordState, updateOperatorParcels } = require('./lib/providers/cartobio.js')
+const { addNewOperatorParcel, fetchLatestCustomersByControlBody, getOperator, deleteRecord, pacageLookup, updateAuditRecordState, updateOperatorParcels, getParcellesStats, getDataGouvStats } = require('./lib/providers/cartobio.js')
 const { parseShapefileArchive } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive } = require('./lib/providers/geofolia.js')
 const { getMesParcellesOperator } = require('./lib/providers/mes-parcelles.js')
@@ -160,9 +160,13 @@ app.register(async (app) => {
     return reply.code(200).send(sign(decodedToken))
   })
 
-  app.get('/api/v2/stats', internalSchema, (request, reply) => {
-    return db.query("SELECT COUNT(parcelles) as count, SUM(JSONB_ARRAY_LENGTH(parcelles->'features')::bigint) as parcelles_count FROM cartobio_operators WHERE metadata->>'source' != '';")
-      .then(({ rows }) => reply.code(200).send({ stats: rows[0] }))
+  app.get('/api/v2/stats', internalSchema, async (request, reply) => {
+    const [dataGouv, stats] = await Promise.all([
+      getDataGouvStats(),
+      getParcellesStats()
+    ])
+
+    return reply.code(200).send({ stats, dataGouv })
   })
 
   /**
