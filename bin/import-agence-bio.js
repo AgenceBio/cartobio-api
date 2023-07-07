@@ -25,14 +25,33 @@ db.connect().then(async (client) => {
   const organismeCertificateur = OCs.find(({ id }) => String(id) === values.ocId)
   const stream = createReadStream(values.file).pipe(stripBom())
   const generator = parseAPIParcellaireStream(stream, { organismeCertificateur })
+  let count = 0
 
   for await (const { geojson, ocId, ocLabel, numeroBio } of generator) {
-    const { id: operatorId } = await fetchOperatorByNumeroBio(numeroBio)
-    const metadata = { source: 'API', sourceLastUpdate: new Date().toISOString() }
+    process.stdout.write(`#${++count} Import n°bio : ${numeroBio}`)
 
-    /* eslint-disable-next-line camelcase */
-    const { record_id } = await updateOperatorParcels({ operatorId }, { geojson, ocId, ocLabel, numeroBio, metadata })
-    await updateAuditRecordState(record_id, { certification_state: 'CERTIFIED' })
+    try {
+      const { id: operatorId } = await fetchOperatorByNumeroBio(numeroBio)
+      process.stdout.write(`, ID #${operatorId}`)
+
+      const metadata = { source: 'API Parcellaire', sourceLastUpdate: new Date().toISOString() }
+      const historyEvent = {
+        state: 'CERTIFIED',
+        date: new Date().toISOString(),
+        provenance: 'API Parcellaire'
+      }
+
+      try {
+        await updateOperatorParcels({ operatorId }, { geojson, ocId, ocLabel, numeroBio, metadata, historyEvent })
+      } catch (error) {
+        console.error(error)
+        process.exit(1)
+      }
+    } catch (error) {
+      process.stdout.write(', ID introuvable [SKIP]')
+    }
+
+    process.stdout.write('\n')
   }
 
   client.release(true)

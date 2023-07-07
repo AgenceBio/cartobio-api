@@ -3,11 +3,13 @@
   "ocLabel": "Ecocert France",
   "numeroBio": "110994",
   "numeroPacage": "084012821",
+  "audit_date": "2023-04-27",
   "geojson": {
     "type": "FeatureCollection",
     "features": [
       {
         "type": "Feature",
+        "id": 45742,
         "geometry": {
           "type": "Polygon",
           "coordinates": [
@@ -36,17 +38,25 @@
           ]
         },
         "properties": {
+          "id": 45742,
+          "remote_id": "45742",
           "CAMPAGNE": 2022,
-          "culture_cpf": "01.92",
-          "TYPE": "ROS",
-          "NUMERO_I": "28",
-          "NUMERO_P": "1",
+          "CPF": "01.92",
+          "culture_variete": "",
+          "cultures": [
+            { "CPF": "01.92", "surface": 0.23, "variete": "" }
+          ],
+          "NUMERO_I": "12",
+          "NUMERO_P": "5",
           "PACAGE": "084012821",
-          "conversion_niveau": "AB"
+          "conversion_niveau": "AB",
+          "engagement_date": "2023-04-27",
+          "audit_notes": "Parcelle 5 ILOT 12 PAC 2023 0C 1271"
         }
       },
       {
         "type": "Feature",
+        "id": 45758,
         "geometry": {
           "type": "Polygon",
           "coordinates": [
@@ -107,17 +117,25 @@
           ]
         },
         "properties": {
+          "id": 45758,
+          "remote_id": 45758,
           "CAMPAGNE": 2022,
-          "culture_cpf": "01.92",
-          "TYPE": "ROS",
+          "CPF": "01.21.12",
+          "culture_variete": "Chardonnay",
+          "cultures": [
+            { "CPF": "01.21.12", "surface": 0.66, "variete": "Chardonnay" }
+          ],
           "NUMERO_I": "49",
-          "NUMERO_P": "1",
+          "NUMERO_P": "20",
           "PACAGE": "084012821",
-          "conversion_niveau": "C1"
+          "conversion_niveau": "C1",
+          "engagement_date": "2023-04-27",
+          "audit_notes": "Ilot-49-20 935 CHARD BIO RIbieres"
         }
       },
       {
         "type": "Feature",
+        "id": 45736,
         "geometry": {
           "type": "Polygon",
           "coordinates": [
@@ -146,13 +164,20 @@
           ]
         },
         "properties": {
+          "id": 45736,
+          "remote_id": "45736",
           "CAMPAGNE": 2022,
-          "culture_cpf": "01.21.12",
-          "TYPE": "VRC",
+          "CPF": "01.21.12",
+          "culture_variete": "",
+          "cultures": [
+            { "CPF": "01.21.12", "surface": 2.01, "variete": "" }
+          ],
           "NUMERO_I": "13",
           "NUMERO_P": "1",
           "PACAGE": "084012821",
-          "conversion_niveau": "AB"
+          "conversion_niveau": "AB",
+          "engagement_date": "2023-04-27",
+          "audit_notes": "Ilot-13-1"
         }
       }
     ]

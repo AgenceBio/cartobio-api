@@ -1,7 +1,7 @@
 ---
 title: API Parcellaire
 date: 2023-04-12
-updated_at: 2023-05-22
+updated_at: 2023-07-07
 contributors:
 - Laetita L (Ecocert)
 - Maud R (CartoBio)
@@ -21,7 +21,7 @@ La mise en place de cette API constitue une première étape pour échanger auto
 Pour prototyper un import à grande échelle, nous convenons :
 
 - de la production d'un fichier d'export, au format JSON, compressé en ZIP
-- transmis de manière sécurisée (via https://drop.infini.fr/ si inférieur à 1Go)
+- transmis de manière sécurisée
 - importé manuellement par l'équipe CartoBio
 
 Cette période permettra d'ajuster le format de fichier sous forme de dialogues entre Organisme de Certification et CartoBio.
