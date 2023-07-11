@@ -42,7 +42,7 @@
           "remote_id": "45742",
           "CAMPAGNE": 2022,
           "CPF": "01.92",
-          "culture_variete": "",
+          "variete": "",
           "cultures": [
             { "CPF": "01.92", "surface": 0.23, "variete": "" }
           ],
@@ -51,7 +51,7 @@
           "PACAGE": "084012821",
           "conversion_niveau": "AB",
           "engagement_date": "2023-04-27",
-          "audit_notes": "Parcelle 5 ILOT 12 PAC 2023 0C 1271"
+          "auditeur_notes": "Parcelle 5 ILOT 12 PAC 2023 0C 1271"
         }
       },
       {
@@ -121,7 +121,7 @@
           "remote_id": 45758,
           "CAMPAGNE": 2022,
           "CPF": "01.21.12",
-          "culture_variete": "Chardonnay",
+          "variete": "Chardonnay",
           "cultures": [
             { "CPF": "01.21.12", "surface": 0.66, "variete": "Chardonnay" }
           ],
@@ -130,7 +130,7 @@
           "PACAGE": "084012821",
           "conversion_niveau": "C1",
           "engagement_date": "2023-04-27",
-          "audit_notes": "Ilot-49-20 935 CHARD BIO RIbieres"
+          "auditeur_notes": "Ilot-49-20 935 CHARD BIO RIbieres"
         }
       },
       {
@@ -168,7 +168,7 @@
           "remote_id": "45736",
           "CAMPAGNE": 2022,
           "CPF": "01.21.12",
-          "culture_variete": "",
+          "variete": "",
           "cultures": [
             { "CPF": "01.21.12", "surface": 2.01, "variete": "" }
           ],
@@ -177,7 +177,7 @@
           "PACAGE": "084012821",
           "conversion_niveau": "AB",
           "engagement_date": "2023-04-27",
-          "audit_notes": "Ilot-13-1"
+          "auditeur_notes": "Ilot-13-1"
         }
       }
     ]
