@@ -26,15 +26,16 @@ FROM (
     -- on ne gère pas encore cette distinction
     -- false as maraichage_diversifie,
     ST_Transform(ST_GeomFromGeoJSON(feature->'geometry'), 4326) AS geom
-    FROM (
-      SELECT
-        jsonb_array_elements("cartobio_operators"."parcelles" -> 'features') AS feature,
-        jsonb_path_query_first("cartobio_operators"."audit_history", '$[*] ? (@.state == "CERTIFIED").date')::text::date AS certification_date,
-        "cartobio_operators"."numerobio",
-        "cartobio_operators"."created_at"
-      FROM "cartobio_operators"
-      WHERE certification_state = 'CERTIFIED' AND audit_history @@ '$[*].state == "CERTIFIED" && $[*].date < "${MAX_DATE}"'
-    ) features
+  FROM (
+    SELECT
+      jsonb_array_elements("cartobio_operators"."parcelles" -> 'features') AS feature,
+      jsonb_path_query_first("cartobio_operators"."audit_history", '$[*] ? (@.state == "CERTIFIED").date')::text::date AS certification_date,
+      "cartobio_operators"."numerobio",
+      "cartobio_operators"."created_at"
+    FROM "cartobio_operators"
+    WHERE certification_state = 'CERTIFIED' AND audit_history @@ '$[*].state == "CERTIFIED" && $[*].date < "${MAX_DATE}"'
+  ) features
+  WHERE feature->'properties'->>'engagement_date' < '${MAX_DATE}' OR feature->'properties'->>'engagement_date' = ''
 ) properties;`, [], { singleRowMode: true, rowMode: 'one' })
 
 ;(async function main () {
