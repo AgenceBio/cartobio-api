@@ -3,7 +3,7 @@
   "ocLabel": "Ecocert France",
   "numeroBio": "110994",
   "numeroPacage": "084012821",
-  "audit_date": "2023-04-27",
+  "auditDate": "2023-04-27",
   "geojson": {
     "type": "FeatureCollection",
     "features": [

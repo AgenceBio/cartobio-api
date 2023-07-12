@@ -5,7 +5,7 @@ const { parseArgs } = require('node:util')
 const stripBom = require('strip-bom-stream')
 const db = require('../lib/db.js')
 const { auth, fetchCertificationBody, fetchOperatorByNumeroBio, parseAPIParcellaireStream } = require('../lib/providers/agence-bio.js')
-const { updateOperatorParcels, updateAuditRecordState } = require('../lib/providers/cartobio.js')
+const { updateOperatorParcels } = require('../lib/providers/cartobio.js')
 
 const CLI_OPTIONS = {
   file: {
@@ -27,7 +27,7 @@ db.connect().then(async (client) => {
   const generator = parseAPIParcellaireStream(stream, { organismeCertificateur })
   let count = 0
 
-  for await (const { geojson, ocId, ocLabel, numeroBio } of generator) {
+  for await (const { geojson, ocId, ocLabel, auditDate, numeroBio } of generator) {
     process.stdout.write(`#${++count} Import n°bio : ${numeroBio}`)
 
     try {
@@ -37,7 +37,7 @@ db.connect().then(async (client) => {
       const metadata = { source: 'API Parcellaire', sourceLastUpdate: new Date().toISOString() }
       const historyEvent = {
         state: 'CERTIFIED',
-        date: new Date().toISOString(),
+        date: auditDate ?? new Date().toISOString(),
         provenance: 'API Parcellaire'
       }
 
