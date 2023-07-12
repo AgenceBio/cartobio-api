@@ -233,7 +233,8 @@ app.register(async (app) => {
     const { operatorId } = request.params
 
     return deleteRecord({ operatorId })
-      .then(() => reply.code(200).send())
+      .then(() => getOperator({ operatorId }))
+      .then(result => reply.code(200).send(result))
   })
 
   /**
