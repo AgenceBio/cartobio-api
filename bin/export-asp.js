@@ -5,6 +5,9 @@ const QueryStream = require('pg-query-stream')
 const JSONStream = require('jsonstream-next')
 const { pipeline } = require('node:stream/promises')
 
+// @todo make it a CLI parameter
+const MAX_DATE = new Date('2023-05-16T00:00:00Z').toISOString()
+
 const query = new QueryStream(`-- pg
 -- https://postgis.net/docs/ST_AsGeoJSON.html
 SELECT 'FeatureCollection' as type, json_agg(ST_AsGeoJSON(properties)::json) features
@@ -14,13 +17,9 @@ FROM (
     -- https://gis.stackexchange.com/a/297289
     -- ST_Area(ST_Transform(ST_GeomFromGeoJSON(feature->'geometry'), 4326)::geography) / 10000 as surface_ha,
     -- ST_Area(ST_Transform(ST_GeomFromGeoJSON(feature->'geometry'), 4326)::geography) as surface_m2,
-    -- https://www.postgresql.org/docs/9.1/functions-datetime.html
-    created_at AS certification_date_debut,
-    created_at + '18 months' AS certification_date_fin,
-    -- quand on aura la colonne 'certification_date'
-    -- cf. https://trello.com/c/KLblWZ4H
-    -- (certification_date OR created_at) AS certification_date_debut,
-    -- (certification_date OR created_at) + '18 months' AS certification_date_fin,
+    -- https://www.postgresql.org/docs/14/functions-datetime.html
+    certification_date AS certification_date_debut,
+    certification_date + interval '18 months' AS certification_date_fin,
     --
     -- on ne gère pas encore les déclassements
     CASE WHEN feature->'properties'->'declassement' IS NULL THEN '{}'::jsonb else feature->'properties'->'declassement' END AS declassement,
@@ -30,12 +29,12 @@ FROM (
     FROM (
       SELECT
         jsonb_array_elements("cartobio_operators"."parcelles" -> 'features') AS feature,
+        jsonb_path_query_first("cartobio_operators"."audit_history", '$[*] ? (@.state == "CERTIFIED").date')::text::date AS certification_date,
         "cartobio_operators"."numerobio",
         "cartobio_operators"."created_at"
       FROM "cartobio_operators"
-      WHERE certification_state IN (/*'OPERATOR_DRAFT', */'AUDITED', 'CERTIFIED')
+      WHERE certification_state = 'CERTIFIED' AND audit_history @@ '$[*].state == "CERTIFIED" && $[*].date < "${MAX_DATE}"'
     ) features
-  LEFT JOIN correspondance_pac_cpf ON (feature->'properties'->>'TYPE' = correspondance_pac_cpf.pac)
 ) properties;`, [], { singleRowMode: true, rowMode: 'one' })
 
 ;(async function main () {
