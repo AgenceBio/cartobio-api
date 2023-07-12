@@ -110,8 +110,8 @@ app.register(fastifyOauth, {
     })
     return state
   },
-  checkStateFunction (state, next) {
-    if (stateCache.has(state)) {
+  checkStateFunction ({ query }, next) {
+    if (stateCache.has(query.state)) {
       return next()
     }
     next(new Error('Invalid state'))
