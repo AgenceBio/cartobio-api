@@ -27,8 +27,13 @@ db.connect().then(async (client) => {
   const generator = parseAPIParcellaireStream(stream, { organismeCertificateur })
   let count = 0
 
-  for await (const { geojson, ocId, ocLabel, auditDate, numeroBio } of generator) {
+  for await (const { geojson, ocId, ocLabel, auditDate, numeroBio, error } of generator) {
     process.stdout.write(`#${++count} Import n°bio : ${numeroBio}`)
+
+    if (error) {
+      process.stdout.write(`, ERREUR [${error.message}] [SKIP]\n`)
+      continue
+    }
 
     try {
       const { id: operatorId } = await fetchOperatorByNumeroBio(numeroBio)
