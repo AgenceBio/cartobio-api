@@ -123,5 +123,28 @@
       ]
     }
   ]
- }
+ },
+ {
+  "numeroBio": 172301,
+  "numeroClient": 195931,
+  "anneeReferenceControle": 2023,
+  "anneeAssolement": 2023,
+  "dateAudit": "2023-03-30",
+  "numeroPacage": 32165694,
+  "parcelles": [
+    {
+      "id": 124300,
+      "dateEngagement": "2022-08-17",
+      "etatProduction": "C1",
+      "numeroIlot": 309,
+      "numeroParcelle": 1,
+      "culture": [
+       {
+        "codeCPF": "",
+        "variete": ""
+       }
+      ]
+     }
+  ]
+}
 ]
