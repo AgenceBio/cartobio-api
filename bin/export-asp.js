@@ -35,7 +35,7 @@ FROM (
     FROM "cartobio_operators"
     WHERE certification_state = 'CERTIFIED' AND audit_history @@ '$[*].state == "CERTIFIED" && $[*].date < "${MAX_DATE}"'
   ) features
-  WHERE feature->'properties'->>'engagement_date' < '${MAX_DATE}' OR feature->'properties'->>'engagement_date' = ''
+  WHERE feature->'properties'->>'conversion_niveau' IN ('C1', 'C2', 'C3', 'AB') AND (feature->'properties'->>'engagement_date' < '${MAX_DATE}' OR feature->'properties'->>'engagement_date' = '')
 ) properties;`, [], { singleRowMode: true, rowMode: 'one' })
 
 ;(async function main () {
