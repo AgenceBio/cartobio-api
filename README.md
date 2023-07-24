@@ -162,9 +162,6 @@ ogr2ogr -f PostgreSQL \
 ## Déployer en production
 
 ```bash
-# Staging
-docker run -d --name postgres-staging --env-file=.env.cartobio-api-staging -v "$(pwd)/postgres_data_staging/postgresql:/var/lib/postgresql" kartoza/postgis:14-3.3
-
 # Production
 docker run -d --name postgres-production -p 127.0.0.1:5432:5432 --env-file=.env.cartobio-api-production -v "$(pwd)/postgres_data_production/postgresql:/var/lib/postgresql" kartoza/postgis:14-3.3
 ```
