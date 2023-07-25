@@ -5,7 +5,6 @@ on:
   push:
     paths-ignore:
     - 'docs/**'
-    - 'bin/**'
     branches:
     - '**'
     tags:
