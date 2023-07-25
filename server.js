@@ -55,7 +55,7 @@ if (reportErrors) {
 
   if (config.get('environment') === 'production') {
     sentryOptions.release = config.get('version')
-  } else if (config.get('environment') === 'staging') {
+  } else if (config.get('environment') === 'staging' || config.get('environment') === 'test') {
     sentryOptions.release = process.env.SENTRY_RELEASE
   }
 
