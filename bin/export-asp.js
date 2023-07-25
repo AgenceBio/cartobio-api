@@ -6,7 +6,7 @@ const JSONStream = require('jsonstream-next')
 const { pipeline } = require('node:stream/promises')
 
 // @todo make it a CLI parameter
-const MAX_DATE = new Date('2023-05-16T00:00:00Z').toISOString()
+const MAX_DATE = new Date('2023-05-15T23:59:59Z').toISOString()
 
 const query = new QueryStream(`-- pg
 -- https://postgis.net/docs/ST_AsGeoJSON.html
@@ -33,9 +33,18 @@ FROM (
       "cartobio_operators"."numerobio",
       "cartobio_operators"."created_at"
     FROM "cartobio_operators"
-    WHERE certification_state = 'CERTIFIED' AND audit_history @@ '$[*].state == "CERTIFIED" && $[*].date < "${MAX_DATE}"'
+    WHERE certification_state = 'CERTIFIED'
+          -- la date de certification est AVANT le 15 mai 20xx (inclus)
+          AND audit_history @? '$[*] ? (@.state == "CERTIFIED" && @.date <= "${MAX_DATE}")'
   ) features
-  WHERE feature->'properties'->>'conversion_niveau' IN ('C1', 'C2', 'C3', 'AB') AND (feature->'properties'->>'engagement_date' < '${MAX_DATE}' OR feature->'properties'->>'engagement_date' = '')
+  WHERE feature->'properties'->>'conversion_niveau' IN ('C1', 'C2', 'C3', 'AB')
+        AND (
+          -- avec une date d'engagement inférieure au 15 mai 20xx (inclus)
+          -- ou une date pas renseignée
+          feature->'properties'->>'engagement_date' <= '${MAX_DATE}'
+          OR feature->'properties'->>'engagement_date' = ''
+          OR jsonb_path_exists(feature, '$.properties.engagement_date') = FALSE
+        )
 ) properties;`, [], { singleRowMode: true, rowMode: 'one' })
 
 ;(async function main () {
