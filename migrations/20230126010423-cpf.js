@@ -27,7 +27,8 @@ exports.up = async function (db) {
 }
 
 exports.down = function (db) {
-  return db.dropTable('correspondance_pac_cpf')
+  // it might have been already dropped in 20230724153800-cpf-drop.js
+  return db.dropTable('correspondance_pac_cpf', { ifExists: true })
 }
 
 exports._meta = {

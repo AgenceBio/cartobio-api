@@ -30,7 +30,39 @@ exports.up = async function (db) {
     num_ilot: 'int',
     num_parcel: 'int',
     bio: 'int',
-    code_cultu: 'string'
+    code_cultu: {
+      type: 'string',
+      length: 3
+    },
+    surf_adm: 'real',
+    precision: {
+      type: 'string',
+      length: 9
+    },
+    reconver_p: 'int',
+    retournmt_: 'int',
+    semence: 'int',
+    dest_ichn: {
+      type: 'string',
+      length: 1
+    },
+    culture_d1: {
+      type: 'string',
+      length: 3
+    },
+    culture_d2: {
+      type: 'string',
+      length: 3
+    },
+    engagement: {
+      type: 'string',
+      length: 2
+    },
+    maraichage: 'int',
+    agroforest: {
+      type: 'string',
+      length: 5
+    }
   })
 
   return db.addIndex('rpg_bio', 'pacage_idx', ['pacage'], false)
