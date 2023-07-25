@@ -135,17 +135,19 @@ Tous les tokens précédemment émis ne seront plus fonctionnels.
 $ npx vpg --length 256 | base64
 ```
 
-## Sauvegarder et restaurer la base de données
+## Sauvegarder et restaurer la base de données en production
 
 ```bash
-docker exec -i postgres pg_dump --data-only -U docker -h localhost gis > dump.sql
+pg_dump --data-only -U postgres -h bdd-cartobio -p 5433 > dump-production.sql
 ```
 
 Puis restaurer :
 
 ```bash
-docker exec -i postgres psql -U docker -h localhost gis < dump.sql
+psql -v ON_ERROR_STOP=1 -U postgres -h bdd-cartobio -p 5433 < dump-production.sql
 ```
+
+**Remarque** : `bdd-cartobio` est un alias de `162.19.57.177` ; le port `5433` correspond à la base de production, et `5434` à la base de préprod.
 
 ## Intégration des données du RPG bio
 
@@ -154,7 +156,7 @@ Elles sont basées sur le [dump statique](#générer-les-fonds-de-carte) utilis�
 
 ```sh
 ogr2ogr -f PostgreSQL \
-  PG:'postgresql://docker:docker@localhost:15432/gis' rpg.gpkg \
+  PG:'postgresql://postgres@bdd-cartobio:5433/postgres' rpg.gpkg \
   -preserve_fid -nln rpg_bio -nlt POLYGON \
   --config PG_USE_COPY YES --config OGR_TRUNCATE YES
 ```
@@ -166,16 +168,6 @@ in2csv Correspondance_PAC_CPFBIO_ONAB.xlsx --sheet 'PAC->BIO' \
   | csvsql --query 'SELECT CODE_PAC as pac, CODE_CPF_BIO as cpf FROM stdin' \
   | csvsql --db 'postgresql://docker:docker@127.0.0.1:15432/gis' \
      --tables correspondance_pac_cpf --insert --no-create
-```
-
-## Déployer en production
-
-```bash
-# Staging
-docker run -d --name postgres-staging --env-file=.env.cartobio-api-staging -v "$(pwd)/postgres_data_staging/postgresql:/var/lib/postgresql" kartoza/postgis:14-3.3
-
-# Production
-docker run -d --name postgres-production -p 127.0.0.1:5432:5432 --env-file=.env.cartobio-api-production -v "$(pwd)/postgres_data_production/postgresql:/var/lib/postgresql" kartoza/postgis:14-3.3
 ```
 
 ## Générer les fonds de carte
@@ -197,10 +189,8 @@ tippecanoe -Z10 -z14 --extend-zooms-if-still-dropping --no-tile-compression --si
 ## Exporter pour l'ASP
 
 ```
-npm run export-asp
+docker exec cartobio-api-production node bin/export-asp.js | jq '.[0]' | ogr2ogr cartobio-asp.gpkg /vsistdin/
 ```
-
-La base générée se trouve sous le nom de `cartobio-asp-MILLESIME.gpkg`.
 
 [cartobio-front]: https://github.com/agencebio/cartobio-front
 [jwt]: https://jwt.io/
