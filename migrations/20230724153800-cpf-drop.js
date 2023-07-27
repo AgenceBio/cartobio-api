@@ -16,7 +16,7 @@ exports.setup = function (options, seedLink) {
 
 // it is a one way migration
 exports.up = async function (db) {
-  return db.dropTable('correspondance_pac_cpf')
+  return db.dropTable('correspondance_pac_cpf', { ifExists: true })
 }
 
 
