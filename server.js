@@ -3,7 +3,13 @@
 const config = require('./lib/config.js')
 config.validate({ allowed: 'strict' })
 
-const app = require('fastify')({ logger: config.get('env') !== 'test' })
+const app = require('fastify')({
+  logger: config.get('env') !== 'test',
+  ajv: {
+    plugins: [require('ajv-formats')]
+  }
+})
+
 const fastifySwagger = require('@fastify/swagger')
 const fastifySwaggerUi = require('@fastify/swagger-ui')
 const fastifyCors = require('@fastify/cors')
@@ -24,11 +30,12 @@ const { parseShapefileArchive } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive } = require('./lib/providers/geofolia.js')
 const { getMesParcellesOperator } = require('./lib/providers/mes-parcelles.js')
 
-const { swaggerConfig } = require('./lib/routes/index.js')
+const { commonSchema, swaggerConfig } = require('./lib/routes/index.js')
 const { sandboxSchema, ocSchema, internalSchema, hiddenSchema, protectedWithTokenRoute } = require('./lib/routes/index.js')
 const { protectedRouteOptions, trackableRoute, enforceSameCertificationBody } = require('./lib/routes/index.js')
 const { routeWithOperatorId, routeWithRecordId, routeWithPacage } = require('./lib/routes/index.js')
 const { tryLoginSchema } = require('./lib/routes/login.js')
+const { updateRecordSchema } = require('./lib/routes/records.js')
 
 // Application is hosted on localhost:8000 by default
 const reportErrors = config.get('reportErrors')
@@ -121,6 +128,8 @@ app.register(fastifyOauth, {
 // Routes to protect with a JSON Web Token
 app.decorateRequest('decodedToken', null)
 
+app.addSchema(commonSchema)
+
 app.register(async (app) => {
   // Begin Public API routes
   app.get('/api/version', deepmerge([sandboxSchema, trackableRoute]), (request, reply) => {
@@ -181,7 +190,7 @@ app.register(async (app) => {
       .then(operators => reply.code(200).send({ operators }))
   })
 
-  app.patch('/api/v2/certification/audits/:recordId', deepmerge([internalSchema, routeWithRecordId, protectedRouteOptions, ocSchema, trackableRoute]), (request, reply) => {
+  app.patch('/api/v2/certification/audits/:recordId', deepmerge([internalSchema, updateRecordSchema, routeWithRecordId, protectedRouteOptions, ocSchema, trackableRoute]), (request, reply) => {
     const { ...patch } = request.body
     const { recordId } = request.params
 
@@ -213,7 +222,7 @@ app.register(async (app) => {
   /**
    * @private
    */
-  app.put('/api/v2/operator/:operatorId/parcelles', deepmerge([internalSchema, routeWithOperatorId, ocSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
+  app.put('/api/v2/operator/:operatorId/parcelles', deepmerge([internalSchema, updateRecordSchema, routeWithOperatorId, ocSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
     const { body } = request
     const { operatorId } = request.params
     const { id: ocId, nom: ocLabel } = request.decodedToken.organismeCertificateur
