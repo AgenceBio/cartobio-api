@@ -39,10 +39,8 @@
         },
         "properties": {
           "id": 45742,
-          "remote_id": "45742",
+          "remoteId": "45742",
           "CAMPAGNE": 2022,
-          "CPF": "01.92",
-          "variete": "",
           "cultures": [
             { "CPF": "01.92", "surface": 0.23, "variete": "" }
           ],
@@ -118,10 +116,8 @@
         },
         "properties": {
           "id": 45758,
-          "remote_id": 45758,
+          "remoteId": 45758,
           "CAMPAGNE": 2022,
-          "CPF": "01.21.12",
-          "variete": "Chardonnay",
           "cultures": [
             { "CPF": "01.21.12", "surface": 0.66, "variete": "Chardonnay" }
           ],
@@ -165,10 +161,8 @@
         },
         "properties": {
           "id": 45736,
-          "remote_id": "45736",
+          "remoteId": "45736",
           "CAMPAGNE": 2022,
-          "CPF": "01.21.12",
-          "variete": "",
           "cultures": [
             { "CPF": "01.21.12", "surface": 2.01, "variete": "" }
           ],
@@ -212,10 +206,8 @@
         },
         "properties": {
           "id": 45737,
-          "remote_id": "45737",
+          "remoteId": "45737",
           "CAMPAGNE": 2022,
-          "CPF": "01.21.12",
-          "variete": "",
           "cultures": [
             { "CPF": "01.21.12", "surface": 1, "variete": "" }
           ],
