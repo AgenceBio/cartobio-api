@@ -35,7 +35,7 @@ const { sandboxSchema, ocSchema, internalSchema, hiddenSchema, protectedWithToke
 const { protectedRouteOptions, trackableRoute, enforceSameCertificationBody } = require('./lib/routes/index.js')
 const { routeWithOperatorId, routeWithRecordId, routeWithPacage } = require('./lib/routes/index.js')
 const { tryLoginSchema } = require('./lib/routes/login.js')
-const { updateRecordSchema } = require('./lib/routes/records.js')
+const { updateFeatureCollectionSchema, updateRecordSchema } = require('./lib/routes/records.js')
 
 // Application is hosted on localhost:8000 by default
 const reportErrors = config.get('reportErrors')
@@ -222,7 +222,7 @@ app.register(async (app) => {
   /**
    * @private
    */
-  app.put('/api/v2/operator/:operatorId/parcelles', deepmerge([internalSchema, updateRecordSchema, routeWithOperatorId, ocSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
+  app.put('/api/v2/operator/:operatorId/parcelles', deepmerge([internalSchema, updateFeatureCollectionSchema, routeWithOperatorId, ocSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
     const { body } = request
     const { operatorId } = request.params
     const { id: ocId, nom: ocLabel } = request.decodedToken.organismeCertificateur
