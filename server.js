@@ -25,7 +25,7 @@ const { createSigner } = require('fast-jwt')
 const { all: deepmerge } = require('deepmerge')
 
 const { fetchOperatorById, fetchCustomersByOperator, getUserProfileById, getUserProfileFromSSOToken, operatorLookup, verifyNotificationAuthorization } = require('./lib/providers/agence-bio.js')
-const { addNewOperatorParcel, fetchLatestCustomersByControlBody, getOperator, deleteRecord, pacageLookup, updateAuditRecordState, updateOperatorParcels, getParcellesStats, getDataGouvStats } = require('./lib/providers/cartobio.js')
+const { addNewOperatorParcel, fetchLatestCustomersByControlBody, getOperator, deleteRecord, pacageLookup, updateAuditRecordState, updateOperatorParcels, patchOperatorFeatures, getParcellesStats, getDataGouvStats } = require('./lib/providers/cartobio.js')
 const { parseShapefileArchive } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive } = require('./lib/providers/geofolia.js')
 const { getMesParcellesOperator } = require('./lib/providers/mes-parcelles.js')
@@ -35,7 +35,7 @@ const { sandboxSchema, ocSchema, internalSchema, hiddenSchema, protectedWithToke
 const { protectedRouteOptions, trackableRoute, enforceSameCertificationBody } = require('./lib/routes/index.js')
 const { routeWithOperatorId, routeWithRecordId, routeWithPacage } = require('./lib/routes/index.js')
 const { tryLoginSchema } = require('./lib/routes/login.js')
-const { updateFeatureCollectionSchema, updateRecordSchema } = require('./lib/routes/records.js')
+const { patchFeatureCollectionSchema, updateFeatureCollectionSchema, updateRecordSchema } = require('./lib/routes/records.js')
 
 // Application is hosted on localhost:8000 by default
 const reportErrors = config.get('reportErrors')
@@ -220,7 +220,8 @@ app.register(async (app) => {
   })
 
   /**
-   * @private
+   * Replace an entire FeatureCollection with a new one
+   * Caveat: we do this even to change one field amongst one feature
    */
   app.put('/api/v2/operator/:operatorId/parcelles', deepmerge([internalSchema, updateFeatureCollectionSchema, routeWithOperatorId, ocSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
     const { body } = request
@@ -231,11 +232,25 @@ app.register(async (app) => {
       .then(result => reply.code(200).send(result))
   })
 
+  /**
+   * Add one (and LATER, many features) to an existing FeatureCollection
+   */
   app.post('/api/v2/operator/:operatorId/parcelles', deepmerge([internalSchema, routeWithOperatorId, ocSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
     const { feature } = request.body
     const { operatorId } = request.params
 
     return addNewOperatorParcel({ operatorId }, feature)
+      .then(result => reply.code(200).send(result))
+  })
+
+  /**
+   * Update features within an existing FeatureCollection
+   */
+  app.patch('/api/v2/operator/:operatorId/parcelles', deepmerge([internalSchema, routeWithOperatorId, patchFeatureCollectionSchema, ocSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
+    const { features } = request.body
+    const { operatorId } = request.params
+
+    return patchOperatorFeatures({ operatorId, decodedToken: request.decodedToken }, features)
       .then(result => reply.code(200).send(result))
   })
 
