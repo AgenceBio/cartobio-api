@@ -14,6 +14,7 @@ SELECT 'FeatureCollection' as type, json_agg(ST_AsGeoJSON(properties)::json) fea
 FROM (
   SELECT
     feature->'properties'->'conversion_niveau' AS conversion_niveau,
+    feature->'properties'->'engagement_date' AS engagement_date,
     -- https://gis.stackexchange.com/a/297289
     -- ST_Area(ST_Transform(ST_GeomFromGeoJSON(feature->'geometry'), 4326)::geography) / 10000 as surface_ha,
     -- ST_Area(ST_Transform(ST_GeomFromGeoJSON(feature->'geometry'), 4326)::geography) as surface_m2,
