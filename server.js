@@ -25,7 +25,7 @@ const { createSigner } = require('fast-jwt')
 const { all: deepmerge } = require('deepmerge')
 
 const { fetchOperatorById, fetchCustomersByOperator, getUserProfileById, getUserProfileFromSSOToken, operatorLookup, verifyNotificationAuthorization } = require('./lib/providers/agence-bio.js')
-const { addNewOperatorParcel, fetchLatestCustomersByControlBody, getOperator, deleteRecord, pacageLookup, updateAuditRecordState, updateOperatorParcels, patchOperatorFeatures, getParcellesStats, getDataGouvStats } = require('./lib/providers/cartobio.js')
+const { addRecordFeature, fetchLatestCustomersByControlBody, getOperator, deleteRecord, getRecord, pacageLookup, patchFeatureCollection, updateAuditRecordState, updateFeatureProperties, getParcellesStats, getDataGouvStats, createOperatorRecord } = require('./lib/providers/cartobio.js')
 const { parseShapefileArchive } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive } = require('./lib/providers/geofolia.js')
 const { getMesParcellesOperator } = require('./lib/providers/mes-parcelles.js')
@@ -35,7 +35,7 @@ const { sandboxSchema, ocSchema, internalSchema, hiddenSchema, protectedWithToke
 const { protectedRouteOptions, trackableRoute, enforceSameCertificationBody } = require('./lib/routes/index.js')
 const { routeWithOperatorId, routeWithRecordId, routeWithPacage } = require('./lib/routes/index.js')
 const { tryLoginSchema } = require('./lib/routes/login.js')
-const { patchFeatureCollectionSchema, updateFeatureCollectionSchema, updateRecordSchema } = require('./lib/routes/records.js')
+const { patchFeatureCollectionSchema, updateFeatureCollectionSchema, updateRecordSchema, patchRecordSchema, updateFeaturePropertiesSchema } = require('./lib/routes/records.js')
 
 // Application is hosted on localhost:8000 by default
 const reportErrors = config.get('reportErrors')
@@ -180,7 +180,6 @@ app.register(async (app) => {
 
   /**
    * @private
-   * @TODO control and derive ocId credentials
    */
   app.post('/api/v2/certification/operators/search', deepmerge([internalSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
     const { input: nom } = request.body
@@ -188,14 +187,6 @@ app.register(async (app) => {
 
     return fetchCustomersByOperator({ ocId, nom })
       .then(operators => reply.code(200).send({ operators }))
-  })
-
-  app.patch('/api/v2/certification/audits/:recordId', deepmerge([internalSchema, updateRecordSchema, routeWithRecordId, protectedRouteOptions, ocSchema, trackableRoute]), (request, reply) => {
-    const { ...patch } = request.body
-    const { recordId } = request.params
-
-    return updateAuditRecordState(recordId, patch)
-      .then(record => reply.code(200).send(record))
   })
 
   /**
@@ -210,7 +201,7 @@ app.register(async (app) => {
   })
 
   /**
-   * @private
+   * Retrieve the latest Record for a given operator
    */
   app.get('/api/v2/operator/:operatorId', deepmerge([internalSchema, routeWithOperatorId, enforceSameCertificationBody, ocSchema, trackableRoute, protectedRouteOptions]), (request, reply) => {
     const { operatorId } = request.params
@@ -220,52 +211,91 @@ app.register(async (app) => {
   })
 
   /**
-   * Replace an entire FeatureCollection with a new one
-   * Caveat: we do this even to change one field amongst one feature
+   * Retrieve a given Record
    */
-  app.put('/api/v2/operator/:operatorId/parcelles', deepmerge([internalSchema, updateFeatureCollectionSchema, routeWithOperatorId, ocSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
-    const { body } = request
+  app.get('/api/v2/audits/:recordId', deepmerge([internalSchema, routeWithRecordId, enforceSameCertificationBody, ocSchema, trackableRoute, protectedRouteOptions]), (request, reply) => {
+    const { recordId } = request.params
+
+    return getRecord(recordId)
+      .then(record => reply.code(200).send(record))
+  })
+
+  /**
+   * Create a new Record for a given Operator
+   */
+  app.post('/api/v2/audits/:operatorId', deepmerge([internalSchema, routeWithOperatorId, enforceSameCertificationBody, ocSchema, trackableRoute, protectedRouteOptions]), (request, reply) => {
     const { operatorId } = request.params
+    const { body, decodedToken } = request
     const { id: ocId, nom: ocLabel } = request.decodedToken.organismeCertificateur
 
-    return updateOperatorParcels({ operatorId }, { ...body, ocId, ocLabel })
+    return createOperatorRecord({ operatorId, decodedToken }, { ...body, ocId, ocLabel })
+      .then(record => reply.code(200).send(record))
+  })
+
+  /**
+   * Partial update Record's metadata (top-level properties except features)
+   * It also keep track of new HistoryEvent along the way, depending who and when you update feature properties
+   */
+  app.patch('/api/v2/audits/:recordId', deepmerge([internalSchema, patchRecordSchema, routeWithRecordId, protectedRouteOptions, ocSchema, trackableRoute]), (request, reply) => {
+    const { ...patch } = request.body
+    const { recordId } = request.params
+
+    return updateAuditRecordState(recordId, patch)
+      .then(record => reply.code(200).send(record))
+  })
+
+  /**
+   * Delete a Record
+   * TODO: do not hard delete but purge features while keeping its history
+   */
+  app.delete('/api/v2/audits/:recordId', deepmerge([internalSchema, routeWithRecordId, protectedRouteOptions, trackableRoute]), (request, reply) => {
+    const { recordId } = request.params
+
+    return deleteRecord({ recordId, decodedToken: request.decodedToken })
       .then(result => reply.code(200).send(result))
   })
 
   /**
-   * Add one (and LATER, many features) to an existing FeatureCollection
+   * Add new feature entries to an existing collection
    */
-  app.post('/api/v2/operator/:operatorId/parcelles', deepmerge([internalSchema, routeWithOperatorId, ocSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
+  app.post('/api/v2/audits/:recordId/parcelles', deepmerge([internalSchema, routeWithRecordId, ocSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
     const { feature } = request.body
-    const { operatorId } = request.params
+    const { recordId } = request.params
+    const { decodedToken } = request
 
-    return addNewOperatorParcel({ operatorId }, feature)
+    return addRecordFeature({ recordId, decodedToken }, feature)
       .then(result => reply.code(200).send(result))
   })
 
   /**
-   * Update features within an existing FeatureCollection
+   * Partial update a feature collection (ie: mass action from the collection screen)
+   *
+   * It's non-destructive — matching ids are updated, new ids are added, non-existent ids are kept as is
    */
-  app.patch('/api/v2/operator/:operatorId/parcelles', deepmerge([internalSchema, routeWithOperatorId, patchFeatureCollectionSchema, ocSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
+  app.patch('/api/v2/audits/:recordId/parcelles', deepmerge([internalSchema, routeWithRecordId, patchFeatureCollectionSchema, ocSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
     const { features } = request.body
-    const { operatorId } = request.params
+    const { recordId } = request.params
 
-    return patchOperatorFeatures({ operatorId, decodedToken: request.decodedToken }, features)
-      .then(result => reply.code(200).send(result))
+    return patchFeatureCollection({ recordId, decodedToken: request.decodedToken }, features)
+      .then(record => reply.code(200).send(record))
   })
 
   /**
-   * @private
+   * Full update a single feature (ie: feature form from an editing modal)
+   *
+   * It's destructive — non-matching ids are removed (ie: crops)
    */
-  app.delete('/api/v2/operator/:operatorId', deepmerge([internalSchema, routeWithOperatorId, ocSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
-    const { operatorId } = request.params
+  app.put('/api/v2/audits/:recordId/parcelles/:featureId', deepmerge([internalSchema, routeWithRecordId, updateFeaturePropertiesSchema, ocSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
+    const { properties } = request.body
+    const { recordId, featureId } = request.params
 
-    return deleteRecord({ operatorId })
-      .then(() => getOperator({ operatorId }))
-      .then(result => reply.code(200).send(result))
+    return updateFeatureProperties({ recordId, featureId, decodedToken: request.decodedToken }, { properties })
+      .then(record => reply.code(200).send(record))
   })
 
   /**
+   * Turn a shapefile into a workeable FeatureCollection
+   * It's essentially used during an import process to preview its content
    * @private
    */
   app.post('/api/v2/convert/shapefile/geojson', deepmerge([protectedRouteOptions, internalSchema]), async (request, reply) => {
@@ -274,6 +304,8 @@ app.register(async (app) => {
   })
 
   /**
+   * Turn a Geofolia file into a workeable FeatureCollection
+   * It's essentially used during an import process to preview its content
    * @private
    */
   app.post('/api/v2/convert/geofolia/geojson', deepmerge([protectedRouteOptions, internalSchema]), async (request, reply) => {
@@ -281,6 +313,9 @@ app.register(async (app) => {
       .then(geojson => reply.send(geojson))
   })
 
+  /**
+   * Retrieves all features associated to a PACAGE as a workeable FeatureCollection
+   */
   app.get('/api/v2/import/pacage/:numeroPacage', deepmerge([internalSchema, ocSchema, protectedRouteOptions, routeWithPacage]), async (request, reply) => {
     const { numeroPacage } = request.params
 
@@ -315,6 +350,9 @@ app.register(async (app) => {
     return reply.send(decodedToken)
   })
 
+  /**
+   * Exchange a notification.agencebio.org token for a CartoBio token
+   */
   app.get('/api/v2/user/exchangeToken', deepmerge([sandboxSchema, internalSchema, protectedRouteOptions]), async (request, reply) => {
     const { error, payload: decodedToken, token } = verifyNotificationAuthorization(request.headers.authorization)
 
