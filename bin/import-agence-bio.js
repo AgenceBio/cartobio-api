@@ -43,7 +43,7 @@ db.connect().then(async (client) => {
       const historyEvent = {
         state: 'CERTIFIED',
         date: auditDate ?? new Date().toISOString(),
-        provenance: 'API Parcellaire'
+        metadata: { provenance: 'API Parcellaire' }
       }
 
       try {

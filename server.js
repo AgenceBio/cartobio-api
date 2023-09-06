@@ -22,20 +22,19 @@ const { randomUUID } = require('node:crypto')
 const Sentry = require('@sentry/node')
 const { ExtraErrorData } = require('@sentry/integrations')
 const { createSigner } = require('fast-jwt')
-const { all: deepmerge } = require('deepmerge')
 
 const { fetchOperatorById, fetchCustomersByOperator, getUserProfileById, getUserProfileFromSSOToken, operatorLookup, verifyNotificationAuthorization } = require('./lib/providers/agence-bio.js')
-const { addNewOperatorParcel, fetchLatestCustomersByControlBody, getOperator, deleteRecord, pacageLookup, updateAuditRecordState, updateOperatorParcels, getParcellesStats, getDataGouvStats } = require('./lib/providers/cartobio.js')
+const { addRecordFeature, fetchLatestCustomersByControlBody, deleteRecord, pacageLookup, patchFeatureCollection, updateAuditRecordState, updateFeatureProperties, getParcellesStats, getDataGouvStats, createOperatorRecord } = require('./lib/providers/cartobio.js')
 const { parseShapefileArchive } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive } = require('./lib/providers/geofolia.js')
 const { getMesParcellesOperator } = require('./lib/providers/mes-parcelles.js')
 
-const { commonSchema, swaggerConfig } = require('./lib/routes/index.js')
+const { deepmerge, commonSchema, swaggerConfig } = require('./lib/routes/index.js')
 const { sandboxSchema, ocSchema, internalSchema, hiddenSchema, protectedWithTokenRoute } = require('./lib/routes/index.js')
 const { protectedRouteOptions, trackableRoute, enforceSameCertificationBody } = require('./lib/routes/index.js')
 const { routeWithOperatorId, routeWithRecordId, routeWithPacage } = require('./lib/routes/index.js')
 const { tryLoginSchema } = require('./lib/routes/login.js')
-const { updateFeatureCollectionSchema, updateRecordSchema } = require('./lib/routes/records.js')
+const { createFeatureSchema, createRecordSchema, patchFeatureCollectionSchema, patchRecordSchema, updateFeaturePropertiesSchema } = require('./lib/routes/records.js')
 
 // Application is hosted on localhost:8000 by default
 const reportErrors = config.get('reportErrors')
@@ -128,22 +127,25 @@ app.register(fastifyOauth, {
 // Routes to protect with a JSON Web Token
 app.decorateRequest('decodedToken', null)
 
+// Requests can be decorated by a given Record too (associated to an operatorId/recordId)
+app.decorateRequest('record', null)
+
 app.addSchema(commonSchema)
 
 app.register(async (app) => {
   // Begin Public API routes
-  app.get('/api/version', deepmerge([sandboxSchema, trackableRoute]), (request, reply) => {
+  app.get('/api/version', deepmerge(sandboxSchema, trackableRoute), (request, reply) => {
     return reply.send({ version: config.get('version') })
   })
 
-  app.get('/api/v2/test', deepmerge([sandboxSchema, protectedRouteOptions]), (request, reply) => {
+  app.get('/api/v2/test', deepmerge(sandboxSchema, protectedRouteOptions), (request, reply) => {
     return reply.send({ message: 'OK' })
   })
 
   /**
    * @private
    */
-  app.post('/api/v2/tryLogin', deepmerge([internalSchema, tryLoginSchema]), (request, reply) => {
+  app.post('/api/v2/tryLogin', deepmerge(internalSchema, tryLoginSchema), (request, reply) => {
     const { q } = request.body
     const sign = createSigner({ key: config.get('jwtSecret'), expiresIn: DURATION_ONE_MINUTE * 8 })
 
@@ -161,7 +163,7 @@ app.register(async (app) => {
   /**
    * @private
    */
-  app.post('/api/v2/temporaryLoginWithToken', deepmerge([internalSchema, protectedRouteOptions]), (request, reply) => {
+  app.post('/api/v2/temporaryLoginWithToken', deepmerge(internalSchema, protectedRouteOptions), (request, reply) => {
     const { decodedToken } = request
 
     delete decodedToken.exp
@@ -180,9 +182,8 @@ app.register(async (app) => {
 
   /**
    * @private
-   * @TODO control and derive ocId credentials
    */
-  app.post('/api/v2/certification/operators/search', deepmerge([internalSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
+  app.post('/api/v2/certification/operators/search', deepmerge(internalSchema, protectedRouteOptions, trackableRoute), (request, reply) => {
     const { input: nom } = request.body
     const { id: ocId } = request.decodedToken.organismeCertificateur
 
@@ -190,19 +191,11 @@ app.register(async (app) => {
       .then(operators => reply.code(200).send({ operators }))
   })
 
-  app.patch('/api/v2/certification/audits/:recordId', deepmerge([internalSchema, updateRecordSchema, routeWithRecordId, protectedRouteOptions, ocSchema, trackableRoute]), (request, reply) => {
-    const { ...patch } = request.body
-    const { recordId } = request.params
-
-    return updateAuditRecordState(recordId, patch)
-      .then(record => reply.code(200).send(record))
-  })
-
   /**
    * @private
    * @TODO control and derive ocId credentials
    */
-  app.get('/api/v2/certification/operators/latest', deepmerge([internalSchema, protectedRouteOptions]), (request, reply) => {
+  app.get('/api/v2/certification/operators/latest', deepmerge(internalSchema, protectedRouteOptions), (request, reply) => {
     const { id: ocId } = request.decodedToken.organismeCertificateur
 
     return fetchLatestCustomersByControlBody({ ocId })
@@ -210,70 +203,125 @@ app.register(async (app) => {
   })
 
   /**
-   * @private
+   * Retrieve the latest Record for a given operator
    */
-  app.get('/api/v2/operator/:operatorId', deepmerge([internalSchema, routeWithOperatorId, enforceSameCertificationBody, ocSchema, trackableRoute, protectedRouteOptions]), (request, reply) => {
-    const { operatorId } = request.params
+  app.get('/api/v2/operator/:operatorId', deepmerge(internalSchema, routeWithOperatorId, enforceSameCertificationBody, ocSchema, trackableRoute, protectedRouteOptions), (request, reply) => {
+    const { record } = request
 
-    return getOperator({ operatorId })
-      .then(result => reply.code(200).send(result))
+    return reply.code(200).send(record)
   })
 
   /**
-   * @private
+   * Retrieve a given Record
    */
-  app.put('/api/v2/operator/:operatorId/parcelles', deepmerge([internalSchema, updateFeatureCollectionSchema, routeWithOperatorId, ocSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
-    const { body } = request
+  app.get('/api/v2/audits/:recordId', deepmerge(internalSchema, routeWithRecordId, enforceSameCertificationBody, ocSchema, trackableRoute, protectedRouteOptions), (request, reply) => {
+    const { record } = request
+
+    return reply.code(200).send(record)
+  })
+
+  /**
+   * Create a new Record for a given Operator
+   * TODO address the mandatory
+   */
+  app.post('/api/v2/audits/:operatorId', deepmerge(internalSchema, createRecordSchema, routeWithOperatorId, enforceSameCertificationBody, ocSchema, trackableRoute, protectedRouteOptions), (request, reply) => {
     const { operatorId } = request.params
+    const { body, decodedToken, record } = request
     const { id: ocId, nom: ocLabel } = request.decodedToken.organismeCertificateur
 
-    return updateOperatorParcels({ operatorId }, { ...body, ocId, ocLabel })
+    return createOperatorRecord({ operatorId, decodedToken, record }, { ...body, ocId, ocLabel })
+      .then(record => reply.code(200).send(record))
+  })
+
+  /**
+   * Partial update Record's metadata (top-level properties except features)
+   * It also keep track of new HistoryEvent along the way, depending who and when you update feature properties
+   */
+  app.patch('/api/v2/audits/:recordId', deepmerge(internalSchema, patchRecordSchema, routeWithRecordId, protectedRouteOptions, ocSchema, trackableRoute), (request, reply) => {
+    const { body: patch, decodedToken, record } = request
+
+    return updateAuditRecordState({ decodedToken, record }, patch)
+      .then(record => reply.code(200).send(record))
+  })
+
+  /**
+   * Delete a Record
+   * TODO: do not hard delete but purge features while keeping its history
+   */
+  app.delete('/api/v2/audits/:recordId', deepmerge(internalSchema, routeWithRecordId, protectedRouteOptions, trackableRoute), (request, reply) => {
+    const { decodedToken, record } = request
+
+    return deleteRecord({ decodedToken, record })
       .then(result => reply.code(200).send(result))
   })
 
-  app.post('/api/v2/operator/:operatorId/parcelles', deepmerge([internalSchema, routeWithOperatorId, ocSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
+  /**
+   * Add new feature entries to an existing collection
+   */
+  app.post('/api/v2/audits/:recordId/parcelles', deepmerge(internalSchema, createFeatureSchema, routeWithRecordId, ocSchema, protectedRouteOptions, trackableRoute), (request, reply) => {
     const { feature } = request.body
-    const { operatorId } = request.params
+    const { decodedToken, record } = request
 
-    return addNewOperatorParcel({ operatorId }, feature)
+    return addRecordFeature({ decodedToken, record }, feature)
       .then(result => reply.code(200).send(result))
   })
 
   /**
-   * @private
+   * Partial update a feature collection (ie: mass action from the collection screen)
+   *
+   * It's non-destructive — matching ids are updated, new ids are added, non-existent ids are kept as is
    */
-  app.delete('/api/v2/operator/:operatorId', deepmerge([internalSchema, routeWithOperatorId, ocSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
-    const { operatorId } = request.params
+  app.patch('/api/v2/audits/:recordId/parcelles', deepmerge(internalSchema, patchFeatureCollectionSchema, routeWithRecordId, ocSchema, protectedRouteOptions, trackableRoute), (request, reply) => {
+    const { body: featureCollection, decodedToken, record } = request
 
-    return deleteRecord({ operatorId })
-      .then(() => getOperator({ operatorId }))
-      .then(result => reply.code(200).send(result))
+    return patchFeatureCollection({ decodedToken, record }, featureCollection.features)
+      .then(record => reply.code(200).send(record))
   })
 
   /**
+   * Full update a single feature (ie: feature form from an editing modal)
+   *
+   * It's destructive — non-matching ids are removed (ie: crops)
+   */
+  app.put('/api/v2/audits/:recordId/parcelles/:featureId', deepmerge(internalSchema, updateFeaturePropertiesSchema, routeWithRecordId, ocSchema, protectedRouteOptions, trackableRoute), (request, reply) => {
+    const { body: feature, decodedToken, record } = request
+    const { featureId } = request.params
+
+    return updateFeatureProperties({ featureId, decodedToken, record }, feature)
+      .then(record => reply.code(200).send(record))
+  })
+
+  /**
+   * Turn a shapefile into a workeable FeatureCollection
+   * It's essentially used during an import process to preview its content
    * @private
    */
-  app.post('/api/v2/convert/shapefile/geojson', deepmerge([protectedRouteOptions, internalSchema]), async (request, reply) => {
+  app.post('/api/v2/convert/shapefile/geojson', deepmerge(protectedRouteOptions, internalSchema), async (request, reply) => {
     return parseShapefileArchive(request.file())
       .then(geojson => reply.send(geojson))
   })
 
   /**
+   * Turn a Geofolia file into a workeable FeatureCollection
+   * It's essentially used during an import process to preview its content
    * @private
    */
-  app.post('/api/v2/convert/geofolia/geojson', deepmerge([protectedRouteOptions, internalSchema]), async (request, reply) => {
+  app.post('/api/v2/convert/geofolia/geojson', deepmerge(protectedRouteOptions, internalSchema), async (request, reply) => {
     return parseGeofoliaArchive(request.file())
       .then(geojson => reply.send(geojson))
   })
 
-  app.get('/api/v2/import/pacage/:numeroPacage', deepmerge([internalSchema, ocSchema, protectedRouteOptions, routeWithPacage]), async (request, reply) => {
+  /**
+   * Retrieves all features associated to a PACAGE as a workeable FeatureCollection
+   */
+  app.get('/api/v2/import/pacage/:numeroPacage', deepmerge(internalSchema, ocSchema, protectedRouteOptions, routeWithPacage), async (request, reply) => {
     const { numeroPacage } = request.params
 
     return pacageLookup({ numeroPacage })
       .then(featureCollection => reply.send(featureCollection))
   })
 
-  app.post('/api/webhooks/mattermost', deepmerge([internalSchema, protectedWithTokenRoute]), async (request, reply) => {
+  app.post('/api/webhooks/mattermost', deepmerge(internalSchema, protectedWithTokenRoute), async (request, reply) => {
     const { user_name: userName, command } = request.body
 
     request.log.info('Incoming mattermost command (%s)', command)
@@ -287,20 +335,23 @@ app.register(async (app) => {
   /**
    * @private
    */
-  app.post('/api/v2/import/mesparcelles/login', deepmerge([hiddenSchema, internalSchema]), async (request, reply) => {
+  app.post('/api/v2/import/mesparcelles/login', deepmerge(hiddenSchema, internalSchema), async (request, reply) => {
     const { email, millesime, password, server } = request.body
 
     const geojson = await getMesParcellesOperator({ email, millesime, password, server })
     reply.send(geojson)
   })
 
-  app.get('/api/v2/user/verify', deepmerge([sandboxSchema, internalSchema, protectedRouteOptions, trackableRoute]), (request, reply) => {
+  app.get('/api/v2/user/verify', deepmerge(sandboxSchema, internalSchema, protectedRouteOptions, trackableRoute), (request, reply) => {
     const { decodedToken } = request
 
     return reply.send(decodedToken)
   })
 
-  app.get('/api/v2/user/exchangeToken', deepmerge([sandboxSchema, internalSchema, protectedRouteOptions]), async (request, reply) => {
+  /**
+   * Exchange a notification.agencebio.org token for a CartoBio token
+   */
+  app.get('/api/v2/user/exchangeToken', deepmerge(sandboxSchema, internalSchema, protectedRouteOptions), async (request, reply) => {
     const { error, payload: decodedToken, token } = verifyNotificationAuthorization(request.headers.authorization)
 
     if (error) {
@@ -328,7 +379,7 @@ app.register(async (app) => {
 
   // usefull only in dev mode
   app.get('/auth-provider/agencebio/login', hiddenSchema, (request, reply) => reply.redirect('/api/auth-provider/agencebio/login'))
-  app.get('/api/auth-provider/agencebio/callback', deepmerge([sandboxSchema, hiddenSchema]), async (request, reply) => {
+  app.get('/api/auth-provider/agencebio/callback', deepmerge(sandboxSchema, hiddenSchema), async (request, reply) => {
     // forwards to the UI the user-selected tab
     const { mode = '', returnto = '' } = stateCache.get(request.query.state)
     const { token } = await app.agenceBioOAuth2.getAccessTokenFromAuthorizationCodeFlow(request)
