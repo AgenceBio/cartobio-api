@@ -11,8 +11,7 @@ jobs:
     - uses: actions/setup-node@v3
       with:
         node-version-file: .nvmrc
-    - run: npm ci
-    - run: npm test -- --collectCoverage --coverageReporters text
+    - run: npm clean-install-test
       env:
         CI: true
         NOTIFICATIONS_AB_ENDPOINT: https://preprod-notifications.agencebio.org:444
@@ -21,3 +20,6 @@ jobs:
         NOTIFICATIONS_AB_SSO_CLIENT_SECRET: "test"
         NOTIFICATIONS_AB_CARTOBIO_USER: "test"
         NOTIFICATIONS_AB_CARTOBIO_PASSWORD: "test"
+
+    - name: Coveralls
+      uses: coverallsapp/github-action@v2

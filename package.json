@@ -66,7 +66,7 @@
     "build:communes-centroids": "node bin/build-communes-centroids.js",
     "export-asp": "node bin/export-asp.js | jq '.[0]' | ogr2ogr cartobio-asp.gpkg /vsistdin/",
     "prestart": "./node_modules/.bin/db-migrate up",
-    "test": "NODE_ENV=test jest --detectOpenHandles --collectCoverage --coverageReporters html --coverageReporters text-summary",
+    "test": "NODE_ENV=test jest --detectOpenHandles --collectCoverage --coverageReporters html --coverageReporters text-summary --coverageReporters lcovonly",
     "postinstall": "npm run build:communes-centroids",
     "posttest": "eslint --ignore-pattern 'migrations/*' .",
     "prewatch": "node ./node_modules/.bin/db-migrate up",
