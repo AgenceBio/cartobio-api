@@ -24,7 +24,7 @@ const { ExtraErrorData } = require('@sentry/integrations')
 const { createSigner } = require('fast-jwt')
 
 const { fetchOperatorById, fetchCustomersByOperator, getUserProfileById, getUserProfileFromSSOToken, operatorLookup, verifyNotificationAuthorization } = require('./lib/providers/agence-bio.js')
-const { addRecordFeature, fetchLatestCustomersByControlBody, deleteRecord, pacageLookup, patchFeatureCollection, updateAuditRecordState, updateFeatureProperties, getParcellesStats, getDataGouvStats, createOperatorRecord } = require('./lib/providers/cartobio.js')
+const { addRecordFeature, deleteSingleFeature, fetchLatestCustomersByControlBody, deleteRecord, pacageLookup, patchFeatureCollection, updateAuditRecordState, updateFeatureProperties, getParcellesStats, getDataGouvStats, createOperatorRecord } = require('./lib/providers/cartobio.js')
 const { parseShapefileArchive } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive } = require('./lib/providers/geofolia.js')
 const { getMesParcellesOperator } = require('./lib/providers/mes-parcelles.js')
@@ -34,7 +34,7 @@ const { sandboxSchema, ocSchema, internalSchema, hiddenSchema, protectedWithToke
 const { protectedRouteOptions, enforceSameCertificationBody } = require('./lib/routes/index.js')
 const { routeWithOperatorId, routeWithRecordId, routeWithPacage } = require('./lib/routes/index.js')
 const { tryLoginSchema } = require('./lib/routes/login.js')
-const { createFeatureSchema, createRecordSchema, patchFeatureCollectionSchema, patchRecordSchema, updateFeaturePropertiesSchema } = require('./lib/routes/records.js')
+const { createFeatureSchema, createRecordSchema, deleteSingleFeatureSchema, patchFeatureCollectionSchema, patchRecordSchema, updateFeaturePropertiesSchema } = require('./lib/routes/records.js')
 
 // Application is hosted on localhost:8000 by default
 const reportErrors = config.get('reportErrors')
@@ -288,6 +288,18 @@ app.register(async (app) => {
     const { featureId } = request.params
 
     return updateFeatureProperties({ featureId, decodedToken, record }, feature)
+      .then(record => reply.code(200).send(record))
+  })
+
+  /**
+   * Delete a single feature
+   */
+  app.delete('/api/v2/audits/:recordId/parcelles/:featureId', deepmerge(internalSchema, deleteSingleFeatureSchema, routeWithRecordId, ocSchema, protectedRouteOptions), (request, reply) => {
+    const { decodedToken, record } = request
+    const { reason } = request.body
+    const { featureId } = request.params
+
+    return deleteSingleFeature({ featureId, decodedToken, record }, { reason })
       .then(record => reply.code(200).send(record))
   })
 

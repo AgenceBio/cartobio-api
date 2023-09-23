@@ -1,0 +1,19 @@
+{
+  "id": 1,
+  "prenom": "test",
+  "nom": "test",
+  "organismeCertificateur": {
+    "id": 1,
+    "nom": "CartoBi'OC"
+  },
+  "groups": [
+    {
+      "id": 1,
+      "nom": "Auditeur"
+    },
+    {
+      "id": 2,
+      "nom": "Chargé de certification"
+    }
+  ]
+}
