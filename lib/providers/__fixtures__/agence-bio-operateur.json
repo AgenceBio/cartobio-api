@@ -1,0 +1,27 @@
+{
+  "id": 1,
+  "nom": "Opérateur test",
+  "denominationCourante": "Opérateur Test SARL",
+  "siret": "",
+  "echeanceSiret": "",
+  "numeroBio": "9999999",
+  "email": "test@example.com",
+  "numeroPacage": "",
+  "codeNAF": "",
+  "departementId": 1,
+  "sitesWeb": ["http://example.com"],
+  "activites": [
+    {
+      "id": 1,
+      "nom": "Production"
+    }
+  ],
+  "productions": [],
+  "certificats": [
+    {
+      "organisme": "OC fictif",
+      "date": "2023-01-01",
+      "url": "http://example.net/certificats/id/1-2-3-4"
+    }
+  ]
+}
