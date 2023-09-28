@@ -38,8 +38,19 @@ curl --data-binary '@/chemin/vers/parcellaire.json' \
   https://cartobio.agencebio.org/api/v2/certification/parcelles
 ```
 
-L'entête `Authorization` contient un jeton de service fourni par l'Agence Bio.\
-Ce même jeton fonctionne avec l'API CartoBio.
+### Authentification
+
+L'entête `Authorization` contient le jeton de service fourni par
+l'Agence Bio pour s'authentifier sur l'API notifications.
+Ce même jeton fonctionne avec l'API CartoBio, en preproduction
+et en production.
+
+Ce jeton peut être testé sur l'API notifications sur
+le chemin `/api/oc/check-token`.
+
+### Réponses
+
+```bash
 
 #### Codes HTTP
 
