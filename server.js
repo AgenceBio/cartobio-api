@@ -359,13 +359,13 @@ app.register(async (app) => {
     preParsing: async (request, reply, payload) => {
       const stream = payload.pipe(stripBom())
 
-      request.headers['content-length'] = '0'
       request.result = await parcellaireStreamToDb(stream)
-      return new PassThrough().end()
+      request.headers['content-length'] = '2'
+      return new PassThrough().end('{}')
     }
   }), (request, reply) => {
     const { count, errors } = request.result
-    return reply.code(200).send({
+    return reply.code(202).send({
       nbObjetTraites: count,
       nbObjetAcceptes: count - errors.length,
       nbObjetRefuses: errors.length,
