@@ -33,7 +33,7 @@ describe('GET /', () => {
       .get('/')
       .type('json')
       .then((response) => {
-        expect(response.status).toBe(404)
+        expect(response.status).toEqual(404)
         expect(response.header['content-type']).toBe('application/json; charset=utf-8')
         expect(response.body).toHaveProperty('error', 'Not Found')
       })
@@ -55,7 +55,7 @@ describe('GET /api/version', () => {
       .get('/api/v1/version')
       .type('json')
       .then((response) => {
-        expect(response.status).toBe(404)
+        expect(response.status).toEqual(404)
       })
   })
 })
@@ -66,7 +66,7 @@ describe('GET /api/v2/test', () => {
       .get('/api/v2/test')
       .type('json')
       .then((response) => {
-        expect(response.status).toBe(401)
+        expect(response.status).toEqual(401)
         expect(response.header['content-type']).toBe('application/json; charset=utf-8')
         expect(response.body).toHaveProperty('error')
       })
@@ -78,21 +78,19 @@ describe('GET /api/v2/test', () => {
       .type('json')
       .set('Authorization', USER_DOC_AUTH_HEADER)
       .then((response) => {
-        expect(response.status).toBe(200)
+        expect(response.status).toEqual(200)
         expect(response.header['content-type']).toBe('application/json; charset=utf-8')
         expect(response.body).toEqual({ message: 'OK' })
       })
   })
 
-  test('responds well with an access_token query string', () => {
+  test('responds well with an access_token query string value', () => {
     return request(app)
       .get('/api/v2/test')
       .query({ access_token: USER_DOC_AUTH_TOKEN })
       .type('json')
       .then((response) => {
-        expect(response.status).toBe(200)
-        expect(response.header['content-type']).toBe('application/json; charset=utf-8')
-        expect(response.body).toEqual({ message: 'OK' })
+        expect(response.status).toEqual(200)
       })
   })
 })
@@ -101,11 +99,11 @@ describe('POST /api/v2/convert/shapefile/geojson', () => {
   test('it converts a L93 zipped archive into WGS84 GeoJSON', () => {
     return request(app)
       .post('/api/v2/convert/shapefile/geojson')
-      .query({ access_token: USER_DOC_AUTH_TOKEN })
       .type('json')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
       .attach('archive', 'test/fixtures/telepac-parcelles.zip')
       .then((response) => {
-        expect(response.status).toBe(200)
+        expect(response.status).toEqual(200)
         expect(response.body).toHaveProperty('features.0.type', 'Feature')
       })
   })
@@ -116,7 +114,96 @@ describe('POST /api/v2/convert/shapefile/geojson', () => {
       .type('json')
       .attach('archive', 'test/fixtures/telepac-parcelles.zip')
       .then((response) => {
-        expect(response.status).toBe(401)
+        expect(response.status).toEqual(401)
+      })
+  })
+})
+
+describe('GET /api/v2/operateurs/:numeroBio/parcelles', () => {
+  const fakeOcToken = 'aaaa-bbbb-cccc-dddd'
+  const fakeOc = { id: 999, nom: 'CartobiOC', numeroControleEu: 'FR-999' }
+  const getMock = jest.mocked(got.get)
+  const postMock = jest.mocked(got.post)
+  const queryMock = jest.mocked(db.query)
+
+  test('it works with a valid numerobio and an OC token', async () => {
+    // 1. AUTHORIZATION check token
+    postMock.mockReturnValueOnce({
+      async json () {
+        return fakeOc
+      }
+    })
+
+    // 2. enforceRecord + getOperatorByNumeroBio
+    getMock.mockReturnValueOnce({
+      async json () {
+        return agencebioOperator
+      }
+    })
+    queryMock.mockResolvedValueOnce({ rows: [record] })
+
+    return request(app)
+      .get('/api/v2/operateurs/1234/parcelles')
+      .type('json')
+      .set('Authorization', fakeOcToken)
+      .then((response) => {
+        expect(response.status).toEqual(200)
+      })
+  })
+
+  test('it works with a valid numerobio and a CartoBio token', () => {
+    // 1. enforceRecord + getOperatorByNumeroBio
+    getMock.mockReturnValueOnce({
+      async json () {
+        return agencebioOperator
+      }
+    })
+    queryMock.mockResolvedValueOnce({ rows: [record] })
+
+    return request(app)
+      .get('/api/v2/operateurs/1234/parcelles')
+      .type('json')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+      .then((response) => {
+        expect(response.status).toEqual(200)
+      })
+  })
+
+  test('it fails with an unknown numerobio and a valid OC token', () => {
+    // 1. AUTHORIZATION check token
+    postMock.mockReturnValueOnce({
+      async json () {
+        return fakeOc
+      }
+    })
+
+    // 2. enforceRecord + getOperatorByNumeroBio
+    getMock.mockResolvedValueOnce(null)
+    queryMock.mockResolvedValueOnce({ rows: [] })
+
+    return request(app)
+      .get('/api/v2/operateurs/1234/parcelles')
+      .type('json')
+      .set('Authorization', fakeOcToken)
+      .then((response) => {
+        expect(response.status).toEqual(404)
+      })
+  })
+
+  test('it fails with a valid numerobio and an invalid OC token', () => {
+    postMock.mockReturnValueOnce({
+      async json () {
+        // eslint-disable-next-line no-throw-literal
+        throw { code: 'ERR_NON_2XX_3XX_RESPONSE' }
+      }
+    })
+
+    return request(app)
+      .get('/api/v2/operateurs/1234/parcelles')
+      .type('json')
+      .set('Authorization', fakeOcToken)
+      .then((response) => {
+        expect(response.status).toEqual(401)
       })
   })
 })

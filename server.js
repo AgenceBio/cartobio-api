@@ -30,9 +30,9 @@ const { parseGeofoliaArchive } = require('./lib/providers/geofolia.js')
 const { getMesParcellesOperator } = require('./lib/providers/mes-parcelles.js')
 
 const { deepmerge, commonSchema, swaggerConfig } = require('./lib/routes/index.js')
-const { sandboxSchema, ocSchema, internalSchema, hiddenSchema, protectedWithTokenRoute } = require('./lib/routes/index.js')
-const { protectedRouteOptions, enforceSameCertificationBody } = require('./lib/routes/index.js')
-const { routeWithOperatorId, routeWithRecordId, routeWithPacage } = require('./lib/routes/index.js')
+const { sandboxSchema, internalSchema, hiddenSchema } = require('./lib/routes/index.js')
+const { protectedWithToken, enforceSameCertificationBody } = require('./lib/routes/index.js')
+const { routeWithNumeroBio, routeWithOperatorId, routeWithRecordId, routeWithPacage } = require('./lib/routes/index.js')
 const { tryLoginSchema } = require('./lib/routes/login.js')
 const { createFeatureSchema, createRecordSchema, deleteSingleFeatureSchema, patchFeatureCollectionSchema, patchRecordSchema, updateFeaturePropertiesSchema } = require('./lib/routes/records.js')
 
@@ -126,6 +126,7 @@ app.register(fastifyOauth, {
 
 // Routes to protect with a JSON Web Token
 app.decorateRequest('decodedToken', null)
+app.decorateRequest('organismeCertificateur', null)
 
 // Requests can be decorated by a given Record too (associated to an operatorId/recordId)
 app.decorateRequest('record', null)
@@ -134,11 +135,11 @@ app.addSchema(commonSchema)
 
 app.register(async (app) => {
   // Begin Public API routes
-  app.get('/api/version', deepmerge(sandboxSchema), (request, reply) => {
+  app.get('/api/version', deepmerge(sandboxSchema), (_, reply) => {
     return reply.send({ version: config.get('version') })
   })
 
-  app.get('/api/v2/test', deepmerge(sandboxSchema, protectedRouteOptions), (request, reply) => {
+  app.get('/api/v2/test', deepmerge(sandboxSchema, protectedWithToken()), (_, reply) => {
     return reply.send({ message: 'OK' })
   })
 
@@ -163,7 +164,7 @@ app.register(async (app) => {
   /**
    * @private
    */
-  app.post('/api/v2/temporaryLoginWithToken', deepmerge(internalSchema, protectedRouteOptions), (request, reply) => {
+  app.post('/api/v2/temporaryLoginWithToken', deepmerge(protectedWithToken()), (request, reply) => {
     const { decodedToken } = request
 
     delete decodedToken.exp
@@ -183,7 +184,7 @@ app.register(async (app) => {
   /**
    * @private
    */
-  app.post('/api/v2/certification/operators/search', deepmerge(internalSchema, protectedRouteOptions), (request, reply) => {
+  app.post('/api/v2/certification/operators/search', deepmerge(protectedWithToken()), (request, reply) => {
     const { input: nom } = request.body
     const { id: ocId } = request.decodedToken.organismeCertificateur
 
@@ -195,7 +196,7 @@ app.register(async (app) => {
    * @private
    * @TODO control and derive ocId credentials
    */
-  app.get('/api/v2/certification/operators/latest', deepmerge(internalSchema, protectedRouteOptions), (request, reply) => {
+  app.get('/api/v2/certification/operators/latest', deepmerge(protectedWithToken()), (request, reply) => {
     const { id: ocId } = request.decodedToken.organismeCertificateur
 
     return fetchLatestCustomersByControlBody({ ocId })
@@ -205,26 +206,29 @@ app.register(async (app) => {
   /**
    * Retrieve the latest Record for a given operator
    */
-  app.get('/api/v2/operator/:operatorId', deepmerge(internalSchema, routeWithOperatorId, enforceSameCertificationBody, ocSchema, protectedRouteOptions), (request, reply) => {
-    const { record } = request
+  app.get('/api/v2/operator/:operatorId', deepmerge(protectedWithToken(), routeWithOperatorId, enforceSameCertificationBody), (request, reply) => {
+    return reply.code(200).send(request.record)
+  })
 
-    return reply.code(200).send(record)
+  /**
+   * Retrieve the latest FeatureCollection for a given operator
+   */
+  app.get('/api/v2/operateurs/:numeroBio/parcelles', deepmerge(protectedWithToken({ oc: true, cartobio: true }), routeWithNumeroBio, enforceSameCertificationBody), (request, reply) => {
+    return reply.code(200).send(request.record.parcelles)
   })
 
   /**
    * Retrieve a given Record
    */
-  app.get('/api/v2/audits/:recordId', deepmerge(internalSchema, routeWithRecordId, enforceSameCertificationBody, ocSchema, protectedRouteOptions), (request, reply) => {
-    const { record } = request
-
-    return reply.code(200).send(record)
+  app.get('/api/v2/audits/:recordId', deepmerge(routeWithRecordId, enforceSameCertificationBody, protectedWithToken()), (request, reply) => {
+    return reply.code(200).send(request.record)
   })
 
   /**
    * Create a new Record for a given Operator
    * TODO address the mandatory
    */
-  app.post('/api/v2/audits/:operatorId', deepmerge(internalSchema, createRecordSchema, routeWithOperatorId, enforceSameCertificationBody, ocSchema, protectedRouteOptions), (request, reply) => {
+  app.post('/api/v2/audits/:operatorId', deepmerge(createRecordSchema, routeWithOperatorId, enforceSameCertificationBody, protectedWithToken()), (request, reply) => {
     const { operatorId } = request.params
     const { body, decodedToken, record } = request
     const { id: ocId, nom: ocLabel } = request.decodedToken.organismeCertificateur
@@ -237,7 +241,7 @@ app.register(async (app) => {
    * Partial update Record's metadata (top-level properties except features)
    * It also keep track of new HistoryEvent along the way, depending who and when you update feature properties
    */
-  app.patch('/api/v2/audits/:recordId', deepmerge(internalSchema, patchRecordSchema, routeWithRecordId, protectedRouteOptions, ocSchema), (request, reply) => {
+  app.patch('/api/v2/audits/:recordId', deepmerge(protectedWithToken(), patchRecordSchema, routeWithRecordId), (request, reply) => {
     const { body: patch, decodedToken, record } = request
 
     return updateAuditRecordState({ decodedToken, record }, patch)
@@ -248,7 +252,7 @@ app.register(async (app) => {
    * Delete a Record
    * TODO: do not hard delete but purge features while keeping its history
    */
-  app.delete('/api/v2/audits/:recordId', deepmerge(internalSchema, routeWithRecordId, protectedRouteOptions), (request, reply) => {
+  app.delete('/api/v2/audits/:recordId', deepmerge(protectedWithToken(), routeWithRecordId), (request, reply) => {
     const { decodedToken, record } = request
 
     return deleteRecord({ decodedToken, record })
@@ -258,7 +262,7 @@ app.register(async (app) => {
   /**
    * Add new feature entries to an existing collection
    */
-  app.post('/api/v2/audits/:recordId/parcelles', deepmerge(internalSchema, createFeatureSchema, routeWithRecordId, ocSchema, protectedRouteOptions), (request, reply) => {
+  app.post('/api/v2/audits/:recordId/parcelles', deepmerge(protectedWithToken(), createFeatureSchema, routeWithRecordId), (request, reply) => {
     const { feature } = request.body
     const { decodedToken, record } = request
 
@@ -271,7 +275,7 @@ app.register(async (app) => {
    *
    * It's non-destructive — matching ids are updated, new ids are added, non-existent ids are kept as is
    */
-  app.patch('/api/v2/audits/:recordId/parcelles', deepmerge(internalSchema, patchFeatureCollectionSchema, routeWithRecordId, ocSchema, protectedRouteOptions), (request, reply) => {
+  app.patch('/api/v2/audits/:recordId/parcelles', deepmerge(protectedWithToken(), patchFeatureCollectionSchema, routeWithRecordId), (request, reply) => {
     const { body: featureCollection, decodedToken, record } = request
 
     return patchFeatureCollection({ decodedToken, record }, featureCollection.features)
@@ -283,7 +287,7 @@ app.register(async (app) => {
    *
    * It's destructive — non-matching ids are removed (ie: crops)
    */
-  app.put('/api/v2/audits/:recordId/parcelles/:featureId', deepmerge(internalSchema, updateFeaturePropertiesSchema, routeWithRecordId, ocSchema, protectedRouteOptions), (request, reply) => {
+  app.put('/api/v2/audits/:recordId/parcelles/:featureId', deepmerge(protectedWithToken(), updateFeaturePropertiesSchema, routeWithRecordId), (request, reply) => {
     const { body: feature, decodedToken, record } = request
     const { featureId } = request.params
 
@@ -294,7 +298,7 @@ app.register(async (app) => {
   /**
    * Delete a single feature
    */
-  app.delete('/api/v2/audits/:recordId/parcelles/:featureId', deepmerge(internalSchema, deleteSingleFeatureSchema, routeWithRecordId, ocSchema, protectedRouteOptions), (request, reply) => {
+  app.delete('/api/v2/audits/:recordId/parcelles/:featureId', deepmerge(protectedWithToken(), deleteSingleFeatureSchema, routeWithRecordId), (request, reply) => {
     const { decodedToken, record } = request
     const { reason } = request.body
     const { featureId } = request.params
@@ -308,7 +312,7 @@ app.register(async (app) => {
    * It's essentially used during an import process to preview its content
    * @private
    */
-  app.post('/api/v2/convert/shapefile/geojson', deepmerge(protectedRouteOptions, internalSchema), async (request, reply) => {
+  app.post('/api/v2/convert/shapefile/geojson', deepmerge(protectedWithToken({ oc: true, cartobio: true })), async (request, reply) => {
     return parseShapefileArchive(request.file())
       .then(geojson => reply.send(geojson))
   })
@@ -318,7 +322,7 @@ app.register(async (app) => {
    * It's essentially used during an import process to preview its content
    * @private
    */
-  app.post('/api/v2/convert/geofolia/geojson', deepmerge(protectedRouteOptions, internalSchema), async (request, reply) => {
+  app.post('/api/v2/convert/geofolia/geojson', deepmerge(protectedWithToken()), async (request, reply) => {
     return parseGeofoliaArchive(request.file())
       .then(geojson => reply.send(geojson))
   })
@@ -326,14 +330,14 @@ app.register(async (app) => {
   /**
    * Retrieves all features associated to a PACAGE as a workeable FeatureCollection
    */
-  app.get('/api/v2/import/pacage/:numeroPacage', deepmerge(internalSchema, ocSchema, protectedRouteOptions, routeWithPacage), async (request, reply) => {
+  app.get('/api/v2/import/pacage/:numeroPacage', deepmerge(protectedWithToken({ cartobio: true, oc: true }), routeWithPacage), async (request, reply) => {
     const { numeroPacage } = request.params
 
     return pacageLookup({ numeroPacage })
       .then(featureCollection => reply.send(featureCollection))
   })
 
-  app.post('/api/webhooks/mattermost', deepmerge(internalSchema, protectedWithTokenRoute), async (request, reply) => {
+  app.post('/api/webhooks/mattermost', deepmerge(protectedWithToken({ mattermost: true }), internalSchema), async (request, reply) => {
     const { user_name: userName, command } = request.body
 
     request.log.info('Incoming mattermost command (%s)', command)
@@ -354,7 +358,7 @@ app.register(async (app) => {
     reply.send(geojson)
   })
 
-  app.get('/api/v2/user/verify', deepmerge(sandboxSchema, internalSchema, protectedRouteOptions), (request, reply) => {
+  app.get('/api/v2/user/verify', deepmerge(protectedWithToken(), sandboxSchema, internalSchema), (request, reply) => {
     const { decodedToken } = request
 
     return reply.send(decodedToken)
@@ -363,7 +367,7 @@ app.register(async (app) => {
   /**
    * Exchange a notification.agencebio.org token for a CartoBio token
    */
-  app.get('/api/v2/user/exchangeToken', deepmerge(sandboxSchema, internalSchema, protectedRouteOptions), async (request, reply) => {
+  app.get('/api/v2/user/exchangeToken', deepmerge(protectedWithToken(), sandboxSchema, internalSchema), async (request, reply) => {
     const { error, payload: decodedToken, token } = verifyNotificationAuthorization(request.headers.authorization)
 
     if (error) {
