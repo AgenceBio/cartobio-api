@@ -121,7 +121,7 @@ describe('POST /api/v2/convert/shapefile/geojson', () => {
 
 describe('GET /api/v2/operateurs/:numeroBio/parcelles', () => {
   const fakeOcToken = 'aaaa-bbbb-cccc-dddd'
-  const fakeOc = { id: 999, nom: 'CartobiOC', numeroControleEu: 'FR-999' }
+  const fakeOc = { id: 999, nom: 'CartobiOC', numeroControleEu: 'FR-BIO-999' }
   const getMock = jest.mocked(got.get)
   const postMock = jest.mocked(got.post)
   const queryMock = jest.mocked(db.query)

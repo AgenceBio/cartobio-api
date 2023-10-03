@@ -133,20 +133,28 @@ app.decorateRequest('record', null)
 
 app.addSchema(commonSchema)
 
+// Expose OpenAPI schema and Swagger documentation
+app.register(fastifySwagger, swaggerConfig)
+
+app.register(fastifySwaggerUi, {
+  baseDir: '/api',
+  routePrefix: '/api/documentation'
+})
+
 app.register(async (app) => {
   // Begin Public API routes
   app.get('/api/version', deepmerge(sandboxSchema), (_, reply) => {
     return reply.send({ version: config.get('version') })
   })
 
-  app.get('/api/v2/test', deepmerge(sandboxSchema, protectedWithToken()), (_, reply) => {
+  app.get('/api/v2/test', deepmerge(sandboxSchema, protectedWithToken({ oc: true, cartobio: true })), (_, reply) => {
     return reply.send({ message: 'OK' })
   })
 
   /**
    * @private
    */
-  app.post('/api/v2/tryLogin', deepmerge(internalSchema, tryLoginSchema), (request, reply) => {
+  app.post('/api/v2/tryLogin', deepmerge(hiddenSchema, tryLoginSchema), (request, reply) => {
     const { q } = request.body
     const sign = createSigner({ key: config.get('jwtSecret'), expiresIn: DURATION_ONE_MINUTE * 8 })
 
@@ -164,7 +172,7 @@ app.register(async (app) => {
   /**
    * @private
    */
-  app.post('/api/v2/temporaryLoginWithToken', deepmerge(protectedWithToken()), (request, reply) => {
+  app.post('/api/v2/temporaryLoginWithToken', deepmerge(protectedWithToken(), hiddenSchema), (request, reply) => {
     const { decodedToken } = request
 
     delete decodedToken.exp
@@ -358,16 +366,16 @@ app.register(async (app) => {
     reply.send(geojson)
   })
 
-  app.get('/api/v2/user/verify', deepmerge(protectedWithToken(), sandboxSchema, internalSchema), (request, reply) => {
-    const { decodedToken } = request
+  app.get('/api/v2/user/verify', deepmerge(protectedWithToken({ oc: true, cartobio: true }), sandboxSchema, internalSchema), (request, reply) => {
+    const { decodedToken, organismeCertificateur } = request
 
-    return reply.send(decodedToken)
+    return reply.send(decodedToken ?? organismeCertificateur)
   })
 
   /**
    * Exchange a notification.agencebio.org token for a CartoBio token
    */
-  app.get('/api/v2/user/exchangeToken', deepmerge(protectedWithToken(), sandboxSchema, internalSchema), async (request, reply) => {
+  app.get('/api/v2/user/exchangeToken', deepmerge(protectedWithToken(), internalSchema), async (request, reply) => {
     const { error, payload: decodedToken, token } = verifyNotificationAuthorization(request.headers.authorization)
 
     if (error) {
@@ -404,14 +412,6 @@ app.register(async (app) => {
 
     return reply.redirect(`${config.get('frontendUrl')}/login?mode=${mode}&returnto=${returnto}#token=${cartobioToken}`)
   })
-})
-
-// Expose OpenAPI schema and Swagger documentation
-app.register(fastifySwagger, swaggerConfig)
-
-app.register(fastifySwaggerUi, {
-  baseDir: '/api',
-  routePrefix: '/api/documentation'
 })
 
 app.ready().then(() => app.swagger())
