@@ -50,29 +50,41 @@ le chemin `/api/oc/check-token`.
 
 ### Réponses
 
-```bash
-
 #### Codes HTTP
 
+```
 | Code HTTP | Message HTTP           | Signification
 | ---       | ---                    | ---
-| `202`     | `Accepted`             | Les données sont acceptées. Leur traitement se fera en traitement différé de plusieurs minutes.
-| `400`     | `Bad Request`          | La requête contient des paramètres qui ne permettent pas de la comprendre.
+| `202`     | `Accepted`             | Les données sont acceptées et enregistrées.
+| `400`     | `Bad Request`          | Le fichier JSON est invalide ou certaines données sont incorrectes.
 | `401`     | `Unauthorized`         | Le jeton d'`Authorization` est manquant.
 | `403`     | `Forbidden`            | Ce jeton d'`Authorization` n'est pas attribué, ou a expiré.
 | `405`     | `Method Not Allowed`   | L'appel utilise un autre verbe HTTP que `POST`.
 | `500`     | `Internal Server Error`| Une erreur inattendue s'est produite de notre côté — un bug doit être résolu pour qu'une nouvelle requête puisse aboutir.
+```
 
 #### Réponse
 
-En cas de statut `202`, un objet représente l'état du traitement.
+En cas de statut `202`, un objet représente le nombre d'objets traités.
 
-| Chemin                        | Type        | Description
-| ---                           | ---         | ---
-| `nbObjetTraites`              | integer     | nombre d'objets reçus
-| `nbObjectAcceptes`            | integer     | nombre d'objets validés pour traitement
-| `nbObjetRefuses`              | integer     | nombre d'objets refusés pour cause d'erreur
-| `listeProblemes`              | array       | année de référence de l'audit AB
+| Chemin           | Type    | Description           |
+|------------------|---------|-----------------------|
+| `nbObjetTraites` | integer | nombre d'objets reçus |
+
+```json
+{
+  "nbObjetTraites": 3
+}
+```
+
+En cas de statut `400`, un objet représente les objets acceptés et refusés. Aucune donnée n'est enregistrée.
+
+| Chemin             | Type    | Description                                          |
+|--------------------|---------|------------------------------------------------------|
+| `nbObjetTraites`   | integer | nombre d'objets reçus                                |
+| `nbObjectAcceptes` | integer | nombre d'objets validés                              |
+| `nbObjetRefuses`   | integer | nombre d'objets refusés pour cause d'erreur          |
+| `listeProblemes`   | array   | la liste des problèmes et leur index dans le fichier |
 
 ```json
 {
@@ -80,9 +92,17 @@ En cas de statut `202`, un objet représente l'état du traitement.
   "nbObjectAcceptes": 1,
   "nbObjetRefuses": 2,
   "listeProblemes": [
-    "[#2] Numéro bio manquant pour le numéro client XYZ",
+    "[#2] Numéro bio manquant",
     "[#3] Numéro CPF invalide pour la parcelle 2"
   ]
+}
+```
+
+Si le JSON est invalide, le message d'erreur est simplement le suivant :
+
+```json
+{
+  "error": "Le JSON est invalide"
 }
 ```
 
@@ -90,39 +110,39 @@ En cas de statut `202`, un objet représente l'état du traitement.
 
 #### Audit
 
-| Chemin                        | Type        | Obligatoire     | Description
-| ---                           | ---         | ---             | ---
-| `numeroBio`                   | string      | **oui**         | numéro bio de l'opérateur
-| `numeroClient`                | string      | **oui**         | numéro client de l'opérateur
-| `anneeReferenceControle`      | integer     | **oui**         | année de référence de l'audit AB
-| `anneeAssolement`             | integer     | non             | année de l'assolement concerné [^1]
-| `dateAudit`                   | string      | **oui**         | date d'audit au format [ISO 8601] (`YYYY-MM-DD`)
-| `numeroPacage`                | string      | non             | numéro pacage de l'opérateur (si applicable)
-| `commentaire`                 | string      | non             | notes d'audit
-| `parcelles`                   | array       | **oui**         | liste d'éléments de type [Parcelle](#parcelle)
+| Chemin                   | Type    | Obligatoire | Description                                      |
+|--------------------------|---------|-------------|--------------------------------------------------|
+| `numeroBio`              | string  | **oui**     | numéro bio de l'opérateur                        |
+| `numeroClient`           | string  | **oui**     | numéro client de l'opérateur                     |
+| `anneeReferenceControle` | integer | **oui**     | année de référence de l'audit AB                 |
+| `anneeAssolement`        | integer | non         | année de l'assolement concerné [^1]              |
+| `dateAudit`              | string  | **oui**     | date d'audit au format [ISO 8601] (`YYYY-MM-DD`) |
+| `numeroPacage`           | string  | non         | numéro pacage de l'opérateur (si applicable)     |
+| `commentaire`            | string  | non         | notes d'audit                                    |
+| `parcelles`              | array   | **oui**     | liste d'éléments de type [Parcelle](#parcelle)   |
 
 #### Parcelle
 
-| Chemin              | Type        | Obligatoire     | Description
-| ---                 | ---         | ---             | ---
-| `id`                | string      | **oui**         | identifiant unique de parcelle (souvent appelé `PK`, `Primary Key` ou `Clé primaire`)
-| `etatProduction`    | enum        | **oui**         | `AB`, `C1`, `C2`, `C3` ou `NB`
-| `dateEngagement`    | string      | non             | date d'engagement (si connue) au format [ISO 8601] (`YYYY-MM-DD`)=> uniquement pour les parcelles en conversion (voir si on peut avoir                                              la date d'import et la date de conversion différencier
-| `numeroIlot`        | string      | non             | numéro d'ilot PAC (si applicable)
-| `numeroParcelle`    | string      | non             | numéro de parcelle PAC (si applicable)
-| `geom`              | string      | non             | coordonnées géographiques (si applicable). Équivalent du champ `geometry.coordinates` d'une [_feature_ GeoJSON]
-| `commentaire`       | string      | non             | notes d'audit spécifiques à la parcelle
-| `cultures`          | array       | **oui**         | liste d'éléments de type [Culture](#culture)
+| Chemin           | Type   | Obligatoire | Description                                                                                                                                                                                                                                |
+|------------------|--------|-------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `id`             | string | **oui**     | identifiant unique de parcelle (souvent appelé `PK`, `Primary Key` ou `Clé primaire`)                                                                                                                                                      |
+| `etatProduction` | enum   | **oui**     | `AB`, `C1`, `C2`, `C3` ou `NB`                                                                                                                                                                                                             |
+| `dateEngagement` | string | non         | date d'engagement (si connue) au format [ISO 8601] (`YYYY-MM-DD`)=> uniquement pour les parcelles en conversion (voir si on peut avoir                                              la date d'import et la date de conversion différencier |
+| `numeroIlot`     | string | non         | numéro d'ilot PAC (si applicable)                                                                                                                                                                                                          |
+| `numeroParcelle` | string | non         | numéro de parcelle PAC (si applicable)                                                                                                                                                                                                     |
+| `geom`           | string | non         | coordonnées géographiques (si applicable). Équivalent du champ `geometry.coordinates` d'une [_feature_ GeoJSON]                                                                                                                            |
+| `commentaire`    | string | non         | notes d'audit spécifiques à la parcelle                                                                                                                                                                                                    |
+| `cultures`       | array  | **oui**     | liste d'éléments de type [Culture](#culture)                                                                                                                                                                                               |
 
 #### Culture
 
-| Chemin       | Type        | Obligatoire    | Description
-| ---          | ---         | ---            | ---
-| `codeCPF`    | string      | **oui**        | code culture (nomenclature CPF Bio)
-| `variete`    | string      | non            | variété de culture (si applicable)
-| `dateSemis`  | string      | non            | date de semis au format [ISO 8601] (`YYYY-MM-DD`)
-| `quantite`   | float       | non            | surface de la parcelle
-| `unite`      | enum        | non            | `ha` (hectare)
+| Chemin      | Type   | Obligatoire | Description                                       |
+|-------------|--------|-------------|---------------------------------------------------|
+| `codeCPF`   | string | **oui**     | code culture (nomenclature CPF Bio)               |
+| `variete`   | string | non         | variété de culture (si applicable)                |
+| `dateSemis` | string | non         | date de semis au format [ISO 8601] (`YYYY-MM-DD`) |
+| `quantite`  | float  | non         | surface de la parcelle                            |
+| `unite`     | enum   | non         | `ha` (hectare)                                    |
 
 #### Exemple
 

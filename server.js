@@ -133,6 +133,9 @@ app.decorateRequest('organismeCertificateur', null)
 // Requests can be decorated by a given Record too (associated to an operatorId/recordId)
 app.decorateRequest('record', null)
 
+// Requests can be decorated by an API result when we do custom stream parsing
+app.decorateRequest('APIResult', null)
+
 app.addSchema(commonSchema)
 
 // Expose OpenAPI schema and Swagger documentation
@@ -359,17 +362,24 @@ app.register(async (app) => {
     preParsing: async (request, reply, payload) => {
       const stream = payload.pipe(stripBom())
 
-      request.result = await parcellaireStreamToDb(stream)
+      request.APIResult = await parcellaireStreamToDb(stream)
       request.headers['content-length'] = '2'
       return new PassThrough().end('{}')
     }
   }), (request, reply) => {
-    const { count, errors } = request.result
+    const { count, errors } = request.APIResult
+
+    if (errors.length > 0) {
+      return reply.code(400).send({
+        nbObjetTraites: count,
+        nbObjetAcceptes: count - errors.length,
+        nbObjetRefuses: errors.length,
+        listeProblemes: errors.map(([index, message]) => `[#${index}] ${message}`)
+      })
+    }
+
     return reply.code(202).send({
-      nbObjetTraites: count,
-      nbObjetAcceptes: count - errors.length,
-      nbObjetRefuses: errors.length,
-      listeProblemes: errors.map(([index, message]) => `[#${index}] ${message}`)
+      nbObjetTraites: count
     })
   })
 
