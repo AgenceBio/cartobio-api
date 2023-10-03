@@ -13,6 +13,9 @@ const sign = createSigner({ key: config.get('jwtSecret') })
 const USER_DOC_AUTH_TOKEN = sign({ ocId: 0, test: true })
 const USER_DOC_AUTH_HEADER = `Bearer ${USER_DOC_AUTH_TOKEN}`
 
+const fakeOcToken = 'aaaa-bbbb-cccc-dddd'
+const fakeOc = { id: 999, nom: 'CartobiOC', numeroControleEu: 'FR-BIO-999' }
+
 // start and stop server
 beforeAll(() => ready())
 afterAll(() => close())
@@ -56,6 +59,37 @@ describe('GET /api/version', () => {
       .type('json')
       .then((response) => {
         expect(response.status).toEqual(404)
+      })
+  })
+})
+
+describe('GET /api/v2/user/verify', () => {
+  test('responds with cartobio decoded token', () => {
+    return request(app)
+      .get('/api/v2/user/verify')
+      .type('json')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+      .then((response) => {
+        expect(response.status).toEqual(200)
+        expect(response.body).toHaveProperty('ocId', 0)
+      })
+  })
+
+  test('responds well with an access_token query string value', () => {
+    const postMock = jest.mocked(got.post)
+
+    postMock.mockReturnValueOnce({
+      async json () {
+        return fakeOc
+      }
+    })
+
+    return request(app)
+      .get('/api/v2/user/verify')
+      .set('Authorization', fakeOcToken)
+      .type('json')
+      .then((response) => {
+        expect(response.body).toEqual(fakeOc)
       })
   })
 })
@@ -120,8 +154,6 @@ describe('POST /api/v2/convert/shapefile/geojson', () => {
 })
 
 describe('GET /api/v2/operateurs/:numeroBio/parcelles', () => {
-  const fakeOcToken = 'aaaa-bbbb-cccc-dddd'
-  const fakeOc = { id: 999, nom: 'CartobiOC', numeroControleEu: 'FR-BIO-999' }
   const getMock = jest.mocked(got.get)
   const postMock = jest.mocked(got.post)
   const queryMock = jest.mocked(db.query)
