@@ -8,6 +8,7 @@ const db = require('./lib/db.js')
 const agencebioOperator = require('./lib/providers/__fixtures__/agence-bio-operateur.json')
 const record = require('./lib/providers/__fixtures__/record-with-features.json')
 const patchedRecordExpectation = require('./lib/providers/__fixtures__/record-with-features-patched.json')
+const apiParcellaire = require('./lib/providers/__fixtures__/agence-bio-api-parcellaire.json')
 
 const sign = createSigner({ key: config.get('jwtSecret') })
 const USER_DOC_AUTH_TOKEN = sign({ ocId: 0, test: true })
@@ -27,7 +28,8 @@ jest.mock('got', () => ({
 }))
 
 jest.mock('./lib/db.js', () => ({
-  query: jest.fn()
+  query: jest.fn(),
+  connect: jest.fn()
 }))
 
 describe('GET /', () => {
@@ -305,5 +307,88 @@ describe('PATCH /api/v2/audits/:recordId/parcelles', () => {
           null
         ])
       })
+  })
+})
+
+describe('POST /api/v2/certification/parcelles', () => {
+  const fakeOcToken = 'aaaa-bbbb-cccc-dddd'
+  const postMock = jest.mocked(got.post)
+  // 1. AUTHORIZATION check token
+  postMock.mockReturnValue({
+    async json () {
+      return { id: 999, nom: 'CartobiOC', numeroControleEu: 'FR-999' }
+    }
+  })
+  const clientQuery = jest.fn(async () => ({ rows: [{ lorem: 'ipsum' }] }))
+  const clientRelease = jest.fn()
+  db.connect.mockResolvedValue({
+    query: clientQuery,
+    release: clientRelease
+  })
+
+  test('it fails without auth', async () => {
+    const res = await request(app).post('/api/v2/certification/parcelles').send(apiParcellaire)
+    expect(db.query).not.toHaveBeenCalled()
+    expect(db.connect).not.toHaveBeenCalled()
+    expect(res.status).toBe(401)
+  })
+
+  test('it responds with 400 when body is not valid JSON', async () => {
+    const res = await request(app)
+      .post('/api/v2/certification/parcelles')
+      .set('Authorization', fakeOcToken)
+      .send(apiParcellaire.toString() + ']')
+    expect(db.query).not.toHaveBeenCalled()
+    expect(db.connect).toHaveBeenCalled()
+    expect(clientQuery).toHaveBeenLastCalledWith('ROLLBACK;')
+    expect(clientRelease).toHaveBeenCalled()
+    expect(res.status).toBe(400)
+  })
+
+  test('it responds with 400 when records are invalid and rollback modifications', async () => {
+    const res = await request(app)
+      .post('/api/v2/certification/parcelles')
+      .set('Authorization', fakeOcToken)
+      .send(apiParcellaire)
+    expect(db.query).not.toHaveBeenCalled()
+    expect(db.connect).toHaveBeenCalled()
+    expect(clientQuery).toHaveBeenLastCalledWith('ROLLBACK;')
+    expect(clientRelease).toHaveBeenCalled()
+    expect(res.status).toBe(400)
+    expect(res.body).toEqual({
+      nbObjetTraites: 4,
+      nbObjetAcceptes: 1,
+      nbObjetRefuses: 3,
+      listeProblemes: [
+        '[#2] champ dateAudit incorrect',
+        '[#3] champ geom incorrect : Unexpected end of JSON input',
+        "[#4] champ geom incorrect : Cannot read properties of undefined (reading 'replace')"
+      ]
+    })
+  })
+
+  test('it responds with 202 when records are valid and save everything to database', async () => {
+    const validApiParcellaire = JSON.parse(JSON.stringify(apiParcellaire))
+    validApiParcellaire.splice(1, 1)
+    validApiParcellaire[1].parcelles[0].geom = '[[[0,0],[0,1],[1,1],[1,0],[0,0]]]'
+    validApiParcellaire[2].parcelles[0].geom = '[[[0,0],[0,1],[1,1],[1,0],[0,0]]]'
+    const res = await request(app)
+      .post('/api/v2/certification/parcelles')
+      .set('Authorization', fakeOcToken)
+      .send(validApiParcellaire)
+
+    expect(db.query).not.toHaveBeenCalled()
+    expect(db.connect).toHaveBeenCalled()
+    expect(clientQuery).toHaveBeenCalledTimes(5) // BEGIN + 3 lines + COMMIT
+    expect(clientQuery).toHaveBeenCalledWith('BEGIN;')
+    expect(clientQuery).toHaveBeenNthCalledWith(2, expect.stringContaining('INSERT INTO'), expect.anything())
+    expect(clientQuery).toHaveBeenNthCalledWith(3, expect.stringContaining('INSERT INTO'), expect.anything())
+    expect(clientQuery).toHaveBeenNthCalledWith(4, expect.stringContaining('INSERT INTO'), expect.anything())
+    expect(clientQuery).toHaveBeenLastCalledWith('COMMIT;')
+    expect(clientRelease).toHaveBeenCalled()
+    expect(res.status).toBe(202)
+    expect(res.body).toEqual({
+      nbObjetTraites: 3
+    })
   })
 })

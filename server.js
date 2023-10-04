@@ -16,15 +16,17 @@ const fastifyCors = require('@fastify/cors')
 const fastifyMultipart = require('@fastify/multipart')
 const fastifyFormBody = require('@fastify/formbody')
 const fastifyOauth = require('@fastify/oauth2')
+const stripBom = require('strip-bom-stream')
 const LRUCache = require('mnemonist/lru-map-with-delete')
 const { randomUUID } = require('node:crypto')
+const { PassThrough } = require('stream')
 
 const Sentry = require('@sentry/node')
 const { ExtraErrorData } = require('@sentry/integrations')
 const { createSigner } = require('fast-jwt')
 
 const { fetchOperatorById, fetchCustomersByOperator, getUserProfileById, getUserProfileFromSSOToken, operatorLookup, verifyNotificationAuthorization } = require('./lib/providers/agence-bio.js')
-const { addRecordFeature, deleteSingleFeature, fetchLatestCustomersByControlBody, deleteRecord, pacageLookup, patchFeatureCollection, updateAuditRecordState, updateFeatureProperties, getParcellesStats, getDataGouvStats, createOperatorRecord } = require('./lib/providers/cartobio.js')
+const { addRecordFeature, fetchLatestCustomersByControlBody, deleteRecord, pacageLookup, patchFeatureCollection, updateAuditRecordState, updateFeatureProperties, getParcellesStats, getDataGouvStats, createOrReplaceOperatorRecord, parcellaireStreamToDb, deleteSingleFeature } = require('./lib/providers/cartobio.js')
 const { parseShapefileArchive } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive } = require('./lib/providers/geofolia.js')
 const { getMesParcellesOperator } = require('./lib/providers/mes-parcelles.js')
@@ -131,6 +133,9 @@ app.decorateRequest('organismeCertificateur', null)
 // Requests can be decorated by a given Record too (associated to an operatorId/recordId)
 app.decorateRequest('record', null)
 
+// Requests can be decorated by an API result when we do custom stream parsing
+app.decorateRequest('APIResult', null)
+
 app.addSchema(commonSchema)
 
 // Expose OpenAPI schema and Swagger documentation
@@ -236,13 +241,21 @@ app.register(async (app) => {
    * Create a new Record for a given Operator
    * TODO address the mandatory
    */
-  app.post('/api/v2/audits/:operatorId', deepmerge(createRecordSchema, routeWithOperatorId, enforceSameCertificationBody, protectedWithToken()), (request, reply) => {
+  app.post('/api/v2/audits/:operatorId', deepmerge(
+    createRecordSchema,
+    routeWithOperatorId,
+    enforceSameCertificationBody,
+    protectedWithToken()
+  ), async (request, reply) => {
     const { operatorId } = request.params
-    const { body, decodedToken, record } = request
     const { id: ocId, nom: ocLabel } = request.decodedToken.organismeCertificateur
 
-    return createOperatorRecord({ operatorId, decodedToken, record }, { ...body, ocId, ocLabel })
-      .then(record => reply.code(200).send(record))
+    const record = await createOrReplaceOperatorRecord(
+      operatorId,
+      { ...request.body, ocId, ocLabel },
+      { decodedToken: request.decodedToken, oldRecord: request.record }
+    )
+    return reply.code(200).send(record)
   })
 
   /**
@@ -343,6 +356,31 @@ app.register(async (app) => {
 
     return pacageLookup({ numeroPacage })
       .then(featureCollection => reply.send(featureCollection))
+  })
+
+  app.post('/api/v2/certification/parcelles', deepmerge(protectedWithToken({ oc: true }), {
+    preParsing: async (request, reply, payload) => {
+      const stream = payload.pipe(stripBom())
+
+      request.APIResult = await parcellaireStreamToDb(stream, request.organismeCertificateur)
+      request.headers['content-length'] = '2'
+      return new PassThrough().end('{}')
+    }
+  }), (request, reply) => {
+    const { count, errors } = request.APIResult
+
+    if (errors.length > 0) {
+      return reply.code(400).send({
+        nbObjetTraites: count,
+        nbObjetAcceptes: count - errors.length,
+        nbObjetRefuses: errors.length,
+        listeProblemes: errors.map(([index, message]) => `[#${index}] ${message}`)
+      })
+    }
+
+    return reply.code(202).send({
+      nbObjetTraites: count
+    })
   })
 
   app.post('/api/webhooks/mattermost', deepmerge(protectedWithToken({ mattermost: true }), internalSchema), async (request, reply) => {
