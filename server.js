@@ -362,7 +362,7 @@ app.register(async (app) => {
     preParsing: async (request, reply, payload) => {
       const stream = payload.pipe(stripBom())
 
-      request.APIResult = await parcellaireStreamToDb(stream)
+      request.APIResult = await parcellaireStreamToDb(stream, request.organismeCertificateur)
       request.headers['content-length'] = '2'
       return new PassThrough().end('{}')
     }
