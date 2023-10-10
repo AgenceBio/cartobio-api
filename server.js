@@ -198,10 +198,12 @@ app.register(async (app) => {
    * @private
    */
   app.post('/api/v2/certification/operators/search', deepmerge(protectedWithToken()), (request, reply) => {
-    const { input: nom } = request.body
+    const input = request.body.input?.trim()
     const { id: ocId } = request.decodedToken.organismeCertificateur
 
-    return fetchCustomersByOperator({ ocId, nom })
+    const [nom, numeroBio] = /^\d+$/.test(input) ? ['', input] : [input, '']
+
+    return fetchCustomersByOperator({ ocId, nom, numeroBio })
       .then(operators => reply.code(200).send({ operators }))
   })
 

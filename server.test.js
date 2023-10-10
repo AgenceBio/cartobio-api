@@ -11,11 +11,11 @@ const patchedRecordExpectation = require('./lib/providers/__fixtures__/record-wi
 const apiParcellaire = require('./lib/providers/__fixtures__/agence-bio-api-parcellaire.json')
 
 const sign = createSigner({ key: config.get('jwtSecret') })
-const USER_DOC_AUTH_TOKEN = sign({ ocId: 0, test: true })
-const USER_DOC_AUTH_HEADER = `Bearer ${USER_DOC_AUTH_TOKEN}`
 
 const fakeOcToken = 'aaaa-bbbb-cccc-dddd'
 const fakeOc = { id: 999, nom: 'CartobiOC', numeroControleEu: 'FR-BIO-999' }
+const USER_DOC_AUTH_TOKEN = sign({ ocId: 0, test: true, organismeCertificateur: fakeOc })
+const USER_DOC_AUTH_HEADER = `Bearer ${USER_DOC_AUTH_TOKEN}`
 
 // start and stop server
 beforeAll(() => ready())
@@ -151,6 +151,46 @@ describe('POST /api/v2/convert/shapefile/geojson', () => {
       .attach('archive', 'test/fixtures/telepac-parcelles.zip')
       .then((response) => {
         expect(response.status).toEqual(401)
+      })
+  })
+})
+
+describe('GET /api/v2/certification/operators/search', () => {
+  const getMock = jest.mocked(got.get)
+  const queryMock = jest.mocked(db.query)
+
+  test('the input is recognized as a numero bio', async () => {
+    getMock.mockReturnValueOnce({
+      async json () {
+        return [agencebioOperator]
+      }
+    })
+    queryMock.mockResolvedValueOnce({ rows: [record] })
+
+    return request(app)
+      .post('/api/v2/certification/operators/search')
+      .type('json')
+      .send({ input: '1234' })
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+      .then((response) => {
+        expect(response.status).toEqual(200)
+      })
+  })
+
+  test('otherwise it is seen as a farm name', () => {
+    getMock.mockReturnValueOnce({
+      async json () {
+        return [agencebioOperator]
+      }
+    })
+    queryMock.mockResolvedValueOnce({ rows: [record] })
+
+    return request(app)
+      .post('/api/v2/certification/operators/search')
+      .send({ input: 'ferme 1234' })
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+      .then((response) => {
+        expect(response.status).toEqual(200)
       })
   })
 })
