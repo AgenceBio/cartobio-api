@@ -4,11 +4,28 @@ const db = require('../lib/db.js')
 const QueryStream = require('pg-query-stream')
 const JSONStream = require('jsonstream-next')
 const { pipeline } = require('node:stream/promises')
+const minimist = require('minimist')
 
-// @todo make it a CLI parameter
-const MAX_DATE = new Date('2023-05-15T23:59:59Z').toISOString()
+const cliOptions = {
+  alias: {
+    onlyC1: ['only-c1']
+  },
+  boolean: ['only-c1'],
+  string: ['campagne'],
+  default: {
+    campagne: new Date().getFullYear()
+  }
+}
 
-const query = new QueryStream(`-- pg
+const { campagne, onlyC1 } = minimist(process.argv.slice(2), cliOptions)
+
+// nouvelles en C1 avant le 15/05/2023
+const maxCampagneDate = new Date(`${campagne}-05-15T23:59:59Z`).toISOString()
+// controlées et certifiées avant le 20/09/2023
+const maxAuditDate = onlyC1 ? new Date(`${campagne}-09-20T00:00:00Z`).toISOString() : maxCampagneDate
+const conversionLevels = onlyC1 ? ['C1'] : ['C1', 'C2', 'C3', 'AB']
+
+const query = new QueryStream(/* sql */`-- pg
 -- https://postgis.net/docs/ST_AsGeoJSON.html
 SELECT 'FeatureCollection' as type, json_agg(ST_AsGeoJSON(properties)::json) features
 FROM (
@@ -35,18 +52,18 @@ FROM (
       "cartobio_operators"."created_at"
     FROM "cartobio_operators"
     WHERE certification_state = 'CERTIFIED'
-          -- la date de certification est AVANT le 15 mai 20xx (inclus)
-          AND audit_history @? '$[*] ? (@.state == "CERTIFIED" && @.date <= "${MAX_DATE}")'
+      -- la date de certification est AVANT le 15 mai 20xx (inclus)
+      AND audit_history @? '$[*] ? (@.state == "CERTIFIED" && @.date <= "${maxAuditDate}")'
   ) features
-  WHERE feature->'properties'->>'conversion_niveau' IN ('C1', 'C2', 'C3', 'AB')
-        AND (
-          -- avec une date d'engagement inférieure au 15 mai 20xx (inclus)
-          -- ou une date pas renseignée
-          feature->'properties'->>'engagement_date' <= '${MAX_DATE}'
-          OR feature->'properties'->>'engagement_date' = ''
-          OR jsonb_path_exists(feature, '$.properties.engagement_date') = FALSE
-        )
-) properties;`, [], { singleRowMode: true, rowMode: 'one' })
+  WHERE feature->'properties'->>'conversion_niveau' = ANY ($1)
+    AND (
+      -- avec une date d'engagement inférieure au 15 mai 20xx (inclus)
+      -- ou une date pas renseignée
+      feature->'properties'->>'engagement_date' <= $2
+      OR feature->'properties'->>'engagement_date' = ''
+      OR jsonb_path_exists(feature, '$.properties.engagement_date') = FALSE
+    )
+) properties;`, [conversionLevels, maxCampagneDate], { singleRowMode: true, rowMode: 'one' })
 
 ;(async function main () {
   const client = await db.connect()
