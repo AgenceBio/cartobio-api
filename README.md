@@ -107,34 +107,6 @@ $ ./node_modules/.bin/db-migrate down:fixtures
 
 # Manuel d'utilisation
 
-
-## Générer un token d'API
-
-L'`ocId` s'obtient à partir de la route `portail/organismesCertificateurs` de l'API Notification de l'Agence Bio.
-
-1. Se rendre sur [jwt.io](https://jwt.io/) ;
-2. Créer un `payload` qui suit ce schéma :
-```json
-{
-  "ocId": <Number>
-}
-```
-3. Renseigner le "secret" (quelqu'un dans l'équipe l'a), et cocher la case `secret base64 encoded` ;
-4. Renseigner ces éléments dans la feuille `Demandes d'accès aux données (fichiers et API)` ;
-5. Tester ce token avec la route `api/v1/test` pour s'assurer de la qualité du token à transmettre ;
-6. Transmettre le token à l'Organisme Certificateur (via un [lien ](), par exemple).
-
-🙌 Bravo !
-
-## Renouveler le secret 256
-
-**Attention** : changer le secret oblige à émettre de nouveaux tokens pour tous les Organismes de Certification.<br>
-Tous les tokens précédemment émis ne seront plus fonctionnels.
-
-```bash
-$ npx vpg --length 256 | base64
-```
-
 ## Sauvegarder et restaurer la base de données en production
 
 ```bash
@@ -179,8 +151,16 @@ tippecanoe -Z10 -z14 --extend-zooms-if-still-dropping --no-tile-compression --si
 
 ## Exporter pour l'ASP
 
-```
+### La couche au 15 mai (tout)
+
+```bash
 docker exec cartobio-api-production node bin/export-asp.js | jq '.[0]' | ogr2ogr cartobio-asp.gpkg /vsistdin/
+```
+
+### La couche au 12 octobre (C1 uniquement)
+
+```bash
+docker exec cartobio-api-production node bin/export-asp.js --only-c1 | jq '.[0]' | ogr2ogr cartobio-asp-c1.gpkg /vsistdin/
 ```
 
 [cartobio-front]: https://github.com/agencebio/cartobio-front

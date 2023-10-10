@@ -4,4 +4,4 @@ node_modules
 
 # built with npm run build:communes-centroids
 data/communes-with-centroids.json
-cartobio-asp.gpkg*
+cartobio-asp*.gpkg*

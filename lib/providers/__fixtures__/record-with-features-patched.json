@@ -1,9 +1,10 @@
 {
   "record_id": "054f0d70-c3da-448f-823e-81fcf7c2bf6e",
-  "numerobio": "34857",
+  "numerobio": "99999",
   "operator_id": 1,
   "operator": {
     "id": 1,
+    "numeroBio": 99999,
     "nom": "test"
   },
   "certification_date_debut": null,
