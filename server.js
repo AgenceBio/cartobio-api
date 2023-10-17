@@ -148,7 +148,7 @@ app.register(fastifySwaggerUi, {
 
 app.register(async (app) => {
   // Begin Public API routes
-  app.get('/api/version', deepmerge(sandboxSchema), (_, reply) => {
+  app.get('/api/version', sandboxSchema, (_, reply) => {
     return reply.send({ version: config.get('version') })
   })
 

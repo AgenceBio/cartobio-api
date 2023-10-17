@@ -47,8 +47,10 @@
   },
   "devDependencies": {
     "@turf/centroid": "^6.5.0",
+    "@types/convict": "^6.1.4",
     "@types/geojson": "^7946.0.10",
     "@types/node": "^18.11.18",
+    "@types/pg": "^8.10.3",
     "@typescript-eslint/eslint-plugin": "^5.47.1",
     "@typescript-eslint/parser": "^5.47.1",
     "eslint": "^7.32.0",
@@ -65,11 +67,13 @@
   },
   "scripts": {
     "build:communes-centroids": "node bin/build-communes-centroids.js",
+    "build:types": "tsc lib/outputs/*.js --declaration --allowJs --emitDeclarationOnly --outDir docs/types",
     "export-asp": "node bin/export-asp.js | jq '.[0]' | ogr2ogr cartobio-asp.gpkg /vsistdin/",
+    "lint": "eslint --ignore-pattern 'migrations/*' .",
     "prestart": "./node_modules/.bin/db-migrate up",
     "test": "NODE_ENV=test jest --detectOpenHandles --collectCoverage --coverageReporters html --coverageReporters text-summary --coverageReporters lcovonly",
     "postinstall": "npm run build:communes-centroids",
-    "posttest": "eslint --ignore-pattern 'migrations/*' .",
+    "posttest": "npm run lint && npm run build:types",
     "prewatch": "node ./node_modules/.bin/db-migrate up",
     "watch": "nodemon server.js"
   },
