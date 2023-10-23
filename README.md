@@ -151,16 +151,21 @@ tippecanoe -Z10 -z14 --extend-zooms-if-still-dropping --no-tile-compression --si
 
 ## Exporter pour l'ASP
 
+La commande produit un fichier GeoJSON. Elle accepte deux arguments, optionnels :
+
+- `--only-c1` : filtre les parcelles à celles en C1, certifiées jusqu'au 19/09 de l'année en cours, et auditées avant le 15/05 de l'année en cours ;
+- `--numerobio-path` : chemin du fichier CSV où consigner la liste des numéro bio des parcelles exportées.
+
 ### La couche au 15 mai (tout)
 
 ```bash
-docker exec cartobio-api-production node bin/export-asp.js | jq '.[0]' | ogr2ogr cartobio-asp.gpkg /vsistdin/
+docker exec cartobio-api-production node bin/export-asp.js --numerobio-path cartobio-asp.csv | ogr2ogr cartobio-asp.gpkg /vsistdin/
 ```
 
 ### La couche au 12 octobre (C1 uniquement)
 
 ```bash
-docker exec cartobio-api-production node bin/export-asp.js --only-c1 | jq '.[0]' | ogr2ogr cartobio-asp-c1.gpkg /vsistdin/
+docker exec cartobio-api-production node bin/export-asp.js --only-c1 --numerobio-path cartobio-asp-c1.csv | ogr2ogr cartobio-asp-c1.gpkg /vsistdin/
 ```
 
 [cartobio-front]: https://github.com/agencebio/cartobio-front

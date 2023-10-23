@@ -68,7 +68,8 @@
   "scripts": {
     "build:communes-centroids": "node bin/build-communes-centroids.js",
     "build:types": "tsc lib/outputs/*.js --declaration --allowJs --emitDeclarationOnly --outDir docs/types",
-    "export-asp": "node bin/export-asp.js | jq '.[0]' | ogr2ogr cartobio-asp.gpkg /vsistdin/",
+    "export-asp": "node bin/export-asp.js --numerobio-path cartobio-asp.csv | ogr2ogr cartobio-asp.gpkg /vsistdin/",
+    "export-asp-c1": "node bin/export-asp.js --only-c1 --numerobio-path cartobio-asp-c1.csv | ogr2ogr cartobio-asp-c1.gpkg /vsistdin/",
     "lint": "eslint --ignore-pattern 'migrations/*' .",
     "prestart": "./node_modules/.bin/db-migrate up",
     "test": "NODE_ENV=test jest --detectOpenHandles --collectCoverage --coverageReporters html --coverageReporters text-summary --coverageReporters lcovonly",
