@@ -26,7 +26,7 @@ const { ExtraErrorData } = require('@sentry/integrations')
 const { createSigner } = require('fast-jwt')
 
 const { fetchOperatorById, fetchCustomersByOperator, getUserProfileById, getUserProfileFromSSOToken, operatorLookup, verifyNotificationAuthorization } = require('./lib/providers/agence-bio.js')
-const { addRecordFeature, fetchLatestCustomersByControlBody, deleteRecord, pacageLookup, patchFeatureCollection, updateAuditRecordState, updateFeatureProperties, getParcellesStats, getDataGouvStats, createOrReplaceOperatorRecord, parcellaireStreamToDb, deleteSingleFeature } = require('./lib/providers/cartobio.js')
+const { addRecordFeature, fetchLatestCustomersByControlBody, deleteRecord, pacageLookup, patchFeatureCollection, updateAuditRecordState, updateFeatureProperties, getParcellesStats, getDataGouvStats, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature } = require('./lib/providers/cartobio.js')
 const { parseShapefileArchive } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive } = require('./lib/providers/geofolia.js')
 const { getMesParcellesOperator } = require('./lib/providers/mes-parcelles.js')
@@ -252,7 +252,7 @@ app.register(async (app) => {
     const { operatorId } = request.params
     const { id: ocId, nom: ocLabel } = request.decodedToken.organismeCertificateur
 
-    const record = await createOrReplaceOperatorRecord(
+    const record = await createOrUpdateOperatorRecord(
       operatorId,
       { ...request.body, ocId, ocLabel },
       { decodedToken: request.decodedToken, oldRecord: request.record }
