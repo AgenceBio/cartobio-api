@@ -223,10 +223,21 @@ Exemple de fichier JSON relatif à un audit de 2 parcelles. Elles comportent res
 ]
 ```
 
-### Algorithme de résolution
+### Algorithme de mise à jour
 
-TBD.
+#### Principe
 
+L'API Parcellaire permet de mettre à jour les données d'un opérateur, des parcelles et des cultures.
+Si des données sont déjà enregistrées pour un opérateur (identifié par un numerobio), les données sont mises à jour
+avec les nouvelles valeurs. Pour supprimer une valeur existante pour un champ, il suffit donc d'envoyer une valeur vide
+pour ce champ. Les champs non-requis par l'API peuvent être omis, ils ne seront pas modifiés.
+
+### Parcelles
+
+Le cas particulier des parcelles est traité de la manière suivante :
+* si une parcelle est déjà enregistrée pour un opérateur, elle est mise à jour avec les nouvelles valeurs
+* si une parcelle est déjà enregistrée pour un opérateur mais n'est pas présente dans les données envoyées,
+* si une parcelle n'est pas déjà enregistrée pour un opérateur, elle est ajoutée
 
 ## Implémentation technique
 
