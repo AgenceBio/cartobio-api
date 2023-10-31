@@ -24,7 +24,11 @@ async function fetchCommunesBoundaries () {
 
       db.query(`
         INSERT INTO communes (code, nom, geometry)
-        VALUES ($1, $2, ST_SetSRID(ST_GeomFromGeoJSON($3), 4326))`
+        VALUES ($1, $2, ST_SetSRID(ST_GeomFromGeoJSON($3), 4326))
+        ON CONFLICT (code) DO UPDATE SET
+          nom = $2,
+          geometry = ST_SetSRID(ST_GeomFromGeoJSON($3), 4326)
+        `
       , [code, nom, JSON.stringify(geometry)]
       )
     })
