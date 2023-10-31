@@ -1,15 +1,12 @@
 'use strict'
 
-const { createWriteStream } = require('fs')
 const { promisify } = require('node:util')
 const { createGunzip } = require('node:zlib')
 const stream = require('node:stream')
-const { join } = require('path')
 const got = require('got')
-const { default: centroid } = require('@turf/centroid')
 const JSONStream = require('jsonstream-next')
 
-const outFile = join(__dirname, '..', 'data', 'communes-with-centroids.json')
+const db = require('../lib/db.js')
 const pipeline = promisify(stream.pipeline)
 
 async function fetchCommunesBoundaries () {
@@ -20,14 +17,17 @@ async function fetchCommunesBoundaries () {
     got.stream(SOURCE),
     createGunzip(),
     JSONStream.parse(['features', true]),
-    (source) => stream.Readable.from(source).map(feature => ({
-      code: feature.properties.code,
-      nom: feature.properties.nom,
-      centroid: centroid(feature).geometry.coordinates,
-      geometry: feature.geometry
-    })),
-    JSONStream.stringify('[\n', ',\n', '\n]'),
-    createWriteStream(outFile)
+    (source) => stream.Readable.from(source).forEach(feature => {
+      // Save to commune table
+      const { code, nom } = feature.properties
+      const geometry = feature.geometry
+
+      db.query(`
+        INSERT INTO communes (code, nom, geometry)
+        VALUES ($1, $2, ST_SetSRID(ST_GeomFromGeoJSON($3), 4326))`
+      , [code, nom, JSON.stringify(geometry)]
+      )
+    })
   ])
 }
 
