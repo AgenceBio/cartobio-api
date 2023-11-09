@@ -29,7 +29,6 @@ const { fetchOperatorById, fetchCustomersByOperator, getUserProfileById, getUser
 const { addRecordFeature, fetchLatestCustomersByControlBody, deleteRecord, pacageLookup, patchFeatureCollection, updateAuditRecordState, updateFeatureProperties, getParcellesStats, getDataGouvStats, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature } = require('./lib/providers/cartobio.js')
 const { parseShapefileArchive } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive } = require('./lib/providers/geofolia.js')
-const { getMesParcellesOperator } = require('./lib/providers/mes-parcelles.js')
 
 const { deepmerge, commonSchema, swaggerConfig } = require('./lib/routes/index.js')
 const { sandboxSchema, internalSchema, hiddenSchema } = require('./lib/routes/index.js')
@@ -394,16 +393,6 @@ app.register(async (app) => {
       response_type: 'ephemeral',
       text: `Coucou ${userName} :wave_light_skin_tone:`
     })
-  })
-
-  /**
-   * @private
-   */
-  app.post('/api/v2/import/mesparcelles/login', deepmerge(hiddenSchema, internalSchema), async (request, reply) => {
-    const { email, millesime, password, server } = request.body
-
-    const geojson = await getMesParcellesOperator({ email, millesime, password, server })
-    reply.send(geojson)
   })
 
   app.get('/api/v2/user/verify', deepmerge(protectedWithToken({ oc: true, cartobio: true }), sandboxSchema, internalSchema), (request, reply) => {
