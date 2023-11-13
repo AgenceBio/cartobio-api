@@ -359,7 +359,17 @@ describe('POST /api/v2/certification/parcelles', () => {
       return { id: 999, nom: 'CartobiOC', numeroControleEu: 'FR-999' }
     }
   })
-  const clientQuery = jest.fn(async () => ({ rows: [{ lorem: 'ipsum' }] }))
+  const clientQuery = jest.fn(
+    async (sql, args) => {
+      if (args && args[6] && args[6].features && args[6].features.some((feature) => !feature.geometry)) {
+        // Simulate trigger error
+        const err = new Error('No geometry')
+        err.code = 'P0001'
+        throw err
+      }
+      return ({ rows: [{ lorem: 'ipsum' }] })
+    }
+  )
   const clientRelease = jest.fn()
   db.connect.mockResolvedValue({
     query: clientQuery,
@@ -402,7 +412,7 @@ describe('POST /api/v2/certification/parcelles', () => {
       listeProblemes: [
         '[#2] champ dateAudit incorrect',
         '[#3] champ geom incorrect : Unexpected end of JSON input',
-        "[#4] champ geom incorrect : Cannot read properties of undefined (reading 'replace')"
+        '[#4] La donnée géographique est manquante ou invalide.'
       ]
     })
   })
