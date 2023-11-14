@@ -25,7 +25,7 @@ const Sentry = require('@sentry/node')
 const { ExtraErrorData } = require('@sentry/integrations')
 const { createSigner } = require('fast-jwt')
 
-const { fetchOperatorById, fetchCustomersByOperator, getUserProfileById, getUserProfileFromSSOToken, operatorLookup, verifyNotificationAuthorization } = require('./lib/providers/agence-bio.js')
+const { fetchOperatorById, fetchCustomersByOc, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators } = require('./lib/providers/agence-bio.js')
 const { addRecordFeature, fetchLatestCustomersByControlBody, deleteRecord, pacageLookup, patchFeatureCollection, updateAuditRecordState, updateFeature, getParcellesStats, getDataGouvStats, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature } = require('./lib/providers/cartobio.js')
 const { parseShapefileArchive } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive } = require('./lib/providers/geofolia.js')
@@ -34,7 +34,6 @@ const { deepmerge, commonSchema, swaggerConfig } = require('./lib/routes/index.j
 const { sandboxSchema, internalSchema, hiddenSchema } = require('./lib/routes/index.js')
 const { protectedWithToken, enforceSameCertificationBody } = require('./lib/routes/index.js')
 const { routeWithNumeroBio, routeWithOperatorId, routeWithRecordId, routeWithPacage } = require('./lib/routes/index.js')
-const { tryLoginSchema } = require('./lib/routes/login.js')
 const { createFeatureSchema, createRecordSchema, deleteSingleFeatureSchema, patchFeatureCollectionSchema, patchRecordSchema, updateFeaturePropertiesSchema } = require('./lib/routes/records.js')
 
 // Application is hosted on localhost:8000 by default
@@ -155,35 +154,6 @@ app.register(async (app) => {
     return reply.send({ message: 'OK' })
   })
 
-  /**
-   * @private
-   */
-  app.post('/api/v2/tryLogin', deepmerge(hiddenSchema, tryLoginSchema), (request, reply) => {
-    const { q } = request.body
-    const sign = createSigner({ key: config.get('jwtSecret'), expiresIn: DURATION_ONE_MINUTE * 8 })
-
-    return operatorLookup({ q })
-      .then(operators => operators.map(operator => ({
-        ...operator,
-        // @todo remove this when we move to SSO login
-        // token is valid for 8 minutes
-        // wich means a user has 8 minutes to search, and click on "identify as…" button
-        temporaryLoginToken: sign(operator)
-      })))
-      .then(userProfiles => reply.code(200).send(userProfiles))
-  })
-
-  /**
-   * @private
-   */
-  app.post('/api/v2/temporaryLoginWithToken', deepmerge(protectedWithToken(), hiddenSchema), (request, reply) => {
-    const { decodedToken } = request
-
-    delete decodedToken.exp
-
-    return reply.code(200).send(sign(decodedToken))
-  })
-
   app.get('/api/v2/stats', internalSchema, async (request, reply) => {
     const [dataGouv, stats] = await Promise.all([
       getDataGouvStats(),
@@ -202,7 +172,7 @@ app.register(async (app) => {
 
     const [nom, numeroBio] = /^\d+$/.test(input) ? ['', input] : [input, '']
 
-    return fetchCustomersByOperator({ ocId, nom, numeroBio })
+    return fetchCustomersByOc({ ocId, nom, numeroBio })
       .then(operators => reply.code(200).send({ operators }))
   })
 
@@ -214,6 +184,18 @@ app.register(async (app) => {
     const { id: ocId } = request.decodedToken.organismeCertificateur
 
     return fetchLatestCustomersByControlBody({ ocId })
+      .then(operators => reply.code(200).send({ operators }))
+  })
+
+  /**
+   * @private
+   * Retrieve a given operators for a given user
+   */
+  app.get('/api/v2/operators', deepmerge(protectedWithToken({ cartobio: true })), (request, reply) => {
+    const { id: userId } = request.decodedToken
+    console.log(userId)
+
+    return fetchUserOperators(userId)
       .then(operators => reply.code(200).send({ operators }))
   })
 
