@@ -24,7 +24,7 @@
     "db-migrate-pg": "^1.2.2",
     "deepmerge": "^4.2.2",
     "dotenv": "^16.0.3",
-    "fast-jwt": "^2.0.2",
+    "fast-jwt": "^3.3.2",
     "fastify": "^4.11.0",
     "form-data": "^4.0.0",
     "get-stream": "^6.0.0",
