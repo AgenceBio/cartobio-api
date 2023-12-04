@@ -14,7 +14,7 @@ const sign = createSigner({ key: config.get('jwtSecret') })
 
 const fakeOcToken = 'aaaa-bbbb-cccc-dddd'
 const fakeOc = { id: 999, nom: 'CartobiOC', numeroControleEu: 'FR-BIO-999' }
-const USER_DOC_AUTH_TOKEN = sign({ ocId: 0, test: true, organismeCertificateur: fakeOc })
+const USER_DOC_AUTH_TOKEN = sign({ ocId: 999, test: true, organismeCertificateur: fakeOc })
 const USER_DOC_AUTH_HEADER = `Bearer ${USER_DOC_AUTH_TOKEN}`
 
 // start and stop server
@@ -73,7 +73,7 @@ describe('GET /api/v2/user/verify', () => {
       .set('Authorization', USER_DOC_AUTH_HEADER)
       .then((response) => {
         expect(response.status).toEqual(200)
-        expect(response.body).toHaveProperty('ocId', 0)
+        expect(response.body).toHaveProperty('ocId', 999)
       })
   })
 
@@ -360,13 +360,14 @@ describe('POST /api/v2/certification/parcelles', () => {
     }
   })
   const clientQuery = jest.fn(
-    async (sql, args) => {
-      if (args && args[6] && args[6].features && args[6].features.some((feature) => !feature.geometry)) {
+    async (sql, [,,,,, parcellaire] = []) => {
+      if (Array.isArray(parcellaire?.features) && parcellaire.features.some((feature) => !feature.geometry)) {
         // Simulate trigger error
         const err = new Error('No geometry')
         err.code = 'P0001'
         throw err
       }
+
       return ({ rows: [{ lorem: 'ipsum' }] })
     }
   )
@@ -410,6 +411,7 @@ describe('POST /api/v2/certification/parcelles', () => {
       nbObjetAcceptes: 1,
       nbObjetRefuses: 3,
       listeProblemes: [
+        // in case of error, check `createOrUpdateOperatorRecord()` SQL arity
         '[#2] champ dateAudit incorrect',
         '[#3] champ geom incorrect : Unexpected end of JSON input',
         '[#4] La donnée géographique est manquante ou invalide.'
