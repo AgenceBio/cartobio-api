@@ -35,6 +35,7 @@ const { sandboxSchema, internalSchema, hiddenSchema } = require('./lib/routes/in
 const { protectedWithToken, enforceSameCertificationBody } = require('./lib/routes/index.js')
 const { routeWithNumeroBio, routeWithOperatorId, routeWithRecordId, routeWithPacage } = require('./lib/routes/index.js')
 const { createFeatureSchema, createRecordSchema, deleteSingleFeatureSchema, patchFeatureCollectionSchema, patchRecordSchema, updateFeaturePropertiesSchema } = require('./lib/routes/records.js')
+const { postCertificationParcellesSchema, respondWithFeatureCollectionSchema } = require('./lib/routes/features.js')
 
 // Application is hosted on localhost:8000 by default
 const reportErrors = config.get('reportErrors')
@@ -209,7 +210,7 @@ app.register(async (app) => {
   /**
    * Retrieve the latest FeatureCollection for a given operator
    */
-  app.get('/api/v2/operateurs/:numeroBio/parcelles', deepmerge(protectedWithToken({ oc: true, cartobio: true }), routeWithNumeroBio, enforceSameCertificationBody), (request, reply) => {
+  app.get('/api/v2/operateurs/:numeroBio/parcelles', deepmerge(protectedWithToken({ oc: true, cartobio: true }), routeWithNumeroBio, enforceSameCertificationBody, respondWithFeatureCollectionSchema), (request, reply) => {
     return reply.code(200).send(request.record.parcelles)
   })
 
@@ -316,7 +317,7 @@ app.register(async (app) => {
    * It's essentially used during an import process to preview its content
    * @private
    */
-  app.post('/api/v2/convert/shapefile/geojson', deepmerge(protectedWithToken({ oc: true, cartobio: true })), async (request, reply) => {
+  app.post('/api/v2/convert/shapefile/geojson', deepmerge(protectedWithToken({ oc: true, cartobio: true }), respondWithFeatureCollectionSchema), async (request, reply) => {
     return parseShapefileArchive(request.file())
       .then(geojson => reply.send(geojson))
   })
@@ -326,7 +327,7 @@ app.register(async (app) => {
    * It's essentially used during an import process to preview its content
    * @private
    */
-  app.post('/api/v2/convert/geofolia/geojson', deepmerge(protectedWithToken()), async (request, reply) => {
+  app.post('/api/v2/convert/geofolia/geojson', deepmerge(protectedWithToken(), respondWithFeatureCollectionSchema), async (request, reply) => {
     return parseGeofoliaArchive(request.file())
       .then(geojson => reply.send(geojson))
   })
@@ -334,14 +335,14 @@ app.register(async (app) => {
   /**
    * Retrieves all features associated to a PACAGE as a workeable FeatureCollection
    */
-  app.get('/api/v2/import/pacage/:numeroPacage', deepmerge(protectedWithToken({ cartobio: true, oc: true }), routeWithPacage), async (request, reply) => {
+  app.get('/api/v2/import/pacage/:numeroPacage', deepmerge(protectedWithToken({ cartobio: true, oc: true }), routeWithPacage, respondWithFeatureCollectionSchema), async (request, reply) => {
     const { numeroPacage } = request.params
 
     return pacageLookup({ numeroPacage })
       .then(featureCollection => reply.send(featureCollection))
   })
 
-  app.post('/api/v2/certification/parcelles', deepmerge(protectedWithToken({ oc: true }), {
+  app.post('/api/v2/certification/parcelles', deepmerge(protectedWithToken({ oc: true }), postCertificationParcellesSchema, {
     preParsing: async (request, reply, payload) => {
       const stream = payload.pipe(stripBom())
 
