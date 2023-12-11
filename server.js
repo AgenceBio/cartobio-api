@@ -193,7 +193,6 @@ app.register(async (app) => {
    */
   app.get('/api/v2/operators', deepmerge(protectedWithToken({ cartobio: true })), (request, reply) => {
     const { id: userId } = request.decodedToken
-    console.log(userId)
 
     return fetchUserOperators(userId)
       .then(operators => reply.code(200).send({ operators }))
