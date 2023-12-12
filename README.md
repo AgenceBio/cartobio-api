@@ -21,8 +21,8 @@ métiers des organismes de certification du bio en France.
   - [Intégration des données du RPG bio](#intégration-des-données-du-rpg-bio)
   - [Générer les fonds de carte](#générer-les-fonds-de-carte)
   - [Exporter pour l'ASP](#exporter-pour-lasp)
-  - [La couche au 15 mai (tout)](#la-couche-au-15-mai-tout)
-  - [La couche au 12 octobre (C1 uniquement)](#la-couche-au-12-octobre-c1-uniquement)
+    - [La couche au 15 mai (tout)](#la-couche-au-15-mai-tout)
+    - [La couche au 12 octobre (C1 uniquement)](#la-couche-au-12-octobre-c1-uniquement)
 
 ## Fonctionnement
 
