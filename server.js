@@ -25,7 +25,7 @@ const Sentry = require('@sentry/node')
 const { ExtraErrorData } = require('@sentry/integrations')
 const { createSigner } = require('fast-jwt')
 
-const { fetchOperatorById, fetchOperatorByNumeroBio, fetchCustomersByOc, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators } = require('./lib/providers/agence-bio.js')
+const { fetchOperatorByNumeroBio, fetchCustomersByOc, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators } = require('./lib/providers/agence-bio.js')
 const { addRecordFeature, fetchLatestCustomersByControlBody, deleteRecord, pacageLookup, patchFeatureCollection, updateAuditRecordState, updateFeature, getParcellesStats, getDataGouvStats, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature } = require('./lib/providers/cartobio.js')
 const { parseShapefileArchive } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive } = require('./lib/providers/geofolia.js')
@@ -383,17 +383,15 @@ app.register(async (app) => {
   /**
    * Exchange a notification.agencebio.org token for a CartoBio token
    */
-  app.get('/api/v2/user/exchangeToken', deepmerge(protectedWithToken(), internalSchema), async (request, reply) => {
-    const { error, payload: decodedToken, token } = verifyNotificationAuthorization(request.headers.authorization)
+  app.get('/api/v2/user/exchangeToken', internalSchema, async (request, reply) => {
+    const { error, decodedToken, token } = verifyNotificationAuthorization(request.headers.authorization)
 
     if (error) {
       return new UnauthorizedApiError('Unable to verify the provided token', error)
     }
 
     const [operator, userProfile] = await Promise.all([
-      fetchOperatorById(decodedToken.operateurId),
-      // when this is addressed https://teams.microsoft.com/l/message/19:GfMlZn9iL0RZXQT_27z74_siyraKF8SINSLJRxDDRF41@thread.tacv2/1701690159883?tenantId=87edbd56-3cfc-4d27-a21e-e3aeb99322f6&groupId=ce63eb92-33ef-46e0-821a-e4c7d03f9e0d&parentMessageId=1701690159883&teamName=Cartobio%20%3C%3E%20Improba&channelName=General&createdTime=1701690159883&allowXTenantAccess=false
-      // fetchOperatorByNumeroBio(decodedToken.numeroBio),
+      fetchOperatorByNumeroBio(decodedToken.numeroBio, token),
       getUserProfileById(decodedToken.userId, token)
     ])
 
