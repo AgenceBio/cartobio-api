@@ -2,7 +2,7 @@
   "id": 99999,
   "nom": "Opérateur test",
   "denominationCourante": "Opérateur Test SARL",
-  "siret": "",
+  "siret": "999999999",
   "echeanceSiret": "",
   "numeroBio": "99999",
   "email": "test@example.com",

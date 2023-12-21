@@ -24,6 +24,7 @@ RUN npm run build:geo-data
 
 
 # Bundle app source
+COPY ./__mocks__ ./__mocks__
 COPY ./lib ./lib
 COPY ./migrations ./migrations
 COPY ./test ./test

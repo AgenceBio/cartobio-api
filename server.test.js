@@ -1,8 +1,10 @@
-const { server: app, close, ready } = require('./server')
+const app = require('./server.js')
 const config = require('./lib/config.js')
 const request = require('supertest')
 const { createSigner } = require('fast-jwt')
 const got = require('got')
+const fs = require('node:fs')
+const { join } = require('node:path')
 const db = require('./lib/db.js')
 
 const agencebioOperator = require('./lib/providers/__fixtures__/agence-bio-operateur.json')
@@ -22,15 +24,11 @@ const USER_DOC_AUTH_TOKEN = sign({ ocId: 999, test: true, organismeCertificateur
 const USER_DOC_AUTH_HEADER = `Bearer ${USER_DOC_AUTH_TOKEN}`
 
 // start and stop server
-beforeAll(() => ready())
-afterAll(() => close())
+beforeAll(() => app.ready())
+afterAll(() => app.close())
 afterEach(() => jest.clearAllMocks())
 
-jest.mock('got', () => ({
-  get: jest.fn(),
-  post: jest.fn()
-}))
-
+jest.mock('got')
 jest.mock('./lib/db.js', () => ({
   query: jest.fn(),
   connect: jest.fn()
@@ -45,7 +43,7 @@ db.connect.mockResolvedValue({
 
 describe('GET /', () => {
   test('responds with a 404', () => {
-    return request(app)
+    return request(app.server)
       .get('/')
       .type('json')
       .then((response) => {
@@ -58,7 +56,7 @@ describe('GET /', () => {
 
 describe('GET /api/version', () => {
   test('responds with package.json version value', () => {
-    return request(app)
+    return request(app.server)
       .get('/api/version')
       .type('json')
       .then((response) => {
@@ -67,7 +65,7 @@ describe('GET /api/version', () => {
   })
 
   test('responds with not found', () => {
-    return request(app)
+    return request(app.server)
       .get('/api/v1/version')
       .type('json')
       .then((response) => {
@@ -78,7 +76,7 @@ describe('GET /api/version', () => {
 
 describe('GET /api/v2/user/verify', () => {
   test('responds with cartobio decoded token', () => {
-    return request(app)
+    return request(app.server)
       .get('/api/v2/user/verify')
       .type('json')
       .set('Authorization', USER_DOC_AUTH_HEADER)
@@ -97,7 +95,7 @@ describe('GET /api/v2/user/verify', () => {
       }
     })
 
-    return request(app)
+    return request(app.server)
       .get('/api/v2/user/verify')
       .set('Authorization', fakeOcToken)
       .type('json')
@@ -109,7 +107,7 @@ describe('GET /api/v2/user/verify', () => {
 
 describe('GET /api/v2/test', () => {
   test('fails when JWT is missing, or invalid', () => {
-    return request(app)
+    return request(app.server)
       .get('/api/v2/test')
       .type('json')
       .then((response) => {
@@ -120,7 +118,7 @@ describe('GET /api/v2/test', () => {
   })
 
   test('responds well with an Authorization header', () => {
-    return request(app)
+    return request(app.server)
       .get('/api/v2/test')
       .type('json')
       .set('Authorization', USER_DOC_AUTH_HEADER)
@@ -132,7 +130,7 @@ describe('GET /api/v2/test', () => {
   })
 
   test('responds well with an access_token query string value', () => {
-    return request(app)
+    return request(app.server)
       .get('/api/v2/test')
       .query({ access_token: USER_DOC_AUTH_TOKEN })
       .type('json')
@@ -144,7 +142,7 @@ describe('GET /api/v2/test', () => {
 
 describe('POST /api/v2/convert/shapefile/geojson', () => {
   test('it converts a L93 zipped archive into WGS84 GeoJSON', () => {
-    return request(app)
+    return request(app.server)
       .post('/api/v2/convert/shapefile/geojson')
       .type('json')
       .set('Authorization', USER_DOC_AUTH_HEADER)
@@ -156,7 +154,7 @@ describe('POST /api/v2/convert/shapefile/geojson', () => {
   })
 
   test('it fails without auth', () => {
-    return request(app)
+    return request(app.server)
       .post('/api/v2/convert/shapefile/geojson')
       .type('json')
       .attach('archive', 'test/fixtures/telepac-parcelles.zip')
@@ -178,7 +176,7 @@ describe('GET /api/v2/certification/operators/search', () => {
     })
     queryMock.mockResolvedValueOnce({ rows: [record] })
 
-    return request(app)
+    return request(app.server)
       .post('/api/v2/certification/operators/search')
       .type('json')
       .send({ input: '1234' })
@@ -196,7 +194,7 @@ describe('GET /api/v2/certification/operators/search', () => {
     })
     queryMock.mockResolvedValueOnce({ rows: [record] })
 
-    return request(app)
+    return request(app.server)
       .post('/api/v2/certification/operators/search')
       .send({ input: 'ferme 1234' })
       .set('Authorization', USER_DOC_AUTH_HEADER)
@@ -228,7 +226,7 @@ describe('GET /api/v2/operateurs/:numeroBio/parcelles', () => {
     queryMock.mockResolvedValueOnce({ rows: [record] })
     queryMock.mockResolvedValueOnce({ rows: parcelles })
 
-    return request(app)
+    return request(app.server)
       .get('/api/v2/operateurs/1234/parcelles')
       .type('json')
       .set('Authorization', fakeOcToken)
@@ -247,7 +245,7 @@ describe('GET /api/v2/operateurs/:numeroBio/parcelles', () => {
     queryMock.mockResolvedValueOnce({ rows: [record] })
     queryMock.mockResolvedValueOnce({ rows: parcelles })
 
-    return request(app)
+    return request(app.server)
       .get('/api/v2/operateurs/1234/parcelles')
       .type('json')
       .set('Authorization', USER_DOC_AUTH_HEADER)
@@ -268,7 +266,7 @@ describe('GET /api/v2/operateurs/:numeroBio/parcelles', () => {
     getMock.mockResolvedValueOnce(null)
     queryMock.mockResolvedValueOnce({ rows: [] })
 
-    return request(app)
+    return request(app.server)
       .get('/api/v2/operateurs/1234/parcelles')
       .type('json')
       .set('Authorization', fakeOcToken)
@@ -285,7 +283,7 @@ describe('GET /api/v2/operateurs/:numeroBio/parcelles', () => {
       }
     })
 
-    return request(app)
+    return request(app.server)
       .get('/api/v2/operateurs/1234/parcelles')
       .type('json')
       .set('Authorization', fakeOcToken)
@@ -339,7 +337,7 @@ describe('PATCH /api/v2/audits/:recordId/parcelles', () => {
       operator: normalizeOperator(agencebioOperator)
     })
 
-    const response = await request(app)
+    const response = await request(app.server)
       .patch('/api/v2/audits/054f0d70-c3da-448f-823e-81fcf7c2bf6e/parcelles')
       .set('Authorization', USER_DOC_AUTH_HEADER)
       .type('json')
@@ -377,6 +375,109 @@ describe('PATCH /api/v2/audits/:recordId/parcelles', () => {
   })
 })
 
+describe('GET /api/v2/import/evv/:numeroEvv+:numeroBio', () => {
+  const xmlEvv = fs.readFileSync(join(__dirname, 'lib', 'providers', '__fixtures__/cvi-evv.xml'), { encoding: 'utf8' })
+  const xmlParcellaire = fs.readFileSync(join(__dirname, 'lib', 'providers', '__fixtures__/cvi-parcellaire.xml'), { encoding: 'utf8' })
+  const getMock = jest.mocked(got.get).mockName('getMock')
+  const queryMock = jest.mocked(db.query)
+
+  beforeEach(() => {
+    getMock.mockReturnValueOnce({
+      async json () {
+        return agencebioOperator
+      }
+    })
+
+    queryMock.mockResolvedValueOnce({ rows: [record] })
+    queryMock.mockResolvedValueOnce({ rows: [] })
+  })
+
+  test('it should return a feature collection', async () => {
+    got.__mocks.get.mockReturnValueOnce({
+      async text () {
+        return xmlEvv
+      }
+    })
+    got.__mocks.get.mockReturnValueOnce({
+      async text () {
+        return xmlParcellaire
+      }
+    })
+
+    const res = await request(app.server)
+      .get('/api/v2/import/evv/01234+99999')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveProperty('features.0.properties.cadastre', ['95476000AI0520'])
+  })
+
+  test('it should return a 404 with an unknown operator', async () => {
+    got.__mocks.get.mockReturnValueOnce({
+      async text () {
+        throw new got.HTTPError({ statusCode: 404 })
+      }
+    })
+
+    const res = await request(app.server)
+      .get('/api/v2/import/evv/01234+99999')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+
+    expect(res.status).toBe(404)
+    expect(res.body.error).toBe('Ce numéro EVV est introuvable')
+  })
+
+  test('it should return a 404 with empty features', async () => {
+    got.__mocks.get.mockReturnValueOnce({
+      async text () {
+        return xmlEvv
+      }
+    })
+    got.__mocks.get.mockReturnValueOnce({
+      async text () {
+        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><parcellaire><listePcv></listePcv></parcellaire>'
+      }
+    })
+
+    const res = await request(app.server)
+      .get('/api/v2/import/evv/01234+99999')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+
+    expect(res.status).toBe(404)
+    expect(res.body.error).toBe('Ce numéro EVV ne retourne pas de parcelles.')
+  })
+
+  test('it should return a 401 with a non-matching evv/siret', async () => {
+    got.__mocks.get.mockReturnValueOnce({
+      async text () {
+        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><evv><numero>01234</numero><siret>1111111111</siret><libelle>test viti</libelle></evv>'
+      }
+    })
+
+    const res = await request(app.server)
+      .get('/api/v2/import/evv/01234+99999')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+
+    expect(res.status).toBe(401)
+    expect(res.body.error).toMatch('ne correspondent pas')
+  })
+
+  test('it should return a 500 with an unavailable remote server', async () => {
+    got.__mocks.get.mockReturnValueOnce({
+      async text () {
+        throw new got.TimeoutError()
+      }
+    })
+
+    const res = await request(app.server)
+      .get('/api/v2/import/evv/01234+99999')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+
+    expect(res.status).toBe(500)
+    expect(res.body.message).toMatch('Impossible de communiquer')
+  })
+})
+
 describe('POST /api/v2/certification/parcelles', () => {
   const fakeOcToken = 'aaaa-bbbb-cccc-dddd'
   const postMock = jest.mocked(got.post)
@@ -400,14 +501,14 @@ describe('POST /api/v2/certification/parcelles', () => {
   )
 
   test('it fails without auth', async () => {
-    const res = await request(app).post('/api/v2/certification/parcelles').send(apiParcellaire)
+    const res = await request(app.server).post('/api/v2/certification/parcelles').send(apiParcellaire)
     expect(db.query).not.toHaveBeenCalled()
     expect(db.connect).not.toHaveBeenCalled()
     expect(res.status).toBe(401)
   })
 
   test('it responds with 400 when body is not valid JSON', async () => {
-    const res = await request(app)
+    const res = await request(app.server)
       .post('/api/v2/certification/parcelles')
       .set('Authorization', fakeOcToken)
       .send(apiParcellaire.toString() + ']')
@@ -419,7 +520,7 @@ describe('POST /api/v2/certification/parcelles', () => {
   })
 
   test('it responds with 400 when records are invalid and rollback modifications', async () => {
-    const res = await request(app)
+    const res = await request(app.server)
       .post('/api/v2/certification/parcelles')
       .set('Authorization', fakeOcToken)
       .send(apiParcellaire)
@@ -446,7 +547,7 @@ describe('POST /api/v2/certification/parcelles', () => {
     validApiParcellaire.splice(1, 1)
     validApiParcellaire[1].parcelles[0].geom = '[[[0,0],[0,1],[1,1],[1,0],[0,0]]]'
     validApiParcellaire[2].parcelles[0].geom = '[[[0,0],[0,1],[1,1],[1,0],[0,0]]]'
-    const res = await request(app)
+    const res = await request(app.server)
       .post('/api/v2/certification/parcelles')
       .set('Authorization', fakeOcToken)
       .send(validApiParcellaire)
@@ -475,7 +576,7 @@ describe('GET /api/v2/certification/parcellaire/:numeroBio', () => {
     const queryMock = jest.mocked(db.query)
     queryMock.mockResolvedValueOnce({ rows: [] })
 
-    const res = await request(app)
+    const res = await request(app.server)
       .get('/api/v2/certification/parcellaire/1234')
       .set('Authorization', fakeOcToken)
     expect(res.status).toBe(404)
@@ -486,7 +587,7 @@ describe('GET /api/v2/certification/parcellaire/:numeroBio', () => {
     queryMock.mockResolvedValueOnce({ rows: [record] })
     queryMock.mockResolvedValueOnce({ rows: parcelles })
 
-    const res = await request(app)
+    const res = await request(app.server)
       .get('/api/v2/certification/parcellaire/1234')
       .set('Authorization', fakeOcToken)
     expect(res.status).toBe(200)

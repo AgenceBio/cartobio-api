@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<parcellaire>
+  <codeEvv>9547600021</codeEvv>
+  <listePcv>
+    <pcv>
+      <codeDepartement>95</codeDepartement>
+      <codeDSF>0</codeDSF>
+      <codeInseeCommune>476</codeInseeCommune>
+      <prefixe></prefixe>
+      <section>AI</section>
+      <plan>0520</plan>
+      <contenanceCadastrale>0.0305</contenanceCadastrale>
+      <listeSpcv>
+        <spcv>
+          <numeroOrdre>00001</numeroOrdre>
+          <campagnePlantation>2013-2014</campagnePlantation>
+          <codeCepage>1141</codeCepage>
+          <codePorteGreffe></codePorteGreffe>
+          <codeProduit>4B999   </codeProduit>
+          <codeModeFaireValoir>PRO</codeModeFaireValoir>
+          <ecartementPied>100.0</ecartementPied>
+          <ecartementRang>200.0</ecartementRang>
+          <etatGestion>PL</etatGestion>
+          <dateRealisationTravaux>2014-02-01</dateRealisationTravaux>
+          <motif>PL-PL</motif>
+          <superficieSPCV>0.0305</superficieSPCV>
+          <numeroAP></numeroAP>
+          <numeroAPRA></numeroAPRA>
+        </spcv>
+        <spcv>
+          <numeroOrdre>00005</numeroOrdre>
+          <campagnePlantation>2001-2002</campagnePlantation>
+          <codeCepage>1591</codeCepage>
+          <codePorteGreffe>9909</codePorteGreffe>
+          <codeProduit>4R999   </codeProduit>
+          <codeModeFaireValoir>FER</codeModeFaireValoir>
+          <ecartementPied>100.0</ecartementPied>
+          <ecartementRang>300.0</ecartementRang>
+          <etatGestion>AR</etatGestion>
+          <dateRealisationTravaux>2018-05-03</dateRealisationTravaux>
+          <motif>AR-FRI</motif>
+          <superficieSPCV>0.045</superficieSPCV>
+          <numeroAP></numeroAP>
+          <numeroAPRA></numeroAPRA>
+        </spcv>
+      </listeSpcv>
+    </pcv>
+    <pcv>
+      <codeDepartement>66</codeDepartement>
+      <codeDSF>0</codeDSF>
+      <codeInseeCommune>198</codeInseeCommune>
+      <prefixe></prefixe>
+      <section> A</section>
+      <plan>1020</plan>
+      <contenanceCadastrale>0.045</contenanceCadastrale>
+      <listeSpcv>
+        <spcv>
+          <numeroOrdre>00003</numeroOrdre>
+          <campagnePlantation>2022-2023</campagnePlantation>
+          <codeCepage>1135</codeCepage>
+          <codePorteGreffe></codePorteGreffe>
+          <codeProduit>3R664   </codeProduit>
+          <codeModeFaireValoir></codeModeFaireValoir>
+          <ecartementPied>80.0</ecartementPied>
+          <ecartementRang>225.0</ecartementRang>
+          <etatGestion>PL</etatGestion>
+          <dateRealisationTravaux>2023-06-30</dateRealisationTravaux>
+          <motif>PL-PN</motif>
+          <superficieSPCV>0.15</superficieSPCV>
+          <numeroAP>2022PN018227</numeroAP>
+          <numeroAPRA></numeroAPRA>
+        </spcv>
+        <spcv>
+          <numeroOrdre>00002</numeroOrdre>
+          <campagnePlantation>2008-2009</campagnePlantation>
+          <codeCepage>1141</codeCepage>
+          <codePorteGreffe></codePorteGreffe>
+          <codeProduit>2B119M  </codeProduit>
+          <codeModeFaireValoir>FER</codeModeFaireValoir>
+          <ecartementPied>80.0</ecartementPied>
+          <ecartementRang>215.0</ecartementRang>
+          <etatGestion>PL</etatGestion>
+          <dateRealisationTravaux>2009-05-15</dateRealisationTravaux>
+          <motif>PL-RPOC</motif>
+          <superficieSPCV>0.0262</superficieSPCV>
+          <numeroAP></numeroAP>
+          <numeroAPRA></numeroAPRA>
+        </spcv>
+      </listeSpcv>
+    </pcv>
+    <pcv>
+      <codeDepartement>01</codeDepartement>
+      <codeDSF>0</codeDSF>
+      <codeInseeCommune>255</codeInseeCommune>
+      <prefixe></prefixe>
+      <section> A</section>
+      <plan>1996</plan>
+      <contenanceCadastrale>0.02</contenanceCadastrale>
+      <listeSpcv/>
+    </pcv>
+  </listePcv>
+</parcellaire>
