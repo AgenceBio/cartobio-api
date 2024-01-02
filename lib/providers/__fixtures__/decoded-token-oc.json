@@ -15,5 +15,9 @@
       "id": 2,
       "nom": "Chargé de certification"
     }
-  ]
+  ],
+  "mainGroup": {
+    "id": 1,
+    "nom": "Auditeur"
+  }
 }
