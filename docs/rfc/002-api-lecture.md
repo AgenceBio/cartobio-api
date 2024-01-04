@@ -78,7 +78,7 @@ Le parcellaire est représenté en utilisant le [format standardisé **GeoJSON**
 | `niveauConversion` | `string` | Niveau de conversion en Agriculture Biologique ([cf. niveaux de conversion](#valeurs-possibles--niveaux-de-conversion)) |
 | `dateEngagement`   | `string` | Date d'engagement en Agriculture Biologique de la parcelle (si applicable) (au format [ISO 8601])                       |
 | `commentaire`      | `string` | Notes d'audit spécifiques à la parcelle                                                                                 |
-| `annotations`      | `array`  | Liste d'étiquettes ([cf. Annotations](#valeurs-possibles--annotations))                                                 |
+| `annotations`      | `json`   | Liste d'étiquettes ([cf. Annotations](#valeurs-possibles--annotations))                                                 |
 
 
 ##### Propriétés facultatives
@@ -132,13 +132,13 @@ Le parcellaire est représenté en utilisant le [format standardisé **GeoJSON**
 
 #### Valeurs possibles : annotations
 
-| Valeur                 | Description             |
-|------------------------|-------------------------|
-| `reduction-conversion` | Réduction de conversion |
-| `downgraded`           | Déclassement            |
-| `risky`                | À risque                |
-| `sampled`              | Prélèvement effectué    |
-| `surveyed`             | Visitée                 |
+| Clés                   | Valeurs possibles      | Description                     |
+|------------------------|------------------------|---------------------------------|
+| `reduction-conversion` | `accepted`, `rejected` | Réduction de conversion         |
+| `downgraded`           | `accepted`, `rejected` | Déclassement                    |
+| `risky`                | `true`                 | À risque                        |
+| `sampled`              | `true`                 | Prélèvement effectué            |
+| `surveyed`             | `true`                 | Visitée                         |
 
 #### Exemple
 
