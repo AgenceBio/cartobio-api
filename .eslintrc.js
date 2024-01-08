@@ -24,7 +24,7 @@ module.exports = {
     ecmaVersion: 2020
   },
   root: true,
-  ignorePatterns: ['**/*.d.ts'],
+  ignorePatterns: ['**/*.d.ts', 'migrations/*.js'],
   rules: {
     'vue/multi-word-component-names': 'off',
     '@typescript-eslint/no-var-requires': 'off'
