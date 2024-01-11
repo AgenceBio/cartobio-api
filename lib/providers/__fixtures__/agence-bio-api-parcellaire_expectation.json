@@ -1,6 +1,6 @@
-[
-  "99999",
-  {
+{
+  "numeroBio": "99999",
+  "data": {
     "ocId": 1,
     "ocLabel": "Ecocert France",
     "numeroPacage": "084012821",
@@ -43,7 +43,11 @@
             "remoteId": "45742",
             "CAMPAGNE": 2022,
             "cultures": [
-              { "CPF": "01.92", "surface": 0.23, "variete": "" }
+              {
+                "CPF": "01.92",
+                "surface": 0.23,
+                "variete": ""
+              }
             ],
             "NUMERO_I": "12",
             "NUMERO_P": "5",
@@ -120,7 +124,11 @@
             "remoteId": 45758,
             "CAMPAGNE": 2022,
             "cultures": [
-              { "CPF": "01.21.12", "surface": 0.66, "variete": "Chardonnay" }
+              {
+                "CPF": "01.21.12",
+                "surface": 0.66,
+                "variete": "Chardonnay"
+              }
             ],
             "NUMERO_I": "49",
             "NUMERO_P": "20",
@@ -165,7 +173,11 @@
             "remoteId": "45736",
             "CAMPAGNE": 2022,
             "cultures": [
-              { "CPF": "01.21.12", "surface": 2.01, "variete": "" }
+              {
+                "CPF": "01.21.12",
+                "surface": 2.01,
+                "variete": ""
+              }
             ],
             "NUMERO_I": "13",
             "NUMERO_P": "1",
@@ -210,7 +222,11 @@
             "remoteId": "45737",
             "CAMPAGNE": 2022,
             "cultures": [
-              { "CPF": "01.21.12", "surface": 1, "variete": "" }
+              {
+                "CPF": "01.21.12",
+                "surface": 1,
+                "variete": ""
+              }
             ],
             "NUMERO_I": "49",
             "NUMERO_P": "",
@@ -223,4 +239,4 @@
       ]
     }
   }
-]
+}
