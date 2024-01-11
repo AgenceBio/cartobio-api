@@ -125,7 +125,7 @@ app.register(fastifyOauth, {
 })
 
 // Routes to protect with a JSON Web Token
-app.decorateRequest('decodedToken', null)
+app.decorateRequest('user', null)
 app.decorateRequest('organismeCertificateur', null)
 
 // Requests can be decorated by a given Record too (associated to a numeroBio/recordId)
@@ -168,7 +168,7 @@ app.register(async (app) => {
    */
   app.post('/api/v2/certification/operators/search', deepmerge(protectedWithToken()), (request, reply) => {
     const input = request.body.input?.trim()
-    const { id: ocId } = request.decodedToken.organismeCertificateur
+    const { id: ocId } = request.user.organismeCertificateur
 
     const [nom, numeroBio] = /^\d+$/.test(input) ? ['', input] : [input, '']
 
@@ -181,7 +181,7 @@ app.register(async (app) => {
    * @TODO control and derive ocId credentials
    */
   app.get('/api/v2/certification/operators/latest', deepmerge(protectedWithToken()), (request, reply) => {
-    const { id: ocId } = request.decodedToken.organismeCertificateur
+    const { id: ocId } = request.user.organismeCertificateur
 
     return fetchLatestCustomersByControlBody({ ocId })
       .then(operators => reply.code(200).send({ operators }))
@@ -192,7 +192,7 @@ app.register(async (app) => {
    * Retrieve a given operators for a given user
    */
   app.get('/api/v2/operators', deepmerge(protectedWithToken({ cartobio: true })), (request, reply) => {
-    const { id: userId } = request.decodedToken
+    const { id: userId } = request.user
 
     return fetchUserOperators(userId)
       .then(operators => reply.code(200).send({ operators }))
@@ -229,11 +229,11 @@ app.register(async (app) => {
     protectedWithToken()
   ), async (request, reply) => {
     const { numeroBio } = request.params
-    const { id: ocId, nom: ocLabel } = request.decodedToken.organismeCertificateur
+    const { id: ocId, nom: ocLabel } = request.record.operator.organismeCertificateur
 
     const record = await createOrUpdateOperatorRecord(
-      { ...request.body, numeroBio, ocId, ocLabel },
-      { decodedToken: request.decodedToken, oldRecord: request.record }
+      { numeroBio, ocId, ocLabel, ...request.body },
+      { user: request.user, oldRecord: request.record }
     )
     return reply.code(200).send(record)
   })
@@ -243,9 +243,9 @@ app.register(async (app) => {
    * It also keep track of new HistoryEvent along the way, depending who and when you update feature properties
    */
   app.patch('/api/v2/audits/:recordId', deepmerge(protectedWithToken(), patchRecordSchema, routeWithRecordId), (request, reply) => {
-    const { body: patch, decodedToken, record } = request
+    const { body: patch, user, record } = request
 
-    return updateAuditRecordState({ decodedToken, record }, patch)
+    return updateAuditRecordState({ user, record }, patch)
       .then(record => reply.code(200).send(record))
   })
 
@@ -254,9 +254,9 @@ app.register(async (app) => {
    * TODO: do not hard delete but purge features while keeping its history
    */
   app.delete('/api/v2/audits/:recordId', deepmerge(protectedWithToken(), routeWithRecordId), (request, reply) => {
-    const { decodedToken, record } = request
+    const { user, record } = request
 
-    return deleteRecord({ decodedToken, record })
+    return deleteRecord({ user, record })
       .then(result => reply.code(200).send(result))
   })
 
@@ -265,9 +265,9 @@ app.register(async (app) => {
    */
   app.post('/api/v2/audits/:recordId/parcelles', deepmerge(protectedWithToken(), createFeatureSchema, routeWithRecordId), (request, reply) => {
     const { feature } = request.body
-    const { decodedToken, record } = request
+    const { user, record } = request
 
-    return addRecordFeature({ decodedToken, record }, feature)
+    return addRecordFeature({ user, record }, feature)
       .then(result => reply.code(200).send(result))
   })
 
@@ -277,9 +277,9 @@ app.register(async (app) => {
    * It's non-destructive — matching ids are updated, new ids are added, non-existent ids are kept as is
    */
   app.patch('/api/v2/audits/:recordId/parcelles', deepmerge(protectedWithToken(), patchFeatureCollectionSchema, routeWithRecordId), (request, reply) => {
-    const { body: featureCollection, decodedToken, record } = request
+    const { body: featureCollection, user, record } = request
 
-    return patchFeatureCollection({ decodedToken, record }, featureCollection.features)
+    return patchFeatureCollection({ user, record }, featureCollection.features)
       .then(record => reply.code(200).send(record))
   })
 
@@ -289,10 +289,10 @@ app.register(async (app) => {
    * It's destructive — non-matching ids are removed (ie: crops)
    */
   app.put('/api/v2/audits/:recordId/parcelles/:featureId', deepmerge(protectedWithToken(), updateFeaturePropertiesSchema, routeWithRecordId), (request, reply) => {
-    const { body: feature, decodedToken, record } = request
+    const { body: feature, user, record } = request
     const { featureId } = request.params
 
-    return updateFeature({ featureId, decodedToken, record }, feature)
+    return updateFeature({ featureId, user, record }, feature)
       .then(record => reply.code(200).send(record))
   })
 
@@ -300,11 +300,11 @@ app.register(async (app) => {
    * Delete a single feature
    */
   app.delete('/api/v2/audits/:recordId/parcelles/:featureId', deepmerge(protectedWithToken(), deleteSingleFeatureSchema, routeWithRecordId), (request, reply) => {
-    const { decodedToken, record } = request
+    const { user, record } = request
     const { reason } = request.body
     const { featureId } = request.params
 
-    return deleteSingleFeature({ featureId, decodedToken, record }, { reason })
+    return deleteSingleFeature({ featureId, user, record }, { reason })
       .then(record => reply.code(200).send(record))
   })
 
@@ -375,9 +375,9 @@ app.register(async (app) => {
   })
 
   app.get('/api/v2/user/verify', deepmerge(protectedWithToken({ oc: true, cartobio: true }), sandboxSchema, internalSchema), (request, reply) => {
-    const { decodedToken, organismeCertificateur } = request
+    const { user, organismeCertificateur } = request
 
-    return reply.send(decodedToken ?? organismeCertificateur)
+    return reply.send(user ?? organismeCertificateur)
   })
 
   /**
