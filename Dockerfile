@@ -29,6 +29,7 @@ COPY ./test ./test
 COPY ./*.js ./
 COPY ./.eslintrc.js ./.eslintrc.js
 COPY ./jsconfig.json ./jsconfig.json
+COPY ./tsconfig.json ./tsconfig.json
 
 EXPOSE  8000
 ENV     NODE_ENV  production
