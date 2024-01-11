@@ -49,6 +49,7 @@
     "@turf/centroid": "^6.5.0",
     "@types/convict": "^6.1.4",
     "@types/geojson": "^7946.0.10",
+    "@types/jest": "^29.5.11",
     "@types/node": "^18.11.18",
     "@types/pg": "^8.10.3",
     "@typescript-eslint/eslint-plugin": "^5.47.1",

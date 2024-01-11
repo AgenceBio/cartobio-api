@@ -363,17 +363,6 @@ app.register(async (app) => {
     })
   })
 
-  app.post('/api/webhooks/mattermost', deepmerge(protectedWithToken({ mattermost: true }), internalSchema), async (request, reply) => {
-    const { user_name: userName, command } = request.body
-
-    request.log.info('Incoming mattermost command (%s)', command)
-
-    reply.send({
-      response_type: 'ephemeral',
-      text: `Coucou ${userName} :wave_light_skin_tone:`
-    })
-  })
-
   app.get('/api/v2/user/verify', deepmerge(protectedWithToken({ oc: true, cartobio: true }), sandboxSchema, internalSchema), (request, reply) => {
     const { user, organismeCertificateur } = request
 
