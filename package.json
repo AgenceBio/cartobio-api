@@ -69,14 +69,14 @@
   "scripts": {
     "load:communes-table": "node bin/build-communes-table.js",
     "build:communes-data": "node bin/build-communes-data.js",
-    "build:types": "tsc lib/outputs/*.js --declaration --allowJs --emitDeclarationOnly --outDir docs/types",
     "export-asp": "node bin/export-asp.js --numerobio-path cartobio-asp.csv | ogr2ogr cartobio-asp.gpkg /vsistdin/",
     "export-asp-c1": "node bin/export-asp.js --only-c1 --numerobio-path cartobio-asp-c1.csv | ogr2ogr cartobio-asp-c1.gpkg /vsistdin/",
     "postinstall": "npm run build:communes-data",
     "prestart": "./node_modules/.bin/db-migrate up && npm run load:communes-table",
     "lint": "eslint --ignore-pattern 'migrations/*' .",
     "test": "NODE_ENV=test jest --detectOpenHandles --collectCoverage --coverageReporters html --coverageReporters text-summary --coverageReporters lcovonly",
-    "posttest": "npm run lint && npm run build:types",
+    "posttest": "npm run lint && npm run test:types",
+    "test:types": "tsc",
     "prewatch": "node ./node_modules/.bin/db-migrate up",
     "watch": "nodemon server.js"
   },
