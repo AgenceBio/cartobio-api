@@ -4,6 +4,12 @@ node_modules
 
 # built with npm run build:communes-centroids
 data/communes.json
+data/antilles.json
+data/guyane.json
+data/reunion.json
+data/mayotte.json
+data/metropole.json
+
 cartobio-asp*.gpkg*
 
 # types
