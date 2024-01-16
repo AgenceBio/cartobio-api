@@ -12,6 +12,6 @@
     "resolveJsonModule": false,
     "lib": [
       "es2022"
-    ],
+    ]
   }
 }
