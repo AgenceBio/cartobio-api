@@ -40,7 +40,7 @@ Il est possible de spécifier des filtres pour obtenir les données d'une versio
 
 | Paramètre       | Type     | Description                                                                                            |
 |-----------------|----------|--------------------------------------------------------------------------------------------------------|
-| `anneeCampagne` | `string` | Année de campagne de certification                                                                     |
+| `anneeAudit` | `string` | Année de l'audit                                                                     |
 | `statut`        | `string` | Statut de certification ([cf. statuts de certification](#valeurs-possibles--statuts-de-certification)) |
 
 ```bash
