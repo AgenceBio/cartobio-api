@@ -7,3 +7,8 @@ import {AgenceBioNormalizedOperator} from "./operator";
 export type NormalizedRecord = DBOperatorRecord & {
     operator?: AgenceBioNormalizedOperator;
 };
+
+export type NormalizedMayBeRecord = NormalizedRecord | {
+    metadata: any;
+    operator: AgenceBioNormalizedOperator;
+}
