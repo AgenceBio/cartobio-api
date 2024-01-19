@@ -15,7 +15,7 @@ export type CartoBioFeatureProperties = GeoJsonProperties & {
     PACAGE?: string;
     NUMERO_I?: string;
     NUMERO_P?: string;
-    cadastre?: string;
+    cadastre?: string[];
     /**
      * @deprecated
      */
