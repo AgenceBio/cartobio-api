@@ -33,6 +33,23 @@ et en production.
 Ce jeton peut être testé sur l'API notifications sur
 le chemin `/api/oc/check-token`.
 
+### Filtres et versions
+
+Par défaut, l'API renvoie les données de la version la plus récemment modifiée du parcellaire.
+Il est possible de spécifier des filtres pour obtenir les données d'une version spécifique.
+
+| Paramètre       | Type     | Description                                                                                            |
+|-----------------|----------|--------------------------------------------------------------------------------------------------------|
+| `anneeAudit` | `string` | Année de l'audit                                                                     |
+| `statut`        | `string` | Statut de certification ([cf. statuts de certification](#valeurs-possibles--statuts-de-certification)) |
+
+```bash
+curl -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: ...' \
+  https://cartobio.agencebio.org/api/v2/certification/parcellaire/:numeroBio?anneeCampagne=2024&statut=OPERATOR_DRAFT
+```
+
 ### Réponses
 
 #### Codes HTTP
