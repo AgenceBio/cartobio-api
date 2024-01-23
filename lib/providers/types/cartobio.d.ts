@@ -1,7 +1,8 @@
 import {EtatProduction} from "../../outputs/record";
-import {CartoBioFeatureCollection} from "../../outputs/types/features";
+import {CartobioCulture} from "../../outputs/types/features";
 import {HistoryEntry} from "../../outputs/types/history";
 import {AgenceBioUserGroup, OrganismeCertificateur} from "./agence-bio";
+import {Polygon} from "geojson";
 
 export type InputApiRecord = {
     numeroBio: number | string;
@@ -40,11 +41,14 @@ export type DBOperatorRecord = {
     certification_state: string;
     created_at: string;
     updated_at: string;
-    parcelles: CartoBioFeatureCollection;
+    parcelles?: DBParcelle[];
     metadata: any;
     audit_history: HistoryEntry[];
     audit_notes: string;
     audit_demandes: string;
+};
+export type DBOperatorRecordWithParcelles = DBOperatorRecord & {
+    parcelles: DBParcelle[];
 };
 export type CartoBioUser = {
     id: number;
@@ -59,4 +63,21 @@ export type CartoBioUser = {
 export type CartoBioOCUser = CartoBioUser & {
     organismeCertificateur: OrganismeCertificateur;
 };
-
+type DBParcelle = {
+    record_id: string;
+    id: string;
+    geometry: Polygon;
+    commune?: string;
+    cultures: CartobioCulture[];
+    conversion_niveau: EtatProduction;
+    engagement_date?: string;
+    commentaire?: string;
+    annotations?: object[]; // Replace with actual Annotations type
+    created?: string;
+    updated?: string;
+    name?: string;
+    numero_pacage?: string;
+    numero_ilot_pac?: string;
+    numero_parcelle_pac?: string;
+    reference_cadastre?: string[];
+};

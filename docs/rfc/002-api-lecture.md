@@ -182,7 +182,7 @@ Exemple de fichier JSON relatif à un audit de 1 parcelles avec 1 culture perman
         },
         "properties": {
           "id": 45742,
-          "annotations": ["sampled", "surveyed"],
+          "annotations": { "surveyed": true },
           "commentaire": "Visitée, Prélèvement effectué",
           "commune": "97411",
           "dateAjout": "2022-03-13:37:42Z",
