@@ -4,7 +4,7 @@
   "description": "api for cartobio",
   "main": "app.js",
   "files": [
-    "**/*.td.s"
+    "**/*.d.ts"
   ],
   "bin": {
     "cartobio-export-asp": "./bin/export-asp.js"
