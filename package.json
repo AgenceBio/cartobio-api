@@ -3,6 +3,9 @@
   "version": "2.13.2",
   "description": "api for cartobio",
   "main": "app.js",
+  "files": [
+    "**/*.td.s"
+  ],
   "bin": {
     "cartobio-export-asp": "./bin/export-asp.js"
   },
@@ -73,13 +76,13 @@
     "build:geo-data": "node bin/build-geo-data.js",
     "export-asp": "node bin/export-asp.js --numerobio-path cartobio-asp.csv | ogr2ogr cartobio-asp.gpkg /vsistdin/",
     "export-asp-c1": "node bin/export-asp.js --only-c1 --numerobio-path cartobio-asp-c1.csv | ogr2ogr cartobio-asp-c1.gpkg /vsistdin/",
-    "postinstall": "npm run build:geo-data",
-    "prestart": "./node_modules/.bin/db-migrate up && npm run load:communes-table",
+    "prestart": "./node_modules/.bin/db-migrate up && npm run build:geo-data && npm run load:communes-table",
     "lint": "eslint --ignore-pattern 'migrations/*' .",
     "test": "NODE_ENV=test jest --detectOpenHandles --collectCoverage --coverageReporters html --coverageReporters text-summary --coverageReporters lcovonly",
+    "pretest": "npm run build:geo-data",
     "posttest": "npm run lint && npm run test:types",
     "test:types": "tsc",
-    "prewatch": "node ./node_modules/.bin/db-migrate up",
+    "prewatch": "./node_modules/.bin/db-migrate up && npm run build:geo-data && npm run load:communes-table",
     "watch": "nodemon server.js"
   },
   "repository": {
