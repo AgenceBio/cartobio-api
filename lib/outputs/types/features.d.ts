@@ -1,6 +1,6 @@
-import {Feature, FeatureCollection, GeoJsonProperties, Polygon} from "geojson";
+import {Feature, FeatureCollection, Polygon} from "geojson";
 
-export type CartoBioFeatureProperties = GeoJsonProperties & {
+export type CartoBioFeatureProperties = {
     id?: string|number;
     createdAt?: string;
     updatedAt?: string;
@@ -24,6 +24,10 @@ export type CartoBioFeatureProperties = GeoJsonProperties & {
      * @deprecated
      */
     TYPE?: string;
+    /**
+     * @deprecated
+     */
+    SURF?: number;
     /**
      * @deprecated
      */

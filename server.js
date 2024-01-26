@@ -45,6 +45,7 @@ const DURATION_ONE_DAY = DURATION_ONE_HOUR * 24
 
 const db = require('./lib/db.js')
 const { FastifyErrorHandler, UnauthorizedApiError } = require('./lib/errors.js')
+const { normalizeRecord } = require('./lib/outputs/record')
 const sign = createSigner({ key: config.get('jwtSecret'), expiresIn: DURATION_ONE_DAY * 30 })
 
 // Sentry error reporting setup
@@ -235,7 +236,7 @@ app.register(async (app) => {
       { numeroBio, ocId, ocLabel, ...request.body },
       { user: request.user, oldRecord: request.record }
     )
-    return reply.code(200).send(record)
+    return reply.code(200).send(normalizeRecord({ record, operator: request.record.operator }))
   })
 
   /**
@@ -268,7 +269,7 @@ app.register(async (app) => {
     const { user, record } = request
 
     return addRecordFeature({ user, record }, feature)
-      .then(result => reply.code(200).send(result))
+      .then(record => reply.code(200).send(normalizeRecord({ record, operator: request.record.operator })))
   })
 
   /**
@@ -280,7 +281,7 @@ app.register(async (app) => {
     const { body: featureCollection, user, record } = request
 
     return patchFeatureCollection({ user, record }, featureCollection.features)
-      .then(record => reply.code(200).send(record))
+      .then(record => reply.code(200).send(normalizeRecord({ record, operator: request.record.operator })))
   })
 
   /**
@@ -293,7 +294,7 @@ app.register(async (app) => {
     const { featureId } = request.params
 
     return updateFeature({ featureId, user, record }, feature)
-      .then(record => reply.code(200).send(record))
+      .then(record => reply.code(200).send(normalizeRecord({ record, operator: request.record.operator })))
   })
 
   /**
@@ -305,7 +306,7 @@ app.register(async (app) => {
     const { featureId } = request.params
 
     return deleteSingleFeature({ featureId, user, record }, { reason })
-      .then(record => reply.code(200).send(record))
+      .then(record => reply.code(200).send(normalizeRecord({ record, operator: request.record.operator })))
   })
 
   /**

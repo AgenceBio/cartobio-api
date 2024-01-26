@@ -6,9 +6,12 @@ const got = require('got')
 const db = require('./lib/db.js')
 
 const agencebioOperator = require('./lib/providers/__fixtures__/agence-bio-operateur.json')
-const record = require('./lib/providers/__fixtures__/record-with-features.json')
-const patchedRecordExpectation = require('./lib/providers/__fixtures__/record-with-features-patched.json')
+const record = require('./lib/providers/__fixtures__/record.json')
+const parcelles = require('./lib/providers/__fixtures__/parcelles.json')
+const parcellesPatched = require('./lib/providers/__fixtures__/parcelles-patched.json')
 const apiParcellaire = require('./lib/providers/__fixtures__/agence-bio-api-parcellaire.json')
+const { normalizeRecord } = require('./lib/outputs/record')
+const { normalizeOperator } = require('./lib/outputs/operator')
 
 const sign = createSigner({ key: config.get('jwtSecret') })
 
@@ -31,6 +34,13 @@ jest.mock('./lib/db.js', () => ({
   query: jest.fn(),
   connect: jest.fn()
 }))
+
+const clientQuery = jest.fn()
+const clientRelease = jest.fn()
+db.connect.mockResolvedValue({
+  query: clientQuery,
+  release: clientRelease
+})
 
 describe('GET /', () => {
   test('responds with a 404', () => {
@@ -215,6 +225,7 @@ describe('GET /api/v2/operateurs/:numeroBio/parcelles', () => {
       }
     })
     queryMock.mockResolvedValueOnce({ rows: [record] })
+    queryMock.mockResolvedValueOnce({ rows: parcelles })
 
     return request(app)
       .get('/api/v2/operateurs/1234/parcelles')
@@ -233,6 +244,7 @@ describe('GET /api/v2/operateurs/:numeroBio/parcelles', () => {
       }
     })
     queryMock.mockResolvedValueOnce({ rows: [record] })
+    queryMock.mockResolvedValueOnce({ rows: parcelles })
 
     return request(app)
       .get('/api/v2/operateurs/1234/parcelles')
@@ -288,7 +300,9 @@ describe('PATCH /api/v2/audits/:recordId/parcelles', () => {
   const postMock = jest.mocked(got.post)
   const queryMock = jest.mocked(db.query)
 
-  test('it updates only the patched properties of the features', () => {
+  test('it updates only the patched properties of the features', async () => {
+    clientQuery.mockClear()
+    queryMock.mockClear()
     // 1. fetchAuthToken
     postMock.mockReturnValueOnce({
       async json () {
@@ -298,16 +312,33 @@ describe('PATCH /api/v2/audits/:recordId/parcelles', () => {
 
     // 2. enforceRecord + fetchOperatorById
     queryMock.mockResolvedValueOnce({ rows: [record] })
+    queryMock.mockResolvedValueOnce({ rows: parcelles })
     getMock.mockReturnValueOnce({
       async json () {
         return agencebioOperator
       }
     })
 
-    // 3. UPDATE
-    queryMock.mockResolvedValueOnce({ rows: [patchedRecordExpectation] })
+    // 3. BEGIN
+    clientQuery.mockResolvedValueOnce(null)
+    // 4. UPDATE cartobio_operator
+    clientQuery.mockResolvedValueOnce({ rows: [record] })
+    // 5. UPDATE cartobio_parcelles
+    for (let i = 0; i < 2; i++) {
+      clientQuery.mockResolvedValueOnce({ rows: [parcellesPatched[i]] })
+    }
+    // joinRecordParcelles
+    queryMock.mockResolvedValueOnce({ rows: parcellesPatched })
 
-    return request(app)
+    const patchedRecordExpectation = normalizeRecord({
+      record: {
+        ...record,
+        parcelles: parcellesPatched
+      },
+      operator: normalizeOperator(agencebioOperator)
+    })
+
+    const response = await request(app)
       .patch('/api/v2/audits/054f0d70-c3da-448f-823e-81fcf7c2bf6e/parcelles')
       .set('Authorization', USER_DOC_AUTH_HEADER)
       .type('json')
@@ -338,15 +369,10 @@ describe('PATCH /api/v2/audits/:recordId/parcelles', () => {
           }
         ]
       })
-      .then((response) => {
-        expect(response.status).toBe(200)
-        expect(response.body).toEqual(patchedRecordExpectation)
-        expect(queryMock.mock.lastCall).toHaveProperty('1', [
-          '054f0d70-c3da-448f-823e-81fcf7c2bf6e',
-          patchedRecordExpectation.parcelles,
-          null
-        ])
-      })
+
+    expect(response.status).toBe(200)
+    expect(response.body).toEqual(patchedRecordExpectation)
+    expect(clientRelease).toHaveBeenCalled()
   })
 })
 
@@ -359,23 +385,18 @@ describe('POST /api/v2/certification/parcelles', () => {
       return { id: 999, nom: 'CartobiOC', numeroControleEu: 'FR-999' }
     }
   })
-  const clientQuery = jest.fn(
-    async (sql, [,,,,, parcellaire] = []) => {
-      if (Array.isArray(parcellaire?.features) && parcellaire.features.some((feature) => !feature.geometry)) {
+  clientQuery.mockImplementation(
+    async (sql, [,, geometry] = []) => {
+      if (sql.includes('INTO cartobio_parcelles') && !geometry) {
         // Simulate trigger error
         const err = new Error('No geometry')
-        err.code = 'P0001'
+        err.code = '23502'
         throw err
       }
 
-      return ({ rows: [{ lorem: 'ipsum' }] })
+      return ({ rows: [record] })
     }
   )
-  const clientRelease = jest.fn()
-  db.connect.mockResolvedValue({
-    query: clientQuery,
-    release: clientRelease
-  })
 
   test('it fails without auth', async () => {
     const res = await request(app).post('/api/v2/certification/parcelles').send(apiParcellaire)
@@ -431,11 +452,14 @@ describe('POST /api/v2/certification/parcelles', () => {
 
     expect(db.query).not.toHaveBeenCalled()
     expect(db.connect).toHaveBeenCalled()
-    expect(clientQuery).toHaveBeenCalledTimes(5) // BEGIN + 3 lines + COMMIT
+    // BEGIN + 3 * BEGIN + 3 * COMMIT + 3 * INSERT cartobio_pperators
+    // + 6 * INSERT cartobio_parcelles + 3 * DELETE + COMMIT
+    expect(clientQuery).toHaveBeenCalledTimes(20)
     expect(clientQuery).toHaveBeenCalledWith('BEGIN;')
-    expect(clientQuery).toHaveBeenNthCalledWith(2, expect.stringContaining('INSERT INTO'), expect.anything())
-    expect(clientQuery).toHaveBeenNthCalledWith(3, expect.stringContaining('INSERT INTO'), expect.anything())
-    expect(clientQuery).toHaveBeenNthCalledWith(4, expect.stringContaining('INSERT INTO'), expect.anything())
+    expect(clientQuery).toHaveBeenNthCalledWith(2, 'BEGIN;')
+    expect(clientQuery).toHaveBeenNthCalledWith(3, expect.stringContaining('cartobio_operators'), expect.anything())
+    expect(clientQuery).toHaveBeenNthCalledWith(4, expect.stringContaining('cartobio_parcelles'), expect.anything())
+    expect(clientQuery).toHaveBeenNthCalledWith(9, 'COMMIT;')
     expect(clientQuery).toHaveBeenLastCalledWith('COMMIT;')
     expect(clientRelease).toHaveBeenCalled()
     expect(res.status).toBe(202)
