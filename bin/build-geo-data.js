@@ -7,15 +7,21 @@ const stream = require('node:stream')
 const { join } = require('path')
 const got = require('got')
 const JSONStream = require('jsonstream-next')
+const fs = require('fs')
 const union = require('@turf/union').default
 
 const pipeline = promisify(stream.pipeline)
 
 async function fetchCommunesBoundaries () {
+  // Skip if file already exists
+  const outFile = join(__dirname, '..', 'data', 'communes.json')
+  if (fs.existsSync(outFile)) {
+    console.log('Commune boundaries file already exists, skipping')
+    return
+  }
+
   const FILENAME = 'communes-50m.geojson.gz'
   const SOURCE = 'http://etalab-datasets.geo.data.gouv.fr/contours-administratifs/2022/geojson/' + FILENAME
-
-  const outFile = join(__dirname, '..', 'data', 'communes.json')
 
   return pipeline([
     got.stream(SOURCE),
@@ -32,6 +38,13 @@ async function fetchCommunesBoundaries () {
 }
 
 async function fetchRegionsBoundaries () {
+  // Skip if file already exists
+  const files = ['metropole', 'antilles', 'guyane', 'reunion', 'mayotte']
+  if (files.every(name => fs.existsSync(join(__dirname, '..', 'data', `${name}.json`)))) {
+    console.log('Region boundaries files already exist, skipping')
+    return
+  }
+
   const FILENAME = 'regions-100m.geojson'
   const SOURCE = 'http://etalab-datasets.geo.data.gouv.fr/contours-administratifs/latest/geojson/' + FILENAME
 
@@ -57,8 +70,8 @@ async function fetchRegionsBoundaries () {
   const reunion = regions.features.find(({ properties }) => properties.code === '04')
   const mayotte = regions.features.find(({ properties }) => properties.code === '06')
 
-  // Dump each file
   const outputs = { metropole, antilles, guyane, reunion, mayotte }
+  // Dump each file
   for (const output in outputs) {
     console.log(`Writing ${output}.json`, outputs[output]?.type)
     const outputFile = join(__dirname, '..', 'data', `${output}.json`)

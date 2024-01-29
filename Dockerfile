@@ -20,6 +20,7 @@ COPY ./bin ./bin
 COPY ./data ./data
 
 RUN npm ci --build-from-source --shared_gdal
+RUN npm run build:geo-data
 
 
 # Bundle app source
