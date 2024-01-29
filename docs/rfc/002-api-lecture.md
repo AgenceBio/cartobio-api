@@ -100,15 +100,15 @@ Le parcellaire est représenté en utilisant le [format standardisé **GeoJSON**
 
 ##### Propriétés facultatives
 
-| Clé                   | Type     | Description                                                                                       |
-|-----------------------|----------|---------------------------------------------------------------------------------------------------|
-| `dateAjout`           | `string` | Date d'ajout sur CartoBio (au format [ISO 8601])                                                  |
-| `dateMiseAJour`       | `string` | Date de modification sur CartoBio (au format [ISO 8601])                                          |
-| `nom`                 | `string` | Nom de la parcelle                                                                                |
-| `numeroPacage`        | `string` | Numéro PACAGE                                                                                     |
-| `numeroIlotPAC`       | `string` | Numéro de l'ilôt PAC                                                                              |
-| `numeroParcellesPAC`  | `string` | Numéro de la parcelle PAC                                                                         |
-| `referenceCadastrale` | `string` | Référence cadastrale complète (code INSEE de la commune + préfixe + section + numéro de parcelle) |
+| Clé                    | Type     | Description                                                                                       |
+|------------------------|----------|---------------------------------------------------------------------------------------------------|
+| `dateAjout`            | `string` | Date d'ajout sur CartoBio (au format [ISO 8601])                                                  |
+| `dateMiseAJour`        | `string` | Date de modification sur CartoBio (au format [ISO 8601])                                          |
+| `nom`                  | `string` | Nom de la parcelle                                                                                |
+| `numeroPacage`         | `string` | Numéro PACAGE                                                                                     |
+| `numeroIlotPAC`        | `string` | Numéro de l'ilôt PAC                                                                              |
+| `numeroParcellePAC`    | `string` | Numéro de la parcelle PAC                                                                         |
+| `referenceCadastrale`  | `string` | Référence cadastrale complète (code INSEE de la commune + préfixe + section + numéro de parcelle) |
 
 ##### Cultures
 

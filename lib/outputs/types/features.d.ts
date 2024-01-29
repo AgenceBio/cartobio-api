@@ -6,7 +6,7 @@ export type CartoBioFeatureProperties = {
     updatedAt?: string;
     COMMUNE_LABEL?: string;
     COMMUNE?: string;
-    cultures: CartobioCulture[];
+    cultures: CartoBioCulture[];
     conversion_niveau: string;
     engagement_date: string;
     commentaire?: string;
@@ -36,7 +36,7 @@ export type CartoBioFeatureProperties = {
 /**
  * Cartobio specific GeoJson definitions
  */
-export type CartobioCulture = {
+export type CartoBioCulture = {
     id: import('crypto').UUID;
     CPF: string;
     TYPE?: string | undefined;

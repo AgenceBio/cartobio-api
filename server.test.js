@@ -12,6 +12,7 @@ const parcellesPatched = require('./lib/providers/__fixtures__/parcelles-patched
 const apiParcellaire = require('./lib/providers/__fixtures__/agence-bio-api-parcellaire.json')
 const { normalizeRecord } = require('./lib/outputs/record')
 const { normalizeOperator } = require('./lib/outputs/operator')
+const { recordToApi } = require('./lib/outputs/api')
 
 const sign = createSigner({ key: config.get('jwtSecret') })
 
@@ -466,5 +467,36 @@ describe('POST /api/v2/certification/parcelles', () => {
     expect(res.body).toEqual({
       nbObjetTraites: 3
     })
+  })
+})
+
+describe('GET /api/v2/certification/parcellaire/:numeroBio', () => {
+  test('it responds with 404 when no operator is found', async () => {
+    const queryMock = jest.mocked(db.query)
+    queryMock.mockResolvedValueOnce({ rows: [] })
+
+    const res = await request(app)
+      .get('/api/v2/certification/parcellaire/1234')
+      .set('Authorization', fakeOcToken)
+    expect(res.status).toBe(404)
+  })
+
+  test('it responds with 200 when operator is found', async () => {
+    const queryMock = jest.mocked(db.query)
+    queryMock.mockResolvedValueOnce({ rows: [record] })
+    queryMock.mockResolvedValueOnce({ rows: parcelles })
+
+    const res = await request(app)
+      .get('/api/v2/certification/parcellaire/1234')
+      .set('Authorization', fakeOcToken)
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual(
+      recordToApi(
+        normalizeRecord({
+          record: { parcelles, ...record },
+          operator: normalizeOperator(agencebioOperator)
+        })
+      )
+    )
   })
 })

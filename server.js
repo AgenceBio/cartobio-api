@@ -46,6 +46,7 @@ const DURATION_ONE_DAY = DURATION_ONE_HOUR * 24
 const db = require('./lib/db.js')
 const { FastifyErrorHandler, UnauthorizedApiError } = require('./lib/errors.js')
 const { normalizeRecord } = require('./lib/outputs/record')
+const { recordToApi } = require('./lib/outputs/api')
 const sign = createSigner({ key: config.get('jwtSecret'), expiresIn: DURATION_ONE_DAY * 30 })
 
 // Sentry error reporting setup
@@ -362,6 +363,10 @@ app.register(async (app) => {
     return reply.code(202).send({
       nbObjetTraites: count
     })
+  })
+
+  app.get('/api/v2/certification/parcellaire/:numeroBio', deepmerge(protectedWithToken({ oc: true }), routeWithNumeroBio), (request, reply) => {
+    return reply.code(200).send(recordToApi(request.record))
   })
 
   app.get('/api/v2/user/verify', deepmerge(protectedWithToken({ oc: true, cartobio: true }), sandboxSchema, internalSchema), (request, reply) => {
