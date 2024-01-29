@@ -72,7 +72,7 @@
     "typescript": "^4.9.4"
   },
   "scripts": {
-    "load:communes-table": "node bin/build-communes-table.js",
+    "load:communes-table": "node bin/load-communes-table.js",
     "build:geo-data": "node bin/build-geo-data.js",
     "export-asp": "node bin/export-asp.js --numerobio-path cartobio-asp.csv | ogr2ogr cartobio-asp.gpkg /vsistdin/",
     "export-asp-c1": "node bin/export-asp.js --only-c1 --numerobio-path cartobio-asp-c1.csv | ogr2ogr cartobio-asp-c1.gpkg /vsistdin/",

@@ -1,26 +1,24 @@
 'use strict'
 
 const { promisify } = require('node:util')
-const { createGunzip } = require('node:zlib')
 const stream = require('node:stream')
-const got = require('got')
 const JSONStream = require('jsonstream-next')
 
 const db = require('../lib/db.js')
+const fs = require('fs')
+const { join } = require('path')
 const pipeline = promisify(stream.pipeline)
 
-async function fetchCommunesBoundaries () {
-  const FILENAME = 'communes-50m.geojson.gz'
-  const SOURCE = 'http://etalab-datasets.geo.data.gouv.fr/contours-administratifs/2022/geojson/' + FILENAME
+async function loadCommuneTable () {
+  // Load commune boundaries from communes.json
+  const inputFile = fs.createReadStream(join(__dirname, '..', 'data', 'communes.json'))
 
   return pipeline([
-    got.stream(SOURCE),
-    createGunzip(),
-    JSONStream.parse(['features', true]),
-    (source) => stream.Readable.from(source).forEach(feature => {
+    inputFile,
+    JSONStream.parse('*'),
+    (source) => stream.Readable.from(source).forEach(commune => {
       // Save to commune table
-      const { code, nom } = feature.properties
-      const geometry = feature.geometry
+      const { code, nom, geometry } = commune
 
       db.query(`
         INSERT INTO communes (code, nom, geometry)
@@ -35,4 +33,4 @@ async function fetchCommunesBoundaries () {
   ])
 }
 
-fetchCommunesBoundaries()
+loadCommuneTable()
