@@ -17,6 +17,7 @@ métiers des organismes de certification du bio en France.
   - [Tests](#tests)
   - [Développer localement](#développer-localement)
 - [Manuel d'utilisation](#manuel-dutilisation)
+  - [Brancher au Webservice des Douanes](#brancher-au-webservice-des-douanes)
   - [Sauvegarder et restaurer la base de données](#sauvegarder-et-restaurer-la-base-de-données-en-production)
   - [Intégration des données du RPG bio](#intégration-des-données-du-rpg-bio)
   - [Générer les fonds de carte](#générer-les-fonds-de-carte)
@@ -105,6 +106,14 @@ $ ./node_modules/.bin/db-migrate down:fixtures
     à sa documentation pour en savoir plus sur les commandes et les API de migration.
 
 # Manuel d'utilisation
+
+## Brancher au Webservice des Douanes
+
+En local, il est impossible d'accéder au webservice des Douanes en direct. Il convient alors d'utiliser un proxy SOCKS via le serveur CartoBio :
+
+```sh
+ssh -A -N -C -D 5000 -J user@ip-serveur-cartobio user@ip-serveur-bdd
+```
 
 ## Sauvegarder et restaurer la base de données en production
 

@@ -26,9 +26,11 @@ const { ExtraErrorData } = require('@sentry/integrations')
 const { createSigner } = require('fast-jwt')
 
 const { fetchOperatorByNumeroBio, fetchCustomersByOc, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators } = require('./lib/providers/agence-bio.js')
-const { addRecordFeature, fetchLatestCustomersByControlBody, deleteRecord, pacageLookup, patchFeatureCollection, updateAuditRecordState, updateFeature, getParcellesStats, getDataGouvStats, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature } = require('./lib/providers/cartobio.js')
+const { addRecordFeature, fetchLatestCustomersByControlBody, deleteRecord, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature } = require('./lib/providers/cartobio.js')
+const { evvLookup, evvParcellaire, pacageLookup, getParcellesStats, getDataGouvStats } = require('./lib/providers/cartobio.js')
 const { parseShapefileArchive } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive } = require('./lib/providers/geofolia.js')
+const { InvalidRequestApiError, NotFoundApiError } = require('./lib/errors.js')
 
 const { deepmerge, commonSchema, swaggerConfig } = require('./lib/routes/index.js')
 const { sandboxSchema, internalSchema, hiddenSchema } = require('./lib/routes/index.js')
@@ -340,6 +342,37 @@ app.register(async (app) => {
       .then(featureCollection => reply.send(featureCollection))
   })
 
+  /**
+   * Retrieves all features associated to an EVV associated to a numeroBio
+   * You still have to add geometries to the collection.
+   * Features contains a 'cadastre' property with references to fetch
+   */
+  app.get('/api/v2/import/evv/:numeroEvv(\\d+)+:numeroBio(\\d+)', deepmerge(protectedWithToken({ cartobio: true, oc: true }), routeWithNumeroBio), async (request, reply) => {
+    const { numeroEvv } = request.params
+    const { siret: expectedSiret } = request.record.operator
+
+    if (!expectedSiret) {
+      throw new InvalidRequestApiError('Le numéro SIRET de l\'opérateur n\'est pas renseigné sur le portail de Notification de l\'Agence Bio. Il est indispensable pour sécuriser la collecte du parcellaire viticole auprès des Douanes.')
+    }
+
+    return evvLookup({ numeroEvv })
+      .then(({ siret }) => {
+        if (!siret) {
+          throw new NotFoundApiError('Ce numéro EVV est introuvable')
+        } else if (siret !== expectedSiret) {
+          throw new UnauthorizedApiError('Les numéros SIRET du nCVI et de l\'opérateur Agence Bio ne correspondent pas.')
+        }
+      })
+      .then(() => evvParcellaire({ numeroEvv }))
+      .then(featureCollection => {
+        if (featureCollection.features.length === 0) {
+          throw new NotFoundApiError('Ce numéro EVV ne retourne pas de parcelles.')
+        }
+
+        return reply.send(featureCollection)
+      })
+  })
+
   app.post('/api/v2/certification/parcelles', deepmerge(protectedWithToken({ oc: true }), {
     preParsing: async (request, reply, payload) => {
       const stream = payload.pipe(stripBom())
@@ -412,12 +445,13 @@ app.register(async (app) => {
   })
 })
 
-app.ready().then(() => app.swagger())
-
 if (require.main === module) {
   db.query('SHOW server_version;').then(async ({ rows }) => {
     const { server_version: pgVersion } = rows[0]
     console.log(`Postgres connection established, v${pgVersion}`)
+
+    await app.ready()
+    await app.swagger()
 
     const address = await app.listen({
       host: config.get('host'),
