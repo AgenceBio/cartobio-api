@@ -144,6 +144,7 @@ exports.up = async function (db) {
         )
     FROM cartobio_operators, jsonb_array_elements(cartobio_operators.parcelles->'features') as feature
     WHERE jsonb_path_exists(cartobio_operators.parcelles, '$.features ? (@.type() == "object")')
+      AND ST_GeomFromGeoJSON(feature->'geometry') IS NOT NULL
     `
   )
 
