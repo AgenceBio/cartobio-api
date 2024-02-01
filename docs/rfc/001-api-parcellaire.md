@@ -117,6 +117,8 @@ Si le JSON est invalide, le message d'erreur est simplement le suivant :
 | `anneeReferenceControle` | integer | **oui**     | année de référence de l'audit AB                 |
 | `anneeAssolement`        | integer | non         | année de l'assolement concerné [^1]              |
 | `dateAudit`              | string  | **oui**     | date d'audit au format [ISO 8601] (`YYYY-MM-DD`) |
+| `dateCertificationDebut` | string  | non         | date de début de validité de certification des parcelles  |
+| `dateCertificationFin`   | string  | non         | date de fin de validité de certification des parcelles    |
 | `numeroPacage`           | string  | non         | numéro pacage de l'opérateur (si applicable)     |
 | `commentaire`            | string  | non         | notes d'audit                                    |
 | `parcelles`              | array   | **oui**     | liste d'éléments de type [Parcelle](#parcelle)   |
@@ -156,6 +158,8 @@ Exemple de fichier JSON relatif à un audit de 2 parcelles. Elles comportent res
    "anneeReferenceControle": 2022,
    "anneeAssolement": 2022,
    "dateAudit": "2023-02-23",
+   "dateCertificationDebut": "2023-03-01",
+   "dateCertificationFin": "2024-12-31",
    "numeroPacage": "084012821",
    "commentaire": "",
    "parcelles": [
