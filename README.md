@@ -118,13 +118,13 @@ ssh -A -N -C -D 5000 -J user@ip-serveur-cartobio user@ip-serveur-bdd
 ## Sauvegarder et restaurer la base de données en production
 
 ```bash
-pg_dump --data-only -U postgres -h bdd-cartobio -p 5433 > dump-production.sql
+docker run --rm postgres:15 pg_dump --clean -t cartobio_operators -t cartobio_parcelles --data-only -U postgres -h bdd-cartobio -p 5433 postgres > dump-production-data-only.sql
 ```
 
-Puis restaurer :
+Puis restaurer (en préprod) :
 
 ```bash
-psql -v ON_ERROR_STOP=1 -U postgres -h bdd-cartobio -p 5433 < dump-production.sql
+docker run -i --rm postgres:15 psql -v ON_ERROR_STOP=1 -U postgres -h bdd-cartobio -p 5434 postgres < dump-production-data-only.sql
 ```
 
 **Remarque** : `bdd-cartobio` est un alias de `162.19.57.177` ; le port `5433` correspond à la base de production, et `5434` à la base de préprod.
