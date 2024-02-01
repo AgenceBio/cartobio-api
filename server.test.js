@@ -536,7 +536,7 @@ describe('POST /api/v2/certification/parcelles', () => {
       listeProblemes: [
         // in case of error, check `createOrUpdateOperatorRecord()` SQL arity
         '[#2] champ dateAudit incorrect',
-        '[#3] champ geom incorrect : Unexpected end of JSON input',
+        '[#3] champ geom incorrect : Expected \',\' or \']\' after array element in JSON at position 32635',
         '[#4] La donnée géographique est manquante ou invalide.'
       ]
     })
