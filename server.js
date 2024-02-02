@@ -250,7 +250,7 @@ app.register(async (app) => {
     const { body: patch, user, record } = request
 
     return updateAuditRecordState({ user, record }, patch)
-      .then(record => reply.code(200).send(record))
+      .then(record => reply.code(200).send(normalizeRecord({ record, operator: request.record.operator })))
   })
 
   /**
