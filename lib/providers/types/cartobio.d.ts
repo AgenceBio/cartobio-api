@@ -46,6 +46,7 @@ type DBParcelle = {
     conversion_niveau: EtatProduction;
     engagement_date?: Date;
     commentaire?: string;
+    auditeur_notes?: string;
     annotations?: object[]; // Replace with actual Annotations type
     created?: string;
     updated?: string;
