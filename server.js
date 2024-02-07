@@ -26,7 +26,7 @@ const { ExtraErrorData } = require('@sentry/integrations')
 const { createSigner } = require('fast-jwt')
 
 const { fetchOperatorByNumeroBio, fetchCustomersByOc, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators } = require('./lib/providers/agence-bio.js')
-const { addRecordFeature, fetchLatestCustomersByControlBody, deleteRecord, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature } = require('./lib/providers/cartobio.js')
+const { addRecordFeature, fetchLatestCustomersByControlBody, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature } = require('./lib/providers/cartobio.js')
 const { evvLookup, evvParcellaire, pacageLookup, getParcellesStats, getDataGouvStats } = require('./lib/providers/cartobio.js')
 const { parseShapefileArchive } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive } = require('./lib/providers/geofolia.js')
@@ -234,10 +234,10 @@ app.register(async (app) => {
   ), async (request, reply) => {
     const { numeroBio } = request.params
     const { id: ocId, nom: ocLabel } = request.record.operator.organismeCertificateur
-
+    const { geojson, metadata, importPrevious } = request.body
     const record = await createOrUpdateOperatorRecord(
-      { numeroBio, ocId, ocLabel, ...request.body },
-      { user: request.user, oldRecord: request.record }
+      { numeroBio, ocId, ocLabel, geojson, metadata },
+      { user: request.user, oldRecord: request.record, copyParcellesData: importPrevious }
     )
     return reply.code(200).send(normalizeRecord({ record, operator: request.record.operator }))
   })
@@ -251,17 +251,6 @@ app.register(async (app) => {
 
     return updateAuditRecordState({ user, record }, patch)
       .then(record => reply.code(200).send(normalizeRecord({ record, operator: request.record.operator })))
-  })
-
-  /**
-   * Delete a Record
-   * TODO: do not hard delete but purge features while keeping its history
-   */
-  app.delete('/api/v2/audits/:recordId', deepmerge(protectedWithToken(), routeWithRecordId), (request, reply) => {
-    const { user, record } = request
-
-    return deleteRecord({ user, record })
-      .then(result => reply.code(200).send(result))
   })
 
   /**
