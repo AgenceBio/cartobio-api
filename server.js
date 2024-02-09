@@ -58,6 +58,7 @@ if (reportErrors) {
     environment: config.get('environment'),
     includeLocalVariables: true,
     integrations: [
+      new Sentry.Integrations.Http({ tracing: true }),
       new ExtraErrorData()
     ],
     tracesSampleRate: config.get('environment') === 'production' ? 0.2 : 1
