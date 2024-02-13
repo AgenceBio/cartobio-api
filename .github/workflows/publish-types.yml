@@ -1,5 +1,8 @@
 name: TS types package
 on:
+  pull_request:
+    paths:
+      - 'lib/**/*.d.ts'
   push:
     paths:
       - 'lib/**/*.d.ts'
@@ -21,6 +24,7 @@ jobs:
       - run: echo "last_version=$(npm show @agencebio/cartobio-types version)" >> $GITHUB_ENV
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: echo "The version is $version and the last version is $last_version"
       - run: test $version != $last_version
         shell: bash
 

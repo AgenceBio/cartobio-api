@@ -1,6 +1,6 @@
 {
   "name": "@agencebio/cartobio-types",
-  "version": "1.0.0-rc1",
+  "version": "1.0.0",
   "main": "types.d.ts",
   "repository": {
     "type": "git",
