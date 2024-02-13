@@ -39,7 +39,7 @@ export type AgenceBioOperator = {
     sitesWeb: string[];
     notifications?: AgenceBioNotification[] | undefined;
     certificats?: AgenceBioCertificate[] | undefined;
-    adressesOperateurs?: AgenceBioAdresses | undefined;
+    adressesOperateurs?: AgenceBioAdresses[];
 };
 export type AgenceBioCertificate = {
     organisme: string;
@@ -78,17 +78,31 @@ export type AgenceBioNotification = {
     activites: AgenceBioActivity[];
     productions: AgenceBioProduction[];
 };
-export type AgenceBioAdresses = {
-    lieu: string;
-    dates: string;
-    codePostal: string;
-    ville: string;
+
+/**
+ * This is what we output
+ */
+export type AgenceBioAdresseGeo = {
+  codeCommune: string,
+  lat: number,
+  long: number,
+}
+
+/**
+ * This is what we consume
+ */
+export type AgenceBioAdresses = AgenceBioAdresseGeo & {
+  active: boolean;
+  lieu: string;
+  dates: string;
+  codePostal: string;
+  ville: string
 };
 /**
  * Only some endpoints provide this data
  */
 export type AgenceBioOperatorWithAdresses = AgenceBioOperator & {
-    adressesOperateurs: AgenceBioAdresses;
+    adressesOperateurs: AgenceBioAdresses[];
 };
 export type AgenceBioActivity = {
     id: number;
