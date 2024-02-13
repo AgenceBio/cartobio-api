@@ -1,4 +1,4 @@
-import {OrganismeCertificateur} from "../../providers/types/agence-bio";
+import {AgenceBioAdresseGeo, OrganismeCertificateur} from "../../providers/types/agence-bio";
 import {NormalizedRecord} from "./record";
 
 export type AgenceBioNormalizedOperator = {
@@ -13,6 +13,7 @@ export type AgenceBioNormalizedOperator = {
     datePremierEngagement: Date;
     certificats: any[];
     organismeCertificateur: OrganismeCertificateur | {};
+    adressesOperateurs: AgenceBioAdresseGeo[],
     codeCommune: string;
     departement: string;
     commune: string;
