@@ -1,0 +1,11 @@
+{
+  "name": "@agencebio/cartobio-types",
+  "version": "1.0.0",
+  "main": "types.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AgenceBio/cartobio-api.git"
+  },
+  "description": "Types partagés pour cartobio",
+  "license": "MIT"
+}

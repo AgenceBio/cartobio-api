@@ -3,9 +3,7 @@
   "version": "2.14.8",
   "description": "api for cartobio",
   "main": "app.js",
-  "files": [
-    "**/*.d.ts"
-  ],
+  "private": true,
   "bin": {
     "cartobio-export-asp": "./bin/export-asp.js"
   },
@@ -96,10 +94,9 @@
     "nodejs",
     "api"
   ],
-  "author": "Bchini Lucas",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/entrepreneur-interet-general/CartoBio-API/issues"
+    "url": "https://github.com/AgenceBio/cartobio-api/issues"
   },
-  "homepage": "https://github.com/entrepreneur-interet-general/CartoBio-API#readme"
+  "homepage": "https://github.com/AgenceBio/cartobio-api#readme"
 }
