@@ -1,6 +1,7 @@
 {
   "include": [
     "lib/**/*.js",
+    "lib/types.d.ts"
   ],
   "exclude": [
     "**/*.test.js"

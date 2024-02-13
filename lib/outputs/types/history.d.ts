@@ -1,4 +1,4 @@
-import { EventType} from "../history";
+import {EventType} from "../history";
 import {CartoBioUser} from "../../providers/types/cartobio";
 
 export type HistoryEntry = {
