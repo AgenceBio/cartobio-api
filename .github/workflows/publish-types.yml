@@ -20,17 +20,17 @@ jobs:
           scope: '@agencebio'
 
       # Get the version from the package.json file and check its different from the last version published
-      #- run: echo "version=$(node -p "require('./lib/package.json').version")" >> $GITHUB_ENV
-      #- run: echo "last_version=$(npm show @agencebio/cartobio-types version)" >> $GITHUB_ENV
-      #  env:
-      #    NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #- name: Test if version has been bumped so we can publish new types package
-      #  run: test $version != $last_version
-      #  shell: bash
+      - run: echo "version=$(node -p "require('./lib/package.json').version")" >> $GITHUB_ENV
+      - run: echo "last_version=$(npm show @agencebio/cartobio-types version)" >> $GITHUB_ENV
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Test if version has been bumped so we can publish new types package
+        run: test $version != $last_version
+        shell: bash
 
       # Publish the package if the version has changed
       - run: npm publish --access public
-        # if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main'
         working-directory: lib
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
