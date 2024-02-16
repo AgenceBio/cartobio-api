@@ -8,7 +8,7 @@
     "cartobio-export-asp": "./bin/export-asp.js"
   },
   "dependencies": {
-    "@agencebio/rosetta-cultures": "^1.0.5",
+    "@agencebio/rosetta-cultures": "^1.7.1",
     "@fastify/cors": "^8.2.0",
     "@fastify/formbody": "^7.4.0",
     "@fastify/multipart": "^7.3.0",

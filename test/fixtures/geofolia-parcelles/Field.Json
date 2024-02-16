@@ -1,0 +1,65 @@
+{
+  "Fields": [
+    {
+      "Id": "376eed81-5fab-4df1-840f-2f58c55f41ec",
+      "Name": "Au bois Sachant",
+      "ParentId1": "00000000-0000-0000-0000-000000000000",
+      "Area": 13300.0000000,
+      "Geography": null,
+      "MainPlotId": "376eed81-5fab-4df1-840f-2f58c55f41ec",
+      "SowingDate": "2022-03-16T00:00:00",
+      "CityNumber": "80021",
+      "IsletNum": "83",
+      "PlotKind": 1,
+      "Comment": null,
+      "RNCropCode": "ZDUZLT",
+      "VarietyName": null
+    },
+    {
+      "Id": "6efe794c-c486-430d-9f5d-75154404b9a4",
+      "Name": "UnePrairieverte2",
+      "ParentId1": "00000000-0000-0000-0000-000000000000",
+      "Area": 20460.1791253,
+      "Geography": "POLYGON ((780132.320324155 6281093.04629876, 780084.067170215 6281184.00436141, 780064.477029228 6281190.42370787, 780047.806063658 6281186.32616902, 779933.421402186 6281106.57148116, 779992.56752269 6281001.58714963, 780132.320324155 6281093.04629876))",
+      "MainPlotId": "6efe794c-c486-430d-9f5d-75154404b9a4",
+      "SowingDate": null,
+      "CityNumber": "29018",
+      "IsletNum": "29",
+      "PlotKind": 1,
+      "Comment": null,
+      "RNCropCode": "H69",
+      "VarietyName": null
+    },
+    {
+      "Id": "50cda72b-7cb8-4d8f-b0a6-94899f0c6123",
+      "Name": "Complète s",
+      "ParentId1": "00000000-0000-0000-0000-000000000000",
+      "Code": "6",
+      "Geography": "POLYGON ((780132.320324155 6281093.04629876, 780084.067170215 6281184.00436141, 780064.477029228 6281190.42370787, 780047.806063658 6281186.32616902, 779933.421402186 6281106.57148116, 779992.56752269 6281001.58714963, 780132.320324155 6281093.04629876))",
+      "MainPlotId": "50cda72b-7cb8-4d8f-b0a6-94899f0c6123",
+      "SowingDate": "2022-04-01T00:00:00",
+      "CityNumber": "22187",
+      "IsletNum": "29",
+      "PlotKind": 1,
+      "Comment": "Parcelle principale avec détails et avec culture secondaire",
+      "RNCropCode": "ZCS      I06",
+      "VarietyName": "Arc-en-ciel"
+    },
+    {
+      "Id": "60f5193f-1b87-4978-a755-6d4149aa3a3f",
+      "Name": "Complète s",
+      "ParentId1": "00000000-0000-0000-0000-000000000000",
+      "Area": 10000.0000000,
+      "Code": "6",
+      "Geography": null,
+      "MainPlotId": "50cda72b-7cb8-4d8f-b0a6-94899f0c6123",
+      "SowingDate": null,
+      "CityNumber": "22187",
+      "IsletNum": "29",
+      "PlotKind": 2,
+      "Comment": "Parcelle secondaire avec détails secondaire",
+      "RNCropCode": "ZCU",
+      "VarietyName": "Trèfle et triticale hors code CPF"
+    }
+  ]
+}
