@@ -14,6 +14,7 @@ const parcellesPatched = require('./lib/providers/__fixtures__/parcelles-patched
 const apiParcellaire = require('./lib/providers/__fixtures__/agence-bio-api-parcellaire.json')
 const { normalizeRecord } = require('./lib/outputs/record')
 const { normalizeOperator } = require('./lib/outputs/operator')
+const { getRandomFeatureId } = require('./lib/outputs/features')
 const { recordToApi } = require('./lib/outputs/api')
 
 const sign = createSigner({ key: config.get('jwtSecret') })
@@ -32,6 +33,10 @@ jest.mock('got')
 jest.mock('./lib/db.js', () => ({
   query: jest.fn(),
   connect: jest.fn()
+}))
+jest.mock('./lib/outputs/features', () => ({
+  ...jest.requireActual('./lib/outputs/features'),
+  getRandomFeatureId: jest.fn()
 }))
 
 const clientQuery = jest.fn()
@@ -158,6 +163,33 @@ describe('POST /api/v2/convert/shapefile/geojson', () => {
       .post('/api/v2/convert/shapefile/geojson')
       .type('json')
       .attach('archive', 'test/fixtures/telepac-parcelles.zip')
+      .then((response) => {
+        expect(response.status).toEqual(401)
+      })
+  })
+})
+
+describe('POST /api/v2/convert/geofolia/geojson', () => {
+  test('it converts a Geofolia zipped archive into WGS84 GeoJSON', () => {
+    const expectation = JSON.parse(fs.readFileSync('test/fixtures/geofolia-parcelles.json', { encoding: 'utf8' }))
+    getRandomFeatureId.mockReturnValueOnce('1').mockReturnValueOnce('2')
+
+    return request(app.server)
+      .post('/api/v2/convert/geofolia/geojson')
+      .type('json')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+      .attach('archive', 'test/fixtures/geofolia-parcelles.zip')
+      .then((response) => {
+        expect(response.status).toEqual(200)
+        expect(response.body).toEqual(expectation)
+      })
+  })
+
+  test('it fails without auth', () => {
+    return request(app.server)
+      .post('/api/v2/convert/geofolia/geojson')
+      .type('json')
+      .attach('archive', 'test/fixtures/geofolia-parcelles.zip')
       .then((response) => {
         expect(response.status).toEqual(401)
       })
