@@ -5,6 +5,8 @@ on:
       - 'lib/**/*.d.ts'
       - 'lib/package.json'
   push:
+    branches:
+      - main
     paths:
       - 'lib/**/*.d.ts'
       - 'lib/package.json'
