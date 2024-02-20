@@ -72,6 +72,7 @@ En cas de statut `200`, un objet JSON représentant l'opérateur, son parcellair
 | `numeroBio`                   | `string`                                 | Numéro bio de l'opérateur                                                                            |
 | `certification`               | `object`                                 | -                                                                                                    |
 | `certification.statut`        | `string`                                 | Statut du parcellaire ([cf. statuts de certification](#valeurs-possibles--statuts-de-certification)) |
+| `certification.dateAudit`     | `string`                                 | Date de l'audit s'il a eu lieu (au format [ISO 8601])                                                |
 | `certification.dateDebut`     | `string`                                 | Date de début de validité de certification du parcellaire (au format [ISO 8601])                     |
 | `certification.dateFin`       | `string`                                 | Date de fin de validité de certification du parcellaire (au format [ISO 8601])                       |
 | `certification.demandesAudit` | `string`                                 | Mémo à l'intention de l'exploitant                                                                   |

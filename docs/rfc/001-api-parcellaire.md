@@ -231,8 +231,9 @@ Exemple de fichier JSON relatif à un audit de 2 parcelles. Elles comportent res
 
 #### Principe
 
-L'API Parcellaire permet de mettre à jour les données d'un opérateur, des parcelles et des cultures.
-Si des données sont déjà enregistrées pour un opérateur (identifié par un numerobio), les données sont mises à jour
+L'API Parcellaire permet de mettre à jour les données d'un parcellaire, des parcelles et des cultures.
+Un parcellaire est identifié par le couple `numeroBio` et `dateAudit`.
+Si des données sont déjà enregistrées pour un parcellaire , les données sont mises à jour
 avec les nouvelles valeurs. Pour supprimer une valeur existante pour un champ, il suffit donc d'envoyer une valeur vide
 pour ce champ. Les champs non-requis par l'API peuvent être omis, ils ne seront pas modifiés.
 
