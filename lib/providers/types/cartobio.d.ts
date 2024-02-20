@@ -20,6 +20,7 @@ export type DBOperatorRecord = {
     audit_history: HistoryEntry[];
     audit_notes: string;
     audit_demandes: string;
+    audit_date: string;
 };
 export type DBOperatorRecordWithParcelles = DBOperatorRecord & {
     parcelles: DBParcelle[];

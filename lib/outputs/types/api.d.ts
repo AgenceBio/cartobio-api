@@ -36,6 +36,7 @@ export type OutputApiRecord = {
 
 export type OutputApiCertification = {
     statut: CertificationState;
+    dateAudit: string;
     dateDebut: string;
     dateFin: string;
     demandesAudit: string;
