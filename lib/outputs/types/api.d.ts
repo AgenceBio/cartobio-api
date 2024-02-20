@@ -54,6 +54,7 @@ export type OutputApiFeatureProperties = {
     id: string;
     commune: string;
     cultures: OutputApiCulture[];
+    surface: number;
     niveauConversion: EtatProduction;
     dateEngagement: string;
     commentaire: string;
