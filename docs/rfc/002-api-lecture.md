@@ -96,7 +96,7 @@ Le parcellaire est représenté en utilisant le [format standardisé **GeoJSON**
 | `dateEngagement`   | `string` | Date d'engagement en Agriculture Biologique de la parcelle (si applicable) (au format [ISO 8601])                       |
 | `commentaire`      | `string` | Notes d'audit spécifiques à la parcelle                                                                                 |
 | `annotations`      | `json`   | Liste d'étiquettes ([cf. Annotations](#valeurs-possibles--annotations))                                                 |
-
+| `surface`          | `float`  | Surface totale de la parcelle (en hectare) calculée à partir de ses contours géographiques                              |
 
 ##### Propriétés facultatives
 
