@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<producteurs xmlns="urn:x-telepac:fr.gouv.agriculture.telepac:echange-producteur" xmlns:gml="http://www.opengis.net/gml">
+  <producteur numero-pacage="999000000" campagne="Courante" fichier-xsd="Echanges-producteur-export-2022-V4">
+  <demandeur>
+    <siret>00000000000000</siret>
+  </demandeur>
+  <rpg>
+    <ilot numero-ilot-reference="070014619754" numero-ilot="1">
+      <commune>70421</commune>
+      <parcelles>
+        <parcelle>
+        <descriptif-parcelle numero-parcelle="1">
+          <culture-principale production-semences="false">
+            <code-culture>PTR</code-culture>
+          </culture-principale>
+        </descriptif-parcelle>
+        <geometrie>
+          <gml:Polygon>
+            <gml:outerBoundaryIs>
+              <gml:LinearRing>
+                <gml:coordinates>
+                  930775.5697999969,6736151.2928 930787.1023000032,6736147.0993 930800.9307999983,6736207.2319 930818.3932999969,6736339.7884 930830.564199999,6736431.3344 930839.5600000024,6736517.8534 930851.938000001,6736639.1077 930841.8933999985,6736639.8557 930817.1547999978,6736641.5755 930796.252700001,6736641.7078
+                  930781.8699000031,6736641.4848 930762.992399998,6736639.1234 930642.376500003,6736628.26 930645.0222999975,6736616.3537 930668.2859999985,6736510.645 930664.0345999971,6736401.0138 930664.0345999971,6736395.193 930663.7038,6736389.9013 930659.1220000014,6736390.572 930533.2018999979,6736418.6422
+                  930512.0352,6736315.7191 930493.1080000028,6736211.555 930534.2409999967,6736203.257 930701.4773000032,6736168.0813 930775.5697999969,6736151.2928
+                </gml:coordinates>
+              </gml:LinearRing>
+            </gml:outerBoundaryIs>
+            <gml:innerBoundaryIs>
+              <gml:LinearRing>
+                <gml:coordinates>
+                  930799.6960000023,6736324.476 930799.6972,6736324.4756 930799.695900001,6736324.4748 930799.6960000023,6736324.476
+                </gml:coordinates>
+              </gml:LinearRing>
+            </gml:innerBoundaryIs>
+            <gml:innerBoundaryIs>
+              <gml:LinearRing>
+                <gml:coordinates>
+                  930774.8007000014,6736466.2024 930770.846000001,6736428.82 930767.362999998,6736384.092 930763.4236000031,6736382.3293 930758.6459999979,6736382.558 930730.3505999967,6736390.0022 930727.704700001,6736398.4689 930730.0860000029,6736435.5106 930729.3659999967,6736451.961 930732.4672999978,6736467.2607
+                  930738.2880999967,6736469.642 930757.6027000025,6736469.642 930768.4507,6736468.8482 930774.8007000014,6736466.2024
+                </gml:coordinates>
+              </gml:LinearRing>
+            </gml:innerBoundaryIs>
+          </gml:Polygon>
+        </geometrie>
+        <surface-admissible>1063</surface-admissible>
+      </parcelle>
+    </parcelles>
+    </ilot>
+    <ilot numero-ilot-reference="070014613381" numero-ilot="2">
+      <commune>70421</commune>
+      <parcelles>
+        <parcelle>
+          <descriptif-parcelle numero-parcelle="2">
+            <culture-principale production-semences="false">
+              <code-culture>PPH</code-culture>
+            </culture-principale>
+            <engagements-maec surface-cible="false" />
+          </descriptif-parcelle>
+        <geometrie>
+          <gml:Polygon>
+            <gml:outerBoundaryIs>
+              <gml:LinearRing>
+                <gml:coordinates>
+                  929903.6313999966,6736485.0001 929904.0207,6736484.6566 929978.8979,6736478.3066 929980.0569000021,6736478.5481 929983.848999999,6736503.388 929984.9479999989,6736510.585 929988.290899999,6736521.9789 930011.8387999982,6736519.8623 930033.5346999988,6736516.1581 930039.3554999977,6736521.4498
+                  930053.9077000022,6736518.0102 930059.4639,6736533.0915 930068.1952000037,6736534.9435 930076.3972999975,6736553.1998 930082.2180999964,6736554.2582 930086.7161,6736568.2811 930058.1410000026,6736573.5728 930042.7951000035,6736571.7207 930033.5346999988,6736566.6936 930036.9742999971,6736544.4686
+                  930009.1930000037,6736541.2936 929970.2991999984,6736542.8811 929965.8012000024,6736551.6123 929963.6846000031,6736566.429 929941.9887000024,6736569.0749 929920.028200001,6736573.0436 929939.8720000014,6736549.6985 929965.0075,6736525.1539 929980.338,6736511.354 929976.487999998,6736506.351
+                  929961.8849999979,6736515.19 929934.9760000035,6736537.486 929908.1220000014,6736571.7207 929886.3259999976,6736562.308 929906.0053,6736505.0456 929903.6313999966,6736485.0001
+                </gml:coordinates>
+              </gml:LinearRing>
+            </gml:outerBoundaryIs>
+          </gml:Polygon>
+        </geometrie>
+        <surface-admissible>92</surface-admissible>
+      </parcelle>
+      <parcelle>
+        <descriptif-parcelle numero-parcelle="4">
+          <culture-principale production-semences="false">
+          <code-culture>BTH</code-culture>
+          <precision>001</precision>
+          </culture-principale>
+          <agroforesterie>RDR3</agroforesterie>
+          <agri-bio conduite-bio="true" conduite-maraichage="false" />
+        </descriptif-parcelle>
+        <geometrie>
+          <gml:Polygon>
+            <gml:outerBoundaryIs>
+              <gml:LinearRing>
+                <gml:coordinates>
+                  930196.518100001,6736453.8992 930174.1269999966,6736452.485 930113.8059,6736274.2799 930140.198100001,6736267.996 930214.810800001,6736251.2611 930267.7313999981,6736434.528 930253.9328000024,6736439.6117 930215.3035999984,6736453.8992 930196.518100001,6736453.8992
+                </gml:coordinates>
+              </gml:LinearRing>
+            </gml:outerBoundaryIs>
+          </gml:Polygon>
+        </geometrie>
+          <surface-admissible>192</surface-admissible>
+        </parcelle>
+      </parcelles>
+    </ilot>
+  </rpg>
+  <maec-api nombre-emplacements="8" />
+  <demandes-aides-pilier1-et-AR paiement-jeunes-agriculteurs="false" soja="false" proteagineux="false" legumineuses-fourrageres-deshydratation="false" semences-legumineuses-fourrageres="false" ble-dur="false" prunes-transformation="false" cerises-transformation="false" peches-transformation="false" poires-transformation="false" tomates-industrie="false" pommes-terre-feculieres="false" chanvre="false" houblon="false" semences-graminees="false" riz="false">
+    <demande-aides-decouplees aides-decouplees="false" />
+    <demande-legumineuses-fourrageres legumineuse-fourragere="false" />
+    <demande-assurance-recolte assurance-recolte="false" />
+  </demandes-aides-pilier1-et-AR>
+  <demandes-aides-pilier2 demande-ab="false" demande-maec="false" demande-agroforesterie="false">
+    <ichn demande-ichn="false" />
+  </demandes-aides-pilier2>
+  </producteur>
+</producteurs>

@@ -28,7 +28,7 @@ const { createSigner } = require('fast-jwt')
 const { fetchOperatorByNumeroBio, fetchCustomersByOc, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators } = require('./lib/providers/agence-bio.js')
 const { addRecordFeature, fetchLatestCustomersByControlBody, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature } = require('./lib/providers/cartobio.js')
 const { evvLookup, evvParcellaire, pacageLookup, getParcellesStats, getDataGouvStats } = require('./lib/providers/cartobio.js')
-const { parseShapefileArchive } = require('./lib/providers/telepac.js')
+const { parseShapefileArchive, parseTelepacXML } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive } = require('./lib/providers/geofolia.js')
 const { InvalidRequestApiError, NotFoundApiError } = require('./lib/errors.js')
 
@@ -309,6 +309,16 @@ app.register(async (app) => {
    */
   app.post('/api/v2/convert/shapefile/geojson', deepmerge(protectedWithToken({ oc: true, cartobio: true })), async (request, reply) => {
     return parseShapefileArchive(request.file())
+      .then(geojson => reply.send(geojson))
+  })
+
+  /**
+   * Turn a shapefile into a workeable FeatureCollection
+   * It's essentially used during an import process to preview its content
+   * @private
+   */
+  app.post('/api/v2/convert/telepac-xml/geojson', deepmerge(protectedWithToken({ oc: true, cartobio: true })), async (request, reply) => {
+    return parseTelepacXML(request.file())
       .then(geojson => reply.send(geojson))
   })
 
