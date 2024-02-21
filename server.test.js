@@ -169,6 +169,162 @@ describe('POST /api/v2/convert/shapefile/geojson', () => {
   })
 })
 
+describe('POST /api/v2/convert/telepac-xml/geojson', () => {
+  const UUIDRe = /^[a-f0-9]+-[a-f0-9]+-[a-f0-9]+-[a-f0-9]+-[a-f0-9]+$/
+
+  test('it converts a L93 multi-feature XML file to WGS84 GeoJSON', () => {
+    getRandomFeatureId.mockReturnValueOnce('1').mockReturnValueOnce('2').mockReturnValueOnce('3')
+
+    return request(app.server)
+      .post('/api/v2/convert/telepac-xml/geojson')
+      .type('json')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+      .attach('archive', 'test/fixtures/telepac-dossier.xml')
+      .then((response) => {
+        expect(response.status).toEqual(200)
+        expect(response.body).toMatchObject({
+          type: 'FeatureCollection',
+          features: [
+            {
+              id: '1',
+              type: 'Feature',
+              geometry: {
+                type: 'Polygon',
+                coordinates: [
+                  expect.arrayContaining([[6.0768655089466765, 47.685278906089444]]),
+                  expect.arrayContaining([[6.07727679068216, 47.68682804163941]]),
+                  expect.arrayContaining([[6.0770187939092795, 47.688111446343]])
+                ]
+              },
+              properties: {
+                id: '1',
+                remoteId: '1.1',
+                COMMUNE: '70421',
+                NUMERO_I: '1',
+                NUMERO_P: '1',
+                PACAGE: '999000000',
+                conversion_niveau: 'CONV',
+                cultures: [
+                  {
+                    CPF: '01.19.10.11',
+                    TYPE: 'PTR',
+                    id: expect.stringMatching(UUIDRe)
+                  }
+                ]
+              }
+            },
+            {
+              id: '2',
+              type: 'Feature',
+              geometry: {
+                type: 'Polygon',
+                coordinates: [
+                  expect.arrayContaining([[6.065424536564729, 47.68858541466545]])
+                ]
+              },
+              properties: {
+                id: '2',
+                remoteId: '2.2',
+                COMMUNE: '70421',
+                NUMERO_I: '2',
+                NUMERO_P: '2',
+                PACAGE: '999000000',
+                conversion_niveau: 'CONV',
+                cultures: [
+                  {
+                    CPF: '01.19.10.12',
+                    TYPE: 'PPH',
+                    id: expect.stringMatching(UUIDRe)
+                  }
+                ]
+              }
+            },
+            {
+              type: 'Feature',
+              id: '3',
+              geometry: {
+                type: 'Polygon',
+                coordinates: [
+                  expect.arrayContaining([[6.069309706237855, 47.6882033150393]])
+                ]
+              },
+              properties: {
+                id: '3',
+                remoteId: '2.4',
+                COMMUNE: '70421',
+                NUMERO_I: '2',
+                NUMERO_P: '4',
+                PACAGE: '999000000',
+                conversion_niveau: 'AB?',
+                cultures: [
+                  {
+                    CPF: '01.11.12',
+                    TYPE: 'BTH',
+                    id: expect.stringMatching(UUIDRe)
+                  }
+                ]
+              }
+            }
+          ]
+        })
+      })
+  })
+
+  test('it converts a L93 single-feature XML file to WGS84 GeoJSON', () => {
+    getRandomFeatureId.mockReturnValueOnce('1')
+
+    return request(app.server)
+      .post('/api/v2/convert/telepac-xml/geojson')
+      .type('json')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+      .attach('archive', 'test/fixtures/mesparcelles-export.xml')
+      .then((response) => {
+        expect(response.status).toEqual(200)
+        expect(response.body).toMatchObject({
+          type: 'FeatureCollection',
+          features: [
+            {
+              id: '1',
+              type: 'Feature',
+              geometry: {
+                type: 'Polygon',
+                coordinates: [
+                  expect.arrayContaining([[5.020622298258249, 44.73758401718037]])
+                ]
+              },
+              properties: {
+                id: '1',
+                remoteId: '1.3',
+                COMMUNE: '26108',
+                NUMERO_I: '1',
+                NUMERO_P: '3',
+                PACAGE: '999000000',
+                conversion_niveau: 'CONV',
+                cultures: [
+                  {
+                    CPF: '01.13.42',
+                    TYPE: 'AIL',
+                    id: expect.stringMatching(UUIDRe)
+                  }
+                ]
+              }
+            }
+          ]
+        })
+      })
+  })
+
+  test('it fails without auth', () => {
+    return request(app.server)
+      .post('/api/v2/convert/telepac-xml/geojson')
+      .type('json')
+      .attach('archive', 'test/fixtures/telepac-dossier.xml')
+      .then((response) => {
+        expect(response.status).toEqual(401)
+      })
+  })
+})
+
 describe('POST /api/v2/convert/geofolia/geojson', () => {
   test('it converts a Geofolia zipped archive into WGS84 GeoJSON', () => {
     const expectation = JSON.parse(fs.readFileSync('test/fixtures/geofolia-parcelles.json', { encoding: 'utf8' }))
