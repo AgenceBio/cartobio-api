@@ -11,5 +11,6 @@ export type NormalizedRecord = Omit<DBOperatorRecord, 'parcelles'> & {
 };
 
 export type NormalizedRecordSummary = Omit<NormalizedRecord, 'parcelles'> & {
-    parcelles: number
+    parcelles: number,
+    surface: number
 };
