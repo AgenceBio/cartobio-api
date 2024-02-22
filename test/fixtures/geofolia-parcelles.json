@@ -40,7 +40,7 @@
         "NUMERO_I": "29",
         "NUMERO_P": "6",
         "conversion_niveau": "",
-        "commentaires": "Parcelle principale avec détails et avec culture secondaire",
+        "commentaires": "Parcelle principale avec détails et avec culture secondaire\n\nParcelle secondaire avec détails secondaire",
         "cultures": [
           {
             "id": "50cda72b-7cb8-4d8f-b0a6-94899f0c6123",
