@@ -1,5 +1,5 @@
-import {AgenceBioAdresseGeo, OrganismeCertificateur} from "../../providers/types/agence-bio";
-import {NormalizedRecord} from "./record";
+import type {AgenceBioAdresseGeo, OrganismeCertificateur} from "../../providers/types/agence-bio.d.ts";
+import type {NormalizedRecord} from "./record.d.ts";
 
 export type AgenceBioNormalizedOperator = {
     id: number;
@@ -23,4 +23,4 @@ export type AgenceBioNormalizedOperator = {
 
 // TODO : this is a bit of duplicate with NormalizedRecord
 //  (we should not have to different objects for sending operator + record)
-export type AgenceBioNormalizedOperatorWithRecord = AgenceBioNormalizedOperator & (NormalizedRecord | { metadata: any })
+export type AgenceBioNormalizedOperatorWithRecord = AgenceBioNormalizedOperator & (NormalizedRecord | { metadata: any });

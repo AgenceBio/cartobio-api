@@ -1,5 +1,5 @@
-import {EventType} from "../history";
-import {CartoBioUser} from "../../providers/types/cartobio";
+import {EventType} from "../history.js";
+import type {CartoBioUser} from "../../providers/types/cartobio.d.ts";
 
 export type HistoryEntry = {
     type: EventType;
