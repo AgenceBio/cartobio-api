@@ -1,12 +1,15 @@
-import {DBOperatorRecord} from "../../providers/types/cartobio";
-import {AgenceBioNormalizedOperator} from "./operator";
-import {CartoBioFeatureCollection} from "./features";
+import type {DBOperatorRecord} from "../../providers/types/cartobio.d.ts";
+import type {AgenceBioNormalizedOperator} from "./operator.d.ts";
+import type {CartoBioFeatureCollection} from "./features.d.ts";
 
 /**
  * A database record normalized to be used in Cartobio, with operator data from Agence Bio
  */
 export type NormalizedRecord = Omit<DBOperatorRecord, 'parcelles'> & {
-    parcelles: CartoBioFeatureCollection;
-    operator: AgenceBioNormalizedOperator;
+    parcelles: CartoBioFeatureCollection ;
+    operator?: AgenceBioNormalizedOperator;
 };
 
+export type NormalizedRecordSummary = Omit<NormalizedRecord, 'parcelles'> & {
+    parcelles: number
+};
