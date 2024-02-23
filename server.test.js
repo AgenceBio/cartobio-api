@@ -352,6 +352,161 @@ describe('POST /api/v2/convert/geofolia/geojson', () => {
   })
 })
 
+describe('POST /api/v2/import/geofolia/:numeroBio', () => {
+  const getMock = jest.mocked(got.get)
+  const postMock = jest.mocked(got.post)
+  const queryMock = jest.mocked(db.query)
+  const archive = fs.readFileSync('test/fixtures/geofolia-parcelles.zip')
+  const expectation = JSON.parse(fs.readFileSync('test/fixtures/geofolia-parcelles.json', { encoding: 'utf8' }))
+
+  test('it checks the availability of a customer on Geofolink', () => {
+    // setup operator
+    getMock.mockReturnValueOnce({
+      async json () {
+        return agencebioOperator
+      }
+    })
+
+    queryMock.mockResolvedValueOnce({ rows: [record] })
+    queryMock.mockResolvedValueOnce({ rows: [] })
+
+    // fake Geofolia token request
+    postMock.mockReturnValueOnce({
+      async json () {
+        return { access_token: 'test-token' }
+      }
+    })
+
+    postMock.mockReturnValueOnce({
+      async json () {
+        return []
+      }
+    })
+
+    return request(app.server)
+      .head('/api/v2/import/geofolia/1234')
+      .type('json')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+      .then((response) => {
+        expect(response.status).toEqual(204)
+      })
+  })
+
+  test('it did not find any relevant SIRET on Geofolink', () => {
+    // setup operator
+    getMock.mockReturnValueOnce({
+      async json () {
+        return agencebioOperator
+      }
+    })
+
+    queryMock.mockResolvedValueOnce({ rows: [record] })
+    queryMock.mockResolvedValueOnce({ rows: [] })
+
+    // we skip the token as it is memoised
+    postMock.mockReturnValueOnce({
+      async json () {
+        const response = { statusCode: 404, statusMessage: 'Not Found' }
+        const error = new got.HTTPError(response)
+        error.response = response
+        throw error
+      }
+    })
+
+    return request(app.server)
+      .head('/api/v2/import/geofolia/1234')
+      .type('json')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+      .then((response) => {
+        expect(response.status).toEqual(404)
+      })
+  })
+
+  test('it requests a working archive on Geofolink', () => {
+    getRandomFeatureId.mockReturnValueOnce('1').mockReturnValueOnce('2')
+
+    // setup operator
+    getMock.mockReturnValueOnce({
+      async json () {
+        return agencebioOperator
+      }
+    })
+
+    queryMock.mockResolvedValueOnce({ rows: [record] })
+    queryMock.mockResolvedValueOnce({ rows: [] })
+
+    // we skip the token as it is memoised
+    getMock.mockReturnValueOnce({
+      async json () {
+        return [{
+          id: 'order-1',
+          identificationCodes: ['999999999']
+        }]
+      }
+    })
+
+    getMock.mockReturnValueOnce({
+      async buffer () {
+        return archive
+      }
+    })
+
+    return request(app.server)
+      .get('/api/v2/import/geofolia/1234')
+      .type('json')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+      .then((response) => {
+        expect(response.status).toEqual(200)
+        expect(response.body).toEqual(expectation)
+      })
+  })
+
+  test('it requests a working archive on Geofolink, but asks to come back later (because it is not ready yet)', () => {
+    // setup operator
+    getMock.mockReturnValueOnce({
+      async json () {
+        return agencebioOperator
+      }
+    })
+
+    queryMock.mockResolvedValueOnce({ rows: [record] })
+    queryMock.mockResolvedValueOnce({ rows: [] })
+
+    // we skip the token as it is memoised
+    getMock.mockReturnValueOnce({
+      async json () {
+        return []
+      }
+    })
+
+    return request(app.server)
+      .get('/api/v2/import/geofolia/1234')
+      .type('json')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+      .then((response) => {
+        expect(response.status).toEqual(202)
+      })
+  })
+
+  test('it fails without auth (head)', () => {
+    return request(app.server)
+      .head('/api/v2/import/geofolia/1234')
+      .type('json')
+      .then((response) => {
+        expect(response.status).toEqual(401)
+      })
+  })
+
+  test('it fails without auth (get)', () => {
+    return request(app.server)
+      .get('/api/v2/import/geofolia/1234')
+      .type('json')
+      .then((response) => {
+        expect(response.status).toEqual(401)
+      })
+  })
+})
+
 describe('GET /api/v2/certification/operators/search', () => {
   const getMock = jest.mocked(got.get)
   const queryMock = jest.mocked(db.query)

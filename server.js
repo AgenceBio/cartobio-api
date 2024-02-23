@@ -29,7 +29,7 @@ const { fetchOperatorByNumeroBio, fetchCustomersByOc, getUserProfileById, getUse
 const { addRecordFeature, fetchLatestCustomersByControlBody, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature } = require('./lib/providers/cartobio.js')
 const { evvLookup, evvParcellaire, pacageLookup, getParcellesStats, getDataGouvStats } = require('./lib/providers/cartobio.js')
 const { parseShapefileArchive, parseTelepacXML } = require('./lib/providers/telepac.js')
-const { parseGeofoliaArchive } = require('./lib/providers/geofolia.js')
+const { parseGeofoliaArchive, geofoliaLookup, geofoliaParcellaire } = require('./lib/providers/geofolia.js')
 const { InvalidRequestApiError, NotFoundApiError } = require('./lib/errors.js')
 
 const { deepmerge, commonSchema, swaggerConfig } = require('./lib/routes/index.js')
@@ -127,6 +127,29 @@ app.register(fastifyOauth, {
     }
     next(new Error('Invalid state'))
   }
+})
+
+app.register(fastifyOauth, {
+  name: 'geofoliaOAuth2',
+  scope: [config.get('geofolia.api.scope')],
+  tags: ['X-HIDDEN'],
+  credentials: {
+    client: {
+      id: config.get('geofolia.oauth.clientId'),
+      secret: config.get('geofolia.oauth.clientSecret')
+    },
+    auth: {
+      authorizeHost: config.get('geofolia.oauth.host'),
+      authorizePath: `/${config.get('geofolia.oauth.tenant')}/oauth2/v2.0/auth`,
+      tokenHost: config.get('geofolia.oauth.host'),
+      tokenPath: `/${config.get('geofolia.oauth.tenant')}/oauth2/v2.0/token`,
+      revokePath: `/${config.get('geofolia.oauth.tenant')}/oauth2/v2.0/revoke`
+    }
+  },
+  // startRedirectPath: '/api/auth-provider/geofolia/login',
+  // callbackUri: '/api/auth-provider/geofolia/callback'
+  startRedirectPath: '/api/login/geofolia',
+  callbackUri: 'http://127.0.0.1:8000/api/login/geofolia/callback'
 })
 
 // Routes to protect with a JSON Web Token
@@ -328,7 +351,9 @@ app.register(async (app) => {
    * @private
    */
   app.post('/api/v2/convert/geofolia/geojson', deepmerge(protectedWithToken()), async (request, reply) => {
-    return parseGeofoliaArchive(request.file())
+    const data = await request.file()
+
+    return parseGeofoliaArchive(await data.toBuffer())
       .then(geojson => reply.send(geojson))
   })
 
@@ -340,6 +365,34 @@ app.register(async (app) => {
 
     return pacageLookup({ numeroPacage })
       .then(featureCollection => reply.send(featureCollection))
+  })
+
+  /**
+   * Checks if an operator has Geofolink features
+   * It triggers a data order, which has the benefit to break the waiting time in two
+   */
+  app.head('/api/v2/import/geofolia/:numeroBio', deepmerge(protectedWithToken({ cartobio: true, oc: true }), routeWithNumeroBio), async (request, reply) => {
+    const { siret } = request.record.operator
+    // const siret = '41522381700016'
+    const isWellKnown = await geofoliaLookup(siret)
+
+    return reply.code(isWellKnown ? 204 : 404).send()
+  })
+
+  /**
+   * Retrieves all features associated to a given SIRET linked to a numeroBio
+   */
+  app.get('/api/v2/import/geofolia/:numeroBio', deepmerge(protectedWithToken({ cartobio: true, oc: true }), routeWithNumeroBio), async (request, reply) => {
+    const { siret } = request.record.operator
+    // const siret = '41522381700016'
+
+    const featureCollection = await geofoliaParcellaire(siret)
+
+    if (!featureCollection) {
+      return reply.code(202).send()
+    }
+
+    return reply.send(featureCollection)
   })
 
   /**
