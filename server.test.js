@@ -676,8 +676,9 @@ describe('POST /api/v2/certification/parcelles', () => {
     }
   })
   clientQuery.mockImplementation(
-    async (sql, [,, geometry] = []) => {
-      if (sql.includes('INTO cartobio_parcelles') && !geometry) {
+    async (sql, [, featureId, geometry] = []) => {
+      if ((sql.includes('UPDATE cartobio_parcelles') && featureId === 124300) ||
+        (sql.includes('INTO cartobio_parcelles') && !geometry)) {
         // Simulate trigger error
         const err = new Error('No geometry')
         err.code = '23502'
