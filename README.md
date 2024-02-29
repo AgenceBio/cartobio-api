@@ -6,7 +6,7 @@ Elle a vocation à être intégrée à [`cartobio-front`][cartobio-front] et aux
 métiers des organismes de certification du bio en France.
 
 
-**Pré-requis** : `node@18`, `postgres@14`, `postgis@3.3`.
+**Pré-requis** : `node@20`, `postgres@15`, `postgis@3.3`.
 
 **📚 Table des matières**
 
@@ -64,8 +64,6 @@ L'application lit les variables définies dans un fichier `.env`.
 | `DATABASE_URL`                       | `http://docker:docker@api-db:15432/cartobio` | URL de la base de données PostGIS qui contient les couches géographiques, et les données métiers CartoBio |
 | `SENTRY_DSN`                         | ``                                           | DSN Sentry pour le suivi des erreurs applicatives                                                         |
 | `CARTOBIO_JWT_SECRET`                | ``                                           | Secret JSON Web Token, pour vérifier l'authenticité des tokens                                            |
-| `NOTIFICATIONS_AB_CARTOBIO_USER`     | ``                                           | Adresse email de connexion à l'espace Notifications de l'Agence Bio                                       |
-| `NOTIFICATIONS_AB_CARTOBIO_PASSWORD` | ``                                           | Mot de passe associé au compte Agence Bio                                                                 |
 | `NOTIFICATIONS_AB_ENDPOINT`          | `https://back.agencebio.org`                 | Point d'accès aux [notifications de l'Agence Bio][api-ab]                                                 |
 
 ## Tests
