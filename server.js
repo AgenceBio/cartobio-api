@@ -198,9 +198,9 @@ app.register(async (app) => {
     const input = request.body.input?.trim()
     const { id: ocId } = request.user.organismeCertificateur
 
-    const [nom, numeroBio] = /^\d+$/.test(input) ? ['', input] : [input, '']
+    const [, siret, numeroBio, nom] = input.match(/^(\d{14})|(\d+)|(.+)$/)
 
-    return fetchCustomersByOc({ ocId, nom, numeroBio })
+    return fetchCustomersByOc({ ocId, siret, numeroBio, nom })
       .then(operators => reply.code(200).send({ operators }))
   })
 
