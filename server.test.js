@@ -13,7 +13,6 @@ const parcelles = require('./lib/providers/__fixtures__/parcelles.json')
 const parcellesPatched = require('./lib/providers/__fixtures__/parcelles-patched.json')
 const apiParcellaire = require('./lib/providers/__fixtures__/agence-bio-api-parcellaire.json')
 const { normalizeRecord } = require('./lib/outputs/record')
-const { normalizeOperator } = require('./lib/outputs/operator')
 const { getRandomFeatureId } = require('./lib/outputs/features')
 const { recordToApi } = require('./lib/outputs/api')
 
@@ -547,95 +546,6 @@ describe('GET /api/v2/certification/operators/search', () => {
   })
 })
 
-describe('GET /api/v2/operateurs/:numeroBio/parcelles', () => {
-  const getMock = jest.mocked(got.get)
-  const postMock = jest.mocked(got.post)
-  const queryMock = jest.mocked(db.query)
-
-  test('it works with a valid numerobio and an OC token', async () => {
-    // 1. AUTHORIZATION check token
-    postMock.mockReturnValueOnce({
-      async json () {
-        return fakeOc
-      }
-    })
-
-    // 2. enforceRecord + getOperatorByNumeroBio
-    getMock.mockReturnValueOnce({
-      async json () {
-        return agencebioOperator
-      }
-    })
-    queryMock.mockResolvedValueOnce({ rows: [record] })
-    queryMock.mockResolvedValueOnce({ rows: parcelles })
-
-    return request(app.server)
-      .get('/api/v2/operateurs/1234/parcelles')
-      .type('json')
-      .set('Authorization', fakeOcToken)
-      .then((response) => {
-        expect(response.status).toEqual(200)
-      })
-  })
-
-  test('it works with a valid numerobio and a CartoBio token', () => {
-    // 1. enforceRecord + getOperatorByNumeroBio
-    getMock.mockReturnValueOnce({
-      async json () {
-        return agencebioOperator
-      }
-    })
-    queryMock.mockResolvedValueOnce({ rows: [record] })
-    queryMock.mockResolvedValueOnce({ rows: parcelles })
-
-    return request(app.server)
-      .get('/api/v2/operateurs/1234/parcelles')
-      .type('json')
-      .set('Authorization', USER_DOC_AUTH_HEADER)
-      .then((response) => {
-        expect(response.status).toEqual(200)
-      })
-  })
-
-  test('it fails with an unknown numerobio and a valid OC token', () => {
-    // 1. AUTHORIZATION check token
-    postMock.mockReturnValueOnce({
-      async json () {
-        return fakeOc
-      }
-    })
-
-    // 2. enforceRecord + getOperatorByNumeroBio
-    getMock.mockResolvedValueOnce(null)
-    queryMock.mockResolvedValueOnce({ rows: [] })
-
-    return request(app.server)
-      .get('/api/v2/operateurs/1234/parcelles')
-      .type('json')
-      .set('Authorization', fakeOcToken)
-      .then((response) => {
-        expect(response.status).toEqual(404)
-      })
-  })
-
-  test('it fails with a valid numerobio and an invalid OC token', () => {
-    postMock.mockReturnValueOnce({
-      async json () {
-        // eslint-disable-next-line no-throw-literal
-        throw { code: 'ERR_NON_2XX_3XX_RESPONSE' }
-      }
-    })
-
-    return request(app.server)
-      .get('/api/v2/operateurs/1234/parcelles')
-      .type('json')
-      .set('Authorization', fakeOcToken)
-      .then((response) => {
-        expect(response.status).toEqual(401)
-      })
-  })
-})
-
 describe('PATCH /api/v2/audits/:recordId/parcelles', () => {
   const fakeAbToken = 'abtoken-bbbb-cccc-dddd'
   const getMock = jest.mocked(got.get)
@@ -644,7 +554,7 @@ describe('PATCH /api/v2/audits/:recordId/parcelles', () => {
 
   test('it updates only the patched properties of the features', async () => {
     clientQuery.mockClear()
-    queryMock.mockClear()
+    queryMock.mockReset()
     // 1. fetchAuthToken
     postMock.mockReturnValueOnce({
       async json () {
@@ -673,11 +583,8 @@ describe('PATCH /api/v2/audits/:recordId/parcelles', () => {
     queryMock.mockResolvedValueOnce({ rows: parcellesPatched })
 
     const patchedRecordExpectation = normalizeRecord({
-      record: {
-        ...record,
-        parcelles: parcellesPatched
-      },
-      operator: normalizeOperator(agencebioOperator)
+      ...record,
+      parcelles: parcellesPatched
     })
 
     const response = await request(app.server)
@@ -916,8 +823,9 @@ describe('POST /api/v2/certification/parcelles', () => {
 })
 
 describe('GET /api/v2/certification/parcellaire/:numeroBio', () => {
-  test('it responds with 404 when no operator is found', async () => {
+  test('it responds with 404 when no parcellaire is found', async () => {
     const queryMock = jest.mocked(db.query)
+    queryMock.mockReset()
     queryMock.mockResolvedValueOnce({ rows: [] })
 
     const res = await request(app.server)
@@ -926,8 +834,9 @@ describe('GET /api/v2/certification/parcellaire/:numeroBio', () => {
     expect(res.status).toBe(404)
   })
 
-  test('it responds with 200 when operator is found', async () => {
+  test('it responds with 200 when a parcellaire is found', async () => {
     const queryMock = jest.mocked(db.query)
+    queryMock.mockReset()
     queryMock.mockResolvedValueOnce({ rows: [record] })
     queryMock.mockResolvedValueOnce({ rows: parcelles })
 
@@ -937,10 +846,7 @@ describe('GET /api/v2/certification/parcellaire/:numeroBio', () => {
     expect(res.status).toBe(200)
     expect(res.body).toEqual(
       recordToApi(
-        normalizeRecord({
-          record: { parcelles, ...record },
-          operator: normalizeOperator(agencebioOperator)
-        })
+        normalizeRecord({ parcelles, ...record })
       )
     )
   })

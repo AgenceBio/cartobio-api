@@ -10,8 +10,9 @@ import {Polygon} from "geojson";
 export type DBOperatorRecord = {
     record_id: number;
     numerobio: string;
-    certification_date_debut: string;
-    certification_date_fin: string;
+    version_name: string;
+    certification_date_debut: Date;
+    certification_date_fin: Date;
     certification_state: CertificationState;
     created_at: string;
     updated_at: string;
@@ -20,7 +21,7 @@ export type DBOperatorRecord = {
     audit_history: HistoryEntry[];
     audit_notes: string;
     audit_demandes: string;
-    audit_date: string;
+    audit_date: Date;
 };
 export type DBOperatorRecordWithParcelles = DBOperatorRecord & {
     parcelles: DBParcelle[];
