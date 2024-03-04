@@ -47,7 +47,7 @@ Il est possible de spécifier des filtres pour obtenir les données d'une versio
 curl -H 'Accept: application/json' \
   -H 'Content-Type: application/json' \
   -H 'Authorization: ...' \
-  https://cartobio.agencebio.org/api/v2/certification/parcellaire/:numeroBio?anneeCampagne=2024&statut=OPERATOR_DRAFT
+  https://cartobio.agencebio.org/api/v2/certification/parcellaire/:numeroBio?anneeAudit=2024&statut=OPERATOR_DRAFT
 ```
 
 ### Réponses

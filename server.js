@@ -26,7 +26,7 @@ const { ExtraErrorData } = require('@sentry/integrations')
 const { createSigner } = require('fast-jwt')
 
 const { fetchOperatorByNumeroBio, fetchCustomersByOc, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators } = require('./lib/providers/agence-bio.js')
-const { addRecordFeature, fetchLatestCustomersByControlBody, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature } = require('./lib/providers/cartobio.js')
+const { addRecordFeature, fetchLatestCustomersByControlBody, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord } = require('./lib/providers/cartobio.js')
 const { evvLookup, evvParcellaire, pacageLookup, getParcellesStats, getDataGouvStats } = require('./lib/providers/cartobio.js')
 const { parseShapefileArchive, parseTelepacXML } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive, geofoliaLookup, geofoliaParcellaire } = require('./lib/providers/geofolia.js')
@@ -35,7 +35,7 @@ const { InvalidRequestApiError, NotFoundApiError } = require('./lib/errors.js')
 const { deepmerge, commonSchema, swaggerConfig } = require('./lib/routes/index.js')
 const { sandboxSchema, internalSchema, hiddenSchema } = require('./lib/routes/index.js')
 const { protectedWithToken, enforceSameCertificationBody } = require('./lib/routes/index.js')
-const { routeWithNumeroBio, routeWithRecordId, routeWithPacage } = require('./lib/routes/index.js')
+const { operatorFromNumeroBio, routeWithRecordId, routeWithPacage } = require('./lib/routes/index.js')
 const { createFeatureSchema, createRecordSchema, deleteSingleFeatureSchema, patchFeatureCollectionSchema, patchRecordSchema, updateFeaturePropertiesSchema } = require('./lib/routes/records.js')
 
 // Application is hosted on localhost:8000 by default
@@ -156,7 +156,9 @@ app.register(fastifyOauth, {
 app.decorateRequest('user', null)
 app.decorateRequest('organismeCertificateur', null)
 
-// Requests can be decorated by a given Record too (associated to a numeroBio/recordId)
+// Requests can be decorated by an operator (associated to a numeroBio)
+app.decorateRequest('operator', null)
+// Requests can be decorated by a given Record too (associated to a recordId)
 app.decorateRequest('record', null)
 
 // Requests can be decorated by an API result when we do custom stream parsing
@@ -217,7 +219,7 @@ app.register(async (app) => {
 
   /**
    * @private
-   * Retrieve a given operators for a given user
+   * Retrieve operators for a given user
    */
   app.get('/api/v2/operators', deepmerge(protectedWithToken({ cartobio: true })), (request, reply) => {
     const { id: userId } = request.user
@@ -227,17 +229,20 @@ app.register(async (app) => {
   })
 
   /**
-   * Retrieve the latest Record for a given operator
+   * @private
+   * Retrieve an operator
    */
-  app.get('/api/v2/operator/:numeroBio', deepmerge(protectedWithToken(), routeWithNumeroBio, enforceSameCertificationBody), (request, reply) => {
-    return reply.code(200).send(request.record)
+  app.get('/api/v2/operator/:numeroBio', deepmerge(protectedWithToken(), operatorFromNumeroBio, enforceSameCertificationBody), (request, reply) => {
+    return reply.code(200).send(request.operator)
   })
 
   /**
-   * Retrieve the latest FeatureCollection for a given operator
+   * @private
+   * Retrieve an operator records
    */
-  app.get('/api/v2/operateurs/:numeroBio/parcelles', deepmerge(protectedWithToken({ oc: true, cartobio: true }), routeWithNumeroBio, enforceSameCertificationBody), (request, reply) => {
-    return reply.code(200).send(request.record.parcelles)
+  app.get('/api/v2/operator/:numeroBio/records', deepmerge(protectedWithToken(), enforceSameCertificationBody), async (request, reply) => {
+    const records = await getRecords(request.params.numeroBio)
+    return reply.code(200).send(records)
   })
 
   /**
@@ -250,20 +255,29 @@ app.register(async (app) => {
   /**
    * Create a new Record for a given Operator
    */
-  app.post('/api/v2/audits/:numeroBio', deepmerge(
+  app.post('/api/v2/operator/:numeroBio/records', deepmerge(
     createRecordSchema,
-    routeWithNumeroBio,
+    operatorFromNumeroBio,
     enforceSameCertificationBody,
     protectedWithToken()
   ), async (request, reply) => {
     const { numeroBio } = request.params
-    const { id: ocId, nom: ocLabel } = request.record.operator.organismeCertificateur
-    const { geojson, metadata, importPrevious } = request.body
+    const { id: ocId, nom: ocLabel } = request.operator.organismeCertificateur
+    const { geojson, metadata, versionName, importPrevious } = request.body
     const record = await createOrUpdateOperatorRecord(
-      { numeroBio, ocId, ocLabel, geojson, metadata },
+      { numeroBio, ocId, ocLabel, geojson, metadata, versionName },
       { user: request.user, oldRecord: request.record, copyParcellesData: importPrevious }
     )
-    return reply.code(200).send(normalizeRecord({ record, operator: request.record.operator }))
+    return reply.code(200).send(normalizeRecord(record))
+  })
+
+  /**
+   * Delete a given Record
+   */
+  app.delete('/api/v2/audits/:recordId', deepmerge(routeWithRecordId, enforceSameCertificationBody, protectedWithToken()), async (request, reply) => {
+    const { user, record } = request
+    await deleteRecord({ user, record })
+    return reply.code(204).send()
   })
 
   /**
@@ -274,7 +288,7 @@ app.register(async (app) => {
     const { body: patch, user, record } = request
 
     return updateAuditRecordState({ user, record }, patch)
-      .then(record => reply.code(200).send(normalizeRecord({ record, operator: request.record.operator })))
+      .then(record => reply.code(200).send(normalizeRecord(record)))
   })
 
   /**
@@ -285,7 +299,7 @@ app.register(async (app) => {
     const { user, record } = request
 
     return addRecordFeature({ user, record }, feature)
-      .then(record => reply.code(200).send(normalizeRecord({ record, operator: request.record.operator })))
+      .then(record => reply.code(200).send(normalizeRecord(record)))
   })
 
   /**
@@ -297,7 +311,7 @@ app.register(async (app) => {
     const { body: featureCollection, user, record } = request
 
     return patchFeatureCollection({ user, record }, featureCollection.features)
-      .then(record => reply.code(200).send(normalizeRecord({ record, operator: request.record.operator })))
+      .then(record => reply.code(200).send(normalizeRecord(record)))
   })
 
   /**
@@ -310,7 +324,7 @@ app.register(async (app) => {
     const { featureId } = request.params
 
     return updateFeature({ featureId, user, record }, feature)
-      .then(record => reply.code(200).send(normalizeRecord({ record, operator: request.record.operator })))
+      .then(record => reply.code(200).send(normalizeRecord(record)))
   })
 
   /**
@@ -322,7 +336,7 @@ app.register(async (app) => {
     const { featureId } = request.params
 
     return deleteSingleFeature({ featureId, user, record }, { reason })
-      .then(record => reply.code(200).send(normalizeRecord({ record, operator: request.record.operator })))
+      .then(record => reply.code(200).send(normalizeRecord(record)))
   })
 
   /**
@@ -371,8 +385,8 @@ app.register(async (app) => {
    * Checks if an operator has Geofolink features
    * It triggers a data order, which has the benefit to break the waiting time in two
    */
-  app.head('/api/v2/import/geofolia/:numeroBio', deepmerge(protectedWithToken({ cartobio: true, oc: true }), routeWithNumeroBio), async (request, reply) => {
-    const { siret } = request.record.operator
+  app.head('/api/v2/import/geofolia/:numeroBio', deepmerge(protectedWithToken({ cartobio: true, oc: true }), operatorFromNumeroBio), async (request, reply) => {
+    const { siret } = request.operator
     // const siret = '41522381700016'
     const isWellKnown = await geofoliaLookup(siret)
 
@@ -382,9 +396,8 @@ app.register(async (app) => {
   /**
    * Retrieves all features associated to a given SIRET linked to a numeroBio
    */
-  app.get('/api/v2/import/geofolia/:numeroBio', deepmerge(protectedWithToken({ cartobio: true, oc: true }), routeWithNumeroBio), async (request, reply) => {
-    const { siret } = request.record.operator
-    // const siret = '41522381700016'
+  app.get('/api/v2/import/geofolia/:numeroBio', deepmerge(protectedWithToken({ cartobio: true, oc: true }), operatorFromNumeroBio), async (request, reply) => {
+    const { siret } = request.operator
 
     const featureCollection = await geofoliaParcellaire(siret)
 
@@ -400,9 +413,9 @@ app.register(async (app) => {
    * You still have to add geometries to the collection.
    * Features contains a 'cadastre' property with references to fetch
    */
-  app.get('/api/v2/import/evv/:numeroEvv(\\d+)+:numeroBio(\\d+)', deepmerge(protectedWithToken({ cartobio: true, oc: true }), routeWithNumeroBio), async (request, reply) => {
+  app.get('/api/v2/import/evv/:numeroEvv(\\d+)+:numeroBio(\\d+)', deepmerge(protectedWithToken({ cartobio: true, oc: true }), operatorFromNumeroBio), async (request, reply) => {
     const { numeroEvv } = request.params
-    const { siret: expectedSiret } = request.record.operator
+    const { siret: expectedSiret } = request.operator
 
     if (!expectedSiret) {
       throw new InvalidRequestApiError('Le numéro SIRET de l\'opérateur n\'est pas renseigné sur le portail de Notification de l\'Agence Bio. Il est indispensable pour sécuriser la collecte du parcellaire viticole auprès des Douanes.')
@@ -451,8 +464,12 @@ app.register(async (app) => {
     })
   })
 
-  app.get('/api/v2/certification/parcellaire/:numeroBio', deepmerge(protectedWithToken({ oc: true }), routeWithNumeroBio), (request, reply) => {
-    return reply.code(200).send(recordToApi(request.record))
+  app.get('/api/v2/certification/parcellaire/:numeroBio', deepmerge(protectedWithToken({ oc: true })), async (request, reply) => {
+    const record = await getOperatorLastRecord(request.params.numeroBio, {
+      anneeAudit: request.query.anneeAudit,
+      statut: request.query.statut
+    })
+    return reply.code(200).send(recordToApi(record))
   })
 
   app.get('/api/v2/user/verify', deepmerge(protectedWithToken({ oc: true, cartobio: true }), sandboxSchema, internalSchema), (request, reply) => {
