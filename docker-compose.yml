@@ -19,7 +19,7 @@ services:
     - external
 
   db:
-    image: kartoza/postgis:14-3.3
+    image: kartoza/postgis:15-3.4
     volumes:
       - geo-db-data:/var/lib/postgresql
     restart: on-failure
