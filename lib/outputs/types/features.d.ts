@@ -8,7 +8,7 @@ export type CartoBioFeatureProperties = {
     COMMUNE?: string;
     cultures: CartoBioCulture[];
     conversion_niveau: string;
-    engagement_date: string;
+    engagement_date?: string;
     commentaires?: string;
     auditeur_notes?: string;
     annotations?: any;

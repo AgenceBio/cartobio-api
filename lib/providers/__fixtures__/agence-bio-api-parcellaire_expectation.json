@@ -3,7 +3,6 @@
   "data": {
     "ocId": 1,
     "ocLabel": "Ecocert France",
-    "numeroPacage": "084012821",
     "auditDate": "2023-04-27T00:00:00.000Z",
     "geojson": {
       "type": "FeatureCollection",
@@ -40,8 +39,6 @@
           },
           "properties": {
             "id": 45742,
-            "remoteId": "45742",
-            "CAMPAGNE": 2022,
             "cultures": [
               {
                 "CPF": "01.92",
@@ -121,8 +118,6 @@
           },
           "properties": {
             "id": 45758,
-            "remoteId": 45758,
-            "CAMPAGNE": 2022,
             "cultures": [
               {
                 "CPF": "01.21.12",
@@ -170,8 +165,6 @@
           },
           "properties": {
             "id": 45736,
-            "remoteId": "45736",
-            "CAMPAGNE": 2022,
             "cultures": [
               {
                 "CPF": "01.21.12",
@@ -219,8 +212,6 @@
           },
           "properties": {
             "id": 45737,
-            "remoteId": "45737",
-            "CAMPAGNE": 2022,
             "cultures": [
               {
                 "CPF": "01.21.12",
@@ -233,7 +224,7 @@
             "PACAGE": "084012821",
             "conversion_niveau": "AB",
             "engagement_date": "2023-04-27",
-            "auditeur_notes": ""
+            "auditeur_notes": null
           }
         }
       ]
