@@ -1,4 +1,4 @@
-import {EventType} from "../history.js";
+import { EventType } from "../../enums.js";
 import type {CartoBioUser} from "../../providers/types/cartobio.d.ts";
 
 export type HistoryEntry = {
