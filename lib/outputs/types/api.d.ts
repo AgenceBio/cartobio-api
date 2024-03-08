@@ -1,5 +1,5 @@
-import {EtatProduction,CertificationState} from "../record";
 import {Feature, FeatureCollection, Polygon} from "geojson";
+import {CertificationState, EtatProduction } from "../../enums";
 
 export type InputApiRecord = {
     numeroBio: number | string;

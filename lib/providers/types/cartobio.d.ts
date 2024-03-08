@@ -1,4 +1,4 @@
-import {EtatProduction,CertificationState} from "../../outputs/record";
+import { CertificationState, EtatProduction } from "../../enums";
 import {CartoBioCulture} from "../../outputs/types/features";
 import {HistoryEntry} from "../../outputs/types/history";
 import {AgenceBioUserGroup, OrganismeCertificateur} from "./agence-bio";
