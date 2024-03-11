@@ -22,7 +22,6 @@ const { randomUUID } = require('node:crypto')
 const { PassThrough } = require('stream')
 
 const Sentry = require('@sentry/node')
-const { ExtraErrorData } = require('@sentry/integrations')
 const { createSigner } = require('fast-jwt')
 
 const { fetchOperatorByNumeroBio, fetchCustomersByOc, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators } = require('./lib/providers/agence-bio.js')
@@ -46,7 +45,7 @@ const DURATION_ONE_HOUR = DURATION_ONE_MINUTE * 60
 const DURATION_ONE_DAY = DURATION_ONE_HOUR * 24
 
 const db = require('./lib/db.js')
-const { FastifyErrorHandler, UnauthorizedApiError } = require('./lib/errors.js')
+const { UnauthorizedApiError } = require('./lib/errors.js')
 const { normalizeRecord } = require('./lib/outputs/record')
 const { recordToApi } = require('./lib/outputs/api')
 const sign = createSigner({ key: config.get('jwtSecret'), expiresIn: DURATION_ONE_DAY * 30 })
@@ -58,8 +57,10 @@ if (reportErrors) {
     environment: config.get('environment'),
     includeLocalVariables: true,
     integrations: [
-      new Sentry.Integrations.Http({ tracing: true }),
-      new ExtraErrorData()
+      // eslint-disable-next-line new-cap
+      new Sentry.extraErrorDataIntegration(),
+      // eslint-disable-next-line new-cap
+      new Sentry.localVariablesIntegration()
     ],
     tracesSampleRate: config.get('environment') === 'production' ? 0.2 : 1
   }
@@ -71,11 +72,8 @@ if (reportErrors) {
   }
 
   Sentry.init(sentryOptions)
+  Sentry.setupFastifyErrorHandler(app)
 }
-
-app.setErrorHandler(new FastifyErrorHandler({
-  sentryClient: Sentry
-}))
 
 // Configure server
 app.register(fastifyCors, {
