@@ -5,6 +5,16 @@ on: [push]
 jobs:
 
   node-test:
+    services:
+      postgres:
+        image: kartoza/postgis:15-3.4
+        env:
+          ALLOW_IP_RANGE: "0.0.0.0/0" # we need that to allow 'api' to connect
+          POSTGRES_USER: docker
+          POSTGRES_PASS: docker
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
@@ -26,6 +36,7 @@ jobs:
         NOTIFICATIONS_AB_SSO_CLIENT_SECRET: "test"
         NOTIFICATIONS_AB_CARTOBIO_USER: "test"
         NOTIFICATIONS_AB_CARTOBIO_PASSWORD: "test"
+        DATABASE_URL: postgresql://docker:docker@127.0.0.1:5432/gis
 
     - name: Coveralls
       uses: coverallsapp/github-action@v2
