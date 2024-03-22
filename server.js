@@ -14,10 +14,8 @@ if (reportErrors) {
     environment: config.get('environment'),
     includeLocalVariables: true,
     integrations: [
-      // eslint-disable-next-line new-cap
-      new Sentry.extraErrorDataIntegration(),
-      // eslint-disable-next-line new-cap
-      new Sentry.localVariablesIntegration()
+      Sentry.extraErrorDataIntegration(),
+      Sentry.localVariablesIntegration()
     ],
     tracesSampleRate: config.get('environment') === 'production' ? 0.2 : 1
   }
