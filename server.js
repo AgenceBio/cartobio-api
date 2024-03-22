@@ -1,56 +1,13 @@
 'use strict'
 
+const Sentry = require('@sentry/node')
 const config = require('./lib/config.js')
 config.validate({ allowed: 'strict' })
 
-const app = require('fastify')({
-  logger: config.get('env') !== 'test',
-  ajv: {
-    plugins: [require('ajv-formats')]
-  }
-})
-
-const fastifySwagger = require('@fastify/swagger')
-const fastifySwaggerUi = require('@fastify/swagger-ui')
-const fastifyCors = require('@fastify/cors')
-const fastifyMultipart = require('@fastify/multipart')
-const fastifyFormBody = require('@fastify/formbody')
-const fastifyOauth = require('@fastify/oauth2')
-const stripBom = require('strip-bom-stream')
-const LRUCache = require('mnemonist/lru-map-with-delete')
-const { randomUUID } = require('node:crypto')
-const { PassThrough } = require('stream')
-
-const Sentry = require('@sentry/node')
-const { createSigner } = require('fast-jwt')
-
-const { fetchOperatorByNumeroBio, fetchCustomersByOc, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators } = require('./lib/providers/agence-bio.js')
-const { addRecordFeature, fetchLatestCustomersByControlBody, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord } = require('./lib/providers/cartobio.js')
-const { evvLookup, evvParcellaire, pacageLookup, getParcellesStats, getDataGouvStats } = require('./lib/providers/cartobio.js')
-const { parseShapefileArchive, parseTelepacXML } = require('./lib/providers/telepac.js')
-const { parseGeofoliaArchive, geofoliaLookup, geofoliaParcellaire } = require('./lib/providers/geofolia.js')
-const { InvalidRequestApiError, NotFoundApiError } = require('./lib/errors.js')
-
-const { deepmerge, commonSchema, swaggerConfig } = require('./lib/routes/index.js')
-const { sandboxSchema, internalSchema, hiddenSchema } = require('./lib/routes/index.js')
-const { protectedWithToken, enforceSameCertificationBody } = require('./lib/routes/index.js')
-const { operatorFromNumeroBio, routeWithRecordId, routeWithPacage } = require('./lib/routes/index.js')
-const { createFeatureSchema, createRecordSchema, deleteSingleFeatureSchema, patchFeatureCollectionSchema, patchRecordSchema, updateFeaturePropertiesSchema } = require('./lib/routes/records.js')
-
+// https://github.com/getsentry/sentry-javascript/blob/8.0.0-alpha.5/docs/v8-node.md
+// Sentry error reporting setup
 // Application is hosted on localhost:8000 by default
 const reportErrors = config.get('reportErrors')
-
-const DURATION_ONE_MINUTE = 1000 * 60
-const DURATION_ONE_HOUR = DURATION_ONE_MINUTE * 60
-const DURATION_ONE_DAY = DURATION_ONE_HOUR * 24
-
-const db = require('./lib/db.js')
-const { FastifyErrorHandler, UnauthorizedApiError } = require('./lib/errors.js')
-const { normalizeRecord } = require('./lib/outputs/record')
-const { recordToApi } = require('./lib/outputs/api')
-const sign = createSigner({ key: config.get('jwtSecret'), expiresIn: DURATION_ONE_DAY * 30 })
-
-// Sentry error reporting setup
 if (reportErrors) {
   const sentryOptions = {
     dsn: config.get('sentry.dsn'),
@@ -72,12 +29,55 @@ if (reportErrors) {
   }
 
   Sentry.init(sentryOptions)
-  Sentry.setupFastifyErrorHandler(app)
 }
 
-app.setErrorHandler(new FastifyErrorHandler({
-  sentryClient: Sentry
-}))
+const app = require('fastify')({
+  logger: config.get('env') !== 'test',
+  ajv: {
+    plugins: [require('ajv-formats')]
+  }
+})
+
+const fastifySwagger = require('@fastify/swagger')
+const fastifySwaggerUi = require('@fastify/swagger-ui')
+const fastifyCors = require('@fastify/cors')
+const fastifyMultipart = require('@fastify/multipart')
+const fastifyFormBody = require('@fastify/formbody')
+const fastifyOauth = require('@fastify/oauth2')
+const stripBom = require('strip-bom-stream')
+const LRUCache = require('mnemonist/lru-map-with-delete')
+const { randomUUID } = require('node:crypto')
+const { PassThrough } = require('stream')
+
+const { createSigner } = require('fast-jwt')
+
+const { fetchOperatorByNumeroBio, fetchCustomersByOc, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators } = require('./lib/providers/agence-bio.js')
+const { addRecordFeature, fetchLatestCustomersByControlBody, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord } = require('./lib/providers/cartobio.js')
+const { evvLookup, evvParcellaire, pacageLookup, getParcellesStats, getDataGouvStats } = require('./lib/providers/cartobio.js')
+const { parseShapefileArchive, parseTelepacXML } = require('./lib/providers/telepac.js')
+const { parseGeofoliaArchive, geofoliaLookup, geofoliaParcellaire } = require('./lib/providers/geofolia.js')
+const { InvalidRequestApiError, NotFoundApiError } = require('./lib/errors.js')
+
+const { deepmerge, commonSchema, swaggerConfig } = require('./lib/routes/index.js')
+const { sandboxSchema, internalSchema, hiddenSchema } = require('./lib/routes/index.js')
+const { protectedWithToken, enforceSameCertificationBody } = require('./lib/routes/index.js')
+const { operatorFromNumeroBio, routeWithRecordId, routeWithPacage } = require('./lib/routes/index.js')
+const { createFeatureSchema, createRecordSchema, deleteSingleFeatureSchema, patchFeatureCollectionSchema, patchRecordSchema, updateFeaturePropertiesSchema } = require('./lib/routes/records.js')
+
+const DURATION_ONE_MINUTE = 1000 * 60
+const DURATION_ONE_HOUR = DURATION_ONE_MINUTE * 60
+const DURATION_ONE_DAY = DURATION_ONE_HOUR * 24
+
+const db = require('./lib/db.js')
+const { FastifyErrorHandler, UnauthorizedApiError } = require('./lib/errors.js')
+const { normalizeRecord } = require('./lib/outputs/record')
+const { recordToApi } = require('./lib/outputs/api')
+const sign = createSigner({ key: config.get('jwtSecret'), expiresIn: DURATION_ONE_DAY * 30 })
+
+app.setErrorHandler(new FastifyErrorHandler())
+if (reportErrors) {
+  Sentry.setupFastifyErrorHandler(app)
+}
 
 // Configure server
 app.register(fastifyCors, {
