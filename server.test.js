@@ -15,6 +15,7 @@ const apiParcellaire = require('./lib/providers/__fixtures__/agence-bio-api-parc
 const { normalizeRecord } = require('./lib/outputs/record')
 const { getRandomFeatureId } = require('./lib/outputs/features')
 const { recordToApi } = require('./lib/outputs/api')
+const { loadRecordFixture, expectDeepCloseTo } = require('./test/utils')
 
 const sign = createSigner({ key: config.get('jwtSecret') })
 
@@ -29,21 +30,10 @@ afterAll(() => app.close())
 afterEach(() => jest.clearAllMocks())
 
 jest.mock('got')
-jest.mock('./lib/db.js', () => ({
-  query: jest.fn(),
-  connect: jest.fn()
-}))
 jest.mock('./lib/outputs/features', () => ({
   ...jest.requireActual('./lib/outputs/features'),
   getRandomFeatureId: jest.fn()
 }))
-
-const clientQuery = jest.fn()
-const clientRelease = jest.fn()
-db.connect.mockResolvedValue({
-  query: clientQuery,
-  release: clientRelease
-})
 
 describe('GET /', () => {
   test('responds with a 404', () => {
@@ -354,7 +344,6 @@ describe('POST /api/v2/convert/geofolia/geojson', () => {
 describe('POST /api/v2/import/geofolia/:numeroBio', () => {
   const getMock = jest.mocked(got.get)
   const postMock = jest.mocked(got.post)
-  const queryMock = jest.mocked(db.query)
   const archive = fs.readFileSync('test/fixtures/geofolia-parcelles.zip')
   const expectation = JSON.parse(fs.readFileSync('test/fixtures/geofolia-parcelles.json', { encoding: 'utf8' }))
 
@@ -365,9 +354,6 @@ describe('POST /api/v2/import/geofolia/:numeroBio', () => {
         return agencebioOperator
       }
     })
-
-    queryMock.mockResolvedValueOnce({ rows: [record] })
-    queryMock.mockResolvedValueOnce({ rows: [] })
 
     // fake Geofolia token request
     postMock.mockReturnValueOnce({
@@ -399,9 +385,6 @@ describe('POST /api/v2/import/geofolia/:numeroBio', () => {
       }
     })
 
-    queryMock.mockResolvedValueOnce({ rows: [record] })
-    queryMock.mockResolvedValueOnce({ rows: [] })
-
     // we skip the token as it is memoised
     postMock.mockReturnValueOnce({
       async json () {
@@ -430,9 +413,6 @@ describe('POST /api/v2/import/geofolia/:numeroBio', () => {
         return agencebioOperator
       }
     })
-
-    queryMock.mockResolvedValueOnce({ rows: [record] })
-    queryMock.mockResolvedValueOnce({ rows: [] })
 
     // we skip the token as it is memoised
     getMock.mockReturnValueOnce({
@@ -467,9 +447,6 @@ describe('POST /api/v2/import/geofolia/:numeroBio', () => {
         return agencebioOperator
       }
     })
-
-    queryMock.mockResolvedValueOnce({ rows: [record] })
-    queryMock.mockResolvedValueOnce({ rows: [] })
 
     // we skip the token as it is memoised
     getMock.mockReturnValueOnce({
@@ -508,7 +485,6 @@ describe('POST /api/v2/import/geofolia/:numeroBio', () => {
 
 describe('GET /api/v2/certification/operators/search', () => {
   const getMock = jest.mocked(got.get)
-  const queryMock = jest.mocked(db.query)
 
   test('the input is recognized as a numero bio', async () => {
     getMock.mockReturnValueOnce({
@@ -516,7 +492,6 @@ describe('GET /api/v2/certification/operators/search', () => {
         return [agencebioOperator]
       }
     })
-    queryMock.mockResolvedValueOnce({ rows: [record] })
 
     return request(app.server)
       .post('/api/v2/certification/operators/search')
@@ -534,7 +509,6 @@ describe('GET /api/v2/certification/operators/search', () => {
         return [agencebioOperator]
       }
     })
-    queryMock.mockResolvedValueOnce({ rows: [record] })
 
     return request(app.server)
       .post('/api/v2/certification/operators/search')
@@ -550,11 +524,10 @@ describe('PATCH /api/v2/audits/:recordId/parcelles', () => {
   const fakeAbToken = 'abtoken-bbbb-cccc-dddd'
   const getMock = jest.mocked(got.get)
   const postMock = jest.mocked(got.post)
-  const queryMock = jest.mocked(db.query)
+
+  beforeEach(loadRecordFixture)
 
   test('it updates only the patched properties of the features', async () => {
-    clientQuery.mockClear()
-    queryMock.mockReset()
     // 1. fetchAuthToken
     postMock.mockReturnValueOnce({
       async json () {
@@ -563,29 +536,19 @@ describe('PATCH /api/v2/audits/:recordId/parcelles', () => {
     })
 
     // 2. enforceRecord + fetchOperatorById
-    queryMock.mockResolvedValueOnce({ rows: [record] })
-    queryMock.mockResolvedValueOnce({ rows: parcelles })
     getMock.mockReturnValueOnce({
       async json () {
         return agencebioOperator
       }
     })
 
-    // 3. BEGIN
-    clientQuery.mockResolvedValueOnce(null)
-    // 4. UPDATE cartobio_operator
-    clientQuery.mockResolvedValueOnce({ rows: [record] })
-    // 5. UPDATE cartobio_parcelles
-    for (let i = 0; i < 2; i++) {
-      clientQuery.mockResolvedValueOnce({ rows: [parcellesPatched[i]] })
-    }
-    // joinRecordParcelles
-    queryMock.mockResolvedValueOnce({ rows: parcellesPatched })
-
     const patchedRecordExpectation = normalizeRecord({
       ...record,
       parcelles: parcellesPatched
     })
+    patchedRecordExpectation.parcelles.features.forEach(
+      parcelle => delete parcelle.properties.updatedAt
+    ) // we don't know
 
     const response = await request(app.server)
       .patch('/api/v2/audits/054f0d70-c3da-448f-823e-81fcf7c2bf6e/parcelles')
@@ -620,8 +583,9 @@ describe('PATCH /api/v2/audits/:recordId/parcelles', () => {
       })
 
     expect(response.status).toBe(200)
-    expect(response.body).toEqual(patchedRecordExpectation)
-    expect(clientRelease).toHaveBeenCalled()
+    expect(response.body.audit_history).toHaveLength(2)
+    expect(db._clientRelease).toHaveBeenCalled()
+    expect(response.body.parcelles).toMatchObject(expectDeepCloseTo(patchedRecordExpectation.parcelles))
   })
 })
 
@@ -629,7 +593,6 @@ describe('GET /api/v2/import/evv/:numeroEvv+:numeroBio', () => {
   const xmlEvv = fs.readFileSync(join(__dirname, 'lib', 'providers', '__fixtures__/cvi-evv.xml'), { encoding: 'utf8' })
   const xmlParcellaire = fs.readFileSync(join(__dirname, 'lib', 'providers', '__fixtures__/cvi-parcellaire.xml'), { encoding: 'utf8' })
   const getMock = jest.mocked(got.get).mockName('getMock')
-  const queryMock = jest.mocked(db.query)
 
   beforeEach(() => {
     getMock.mockReturnValueOnce({
@@ -637,9 +600,6 @@ describe('GET /api/v2/import/evv/:numeroEvv+:numeroBio', () => {
         return agencebioOperator
       }
     })
-
-    queryMock.mockResolvedValueOnce({ rows: [record] })
-    queryMock.mockResolvedValueOnce({ rows: [] })
   })
 
   test('it should return a feature collection', async () => {
@@ -737,19 +697,6 @@ describe('POST /api/v2/certification/parcelles', () => {
       return { id: 999, nom: 'CartobiOC', numeroControleEu: 'FR-999' }
     }
   })
-  clientQuery.mockImplementation(
-    async (sql, [, featureId, geometry] = []) => {
-      if ((sql.includes('UPDATE cartobio_parcelles') && featureId === 124300) ||
-        (sql.includes('INTO cartobio_parcelles') && !geometry)) {
-        // Simulate trigger error
-        const err = new Error('No geometry')
-        err.code = '23502'
-        throw err
-      }
-
-      return ({ rows: [record] })
-    }
-  )
 
   test('it fails without auth', async () => {
     const res = await request(app.server).post('/api/v2/certification/parcelles').send(apiParcellaire)
@@ -765,8 +712,8 @@ describe('POST /api/v2/certification/parcelles', () => {
       .send(apiParcellaire.toString() + ']')
     expect(db.query).not.toHaveBeenCalled()
     expect(db.connect).toHaveBeenCalled()
-    expect(clientQuery).toHaveBeenLastCalledWith('ROLLBACK;')
-    expect(clientRelease).toHaveBeenCalled()
+    expect(db._clientQuery).toHaveBeenCalledWith('ROLLBACK;')
+    expect(db._clientRelease).toHaveBeenCalled()
     expect(res.status).toBe(400)
   })
 
@@ -777,8 +724,8 @@ describe('POST /api/v2/certification/parcelles', () => {
       .send(apiParcellaire)
     expect(db.query).not.toHaveBeenCalled()
     expect(db.connect).toHaveBeenCalled()
-    expect(clientQuery).toHaveBeenLastCalledWith('ROLLBACK;')
-    expect(clientRelease).toHaveBeenCalled()
+    expect(db._clientQuery).toHaveBeenCalledWith('ROLLBACK;')
+    expect(db._clientRelease).toHaveBeenCalled()
     expect(res.status).toBe(400)
     expect(res.body).toEqual({
       nbObjetTraites: 4,
@@ -805,16 +752,8 @@ describe('POST /api/v2/certification/parcelles', () => {
 
     expect(db.query).not.toHaveBeenCalled()
     expect(db.connect).toHaveBeenCalled()
-    // BEGIN + 3 * BEGIN + 3 * COMMIT + 3 * INSERT cartobio_pperators
-    // + 6 * INSERT cartobio_parcelles + 3 * DELETE + COMMIT
-    expect(clientQuery).toHaveBeenCalledTimes(20)
-    expect(clientQuery).toHaveBeenCalledWith('BEGIN;')
-    expect(clientQuery).toHaveBeenNthCalledWith(2, 'BEGIN;')
-    expect(clientQuery).toHaveBeenNthCalledWith(3, expect.stringContaining('cartobio_operators'), expect.anything())
-    expect(clientQuery).toHaveBeenNthCalledWith(4, expect.stringContaining('cartobio_parcelles'), expect.anything())
-    expect(clientQuery).toHaveBeenNthCalledWith(9, 'COMMIT;')
-    expect(clientQuery).toHaveBeenLastCalledWith('COMMIT;')
-    expect(clientRelease).toHaveBeenCalled()
+    expect(db._clientQuery).toHaveBeenLastCalledWith('COMMIT;')
+    expect(db._clientRelease).toHaveBeenCalled()
     expect(res.status).toBe(202)
     expect(res.body).toEqual({
       nbObjetTraites: 3
@@ -823,11 +762,8 @@ describe('POST /api/v2/certification/parcelles', () => {
 })
 
 describe('GET /api/v2/certification/parcellaire/:numeroBio', () => {
+  beforeEach(loadRecordFixture)
   test('it responds with 404 when no parcellaire is found', async () => {
-    const queryMock = jest.mocked(db.query)
-    queryMock.mockReset()
-    queryMock.mockResolvedValueOnce({ rows: [] })
-
     const res = await request(app.server)
       .get('/api/v2/certification/parcellaire/1234')
       .set('Authorization', fakeOcToken)
@@ -835,18 +771,15 @@ describe('GET /api/v2/certification/parcellaire/:numeroBio', () => {
   })
 
   test('it responds with 200 when a parcellaire is found', async () => {
-    const queryMock = jest.mocked(db.query)
-    queryMock.mockReset()
-    queryMock.mockResolvedValueOnce({ rows: [record] })
-    queryMock.mockResolvedValueOnce({ rows: parcelles })
-
     const res = await request(app.server)
-      .get('/api/v2/certification/parcellaire/1234')
+      .get('/api/v2/certification/parcellaire/99999')
       .set('Authorization', fakeOcToken)
     expect(res.status).toBe(200)
     expect(res.body).toEqual(
-      recordToApi(
-        normalizeRecord({ parcelles, ...record })
+      expectDeepCloseTo(
+        recordToApi(
+          normalizeRecord({ parcelles, ...record })
+        )
       )
     )
   })

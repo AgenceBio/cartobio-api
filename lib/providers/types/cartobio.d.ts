@@ -11,8 +11,8 @@ export type DBOperatorRecord = {
     record_id: number;
     numerobio: string;
     version_name: string;
-    certification_date_debut: Date;
-    certification_date_fin: Date;
+    certification_date_debut: string;
+    certification_date_fin: string;
     certification_state: CertificationState;
     created_at: string;
     updated_at: string;
@@ -21,7 +21,7 @@ export type DBOperatorRecord = {
     audit_history: HistoryEntry[];
     audit_notes: string;
     audit_demandes: string;
-    audit_date: Date;
+    audit_date: string;
 };
 export type DBOperatorRecordWithParcelles = DBOperatorRecord & {
     parcelles: DBParcelle[];

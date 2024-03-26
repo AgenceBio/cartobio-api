@@ -19,6 +19,17 @@ concurrency:
 
 jobs:
   build:
+    services:
+      postgres:
+        image: kartoza/postgis:15-3.4
+        env:
+          ALLOW_IP_RANGE: "0.0.0.0/0" # we need that to allow 'api' to connect
+          POSTGRES_USER: docker
+          POSTGRES_PASS: docker
+          DB_NAME: gis
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+        ports:
+          - 5432:5432
     runs-on: ubuntu-latest
 
     outputs:
@@ -30,10 +41,32 @@ jobs:
     - uses: docker/setup-buildx-action@v2
     - run: docker build -t agencebio/cartobio-api .
 
+    - name: Get services bridge network name
+      id: network
+      run: echo "SERVICES_NETWORK=$(docker network ls --filter name=github --format '{{.Name}}')" >> "${GITHUB_ENV}"
+
     - name: Test the Docker image
-      run: docker run -e NOTIFICATIONS_AB_CARTOBIO_USER -e NOTIFICATIONS_AB_CARTOBIO_PASSWORD -e NOTIFICATIONS_AB_SSO_CLIENT_ID -e NOTIFICATIONS_AB_SSO_CLIENT_SECRET -e NOTIFICATIONS_AB_ENDPOINT -e CARTOBIO_JWT_SECRET -e GEOFOLIA_OAUTH_HOST -e GEOFOLIA_OAUTH_TENANT -e GEOFOLIA_OAUTH_CLIENT_ID -e GEOFOLIA_OAUTH_CLIENT_SECRET -e GEOFOLIA_API_HOST -e GEOFOLIA_API_SUBSCRIPTION_KEY -e CI agencebio/cartobio-api npm test
+      run: > 
+        docker run 
+        -e DATABASE_URL 
+        -e NOTIFICATIONS_AB_CARTOBIO_USER 
+        -e NOTIFICATIONS_AB_CARTOBIO_PASSWORD 
+        -e NOTIFICATIONS_AB_SSO_CLIENT_ID 
+        -e NOTIFICATIONS_AB_SSO_CLIENT_SECRET 
+        -e NOTIFICATIONS_AB_ENDPOINT 
+        -e CARTOBIO_JWT_SECRET 
+        -e GEOFOLIA_OAUTH_HOST 
+        -e GEOFOLIA_OAUTH_TENANT 
+        -e GEOFOLIA_OAUTH_CLIENT_ID 
+        -e GEOFOLIA_OAUTH_CLIENT_SECRET 
+        -e GEOFOLIA_API_HOST 
+        -e GEOFOLIA_API_SUBSCRIPTION_KEY 
+        -e CI 
+        --network ${{ env.SERVICES_NETWORK }}
+        agencebio/cartobio-api npm test
       env:
         CI: true
+        DATABASE_URL: postgresql://docker:docker@postgres:5432/gis
         NOTIFICATIONS_AB_ENDPOINT: https://preprod-notifications.agencebio.org:444
         CARTOBIO_JWT_SECRET: "${{ secrets.CARTOBIO_JWT_SECRET }}"
         GEOFOLIA_OAUTH_HOST: https://login.microsoftonline.com
