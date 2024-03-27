@@ -6,9 +6,9 @@ module.exports.loadRecordFixture = async function () {
   await db.query(
     /* sql */`
       INSERT INTO cartobio_operators
-      (record_id, version_name, numerobio, certification_state, audit_date, audit_history, metadata)
+      (record_id, version_name, numerobio, certification_state, audit_date, audit_history, metadata, oc_id, oc_label)
       VALUES
-      ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb)
+      ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9)
       `,
     [
       record.record_id,
@@ -17,7 +17,9 @@ module.exports.loadRecordFixture = async function () {
       record.certification_state,
       record.audit_date,
       JSON.stringify(record.audit_history),
-      record.metadata
+      record.metadata,
+      record.oc_id,
+      record.oc_label
     ]
   )
 

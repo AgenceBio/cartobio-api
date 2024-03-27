@@ -6,6 +6,8 @@
   "certification_date_fin": null,
   "certification_state": "PENDING_CERTIFICATION",
   "audit_date": "2023-09-07",
+  "oc_id": 999,
+  "oc_label": "CartobiOC",
   "metadata": {
     "campagne": "2023",
     "pacage": "999999999",

@@ -6,6 +6,8 @@
   "echeanceSiret": "",
   "numeroBio": "99999",
   "email": "test@example.com",
+  "dateEngagement": "",
+  "datePremierEngagement": null,
   "numeroPacage": "",
   "codeNAF": "",
   "departementId": 1,
@@ -17,8 +19,10 @@
     }
   ],
   "productions": [],
+  "notifications": [],
   "certificats": [
     {
+      "organismeCertificateurId": 999,
       "organisme": "OC fictif",
       "date": "2023-01-01",
       "url": "http://example.net/certificats/id/1-2-3-4"

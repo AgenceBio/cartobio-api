@@ -21,7 +21,7 @@ module.exports = {
   },
   // parser: '@typescript-eslint/parser',
   parserOptions: {
-    ecmaVersion: 2020
+    ecmaVersion: 2023
   },
   root: true,
   ignorePatterns: ['**/*.d.ts', 'migrations/**/*.js'],
