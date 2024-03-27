@@ -12,6 +12,7 @@ const record = require('./lib/providers/__fixtures__/record.json')
 const parcelles = require('./lib/providers/__fixtures__/parcelles.json')
 const parcellesPatched = require('./lib/providers/__fixtures__/parcelles-patched.json')
 const apiParcellaire = require('./lib/providers/__fixtures__/agence-bio-api-parcellaire.json')
+const { normalizeOperator } = require('./lib/outputs/operator.js')
 const { normalizeRecord } = require('./lib/outputs/record')
 const { getRandomFeatureId } = require('./lib/outputs/features')
 const { recordToApi } = require('./lib/outputs/api')
@@ -483,40 +484,218 @@ describe('POST /api/v2/import/geofolia/:numeroBio', () => {
   })
 })
 
-describe('GET /api/v2/certification/operators/search', () => {
+describe('GET /api/v2/certification/search', () => {
   const getMock = jest.mocked(got.get)
 
-  test('the input is recognized as a numero bio', async () => {
-    getMock.mockReturnValueOnce({
-      async json () {
-        return [agencebioOperator]
-      }
+  const mockResultsOrder = (...results) => {
+    results.forEach(result => {
+      getMock.mockReturnValueOnce({
+        async json () {
+          return result
+        }
+      })
+    })
+  }
+
+  describe('with search', () => {
+    beforeEach(loadRecordFixture)
+    beforeEach(() => mockResultsOrder([agencebioOperator]))
+    afterEach(() => getMock.mockReset())
+
+    test('search with no results', async () => {
+      getMock.mockReset().mockReturnValueOnce({
+        async json () {
+          return []
+        }
+      })
+
+      return request(app.server)
+        .post('/api/v2/certification/search')
+        .type('json')
+        .send({ input: '1234' })
+        .set('Authorization', USER_DOC_AUTH_HEADER)
+        .then((response) => {
+          expect(response.body).toMatchObject({
+            pagination: {
+              total: 0,
+              page: 1,
+              page_max: 1
+            },
+            records: []
+          })
+        })
     })
 
-    return request(app.server)
-      .post('/api/v2/certification/operators/search')
-      .type('json')
-      .send({ input: '1234' })
-      .set('Authorization', USER_DOC_AUTH_HEADER)
-      .then((response) => {
-        expect(response.status).toEqual(200)
-      })
+    test('search default sort (audit_date/desc)', async () => {
+      return request(app.server)
+        .post('/api/v2/certification/search')
+        .type('json')
+        .send({ input: '99999' })
+        .set('Authorization', USER_DOC_AUTH_HEADER)
+        .then((response) => {
+          expect(response.body).toMatchObject({
+            pagination: {
+              total: 1,
+              page: 1,
+              page_max: 1
+            },
+            records: [
+              {
+                ...normalizeOperator(agencebioOperator),
+                dateEngagement: '',
+                datePremierEngagement: null,
+                notifications: [],
+                record_id: '054f0d70-c3da-448f-823e-81fcf7c2bf6e',
+                certification_state: 'PENDING_CERTIFICATION',
+                audit_date: '2023-09-07'
+              }
+            ]
+          })
+        })
+    })
+
+    test('search manual sort (nom/asc)', () => {
+      return request(app.server)
+        .post('/api/v2/certification/search')
+        .type('json')
+        .send({ input: 'test', sort: 'nom', order: 'asc' })
+        .set('Authorization', USER_DOC_AUTH_HEADER)
+        .then((response) => {
+          expect(response.body).toMatchObject({
+            pagination: {
+              total: 1,
+              page: 1,
+              page_max: 1
+            },
+            records: [
+              {
+                ...normalizeOperator(agencebioOperator),
+                dateEngagement: '',
+                datePremierEngagement: null,
+                notifications: [],
+                record_id: '054f0d70-c3da-448f-823e-81fcf7c2bf6e',
+                certification_state: 'PENDING_CERTIFICATION',
+                audit_date: '2023-09-07'
+              }
+            ]
+          })
+        })
+    })
+
+    test('search manual sort (engagement_date/desc)', () => {
+      return request(app.server)
+        .post('/api/v2/certification/search')
+        .type('json')
+        .send({ input: 'test', sort: 'engagement_date', order: 'desc' })
+        .set('Authorization', USER_DOC_AUTH_HEADER)
+        .then((response) => {
+          expect(response.body).toMatchObject({
+            pagination: {
+              total: 1,
+              page: 1,
+              page_max: 1
+            },
+            records: [
+              {
+                ...normalizeOperator(agencebioOperator),
+                dateEngagement: '',
+                datePremierEngagement: null,
+                notifications: [],
+                record_id: '054f0d70-c3da-448f-823e-81fcf7c2bf6e',
+                certification_state: 'PENDING_CERTIFICATION',
+                audit_date: '2023-09-07'
+              }
+            ]
+          })
+        })
+    })
+
+    test('search manual sort (statut/desc)', () => {
+      return request(app.server)
+        .post('/api/v2/certification/search')
+        .type('json')
+        .send({ input: 'test', sort: 'statut', order: 'desc' })
+        .set('Authorization', USER_DOC_AUTH_HEADER)
+        .then((response) => {
+          expect(response.body).toMatchObject({
+            pagination: {
+              total: 1,
+              page: 1,
+              page_max: 1
+            },
+            records: [
+              {
+                ...normalizeOperator(agencebioOperator),
+                dateEngagement: '',
+                datePremierEngagement: null,
+                notifications: [],
+                record_id: '054f0d70-c3da-448f-823e-81fcf7c2bf6e',
+                certification_state: 'PENDING_CERTIFICATION',
+                audit_date: '2023-09-07'
+              }
+            ]
+          })
+        })
+    })
   })
 
-  test('otherwise it is seen as a farm name', () => {
-    getMock.mockReturnValueOnce({
-      async json () {
-        return [agencebioOperator]
-      }
+  describe('with local results (no search)', () => {
+    beforeEach(loadRecordFixture)
+    afterEach(() => getMock.mockReset())
+
+    test('dashboard default sort (audit_date/desc)', () => {
+      mockResultsOrder(
+        { ...agencebioOperator, id: 99999, numeroBio: '99999', nom: 'Opérateur test 1' },
+        { ...agencebioOperator, id: 99998, numeroBio: '99998', nom: 'Opérateur test 2' },
+        { ...agencebioOperator, id: 99997, numeroBio: '99997', nom: 'Opérateur test 3' }
+      )
+
+      return request(app.server)
+        .post('/api/v2/certification/search')
+        .send({ input: '' })
+        .set('Authorization', USER_DOC_AUTH_HEADER)
+        .then((response) => {
+          expect(response.body).toHaveProperty('pagination', {
+            total: 3,
+            page: 1,
+            page_max: 1
+          })
+
+          const ids = response.body.records.map(({ record_id: d }) => d)
+          expect(ids).toEqual([
+            '054f0d70-c3da-448f-823e-81fcf7c2bf6e',
+            '054f0d70-c3da-448f-823e-12fcf7c20002',
+            '054f0d70-c3da-448f-823e-12fcf7c20001'
+          ])
+        })
     })
 
-    return request(app.server)
-      .post('/api/v2/certification/operators/search')
-      .send({ input: 'ferme 1234' })
-      .set('Authorization', USER_DOC_AUTH_HEADER)
-      .then((response) => {
-        expect(response.status).toEqual(200)
-      })
+    test('dashboard explicit sort (statut/asc)', () => {
+      mockResultsOrder(
+        { ...agencebioOperator, id: 99997, numeroBio: '99997', nom: 'Opérateur test 3' },
+        { ...agencebioOperator, id: 99999, numeroBio: '99999', nom: 'Opérateur test 1' },
+        { ...agencebioOperator, id: 99998, numeroBio: '99998', nom: 'Opérateur test 2' }
+      )
+
+      return request(app.server)
+        .post('/api/v2/certification/search')
+        .send({ input: '', page: 1, sort: 'statut', order: 'asc' })
+        .set('Authorization', USER_DOC_AUTH_HEADER)
+        .then((response) => {
+          expect(response.body).toHaveProperty('pagination', {
+            total: 3,
+            page: 1,
+            page_max: 1
+          })
+
+          const ids = response.body.records.map(({ record_id: d }) => d)
+          expect(ids).toEqual([
+            '054f0d70-c3da-448f-823e-12fcf7c20001',
+            '054f0d70-c3da-448f-823e-81fcf7c2bf6e',
+            '054f0d70-c3da-448f-823e-12fcf7c20002'
+          ])
+        })
+    })
   })
 })
 
@@ -710,6 +889,7 @@ describe('POST /api/v2/certification/parcelles', () => {
       .post('/api/v2/certification/parcelles')
       .set('Authorization', fakeOcToken)
       .send(apiParcellaire.toString() + ']')
+
     expect(db.query).not.toHaveBeenCalled()
     expect(db.connect).toHaveBeenCalled()
     expect(db._clientQuery).toHaveBeenCalledWith('ROLLBACK;')
@@ -767,6 +947,7 @@ describe('GET /api/v2/certification/parcellaire/:numeroBio', () => {
     const res = await request(app.server)
       .get('/api/v2/certification/parcellaire/1234')
       .set('Authorization', fakeOcToken)
+
     expect(res.status).toBe(404)
   })
 

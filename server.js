@@ -49,8 +49,8 @@ const { PassThrough } = require('stream')
 
 const { createSigner } = require('fast-jwt')
 
-const { fetchOperatorByNumeroBio, fetchCustomersByOc, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators } = require('./lib/providers/agence-bio.js')
-const { addRecordFeature, fetchLatestCustomersByControlBody, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord } = require('./lib/providers/cartobio.js')
+const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators } = require('./lib/providers/agence-bio.js')
+const { addRecordFeature, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords } = require('./lib/providers/cartobio.js')
 const { evvLookup, evvParcellaire, pacageLookup, getParcellesStats, getDataGouvStats } = require('./lib/providers/cartobio.js')
 const { parseShapefileArchive, parseTelepacXML } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive, geofoliaLookup, geofoliaParcellaire } = require('./lib/providers/geofolia.js')
@@ -60,6 +60,7 @@ const { deepmerge, commonSchema, swaggerConfig } = require('./lib/routes/index.j
 const { sandboxSchema, internalSchema, hiddenSchema } = require('./lib/routes/index.js')
 const { protectedWithToken, enforceSameCertificationBody } = require('./lib/routes/index.js')
 const { operatorFromNumeroBio, routeWithRecordId, routeWithPacage } = require('./lib/routes/index.js')
+const { certificationBodySearchSchema } = require('./lib/routes/index.js')
 const { createFeatureSchema, createRecordSchema, deleteSingleFeatureSchema, patchFeatureCollectionSchema, patchRecordSchema, updateFeaturePropertiesSchema } = require('./lib/routes/records.js')
 
 const DURATION_ONE_MINUTE = 1000 * 60
@@ -196,25 +197,13 @@ app.register(async (app) => {
   /**
    * @private
    */
-  app.post('/api/v2/certification/operators/search', deepmerge(protectedWithToken()), (request, reply) => {
-    const input = request.body.input?.trim()
+  app.post('/api/v2/certification/search', deepmerge(certificationBodySearchSchema, protectedWithToken()), async (request, reply) => {
+    const { input, page, sort, order } = request.body
     const { id: ocId } = request.user.organismeCertificateur
 
-    const [, siret, numeroBio, nom] = input.match(/^(\d{14})|(\d+)|(.+)$/)
+    const { pagination, records } = await searchControlBodyRecords({ ocId, input, page, sort, order })
 
-    return fetchCustomersByOc({ ocId, siret, numeroBio, nom })
-      .then(operators => reply.code(200).send({ operators }))
-  })
-
-  /**
-   * @private
-   * @TODO control and derive ocId credentials
-   */
-  app.get('/api/v2/certification/operators/latest', deepmerge(protectedWithToken()), (request, reply) => {
-    const { id: ocId } = request.user.organismeCertificateur
-
-    return fetchLatestCustomersByControlBody({ ocId })
-      .then(operators => reply.code(200).send({ operators }))
+    return reply.code(200).send({ pagination, records })
   })
 
   /**
