@@ -12,7 +12,7 @@
     "checkJs": true,
     "resolveJsonModule": false,
     "lib": [
-      "es2022"
+      "es2023"
     ]
   }
 }

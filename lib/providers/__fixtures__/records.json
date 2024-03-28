@@ -1,0 +1,122 @@
+[
+  {
+    "record_id": "054f0d70-c3da-448f-823e-81fcf7c2bf6e",
+    "numerobio": "99999",
+    "version_name": "audit 2023",
+    "certification_date_debut": null,
+    "certification_date_fin": null,
+    "certification_state": "PENDING_CERTIFICATION",
+    "audit_date": "2023-09-07",
+    "oc_id": 999,
+    "oc_label": "CartobiOC",
+    "metadata": {
+      "campagne": "2023",
+      "pacage": "999999999",
+      "source": "telepac",
+      "sourceLastUpdate": "2023-09-07T13:25:16.435Z"
+    },
+    "audit_history": [
+      {
+        "date": "2023-09-07T13:25:16.435Z",
+        "type": "FeatureCollectionCreation",
+        "state": "PENDING_CERTIFICATION",
+        "metadata": {
+          "campagne": "2023",
+          "pacage": "999999999",
+          "source": "telepac"
+        }
+      }
+    ],
+    "audit_notes": "",
+    "audit_demandes": ""
+  },
+  {
+    "record_id": "054f0d70-c3da-448f-823e-81fcf7c11112",
+    "numerobio": "99999",
+    "version_name": "audit 2022",
+    "certification_date_debut": "2022-01-01",
+    "certification_date_fin": "2024-03-31",
+    "certification_state": "CERTIFIED",
+    "audit_date": "2022-05-01",
+    "oc_id": 999,
+    "oc_label": "CartobiOC",
+    "metadata": {
+      "campagne": "2022",
+      "pacage": "999999999",
+      "source": "telepac",
+      "sourceLastUpdate": "2022-04-07T13:25:16.435Z"
+    },
+    "audit_history": [
+      {
+        "date": "2022-05-13T13:25:16.435Z",
+        "type": "CertificationStateChange",
+        "state": "CERTIFIED",
+        "metadata": {}
+      },
+      {
+        "date": "2022-04-07T13:25:16.435Z",
+        "type": "FeatureCollectionCreation",
+        "state": "PENDING_CERTIFICATION",
+        "metadata": {
+          "campagne": "2023",
+          "pacage": "999999999",
+          "source": "telepac"
+        }
+      }
+    ],
+    "audit_notes": "",
+    "audit_demandes": ""
+  },
+  {
+    "record_id": "054f0d70-c3da-448f-823e-12fcf7c20002",
+    "numerobio": "99998",
+    "version_name": "audit 2022",
+    "certification_date_debut": "2022-02-01",
+    "certification_date_fin": "2024-03-31",
+    "certification_state": "CERTIFIED",
+    "audit_date": "2022-09-01",
+    "oc_id": 999,
+    "oc_label": "CartobiOC",
+    "metadata": {},
+    "audit_history": [
+      {
+        "date": "2022-09-10T13:25:16.435Z",
+        "type": "CertificationStateChange",
+        "state": "CERTIFIED",
+        "metadata": {}
+      },
+      {
+        "date": "2022-09-01T13:25:16.435Z",
+        "type": "FeatureCollectionCreation",
+        "state": "PENDING_CERTIFICATION",
+        "metadata": {
+          "campagne": "2023",
+          "pacage": "999999999",
+          "source": "telepac"
+        }
+      }
+    ],
+    "audit_notes": "",
+    "audit_demandes": ""
+  },
+  {
+    "record_id": "054f0d70-c3da-448f-823e-12fcf7c20001",
+    "numerobio": "99997",
+    "version_name": "audit 2023",
+    "certification_date_debut": null,
+    "certification_date_fin": null,
+    "certification_state": "OPERATOR_DRAFT",
+    "audit_date": null,
+    "oc_id": 999,
+    "oc_label": "CartobiOC",
+    "metadata": {
+      "campagne": "2023",
+      "pacage": "999999999",
+      "source": "telepac",
+      "sourceLastUpdate": "2023-09-07T13:25:16.435Z"
+    },
+    "audit_history": [],
+    "audit_notes": "",
+    "audit_demandes": ""
+  }
+]
