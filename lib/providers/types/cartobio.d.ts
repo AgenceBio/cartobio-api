@@ -46,7 +46,7 @@ type DBParcelle = {
     commune?: string;
     cultures: CartoBioCulture[];
     conversion_niveau: EtatProduction;
-    engagement_date?: Date;
+    engagement_date?: string;
     commentaire?: string;
     auditeur_notes?: string;
     annotations?: object[]; // Replace with actual Annotations type
