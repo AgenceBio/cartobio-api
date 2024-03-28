@@ -1,14 +1,14 @@
 const db = require('../lib/db')
-const record = require('../lib/providers/__fixtures__/record.json')
+const records = require('../lib/providers/__fixtures__/records.json')
 const parcelles = require('../lib/providers/__fixtures__/parcelles.json')
 
 module.exports.loadRecordFixture = async function () {
-  await db.query(
+  await Promise.all(records.map(record => db.query(
     /* sql */`
       INSERT INTO cartobio_operators
-      (record_id, version_name, numerobio, certification_state, audit_date, audit_history, metadata)
+      (record_id, version_name, numerobio, certification_state, audit_date, audit_history, metadata, oc_id, oc_label)
       VALUES
-      ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb)
+      ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9)
       `,
     [
       record.record_id,
@@ -17,9 +17,11 @@ module.exports.loadRecordFixture = async function () {
       record.certification_state,
       record.audit_date,
       JSON.stringify(record.audit_history),
-      record.metadata
+      record.metadata,
+      record.oc_id,
+      record.oc_label
     ]
-  )
+  )))
 
   for (let i = 0; i < parcelles.length; i++) {
     const parcelle = parcelles[i]
@@ -31,7 +33,7 @@ module.exports.loadRecordFixture = async function () {
         ($1, $2, $3::geometry, $4, $5::jsonb)
         `,
       [
-        record.record_id,
+        records.at(0).record_id,
         parcelle.id,
         parcelle.geometry,
         parcelle.commune,
