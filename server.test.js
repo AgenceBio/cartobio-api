@@ -8,7 +8,7 @@ const { join } = require('node:path')
 const db = require('./lib/db.js')
 
 const agencebioOperator = require('./lib/providers/__fixtures__/agence-bio-operateur.json')
-const record = require('./lib/providers/__fixtures__/record.json')
+const [record] = require('./lib/providers/__fixtures__/records.json')
 const parcelles = require('./lib/providers/__fixtures__/parcelles.json')
 const parcellesPatched = require('./lib/providers/__fixtures__/parcelles-patched.json')
 const apiParcellaire = require('./lib/providers/__fixtures__/agence-bio-api-parcellaire.json')
