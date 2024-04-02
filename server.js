@@ -62,6 +62,7 @@ const { protectedWithToken, enforceSameCertificationBody } = require('./lib/rout
 const { operatorFromNumeroBio, routeWithRecordId, routeWithPacage } = require('./lib/routes/index.js')
 const { certificationBodySearchSchema } = require('./lib/routes/index.js')
 const { createFeatureSchema, createRecordSchema, deleteSingleFeatureSchema, patchFeatureCollectionSchema, patchRecordSchema, updateFeaturePropertiesSchema } = require('./lib/routes/records.js')
+const { geofoliaImportSchema } = require('./lib/routes/index.js')
 
 const DURATION_ONE_MINUTE = 1000 * 60
 const DURATION_ONE_HOUR = DURATION_ONE_MINUTE * 60
@@ -374,10 +375,11 @@ app.register(async (app) => {
    * Checks if an operator has Geofolink features
    * It triggers a data order, which has the benefit to break the waiting time in two
    */
-  app.head('/api/v2/import/geofolia/:numeroBio', deepmerge(protectedWithToken({ cartobio: true, oc: true }), operatorFromNumeroBio), async (request, reply) => {
+  app.head('/api/v2/import/geofolia/:numeroBio', deepmerge(protectedWithToken({ cartobio: true, oc: true }), operatorFromNumeroBio, geofoliaImportSchema), async (request, reply) => {
     const { siret } = request.operator
-    // const siret = '41522381700016'
-    const isWellKnown = await geofoliaLookup(siret)
+    const { year } = request.query
+
+    const isWellKnown = await geofoliaLookup(siret, year)
 
     return reply.code(isWellKnown ? 204 : 404).send()
   })
