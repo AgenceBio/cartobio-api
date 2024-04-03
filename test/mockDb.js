@@ -1,3 +1,27 @@
+const { expect } = require('@jest/globals')
+
+expect.extend({
+  toBeAFeatureId (actual) {
+    const val = typeof actual === 'number' ? actual : parseInt(actual, 10)
+
+    if (!Number.isNaN(val) && val > 0) {
+      return {
+        pass: true,
+        message () {
+          ''
+        }
+      }
+    } else {
+      return {
+        pass: false,
+        message () {
+          return `expected ${this.utils.printReceived(actual)} to be a valid feature id`
+        }
+      }
+    }
+  }
+})
+
 jest.mock('../lib/db.js', () => {
   const { Client } = require('pg')
   const pgTypes = require('pg').types

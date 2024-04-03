@@ -14,7 +14,6 @@ const parcellesPatched = require('./lib/providers/__fixtures__/parcelles-patched
 const apiParcellaire = require('./lib/providers/__fixtures__/agence-bio-api-parcellaire.json')
 const { normalizeOperator } = require('./lib/outputs/operator.js')
 const { normalizeRecord } = require('./lib/outputs/record')
-const { getRandomFeatureId } = require('./lib/outputs/features')
 const { recordToApi } = require('./lib/outputs/api')
 const { loadRecordFixture, expectDeepCloseTo } = require('./test/utils')
 
@@ -29,12 +28,6 @@ const USER_DOC_AUTH_HEADER = `Bearer ${USER_DOC_AUTH_TOKEN}`
 beforeAll(() => app.ready())
 afterAll(() => app.close())
 afterEach(() => jest.clearAllMocks())
-
-jest.mock('got')
-jest.mock('./lib/outputs/features', () => ({
-  ...jest.requireActual('./lib/outputs/features'),
-  getRandomFeatureId: jest.fn()
-}))
 
 describe('GET /', () => {
   test('responds with a 404', () => {
@@ -135,180 +128,99 @@ describe('GET /api/v2/test', () => {
   })
 })
 
-describe('POST /api/v2/convert/shapefile/geojson', () => {
+describe('POST /api/v2/convert/telepac/geojson', () => {
+  const { single, multi } = require('./test/fixtures/telepac-expectations.js')
+
   test('it converts a L93 zipped archive into WGS84 GeoJSON', () => {
     return request(app.server)
-      .post('/api/v2/convert/shapefile/geojson')
+      .post('/api/v2/convert/telepac/geojson')
       .type('json')
       .set('Authorization', USER_DOC_AUTH_HEADER)
       .attach('archive', 'test/fixtures/telepac-parcelles.zip')
       .then((response) => {
         expect(response.status).toEqual(200)
+        expect(response.body.features).toHaveLength(45)
         expect(response.body).toHaveProperty('features.0.type', 'Feature')
       })
   })
 
-  test('it fails without auth', () => {
+  test('it converts a L93 multi-feature XML Telepac 2024v4 file to WGS84 GeoJSON', () => {
     return request(app.server)
-      .post('/api/v2/convert/shapefile/geojson')
-      .type('json')
-      .attach('archive', 'test/fixtures/telepac-parcelles.zip')
-      .then((response) => {
-        expect(response.status).toEqual(401)
-      })
-  })
-})
-
-describe('POST /api/v2/convert/telepac-xml/geojson', () => {
-  const UUIDRe = /^[a-f0-9]+-[a-f0-9]+-[a-f0-9]+-[a-f0-9]+-[a-f0-9]+$/
-
-  test('it converts a L93 multi-feature XML file to WGS84 GeoJSON', () => {
-    getRandomFeatureId.mockReturnValueOnce('1').mockReturnValueOnce('2').mockReturnValueOnce('3')
-
-    return request(app.server)
-      .post('/api/v2/convert/telepac-xml/geojson')
+      .post('/api/v2/convert/telepac/geojson')
       .type('json')
       .set('Authorization', USER_DOC_AUTH_HEADER)
-      .attach('archive', 'test/fixtures/telepac-dossier.xml')
+      .attach('archive', 'test/fixtures/telepac-multi-2024v4.xml')
       .then((response) => {
         expect(response.status).toEqual(200)
-        expect(response.body).toMatchObject({
-          type: 'FeatureCollection',
-          features: [
-            {
-              id: '1',
-              type: 'Feature',
-              geometry: {
-                type: 'Polygon',
-                coordinates: [
-                  expect.arrayContaining([[6.0768655089466765, 47.685278906089444]]),
-                  expect.arrayContaining([[6.07727679068216, 47.68682804163941]]),
-                  expect.arrayContaining([[6.0770187939092795, 47.688111446343]])
-                ]
-              },
-              properties: {
-                id: '1',
-                remoteId: '1.1',
-                COMMUNE: '70421',
-                NUMERO_I: '1',
-                NUMERO_P: '1',
-                PACAGE: '999000000',
-                conversion_niveau: 'CONV',
-                cultures: [
-                  {
-                    CPF: '01.19.10.11',
-                    TYPE: 'PTR',
-                    id: expect.stringMatching(UUIDRe)
-                  }
-                ]
-              }
-            },
-            {
-              id: '2',
-              type: 'Feature',
-              geometry: {
-                type: 'Polygon',
-                coordinates: [
-                  expect.arrayContaining([[6.065424536564729, 47.68858541466545]])
-                ]
-              },
-              properties: {
-                id: '2',
-                remoteId: '2.2',
-                COMMUNE: '70421',
-                NUMERO_I: '2',
-                NUMERO_P: '2',
-                PACAGE: '999000000',
-                conversion_niveau: 'CONV',
-                cultures: [
-                  {
-                    CPF: '01.19.10.12',
-                    TYPE: 'PPH',
-                    id: expect.stringMatching(UUIDRe)
-                  }
-                ]
-              }
-            },
-            {
-              type: 'Feature',
-              id: '3',
-              geometry: {
-                type: 'Polygon',
-                coordinates: [
-                  expect.arrayContaining([[6.069309706237855, 47.6882033150393]])
-                ]
-              },
-              properties: {
-                id: '3',
-                remoteId: '2.4',
-                COMMUNE: '70421',
-                NUMERO_I: '2',
-                NUMERO_P: '4',
-                PACAGE: '999000000',
-                conversion_niveau: 'AB?',
-                cultures: [
-                  {
-                    CPF: '01.11.12',
-                    TYPE: 'BTH',
-                    id: expect.stringMatching(UUIDRe)
-                  }
-                ]
-              }
-            }
-          ]
-        })
+        expect(response.body).toMatchObject(multi)
       })
   })
 
-  test('it converts a L93 single-feature XML file to WGS84 GeoJSON', () => {
-    getRandomFeatureId.mockReturnValueOnce('1')
-
+  test('it converts a L93 multi-feature XML Telepac 2024v3 file to WGS84 GeoJSON', () => {
     return request(app.server)
-      .post('/api/v2/convert/telepac-xml/geojson')
+      .post('/api/v2/convert/telepac/geojson')
       .type('json')
       .set('Authorization', USER_DOC_AUTH_HEADER)
-      .attach('archive', 'test/fixtures/mesparcelles-export.xml')
+      .attach('archive', 'test/fixtures/telepac-multi-2024v3.xml')
       .then((response) => {
         expect(response.status).toEqual(200)
-        expect(response.body).toMatchObject({
-          type: 'FeatureCollection',
-          features: [
-            {
-              id: '1',
-              type: 'Feature',
-              geometry: {
-                type: 'Polygon',
-                coordinates: [
-                  expect.arrayContaining([[5.020622298258249, 44.73758401718037]])
-                ]
-              },
-              properties: {
-                id: '1',
-                remoteId: '1.3',
-                COMMUNE: '26108',
-                NUMERO_I: '1',
-                NUMERO_P: '3',
-                PACAGE: '999000000',
-                conversion_niveau: 'CONV',
-                cultures: [
-                  {
-                    CPF: '01.13.42',
-                    TYPE: 'AIL',
-                    id: expect.stringMatching(UUIDRe)
-                  }
-                ]
-              }
-            }
-          ]
-        })
+        expect(response.body).toMatchObject(multi)
+      })
+  })
+
+  test('it converts a L93 single-feature XML 2024v3 file to WGS84 GeoJSON', () => {
+    return request(app.server)
+      .post('/api/v2/convert/telepac/geojson')
+      .type('json')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+      .attach('archive', 'test/fixtures/telepac-single-2024v3.xml')
+      .then((response) => {
+        expect(response.status).toEqual(200)
+        expect(response.body).toMatchObject(single)
+      })
+  })
+
+  test('it converts a L93 single-feature XML 2024v4 file to WGS84 GeoJSON', () => {
+    return request(app.server)
+      .post('/api/v2/convert/telepac/geojson')
+      .type('json')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+      .attach('archive', 'test/fixtures/telepac-single-2024v4.xml')
+      .then((response) => {
+        expect(response.status).toEqual(200)
+        expect(response.body).toMatchObject(single)
+      })
+  })
+
+  test('it fails when sending a non-recognized file', () => {
+    return request(app.server)
+      .post('/api/v2/convert/telepac/geojson')
+      .type('json')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+      .attach('archive', 'test/fixtures/parcels.json')
+      .then((response) => {
+        expect(response.status).toEqual(400)
+        expect(response.body).toHaveProperty('error', 'Format de fichier non-reconnu.')
+      })
+  })
+
+  test('it fails when sending a non-recognized format', () => {
+    return request(app.server)
+      .post('/api/v2/convert/telepac/geojson')
+      .type('json')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+      .attach('archive', 'test/fixtures/geofolia-parcelles.zip')
+      .then((response) => {
+        expect(response.status).toEqual(400)
+        expect(response.body).toHaveProperty('error', 'Impossible de trouver l\'archive Telepac dans ce fichier.')
       })
   })
 
   test('it fails without auth', () => {
     return request(app.server)
-      .post('/api/v2/convert/telepac-xml/geojson')
+      .post('/api/v2/convert/telepac/geojson')
       .type('json')
-      .attach('archive', 'test/fixtures/telepac-dossier.xml')
+      .attach('archive', 'test/fixtures/telepac-multi-2024v4.xml')
       .then((response) => {
         expect(response.status).toEqual(401)
       })
@@ -317,8 +229,7 @@ describe('POST /api/v2/convert/telepac-xml/geojson', () => {
 
 describe('POST /api/v2/convert/geofolia/geojson', () => {
   test('it converts a Geofolia zipped archive into WGS84 GeoJSON', () => {
-    const expectation = JSON.parse(fs.readFileSync('test/fixtures/geofolia-parcelles.json', { encoding: 'utf8' }))
-    getRandomFeatureId.mockReturnValueOnce('1').mockReturnValueOnce('2')
+    const expectation = require('./test/fixtures/geofolia-parcelles.js')
 
     return request(app.server)
       .post('/api/v2/convert/geofolia/geojson')
@@ -346,7 +257,7 @@ describe('POST /api/v2/import/geofolia/:numeroBio', () => {
   const getMock = jest.mocked(got.get)
   const postMock = jest.mocked(got.post)
   const archive = fs.readFileSync('test/fixtures/geofolia-parcelles.zip')
-  const expectation = JSON.parse(fs.readFileSync('test/fixtures/geofolia-parcelles.json', { encoding: 'utf8' }))
+  const expectation = require('./test/fixtures/geofolia-parcelles.js')
 
   test('it checks the availability of a customer on Geofolink', () => {
     // setup operator
@@ -406,8 +317,6 @@ describe('POST /api/v2/import/geofolia/:numeroBio', () => {
   })
 
   test('it requests a working archive on Geofolink', () => {
-    getRandomFeatureId.mockReturnValueOnce('1').mockReturnValueOnce('2')
-
     // setup operator
     getMock.mockReturnValueOnce({
       async json () {
