@@ -216,6 +216,18 @@ describe('POST /api/v2/convert/telepac/geojson', () => {
       })
   })
 
+  test('it fails when sending a geographical without numero_i/numero_p data', () => {
+    return request(app.server)
+      .post('/api/v2/convert/telepac/geojson')
+      .type('json')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+      .attach('archive', 'test/fixtures/geofolia-parcelles.zip')
+      .then((response) => {
+        expect(response.status).toEqual(400)
+        expect(response.body).toHaveProperty('error', 'Impossible de trouver l\'archive Telepac dans ce fichier.')
+      })
+  })
+
   test('it fails without auth', () => {
     return request(app.server)
       .post('/api/v2/convert/telepac/geojson')
