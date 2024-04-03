@@ -1,5 +1,5 @@
 <producteurs xmlns="urn:x-telepac:fr.gouv.agriculture.telepac:echange-producteur-import" xmlns:gml="http://www.opengis.net/gml">
-  <producteur numero-pacage="999000000">
+  <producteur numero-pacage="026532467">
     <rpg>
       <ilots>
         <ilot numero-ilot="1">
@@ -7,9 +7,10 @@
           <parcelles>
             <parcelle>
               <descriptif-parcelle numero-parcelle="3">
-                <culture-principale production-semences="false" production-fermiers="false" deshydratation="false" derogation-ukraine="false" culture-secondaire="A00">
+                <culture-principale production-semences="false" production-fermiers="false" deshydratation="false" culture-secondaire="A00">
                   <code-culture>AIL</code-culture>
                   <reconversion-pp>false</reconversion-pp>
+                  <obligation-reimplantation-pp>false</obligation-reimplantation-pp>
                 </culture-principale>
                 <agri-bio conduite-bio="false"/>
                 <engagements-maec surface-cible="false" elevage-monogastrique="false"/>

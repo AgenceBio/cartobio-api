@@ -1,0 +1,851 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<xsd:schema targetNamespace="urn:x-telepac:fr.gouv.agriculture.telepac:echange-producteur-import"
+            xmlns="urn:x-telepac:fr.gouv.agriculture.telepac:echange-producteur-import"
+            xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:gml="http://www.opengis.net/gml" elementFormDefault="qualified"
+            attributeFormDefault="unqualified"
+            version="2023-V2">
+    <!-- Import du schema GML (Geometry Markeup Language) (cf. http://www.opengis.net/gml/) -->
+    <xsd:import namespace="http://www.opengis.net/gml" schemaLocation="http://schemas.opengis.net/gml/2.1.2/geometry.xsd"/>
+
+    <!-- element Racine -->
+    <xsd:element name="producteurs">
+        <xsd:complexType>
+            <xsd:sequence>
+                <xsd:element name="producteur" type="Producteur" minOccurs="1" maxOccurs="unbounded"/>
+            </xsd:sequence>
+        </xsd:complexType>
+    </xsd:element>
+
+    <!-- type Producteur -->
+    <xsd:complexType name="Producteur">
+        <xsd:all>
+            <xsd:element name="rpg" type="RPG" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="demandes-aides" type="DemandesAides" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="effectifs-animaux" type="EffectifsAnimaux" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="autres-obligations" type="AutresObligations" minOccurs="0" maxOccurs="1"/>
+        </xsd:all>
+        <xsd:attribute name="numero-pacage" type="NumeroPacage" use="required"/>
+    </xsd:complexType>
+
+    <!-- type RPG -->
+    <xsd:complexType name="RPG">
+        <xsd:all>
+            <xsd:element name="ilots" minOccurs="0" maxOccurs="1">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="ilot" type="IlotRpg" minOccurs="1" maxOccurs="unbounded"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="sna-declarees-creees" minOccurs="0" maxOccurs="1">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="surfaceNonAgricole" type="SurfaceNonAgricoleCree" minOccurs="1" maxOccurs="unbounded"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="sna-declarees-modifiees" minOccurs="0" maxOccurs="1">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="surfaceNonAgricole" type="SurfaceNonAgricoleModifiee" minOccurs="1" maxOccurs="unbounded"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="sna-declarees-supprimees" minOccurs="0" maxOccurs="1">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="surfaceNonAgricole" type="SurfaceNonAgricoleSupprimee" minOccurs="1" maxOccurs="unbounded"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="zdh-declarees-creees" minOccurs="0" maxOccurs="1">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="zoneDensiteHomogene" type="ZoneDensiteHomogeneCree" minOccurs="1" maxOccurs="unbounded"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="zdh-declarees-modifiees" minOccurs="0" maxOccurs="1">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="zoneDensiteHomogene" type="ZoneDensiteHomogeneModifiee" minOccurs="1" maxOccurs="unbounded"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="zdh-declarees-supprimees" minOccurs="0" maxOccurs="1">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="zoneDensiteHomogene" type="ZoneDensiteHomogeneSupprimee" minOccurs="1" maxOccurs="unbounded"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+        </xsd:all>
+    </xsd:complexType>
+    <xsd:complexType name="IlotRpg">
+        <xsd:all>
+            <xsd:element name="commune" type="CodeInseeCommune" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="geometrie" type="GeometrieType" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="justification" type="JustificationOperation" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="parcelles" type="ParcellesIlot" minOccurs="0"/>
+        </xsd:all>
+        <xsd:attribute name="numero-ilot" type="NumeroIlot" use="required"/>
+        <xsd:attribute name="numero-ilot-reference" type="NumeroIlotReference" use="optional"/>
+    </xsd:complexType>
+
+    <!-- type ParcellesIlot -->
+    <xsd:complexType name="ParcellesIlot">
+        <xsd:sequence>
+            <xsd:element name="parcelle" type="ParcelleIlot" minOccurs="1" maxOccurs="unbounded"/>
+        </xsd:sequence>
+    </xsd:complexType>
+
+    <!-- type ParcelleIlot -->
+    <xsd:complexType name="ParcelleIlot">
+        <xsd:sequence>
+            <xsd:element name="descriptif-parcelle" type="DescriptifParcelle" minOccurs="1" maxOccurs="1"/>
+            <xsd:element name="geometrie" type="GeometrieType" minOccurs="1" maxOccurs="1"/>
+        </xsd:sequence>
+    </xsd:complexType>
+
+    <!-- type DescriptifParcelle -->
+    <xsd:complexType name="DescriptifParcelle">
+        <xsd:all>
+            <xsd:element name="culture-principale" type="CulturePrincipale" minOccurs="1" maxOccurs="1"/>
+            <xsd:element name="culture-derobee" type="CultureDerobee" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="agri-bio" type="AgriBio" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="engagements-maec" type="EngagementsMaec" minOccurs="0" maxOccurs="1"/>
+        </xsd:all>
+        <xsd:attribute name="numero-parcelle" type="NumeroParcelle" use="required"/>
+    </xsd:complexType>
+
+    <!-- type CulturePrincipale -->
+    <xsd:complexType name="CulturePrincipale">
+        <xsd:sequence>
+            <xsd:element name="code-culture" type="CodeCulture" minOccurs="1" maxOccurs="1"/>
+            <xsd:element name="precision" type="Precision" minOccurs="0" maxOccurs="3"/>
+            <xsd:element name="culture-interrang" type="CultureInterrang" minOccurs="0" maxOccurs="3"/>
+            <xsd:element name="longueur-bordure" type="Distance" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="reconversion-pp" type="xsd:boolean" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="retournement-pp" type="xsd:boolean" minOccurs="0" maxOccurs="1"/>
+        </xsd:sequence>
+        <xsd:attribute name="production-semences" type="xsd:boolean" use="optional"/>
+        <xsd:attribute name="production-fermiers" type="xsd:boolean" use="optional"/>
+        <xsd:attribute name="deshydratation" type="xsd:boolean" use="optional"/>
+        <xsd:attribute name="destination-chanvre" type="DestinationChanvre" use="optional"/>
+        <xsd:attribute name="date-plantation" type="DatePlantation" use="optional"/>
+        <xsd:attribute name="derogation-ukraine" type="xsd:boolean" use="optional"/>
+        <xsd:attribute name="destination" type="CodeDestinationICHN" use="optional"/>
+        <xsd:attribute name="culture-secondaire" type="CultureSecondaire" use="optional"/>
+        <xsd:attribute name="date-labour" type="PeriodeLabour" use="optional"/>
+        <xsd:attribute name="inter-rang" type="TypeInterRang" use="optional"/>
+        <xsd:attribute name="culture-serre-tunnel" type="CultureSerreTunnel" use="optional"/>
+        <xsd:attribute name="couvert-forestier" type="xsd:boolean" use="optional"/>
+        <xsd:attribute name="accident-culture" type="xsd:boolean" use="optional"/>
+    </xsd:complexType>
+
+    <!-- type CultureInterrang -->
+    <xsd:complexType name="CultureInterrang">
+        <xsd:all>
+            <xsd:element name="code-culture" type="CodeCulture" minOccurs="1" maxOccurs="1"/>
+        </xsd:all>
+    </xsd:complexType>
+
+    <!-- type CultureDerobee -->
+    <xsd:complexType name="CultureDerobee">
+        <xsd:attribute name="melange-BCAE8-culture1" type="CodeCultureDerobee" use="required"/>
+        <xsd:attribute name="melange-BCAE8-culture2" type="CodeCultureDerobee" use="optional"/>
+    </xsd:complexType>
+
+    <!-- type AgriBio -->
+    <xsd:complexType name="AgriBio">
+        <xsd:attribute name="conduite-bio" type="xsd:boolean" use="required"/>
+        <xsd:attribute name="type-conduite-bio" type="TypeAB" use="optional"/>
+        <xsd:attribute name="conduite-maraichage" type="xsd:boolean" use="optional"/>
+    </xsd:complexType>
+
+    <!-- type EngagementsMaec -->
+    <xsd:complexType name="EngagementsMaec">
+        <xsd:attribute name="surface-cible" type="xsd:boolean" use="optional"/>
+        <xsd:attribute name="engagement-PRV" type="MesureMaec" use="optional"/>
+        <xsd:attribute name="elevage-monogastrique" type="xsd:boolean" use="optional"/>
+    </xsd:complexType>
+
+    <!-- type SurfaceNonAgricole -->
+    <xsd:complexType name="SurfaceNonAgricoleCree">
+        <xsd:all>
+            <xsd:element name="numeroSnacreationTas" type="NumeroSnaCreationTas" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="typeSna" type="TypeSna" minOccurs="1" maxOccurs="1"/>
+            <xsd:element name="murTraditionnelPierreIAE" type="xsd:boolean" minOccurs="0"/>
+            <xsd:element name="geometrie" type="GeometrieSnaType" minOccurs="1" maxOccurs="1"/>
+            <xsd:element name="justification" type="JustificationOperation" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="campagneDebutValidite" type="CampagneValidite" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="intersectionsSnaIlots" minOccurs="0" maxOccurs="1">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="intersectionSnaIlot" type="IntersectionSnaIlot" minOccurs="1" maxOccurs="unbounded"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="intersectionsSnaParcelles" minOccurs="0" maxOccurs="1">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="intersectionSnaParcelle" type="IntersectionSnaParcelle" minOccurs="1" maxOccurs="unbounded"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+        </xsd:all>
+    </xsd:complexType>
+    <xsd:complexType name="SurfaceNonAgricoleModifiee">
+        <xsd:all>
+            <xsd:element name="numeroSna" type="NumeroSna" minOccurs="1" maxOccurs="1"/>
+            <xsd:element name="typeSna" type="TypeSna" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="murTraditionnelPierreIAE" type="xsd:boolean" minOccurs="0"/>
+            <xsd:element name="geometrie" type="GeometrieSnaType" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="justification" type="JustificationOperation" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="campagneDebutValidite" type="CampagneValidite" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="intersectionsSnaIlots" minOccurs="0" maxOccurs="1">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="intersectionSnaIlot" type="IntersectionSnaIlot" minOccurs="1" maxOccurs="unbounded"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="intersectionsSnaParcelles" minOccurs="0" maxOccurs="1">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="intersectionSnaParcelle" type="IntersectionSnaParcelle" minOccurs="1" maxOccurs="unbounded"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+        </xsd:all>
+    </xsd:complexType>
+    <xsd:complexType name="SurfaceNonAgricoleSupprimee">
+        <xsd:sequence>
+            <xsd:element name="numeroSna" type="NumeroSna" minOccurs="1" maxOccurs="1"/>
+            <xsd:element name="justification" type="JustificationOperation" minOccurs="1" maxOccurs="1"/>
+            <xsd:element name="campagneDebutValidite" type="CampagneValidite" minOccurs="1" maxOccurs="1"/>
+        </xsd:sequence>
+    </xsd:complexType>
+
+    <!-- type ZoneDensiteHomogene -->
+    <xsd:complexType name="ZoneDensiteHomogeneCree">
+        <xsd:all>
+            <xsd:element name="numeroZdhcreationTas" type="NumeroZdhCreationTas" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="densiteVegetation" type="DensiteVegetation" minOccurs="1" maxOccurs="1"/>
+            <xsd:element name="geometrie" type="GeometrieType" minOccurs="1" maxOccurs="1"/>
+            <xsd:element name="justification" type="JustificationOperation" minOccurs="0" maxOccurs="1"/>
+        </xsd:all>
+    </xsd:complexType>
+    <xsd:complexType name="ZoneDensiteHomogeneModifiee">
+        <xsd:all>
+            <xsd:element name="numeroZdh" type="NumeroZdh" minOccurs="1" maxOccurs="1"/>
+            <xsd:element name="densiteVegetation" type="DensiteVegetation" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="geometrie" type="GeometrieType" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="justification" type="JustificationOperation" minOccurs="0" maxOccurs="1"/>
+        </xsd:all>
+    </xsd:complexType>
+    <xsd:complexType name="ZoneDensiteHomogeneSupprimee">
+        <xsd:all>
+            <xsd:element name="numeroZdh" type="NumeroZdh" minOccurs="1" maxOccurs="1"/>
+            <xsd:element name="justification" type="JustificationOperation" minOccurs="1" maxOccurs="1"/>
+        </xsd:all>
+    </xsd:complexType>
+
+    <!-- type IntersectionSnaIlot -->
+    <xsd:complexType name="IntersectionSnaIlot">
+        <xsd:sequence>
+            <xsd:element name="numeroIlot" type="NumeroIlot" minOccurs="1" maxOccurs="1"/>
+            <xsd:element name="largeur" type="Distance" minOccurs="0"/>
+        </xsd:sequence>
+    </xsd:complexType>
+
+    <!-- type IntersectionSnaParcelle -->
+    <xsd:complexType name="IntersectionSnaParcelle">
+        <xsd:sequence>
+            <xsd:element name="numeroIlot" type="NumeroIlot" minOccurs="1" maxOccurs="1"/>
+            <xsd:element name="numeroParcelle" type="NumeroParcelle" minOccurs="1" maxOccurs="1"/>
+            <xsd:element name="nombreArbres" type="NombreArbres" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="longueur-iae" type="Distance" minOccurs="0" maxOccurs="1"/>
+        </xsd:sequence>
+    </xsd:complexType>
+
+    <!-- type Geometrie -->
+    <xsd:complexType name="GeometrieType">
+        <xsd:sequence>
+            <xsd:element ref="gml:Polygon" minOccurs="1" maxOccurs="1"/>
+        </xsd:sequence>
+    </xsd:complexType>
+    <xsd:complexType name="GeometrieSnaType">
+        <xsd:choice>
+            <xsd:element ref="gml:Polygon" minOccurs="1" maxOccurs="1"/>
+            <xsd:element ref="gml:Point" minOccurs="1" maxOccurs="1"/>
+        </xsd:choice>
+    </xsd:complexType>
+
+    <!-- type JustificationOperation -->
+    <xsd:complexType name="JustificationOperation">
+        <xsd:all>
+            <xsd:element name="motifOperation" type="CodeMotifOperation" minOccurs="1" maxOccurs="1"/>
+            <xsd:element name="justification" type="CommentaireJustification" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="pjAFournir" type="xsd:boolean" minOccurs="0" maxOccurs="1"/>
+        </xsd:all>
+    </xsd:complexType>
+
+    <!-- type DemandesAides -->
+    <xsd:complexType name="DemandesAides">
+        <xsd:sequence>
+            <xsd:element name="demandeur" type="Demandeur" minOccurs="1" maxOccurs="1"/>
+            <xsd:choice minOccurs="1" maxOccurs="1">
+                <xsd:element name="demandes-aides-pilier1-et-AR" type="DemandesAidesPilier1EtAR" minOccurs="1" maxOccurs="1"/>
+                <xsd:element name="demandes-aides-posei-dom" type="DemandesAidesPoseiDom" minOccurs="1" maxOccurs="1"/>
+                <xsd:element name="demandes-aides-pilier1-mayotte" type="DemandesAidesPilier1Mayotte" minOccurs="1" maxOccurs="1"/>
+            </xsd:choice>
+            <xsd:choice minOccurs="1" maxOccurs="1">
+                <xsd:element name="demandes-aides-pilier2-metropole" type="DemandesAidesPilier2Metropole" minOccurs="1" maxOccurs="1"/>
+                <xsd:element name="demandes-aides-pilier2-dom" type="DemandesAidesPilier2Dom" minOccurs="1" maxOccurs="1"/>
+                <xsd:element name="demandes-aides-pilier2-mayotte" type="DemandesAidesPilier2Mayotte" minOccurs="1" maxOccurs="1"/>
+            </xsd:choice>
+        </xsd:sequence>
+    </xsd:complexType>
+
+    <!-- type Demandeur -->
+    <xsd:complexType name="Demandeur">
+        <xsd:sequence>
+            <xsd:choice minOccurs="0" maxOccurs="1">
+                <xsd:element name="identification-individuelle" type="IdentificationIndividuelle" minOccurs="0" maxOccurs="1"/>
+                <xsd:element name="identification-societe" type="IdentificationSociete" minOccurs="0" maxOccurs="1"/>
+            </xsd:choice>
+            <xsd:element name="iban" type="Iban" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="courriel" type="Email" minOccurs="0" maxOccurs="1"/>
+        </xsd:sequence>
+        <xsd:attribute name="certificat-environnemental" type="xsd:boolean" use="required"/>
+        <xsd:attribute name="dossier-sans-demande-aides" type="xsd:boolean" use="required"/>
+    </xsd:complexType>
+
+    <!-- type IdentificationIndividuelle -->
+    <xsd:complexType name="IdentificationIndividuelle">
+        <xsd:attribute name="revenus-retraite" type="MontantRevenus" use="optional"/>
+        <xsd:attribute name="numero-fiscal" type="NumeroFiscal" use="optional"/>
+    </xsd:complexType>
+
+    <!-- type IdentificationSociete -->
+    <xsd:complexType name="IdentificationSociete">
+        <xsd:all>
+            <xsd:element name="associes" minOccurs="1" maxOccurs="1">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="associe" type="Associe" minOccurs="1" maxOccurs="10"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+        </xsd:all>
+    </xsd:complexType>
+    <!-- type Associe -->
+    <xsd:complexType name="Associe">
+        <xsd:all>
+            <xsd:element name="revenus-retraite" type="MontantRevenus" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="numero-fiscal" type="NumeroFiscal" minOccurs="0" maxOccurs="1"/>
+        </xsd:all>
+        <xsd:attribute name="numero-pacage" type="NumeroPacage" use="required"/>
+    </xsd:complexType>
+
+    <!-- type Iban -->
+    <xsd:complexType name="Iban">
+        <xsd:attribute name="compte-iban" type="CompteIban" use="required"/>
+        <xsd:attribute name="bic" type="BIC" use="required"/>
+        <xsd:attribute name="titulaire" type="TitulaireRib" use="optional"/>
+    </xsd:complexType>
+
+    <!-- type Demandes Aides pilier 1 et AR -->
+    <xsd:complexType name="DemandesAidesPilier1EtAR">
+        <xsd:sequence>
+            <xsd:element name="demande-aides-decouplees" type="AidesDecouplees" minOccurs="1"/>
+            <xsd:element name="demande-aide-ecoregime" type="AideEcoregime" minOccurs="1"/>
+            <xsd:element name="demande-legumineuses-fourrageres" type="LegumineusesFourrageres" minOccurs="1"/>
+            <xsd:element name="demande-legumineuses-graines" type="LegumineusesGraines" minOccurs="1"/>
+            <xsd:element name="demande-assurance-recolte" type="AssuranceRecolte" minOccurs="1"/>
+        </xsd:sequence>
+        <xsd:attribute name="aide-jeunes-agriculteurs" type="xsd:boolean" use="required"/>
+        <xsd:attribute name="ble-dur" type="xsd:boolean" use="required"/>
+        <xsd:attribute name="prunes-transformation" type="xsd:boolean" use="required"/>
+        <xsd:attribute name="cerises-transformation" type="xsd:boolean" use="required"/>
+        <xsd:attribute name="peches-transformation" type="xsd:boolean" use="required"/>
+        <xsd:attribute name="poires-transformation" type="xsd:boolean" use="required"/>
+        <xsd:attribute name="tomates-industrie" type="xsd:boolean" use="required"/>
+        <xsd:attribute name="pommes-terre-feculieres" type="xsd:boolean" use="required"/>
+        <xsd:attribute name="chanvre" type="xsd:boolean" use="required"/>
+        <xsd:attribute name="houblon" type="xsd:boolean" use="required"/>
+        <xsd:attribute name="semences-graminees" type="xsd:boolean" use="required"/>
+        <xsd:attribute name="riz" type="xsd:boolean" use="required"/>
+        <xsd:attribute name="maraichage" type="xsd:boolean" use="required"/>
+    </xsd:complexType>
+    <xsd:complexType name="DemandesAidesPoseiDom">
+        <xsd:attribute name="tonne-de-canne-livree" type="xsd:boolean" use="required"/>
+    </xsd:complexType>
+    <xsd:complexType name="DemandesAidesPilier1Mayotte">
+        <xsd:sequence>
+            <xsd:element name="demande-structure-collective" type="StructureCollective" minOccurs="1"/>
+        </xsd:sequence>
+        <xsd:attribute name="aide-de-base" type="xsd:boolean" use="required"/>
+        <xsd:attribute name="vanille" type="xsd:boolean" use="required"/>
+        <xsd:attribute name="ylang-ylang" type="xsd:boolean" use="required"/>
+        <xsd:attribute name="nouvel-installe" type="xsd:boolean" use="required"/>
+    </xsd:complexType>
+
+    <!-- type AidesDecouplees -->
+    <xsd:complexType name="AidesDecouplees">
+        <xsd:attribute name="aides-decouplees" type="xsd:boolean" use="required"/>
+    </xsd:complexType>
+
+    <!-- type AideEcoregime -->
+    <xsd:complexType name="AideEcoregime">
+        <xsd:attribute name="aide-ecoregime" type="xsd:boolean" use="required"/>
+        <xsd:attribute name="voie-ecoregime" type="VoieEcoregime" use="optional"/>
+        <xsd:attribute name="bonus-haie" type="xsd:boolean" use="optional"/>
+        <xsd:attribute name="certification" type="Certification" use="optional"/>
+    </xsd:complexType>
+
+    <!-- type LegumineusesFourrageres -->
+    <xsd:complexType name="LegumineusesFourrageres">
+        <xsd:attribute name="legumineuse-fourragere" type="xsd:boolean" use="required"/>
+        <xsd:attribute name="demandeur-eleveur" type="xsd:boolean" use="optional"/>
+        <xsd:attribute name="numero-pacage-eleveur" type="NumeroPacage" use="optional"/>
+    </xsd:complexType>
+
+    <!-- type LegumineusesGraines -->
+    <xsd:complexType name="LegumineusesGraines">
+        <xsd:attribute name="legumineuse-graine" type="xsd:boolean" use="required"/>
+        <xsd:attribute name="contrat-deshydratation" type="xsd:boolean" use="optional"/>
+        <xsd:attribute name="contrat-semences" type="xsd:boolean" use="optional"/>
+    </xsd:complexType>
+
+    <!-- type AssuranceRecolte -->
+    <xsd:complexType name="AssuranceRecolte">
+        <xsd:sequence>
+            <xsd:element name="assureurs-avec-accord-diffusion" minOccurs="0">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="assureur" type="CodeAssureur" minOccurs="1" maxOccurs="3"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+        </xsd:sequence>
+        <xsd:attribute name="assurance-recolte" type="xsd:boolean" use="required"/>
+    </xsd:complexType>
+
+    <!-- type StructureCollective -->
+    <xsd:complexType name="StructureCollective">
+        <xsd:attribute name="structure-collective" type="xsd:boolean" use="required"/>
+        <xsd:attribute name="secteur-vegetale" type="xsd:boolean" use="optional"/>
+        <xsd:attribute name="secteur-animale" type="xsd:boolean" use="optional"/>
+    </xsd:complexType>
+
+    <!-- type Demandes Aides pilier 2 -->
+    <xsd:complexType name="DemandesAidesPilier2">
+        <xsd:sequence>
+            <xsd:element name="ichn" type="ICHN" minOccurs="1"/>
+        </xsd:sequence>
+        <xsd:attribute name="demande-maec" type="xsd:boolean" use="required"/>
+        <xsd:attribute name="demande-ab" type="xsd:boolean" use="required"/>
+        <xsd:attribute name="demande-maec-rdr4" type="xsd:boolean" use="required"/>
+        <xsd:attribute name="demande-ab-rdr4" type="xsd:boolean" use="required"/>
+    </xsd:complexType>
+    <xsd:complexType name="DemandesAidesPilier2Metropole">
+        <xsd:complexContent>
+            <xsd:extension base="DemandesAidesPilier2">
+            </xsd:extension>
+        </xsd:complexContent>
+    </xsd:complexType>
+    <xsd:complexType name="DemandesAidesPilier2Dom">
+        <xsd:complexContent>
+            <xsd:extension base="DemandesAidesPilier2">
+            </xsd:extension>
+        </xsd:complexContent>
+    </xsd:complexType>
+    <xsd:complexType name="DemandesAidesPilier2Mayotte">
+        <xsd:complexContent>
+            <xsd:extension base="DemandesAidesPilier2">
+            </xsd:extension>
+        </xsd:complexContent>
+    </xsd:complexType>
+
+    <!-- type ICHN -->
+    <xsd:complexType name="ICHN">
+        <xsd:attribute name="demande-ichn" type="xsd:boolean" use="required"/>
+        <xsd:attribute name="pension-reversion" type="xsd:boolean" use="optional"/>
+    </xsd:complexType>
+
+    <!-- type Effectifs Animaux -->
+    <xsd:complexType name="EffectifsAnimaux">
+        <xsd:sequence>
+            <xsd:element name="effectif-animal" minOccurs="0" maxOccurs="unbounded">
+                <xsd:complexType>
+                    <xsd:choice minOccurs="1">
+                        <xsd:element name="effectif-present-ou-transhumant" type="EffectifPresentOuTranshumant" minOccurs="0" maxOccurs="unbounded"/>
+                        <xsd:element name="effectif-present" type="EffectifPresent" minOccurs="0" maxOccurs="unbounded"/>
+                    </xsd:choice>
+                </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="numeros-sire" minOccurs="0" maxOccurs="1">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="numero-sire" type="SIRE" minOccurs="1" maxOccurs="10"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+        </xsd:sequence>
+        <xsd:attribute name="existence-UGB-bovines" type="xsd:boolean" use="optional"/>
+    </xsd:complexType>
+
+    <!-- type Effectif present ou transhumant pour: ovins, caprins, équidés, lamas, alpagas, cerfs et biches, daims et daines, truies reproductrices, autres porcins -->
+    <xsd:complexType name="EffectifPresentOuTranshumant">
+        <xsd:all>
+            <xsd:element name="type-animal-1" type="TypeAnimauxType1" minOccurs="1" maxOccurs="1"/>
+            <xsd:element name="nb-animaux-1" type="NbAnimauxType1" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="effectifs-transhumant" minOccurs="0" maxOccurs="1">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="effectif-transhumant" type="EffectifTranshumant" maxOccurs="unbounded"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+        </xsd:all>
+    </xsd:complexType>
+
+    <!-- type Effectif present ou transhumant pour: poules pondeuses et autres volailles et lapins -->
+    <xsd:complexType name="EffectifPresent">
+        <xsd:all>
+            <xsd:element name="type-animal-2" type="TypeAnimauxType2" minOccurs="1" maxOccurs="1"/>
+            <xsd:element name="nb-animaux-2" type="NbAnimauxType2" minOccurs="0" maxOccurs="1"/>
+        </xsd:all>
+    </xsd:complexType>
+
+    <!-- type Effectif transhumant -->
+    <xsd:complexType name="EffectifTranshumant">
+        <xsd:sequence>
+            <xsd:choice minOccurs="1" maxOccurs="1">
+                <xsd:element name="nb-animaux-envoyes" type="NbAnimauxType1"/>
+                <xsd:element name="nb-animaux-recus" type="NbAnimauxType1"/>
+            </xsd:choice>
+            <xsd:choice minOccurs="1" maxOccurs="1">
+                <xsd:element name="estive" type="xsd:boolean"/>
+                <xsd:element name="hivernage" type="xsd:boolean"/>
+            </xsd:choice>
+            <xsd:element name="nom-exploitant" type="NomExploitant" minOccurs="1"/>
+            <xsd:element name="departement" type="CodeDepartement" minOccurs="1"/>
+            <xsd:element name="commune" type="CodeInseeCommune" minOccurs="0"/>
+        </xsd:sequence>
+    </xsd:complexType>
+
+    <!-- type AutresObligations -->
+    <xsd:complexType name="AutresObligations">
+        <xsd:attribute name="periode-bcae6" type="PeriodeBCAE6" use="required"/>
+    </xsd:complexType>
+
+    <!-- ============= -->
+    <!-- Types de base -->
+    <!-- ============= -->
+    <xsd:simpleType name="BIC">
+        <xsd:restriction base="xsd:string">
+            <xsd:pattern value="[a-zA-Z]{6}[0-9a-zA-Z]{2}([0-9a-zA-Z]{3})?"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="CampagneValidite">
+        <xsd:restriction base="xsd:integer">
+            <xsd:minInclusive value="2015"/>
+            <xsd:maxInclusive value="2023"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="Certification">
+        <xsd:restriction base="xsd:token">
+            <xsd:enumeration value="CBIO"/>
+            <xsd:enumeration value="CHVE"/>
+            <xsd:enumeration value="CCE2"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="CodeAssureur">
+        <xsd:restriction base="xsd:string">
+            <xsd:maxLength value="3"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="CodeCulture">
+        <xsd:restriction base="xsd:token">
+            <xsd:maxLength value="3"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="CodeCultureDerobee">
+        <xsd:restriction base="xsd:token">
+            <xsd:maxLength value="3"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="CodeDepartement">
+        <xsd:restriction base="xsd:string">
+            <xsd:pattern value="[0-9][0-9AB][0-9AB]?"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="CodeDestinationICHN">
+        <xsd:restriction base="xsd:token">
+            <!-- Autoconsommation -->
+            <xsd:enumeration value="A"/>
+            <!-- Commercialisation -->
+            <xsd:enumeration value="C"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="CodeInseeCommune">
+        <xsd:restriction base="xsd:string">
+            <xsd:pattern value="[0-9][0-9AB][0-9]{3}"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="CodeMotifOperation">
+        <xsd:restriction base="xsd:string">
+            <xsd:pattern value="(ILOT|SNA|ZDH){1}_{1}(C|M|S){1}[0-9]{1}"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="CommentaireJustification">
+        <xsd:restriction base="xsd:string">
+            <xsd:maxLength value="200"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="CompteIban">
+        <xsd:restriction base="xsd:string">
+            <xsd:pattern value="[A-Z]{2}[0-9]{2}([A-Z]|[0-9]){8,30}"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="CultureSecondaire">
+        <xsd:restriction base="xsd:token">
+            <xsd:maxLength value="15"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="CultureSerreTunnel">
+        <xsd:restriction base="xsd:token">
+            <xsd:enumeration value="A"/>
+            <xsd:enumeration value="P"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="DatePlantation">
+        <xsd:restriction base="xsd:token">
+            <xsd:maxLength value="15"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="DensiteVegetation">
+        <xsd:restriction base="xsd:token">
+            <!-- Densite inferieure ou egale a 10% -->
+            <xsd:enumeration value="MOINS_10"/>
+            <!-- Densite comprise entre 10% exclus et 30% inclus -->
+            <xsd:enumeration value="D10_30"/>
+            <!-- Densite comprise entre 30% exclus et 50% inclus -->
+            <xsd:enumeration value="D30_50"/>
+            <!-- Densite comprise entre 50% exclus et 80% inclus -->
+            <xsd:enumeration value="D50_80"/>
+            <!-- Densite strictement superieure a 80% -->
+            <xsd:enumeration value="PLUS_80"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="DestinationChanvre">
+        <xsd:restriction base="xsd:token">
+            <xsd:maxLength value="15"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="Distance">
+        <xsd:restriction base="xsd:decimal">
+            <xsd:totalDigits value="10"/>
+            <xsd:fractionDigits value="1"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="Email">
+        <xsd:restriction base="xsd:string">
+            <xsd:pattern value="([a-zA-Z0-9_\.\-])+@(([a-zA-Z0-9\-])+\.)+([a-zA-Z0-9]{2,4})+"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="MesureMaec">
+        <xsd:restriction base="xsd:string">
+            <xsd:pattern value="[A-Z]{2}_PRV_C[AP]"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="MontantRevenus">
+        <xsd:restriction base="xsd:integer">
+            <xsd:maxInclusive value="9999999999"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="NbAnimauxType1">
+        <xsd:restriction base="xsd:nonNegativeInteger">
+            <xsd:maxInclusive value="9999"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="NbAnimauxType2">
+        <xsd:restriction base="xsd:nonNegativeInteger">
+            <xsd:maxInclusive value="999999"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="NombreArbres">
+        <xsd:restriction base="xsd:integer">
+            <xsd:minInclusive value="0"/>
+            <xsd:maxInclusive value="9999"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="NomExploitant">
+        <xsd:restriction base="xsd:normalizedString">
+            <xsd:maxLength value="60"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="NumeroIlot">
+        <xsd:restriction base="xsd:positiveInteger">
+            <xsd:maxInclusive value="9999"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="NumeroIlotReference">
+        <xsd:restriction base="xsd:string">
+            <xsd:pattern value="[0-9]{2}[0-9AB][0-9]{9}"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="NumeroFiscal">
+        <xsd:restriction base="xsd:string">
+            <xsd:pattern value="[0-9]{13}"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="NumeroPacage">
+        <xsd:restriction base="xsd:string">
+            <xsd:pattern value="[0-9]{2}[0-9AB][0-9]{6}"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="NumeroParcelle">
+        <xsd:restriction base="xsd:positiveInteger">
+            <xsd:totalDigits value="3"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="NumeroSna">
+        <xsd:restriction base="xsd:string">
+            <xsd:pattern value="[0-9]{2}[0-9AB][0-9]{9}"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="NumeroSnaCreationTas">
+        <xsd:restriction base="xsd:positiveInteger">
+            <xsd:maxInclusive value="9999"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="NumeroZdh">
+        <xsd:restriction base="xsd:string">
+            <xsd:pattern value="[0-9]{2}[0-9AB][0-9]{9}"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="NumeroZdhCreationTas">
+        <xsd:restriction base="xsd:positiveInteger">
+            <xsd:maxInclusive value="9999"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="PeriodeBCAE6">
+        <xsd:restriction base="xsd:string">
+            <xsd:maxLength value="20"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="PeriodeLabour">
+        <xsd:restriction base="xsd:token">
+            <xsd:maxLength value="15"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="Precision">
+        <xsd:restriction base="xsd:string">
+            <xsd:maxLength value="3"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="SIRE">
+        <xsd:restriction base="xsd:string">
+            <xsd:maxLength value="9"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="TitulaireRib">
+        <xsd:restriction base="xsd:string">
+            <xsd:pattern value="[0-9A-Za-z -]{0,50}"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="TypeAB">
+        <xsd:restriction base="xsd:token">
+            <xsd:enumeration value="C1"/>
+            <xsd:enumeration value="C2"/>
+            <xsd:enumeration value="C3"/>
+            <xsd:enumeration value="AB"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="TypeAnimauxType1">
+        <xsd:restriction base="xsd:token">
+            <!-- Alpagas -->
+            <xsd:enumeration value="AL"/>
+            <!-- Autres porcins -->
+            <xsd:enumeration value="AP"/>
+            <!-- Caprins -->
+            <xsd:enumeration value="CA"/>
+            <!-- Cerfs et biches -->
+            <xsd:enumeration value="CE"/>
+            <!-- Daims et daines -->
+            <xsd:enumeration value="DA"/>
+            <!-- Equides -->
+            <xsd:enumeration value="EQ"/>
+            <!-- Lamas -->
+            <xsd:enumeration value="LA"/>
+            <!-- Ovins -->
+            <xsd:enumeration value="OV"/>
+            <!-- Truies reproductrices -->
+            <xsd:enumeration value="TR"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="TypeAnimauxType2">
+        <xsd:restriction base="xsd:token">
+            <!-- Autres volailles -->
+            <xsd:enumeration value="AV"/>
+            <!-- Poules pondeuses -->
+            <xsd:enumeration value="PP"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="TypeInterRang">
+        <xsd:restriction base="xsd:token">
+            <xsd:maxLength value="15"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="TypeSna">
+        <xsd:restriction base="xsd:token">
+            <!-- Mare -->
+            <xsd:enumeration value="A1"/>
+            <!-- Surface en eau non maconnee (hors mare) -->
+            <xsd:enumeration value="A2"/>
+            <!-- Surface en eau maconnee -->
+            <xsd:enumeration value="A3"/>
+            <!-- Fosse non maconne -->
+            <xsd:enumeration value="A4"/>
+            <!-- Fosse maconne -->
+            <xsd:enumeration value="A5"/>
+            <!-- Affleurement rocheux -->
+            <xsd:enumeration value="A6"/>
+            <!-- Mur -->
+            <xsd:enumeration value="A7"/>
+            <!-- Batiment -->
+            <xsd:enumeration value="B1"/>
+            <!-- Route, chemin ou voie ferree -->
+            <xsd:enumeration value="B2"/>
+            <!-- Surface amenagee -->
+            <xsd:enumeration value="B3"/>
+            <!-- Arbre -->
+            <xsd:enumeration value="V1"/>
+            <!-- Arbres alignes -->
+            <xsd:enumeration value="V2"/>
+            <!-- Bosquet -->
+            <xsd:enumeration value="V3"/>
+            <!-- Haie -->
+            <xsd:enumeration value="V4"/>
+            <!-- Foret -->
+            <xsd:enumeration value="V5"/>
+            <!-- Broussailles -->
+            <xsd:enumeration value="V6"/>
+            <!-- Autre surface vegetale non agricole -->
+            <xsd:enumeration value="V7"/>
+            <!-- Vegetation non agricole non caracterisee -->
+            <xsd:enumeration value="V8"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+    <xsd:simpleType name="VoieEcoregime">
+        <xsd:restriction base="xsd:token">
+            <xsd:enumeration value="VP"/>
+            <xsd:enumeration value="VC"/>
+            <xsd:enumeration value="VB"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+</xsd:schema>
