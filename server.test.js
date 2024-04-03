@@ -128,36 +128,25 @@ describe('GET /api/v2/test', () => {
   })
 })
 
-describe('POST /api/v2/convert/shapefile/geojson', () => {
+describe('POST /api/v2/convert/telepac/geojson', () => {
+  const { single, multi } = require('./test/fixtures/telepac-expectations.js')
+
   test('it converts a L93 zipped archive into WGS84 GeoJSON', () => {
     return request(app.server)
-      .post('/api/v2/convert/shapefile/geojson')
+      .post('/api/v2/convert/telepac/geojson')
       .type('json')
       .set('Authorization', USER_DOC_AUTH_HEADER)
       .attach('archive', 'test/fixtures/telepac-parcelles.zip')
       .then((response) => {
         expect(response.status).toEqual(200)
+        expect(response.body.features).toHaveLength(45)
         expect(response.body).toHaveProperty('features.0.type', 'Feature')
       })
   })
 
-  test('it fails without auth', () => {
-    return request(app.server)
-      .post('/api/v2/convert/shapefile/geojson')
-      .type('json')
-      .attach('archive', 'test/fixtures/telepac-parcelles.zip')
-      .then((response) => {
-        expect(response.status).toEqual(401)
-      })
-  })
-})
-
-describe('POST /api/v2/convert/telepac-xml/geojson', () => {
-  const { single, multi } = require('./test/fixtures/telepac-expectations.js')
-
   test('it converts a L93 multi-feature XML Telepac 2024v4 file to WGS84 GeoJSON', () => {
     return request(app.server)
-      .post('/api/v2/convert/telepac-xml/geojson')
+      .post('/api/v2/convert/telepac/geojson')
       .type('json')
       .set('Authorization', USER_DOC_AUTH_HEADER)
       .attach('archive', 'test/fixtures/telepac-multi-2024v4.xml')
@@ -169,7 +158,7 @@ describe('POST /api/v2/convert/telepac-xml/geojson', () => {
 
   test('it converts a L93 multi-feature XML Telepac 2024v3 file to WGS84 GeoJSON', () => {
     return request(app.server)
-      .post('/api/v2/convert/telepac-xml/geojson')
+      .post('/api/v2/convert/telepac/geojson')
       .type('json')
       .set('Authorization', USER_DOC_AUTH_HEADER)
       .attach('archive', 'test/fixtures/telepac-multi-2024v3.xml')
@@ -181,7 +170,7 @@ describe('POST /api/v2/convert/telepac-xml/geojson', () => {
 
   test('it converts a L93 single-feature XML 2024v3 file to WGS84 GeoJSON', () => {
     return request(app.server)
-      .post('/api/v2/convert/telepac-xml/geojson')
+      .post('/api/v2/convert/telepac/geojson')
       .type('json')
       .set('Authorization', USER_DOC_AUTH_HEADER)
       .attach('archive', 'test/fixtures/telepac-single-2024v3.xml')
@@ -193,7 +182,7 @@ describe('POST /api/v2/convert/telepac-xml/geojson', () => {
 
   test('it converts a L93 single-feature XML 2024v4 file to WGS84 GeoJSON', () => {
     return request(app.server)
-      .post('/api/v2/convert/telepac-xml/geojson')
+      .post('/api/v2/convert/telepac/geojson')
       .type('json')
       .set('Authorization', USER_DOC_AUTH_HEADER)
       .attach('archive', 'test/fixtures/telepac-single-2024v4.xml')
@@ -203,9 +192,33 @@ describe('POST /api/v2/convert/telepac-xml/geojson', () => {
       })
   })
 
+  test('it fails when sending a non-recognized file', () => {
+    return request(app.server)
+      .post('/api/v2/convert/telepac/geojson')
+      .type('json')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+      .attach('archive', 'test/fixtures/parcels.json')
+      .then((response) => {
+        expect(response.status).toEqual(400)
+        expect(response.body).toHaveProperty('error', 'Format de fichier non-reconnu.')
+      })
+  })
+
+  test('it fails when sending a non-recognized format', () => {
+    return request(app.server)
+      .post('/api/v2/convert/telepac/geojson')
+      .type('json')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+      .attach('archive', 'test/fixtures/geofolia-parcelles.zip')
+      .then((response) => {
+        expect(response.status).toEqual(400)
+        expect(response.body).toHaveProperty('error', 'Impossible de trouver l\'archive Telepac dans ce fichier.')
+      })
+  })
+
   test('it fails without auth', () => {
     return request(app.server)
-      .post('/api/v2/convert/telepac-xml/geojson')
+      .post('/api/v2/convert/telepac/geojson')
       .type('json')
       .attach('archive', 'test/fixtures/telepac-multi-2024v4.xml')
       .then((response) => {
