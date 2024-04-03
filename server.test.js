@@ -14,7 +14,6 @@ const parcellesPatched = require('./lib/providers/__fixtures__/parcelles-patched
 const apiParcellaire = require('./lib/providers/__fixtures__/agence-bio-api-parcellaire.json')
 const { normalizeOperator } = require('./lib/outputs/operator.js')
 const { normalizeRecord } = require('./lib/outputs/record')
-const { getRandomFeatureId } = require('./lib/outputs/features')
 const { recordToApi } = require('./lib/outputs/api')
 const { loadRecordFixture, expectDeepCloseTo } = require('./test/utils')
 
@@ -29,12 +28,6 @@ const USER_DOC_AUTH_HEADER = `Bearer ${USER_DOC_AUTH_TOKEN}`
 beforeAll(() => app.ready())
 afterAll(() => app.close())
 afterEach(() => jest.clearAllMocks())
-
-jest.mock('got')
-jest.mock('./lib/outputs/features', () => ({
-  ...jest.requireActual('./lib/outputs/features'),
-  getRandomFeatureId: jest.fn()
-}))
 
 describe('GET /', () => {
   test('responds with a 404', () => {
@@ -223,8 +216,7 @@ describe('POST /api/v2/convert/telepac-xml/geojson', () => {
 
 describe('POST /api/v2/convert/geofolia/geojson', () => {
   test('it converts a Geofolia zipped archive into WGS84 GeoJSON', () => {
-    const expectation = JSON.parse(fs.readFileSync('test/fixtures/geofolia-parcelles.json', { encoding: 'utf8' }))
-    getRandomFeatureId.mockReturnValueOnce('1').mockReturnValueOnce('2')
+    const expectation = require('./test/fixtures/geofolia-parcelles.js')
 
     return request(app.server)
       .post('/api/v2/convert/geofolia/geojson')
@@ -252,7 +244,7 @@ describe('POST /api/v2/import/geofolia/:numeroBio', () => {
   const getMock = jest.mocked(got.get)
   const postMock = jest.mocked(got.post)
   const archive = fs.readFileSync('test/fixtures/geofolia-parcelles.zip')
-  const expectation = JSON.parse(fs.readFileSync('test/fixtures/geofolia-parcelles.json', { encoding: 'utf8' }))
+  const expectation = require('./test/fixtures/geofolia-parcelles.js')
 
   test('it checks the availability of a customer on Geofolink', () => {
     // setup operator
@@ -312,8 +304,6 @@ describe('POST /api/v2/import/geofolia/:numeroBio', () => {
   })
 
   test('it requests a working archive on Geofolink', () => {
-    getRandomFeatureId.mockReturnValueOnce('1').mockReturnValueOnce('2')
-
     // setup operator
     getMock.mockReturnValueOnce({
       async json () {
