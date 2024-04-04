@@ -56,7 +56,7 @@ const { parseTelepacArchive } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive, geofoliaLookup, geofoliaParcellaire } = require('./lib/providers/geofolia.js')
 const { InvalidRequestApiError, NotFoundApiError } = require('./lib/errors.js')
 
-const { deepmerge, commonSchema, swaggerConfig } = require('./lib/routes/index.js')
+const { deepmerge, commonSchema, swaggerConfig, CartoBioDecoratorsPlugin } = require('./lib/routes/index.js')
 const { sandboxSchema, internalSchema, hiddenSchema } = require('./lib/routes/index.js')
 const { protectedWithToken, enforceSameCertificationBody } = require('./lib/routes/index.js')
 const { operatorFromNumeroBio, routeWithRecordId, routeWithPacage } = require('./lib/routes/index.js')
@@ -154,27 +154,16 @@ app.register(fastifyOauth, {
   callbackUri: 'http://127.0.0.1:8000/api/login/geofolia/callback'
 })
 
-// Routes to protect with a JSON Web Token
-app.decorateRequest('user', null)
-app.decorateRequest('organismeCertificateur', null)
-
-// Requests can be decorated by an operator (associated to a numeroBio)
-app.decorateRequest('operator', null)
-// Requests can be decorated by a given Record too (associated to a recordId)
-app.decorateRequest('record', null)
-
-// Requests can be decorated by an API result when we do custom stream parsing
-app.decorateRequest('APIResult', null)
-
 app.addSchema(commonSchema)
 
 // Expose OpenAPI schema and Swagger documentation
 app.register(fastifySwagger, swaggerConfig)
-
 app.register(fastifySwaggerUi, {
   baseDir: '/api',
   routePrefix: '/api/documentation'
 })
+
+app.register(CartoBioDecoratorsPlugin)
 
 app.register(async (app) => {
   // Begin Public API routes

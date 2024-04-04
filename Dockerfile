@@ -29,6 +29,7 @@ COPY ./lib ./lib
 COPY ./migrations ./migrations
 COPY ./test ./test
 COPY ./*.js ./
+COPY ./*.d.ts ./
 COPY ./.eslintrc.js ./.eslintrc.js
 COPY ./jsconfig.json ./jsconfig.json
 COPY ./tsconfig.json ./tsconfig.json

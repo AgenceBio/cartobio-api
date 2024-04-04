@@ -1,5 +1,6 @@
 {
   "include": [
+    "server.d.ts",
     "lib/**/*.js",
     "lib/types.d.ts"
   ],
