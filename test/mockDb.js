@@ -5,7 +5,6 @@ const isISO8601 = require('validator/lib/isISO8601.js')
 expect.extend({
   stringMatchingISODate (actual) {
     const result = isISO8601(actual, { strict: true, strictSeparator: true })
-    console.log({ result })
 
     if (result) {
       return {

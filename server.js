@@ -58,8 +58,7 @@ const { InvalidRequestApiError, NotFoundApiError } = require('./lib/errors.js')
 
 const { deepmerge, commonSchema, swaggerConfig, CartoBioDecoratorsPlugin } = require('./lib/routes/index.js')
 const { sandboxSchema, internalSchema, hiddenSchema } = require('./lib/routes/index.js')
-const { protectedWithToken, enforceSameCertificationBody } = require('./lib/routes/index.js')
-const { operatorFromNumeroBio, routeWithRecordId, routeWithPacage } = require('./lib/routes/index.js')
+const { operatorFromNumeroBio, protectedWithToken, routeWithRecordId, routeWithPacage } = require('./lib/routes/index.js')
 const { certificationBodySearchSchema } = require('./lib/routes/index.js')
 const { createFeatureSchema, createRecordSchema, deleteSingleFeatureSchema, patchFeatureCollectionSchema, patchRecordSchema, updateFeaturePropertiesSchema } = require('./lib/routes/records.js')
 const { geofoliaImportSchema } = require('./lib/routes/index.js')
@@ -211,7 +210,7 @@ app.register(async (app) => {
    * @private
    * Retrieve an operator
    */
-  app.get('/api/v2/operator/:numeroBio', deepmerge(protectedWithToken(), operatorFromNumeroBio, enforceSameCertificationBody), (request, reply) => {
+  app.get('/api/v2/operator/:numeroBio', deepmerge(protectedWithToken(), operatorFromNumeroBio), (request, reply) => {
     return reply.code(200).send(request.operator)
   })
 
@@ -219,7 +218,7 @@ app.register(async (app) => {
    * @private
    * Retrieve an operator records
    */
-  app.get('/api/v2/operator/:numeroBio/records', deepmerge(protectedWithToken(), enforceSameCertificationBody), async (request, reply) => {
+  app.get('/api/v2/operator/:numeroBio/records', deepmerge(protectedWithToken(), operatorFromNumeroBio), async (request, reply) => {
     const records = await getRecords(request.params.numeroBio)
     return reply.code(200).send(records)
   })
@@ -227,7 +226,7 @@ app.register(async (app) => {
   /**
    * Retrieve a given Record
    */
-  app.get('/api/v2/audits/:recordId', deepmerge(routeWithRecordId, enforceSameCertificationBody, protectedWithToken()), (request, reply) => {
+  app.get('/api/v2/audits/:recordId', deepmerge(routeWithRecordId, protectedWithToken()), (request, reply) => {
     return reply.code(200).send(request.record)
   })
 
@@ -237,7 +236,6 @@ app.register(async (app) => {
   app.post('/api/v2/operator/:numeroBio/records', deepmerge(
     createRecordSchema,
     operatorFromNumeroBio,
-    enforceSameCertificationBody,
     protectedWithToken()
   ), async (request, reply) => {
     const { numeroBio } = request.params
@@ -253,7 +251,7 @@ app.register(async (app) => {
   /**
    * Delete a given Record
    */
-  app.delete('/api/v2/audits/:recordId', deepmerge(routeWithRecordId, enforceSameCertificationBody, protectedWithToken()), async (request, reply) => {
+  app.delete('/api/v2/audits/:recordId', deepmerge(routeWithRecordId, protectedWithToken()), async (request, reply) => {
     const { user, record } = request
     await deleteRecord({ user, record })
     return reply.code(204).send()
@@ -360,7 +358,7 @@ app.register(async (app) => {
 
     const isWellKnown = await geofoliaLookup(siret, year)
 
-    return reply.code(isWellKnown ? 204 : 404).send()
+    return reply.code(isWellKnown === true ? 204 : 404).send()
   })
 
   /**
@@ -434,7 +432,7 @@ app.register(async (app) => {
     })
   })
 
-  app.get('/api/v2/certification/parcellaire/:numeroBio', deepmerge(protectedWithToken({ oc: true })), async (request, reply) => {
+  app.get('/api/v2/certification/parcellaire/:numeroBio', deepmerge(protectedWithToken({ oc: true }), operatorFromNumeroBio), async (request, reply) => {
     const record = await getOperatorLastRecord(request.params.numeroBio, {
       anneeAudit: request.query.anneeAudit,
       statut: request.query.statut

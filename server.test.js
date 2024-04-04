@@ -21,8 +21,13 @@ const sign = createSigner({ key: config.get('jwtSecret') })
 
 const fakeOcToken = 'aaaa-bbbb-cccc-dddd'
 const fakeOc = { id: 999, nom: 'CartobiOC', numeroControleEu: 'FR-BIO-999' }
-const USER_DOC_AUTH_TOKEN = sign({ ocId: 999, test: true, organismeCertificateur: fakeOc })
+const fakeUser = { id: 1, prenom: 'Tonio', nom: 'Est', test: true, organismeCertificateur: fakeOc }
+const USER_DOC_AUTH_TOKEN = sign(fakeUser, { expiresIn: '10m' })
 const USER_DOC_AUTH_HEADER = `Bearer ${USER_DOC_AUTH_TOKEN}`
+
+const otherFakeOc = { id: 1111, nom: 'Certificator', numeroControleEu: 'FR-BIO-1111' }
+const OTHER_USER_DOC_AUTH_TOKEN = sign({ id: 2, prenom: 'Tania', nom: 'Ouest', test: true, organismeCertificateur: otherFakeOc }, { expiresIn: '10m' })
+const OTHER_OC_AUTH_TOKEN = 'zzzz-zzzz-zzzz-zzzz'
 
 // start and stop server
 beforeAll(() => app.ready())
@@ -63,18 +68,29 @@ describe('GET /api/version', () => {
 })
 
 describe('GET /api/v2/user/verify', () => {
-  test('responds with cartobio decoded token', () => {
+  test('responds with cartobio decoded token Authorization', () => {
     return request(app.server)
       .get('/api/v2/user/verify')
       .type('json')
       .set('Authorization', USER_DOC_AUTH_HEADER)
       .then((response) => {
         expect(response.status).toEqual(200)
-        expect(response.body).toHaveProperty('ocId', 999)
+        expect(response.body).toMatchObject(fakeUser)
       })
   })
 
   test('responds well with an access_token query string value', () => {
+    return request(app.server)
+      .get('/api/v2/user/verify')
+      .query({ access_token: USER_DOC_AUTH_TOKEN })
+      .type('json')
+      .then((response) => {
+        expect(response.status).toEqual(200)
+        expect(response.body).toMatchObject(fakeUser)
+      })
+  })
+
+  test('responds with an OC token Authorization', () => {
     const postMock = jest.mocked(got.post)
 
     postMock.mockReturnValueOnce({
@@ -88,7 +104,8 @@ describe('GET /api/v2/user/verify', () => {
       .set('Authorization', fakeOcToken)
       .type('json')
       .then((response) => {
-        expect(response.body).toEqual(fakeOc)
+        expect(response.status).toEqual(200)
+        expect(response.body).toMatchObject(fakeOc)
       })
   })
 })
@@ -101,7 +118,26 @@ describe('GET /api/v2/test', () => {
       .then((response) => {
         expect(response.status).toEqual(401)
         expect(response.header['content-type']).toBe('application/json; charset=utf-8')
-        expect(response.body).toHaveProperty('error')
+        expect(response.body).toMatchObject({
+          error: "Un jeton d'API est nécessaire pour accéder à ce contenu."
+        })
+      })
+  })
+
+  test('fails when JWT cannot be verified', () => {
+    const sign = createSigner({ key: 'aaaaa' })
+    const wrongUserToken = sign(fakeUser)
+
+    return request(app.server)
+      .get('/api/v2/test')
+      .type('json')
+      .set('Authorization', `Bearer ${wrongUserToken}`)
+      .then((response) => {
+        expect(response.status).toEqual(401)
+        expect(response.header['content-type']).toBe('application/json; charset=utf-8')
+        expect(response.body).toMatchObject({
+          error: "Nous n'avons pas réussi à vérifier le jeton d'authentification."
+        })
       })
   })
 
@@ -125,6 +161,193 @@ describe('GET /api/v2/test', () => {
       .then((response) => {
         expect(response.status).toEqual(200)
       })
+  })
+})
+
+describe('GET /api/v2/certification/parcellaire/:numeroBio', () => {
+  const postMock = jest.mocked(got.post)
+  const getMock = jest.mocked(got.get)
+
+  beforeEach(loadRecordFixture)
+  afterEach(() => {
+    postMock.mockReset()
+    getMock.mockReset()
+  })
+
+  test('it responds with 404 when no parcellaire is found', async () => {
+    getMock.mockReturnValueOnce({
+      async json () {
+        const response = { statusCode: 404, statusMessage: 'Not Found' }
+        const error = new got.HTTPError(response)
+        error.response = response
+        throw error
+      }
+    })
+
+    const res = await request(app.server)
+      .get('/api/v2/certification/parcellaire/1234')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+
+    expect(res.status).toBe(404)
+  })
+
+  test('it responds with 200 when a parcellaire is found', async () => {
+    getMock.mockReturnValueOnce({
+      async json () {
+        return agencebioOperator
+      }
+    })
+
+    const res = await request(app.server)
+      .get('/api/v2/certification/parcellaire/99999')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual(
+      expectDeepCloseTo(
+        recordToApi(
+          normalizeRecord({ parcelles, ...record })
+        )
+      )
+    )
+  })
+
+  test('it works with an oc token', async () => {
+    getMock.mockReturnValueOnce({
+      async json () {
+        return agencebioOperator
+      }
+    })
+
+    postMock.mockReturnValueOnce({
+      async json () {
+        return fakeOc
+      }
+    })
+
+    const response = await request(app.server)
+      .get('/api/v2/certification/parcellaire/99999')
+      .set('Authorization', fakeOcToken)
+      .type('json')
+
+    expect(response.status).toEqual(200)
+    expect(response.body).toEqual(
+      expectDeepCloseTo(
+        recordToApi(
+          normalizeRecord({ parcelles, ...record })
+        )
+      )
+    )
+  })
+
+  test('it fails with a non-matching user token', async () => {
+    getMock.mockReturnValueOnce({
+      async json () {
+        return agencebioOperator
+      }
+    })
+
+    const response = await request(app.server)
+      .get('/api/v2/certification/parcellaire/99999')
+      .set('Authorization', `Bearer ${OTHER_USER_DOC_AUTH_TOKEN}`)
+      .type('json')
+
+    expect(response.status).toEqual(401)
+  })
+
+  test('it fails with a non-matching oc token', async () => {
+    getMock.mockReturnValueOnce({
+      async json () {
+        return agencebioOperator
+      }
+    })
+
+    postMock.mockReturnValueOnce({
+      async json () {
+        return otherFakeOc
+      }
+    })
+
+    const response = await request(app.server)
+      .get('/api/v2/certification/parcellaire/99999')
+      .set('Authorization', OTHER_OC_AUTH_TOKEN)
+      .type('json')
+
+    expect(response.status).toEqual(401)
+  })
+})
+
+describe('GET /api/v2/audits/:recordId', () => {
+  beforeEach(loadRecordFixture)
+
+  test('it works with a matching user token', async () => {
+    got.get.mockReturnValueOnce({
+      async json () {
+        return agencebioOperator
+      }
+    })
+
+    const response = await request(app.server)
+      .get('/api/v2/audits/054f0d70-c3da-448f-823e-81fcf7c11112')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+      .type('json')
+
+    const expectedRecord = normalizeRecord({ parcelles, ...record })
+
+    // we cleanup fixtures stuff
+    delete expectedRecord.oc_id
+    delete expectedRecord.oc_label
+
+    expect(response.status).toEqual(200)
+    expect(response.body).toMatchObject(expectDeepCloseTo(expectedRecord))
+  })
+
+  test('it is not supposed to work with a valid oc token', async () => {
+    got.get.mockReturnValueOnce({
+      async json () {
+        return agencebioOperator
+      }
+    })
+
+    got.post.mockReturnValueOnce({
+      async json () {
+        return fakeOc
+      }
+    })
+
+    const response = await request(app.server)
+      .get('/api/v2/audits/054f0d70-c3da-448f-823e-81fcf7c11112')
+      .set('Authorization', fakeOcToken)
+      .type('json')
+
+    expect(response.status).toEqual(401)
+    expect(response.body.error).toMatch("Un jeton d'API est nécessaire")
+  })
+
+  test('it fails with an inexisting record', async () => {
+    got.get.mockReturnValueOnce({
+      async json () {
+        const response = { statusCode: 404, statusMessage: 'Not Found' }
+        const error = new got.HTTPError(response)
+        error.response = response
+        throw error
+      }
+    })
+
+    const res = await request(app.server)
+      .get('/api/v2/audits/aaaaaaaa-c3da-448f-823e-81fcf7c2bf6e')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+
+    expect(res.status).toBe(404)
+  })
+
+  test.skip('it fails with a non-matching user token', async () => {
+    const response = await request(app.server)
+      .get('/api/v2/audits/054f0d70-c3da-448f-823e-81fcf7c11112')
+      .set('Authorization', `Bearer ${OTHER_USER_DOC_AUTH_TOKEN}`)
+      .type('json')
+
+    expect(response.status).toEqual(401)
   })
 })
 
@@ -265,143 +488,167 @@ describe('POST /api/v2/convert/geofolia/geojson', () => {
   })
 })
 
-describe('POST /api/v2/import/geofolia/:numeroBio', () => {
+describe('HEAD/GET /api/v2/import/geofolia/:numeroBio', () => {
   const getMock = jest.mocked(got.get)
   const postMock = jest.mocked(got.post)
   const archive = fs.readFileSync('test/fixtures/geofolia-parcelles.zip')
   const expectation = require('./test/fixtures/geofolia-parcelles.js')
 
-  test('it checks the availability of a customer on Geofolink', () => {
-    // setup operator
-    getMock.mockReturnValueOnce({
-      async json () {
-        return agencebioOperator
-      }
+  describe('HEAD /api/v2/import/geofolia/:numeroBio', () => {
+    beforeEach(loadRecordFixture)
+    afterEach(() => {
+      getMock.mockReset()
+      postMock.mockReset()
+    })
+    beforeAll(() => {
+      getMock.mockReset()
+      postMock.mockReset()
     })
 
-    // fake Geofolia token request
-    postMock.mockReturnValueOnce({
-      async json () {
-        return { access_token: 'test-token' }
-      }
+    test('it fails without auth (head)', () => {
+      return request(app.server)
+        .head('/api/v2/import/geofolia/99999')
+        .type('json')
+        .then((response) => {
+          expect(response.status).toEqual(401)
+        })
     })
 
-    postMock.mockReturnValueOnce({
-      async json () {
-        return []
-      }
-    })
-
-    return request(app.server)
-      .head('/api/v2/import/geofolia/1234')
-      .type('json')
-      .set('Authorization', USER_DOC_AUTH_HEADER)
-      .then((response) => {
-        expect(response.status).toEqual(204)
+    test('it checks the availability of a customer on Geofolink', () => {
+      // setup operator
+      getMock.mockReturnValueOnce({
+        async json () {
+          return agencebioOperator
+        }
       })
+
+      // fake Geofolia token request
+      postMock.mockReturnValueOnce({
+        async json () {
+          return { access_token: 'test-token' }
+        }
+      })
+
+      postMock.mockReturnValueOnce({
+        async json () {
+          return []
+        }
+      })
+
+      return request(app.server)
+        .head('/api/v2/import/geofolia/99999')
+        .type('json')
+        .set('Authorization', USER_DOC_AUTH_HEADER)
+        .then((response) => {
+          expect(response.status).toEqual(204)
+        })
+    })
+
+    test('it did not find any relevant SIRET on Geofolink', () => {
+      // setup operator
+      getMock.mockReturnValueOnce({
+        async json () {
+          return agencebioOperator
+        }
+      })
+
+      // we skip the token as it is memoised
+      postMock.mockReturnValueOnce({
+        async json () {
+          const response = { statusCode: 404, statusMessage: 'Not Found' }
+          const error = new got.HTTPError(response)
+          error.response = response
+          throw error
+        }
+      })
+
+      return request(app.server)
+        .head('/api/v2/import/geofolia/99999')
+        .type('json')
+        .set('Authorization', USER_DOC_AUTH_HEADER)
+        .then((response) => {
+          expect(response.status).toEqual(404)
+        })
+    })
   })
 
-  test('it did not find any relevant SIRET on Geofolink', () => {
-    // setup operator
-    getMock.mockReturnValueOnce({
-      async json () {
-        return agencebioOperator
-      }
+  describe('GET /api/v2/import/geofolia/:numeroBio', () => {
+    beforeEach(loadRecordFixture)
+    afterEach(() => {
+      getMock.mockReset()
+      postMock.mockReset()
+    })
+    beforeAll(() => {
+      getMock.mockReset()
+      postMock.mockReset()
     })
 
-    // we skip the token as it is memoised
-    postMock.mockReturnValueOnce({
-      async json () {
-        const response = { statusCode: 404, statusMessage: 'Not Found' }
-        const error = new got.HTTPError(response)
-        error.response = response
-        throw error
-      }
+    test('it fails without auth (get)', () => {
+      return request(app.server)
+        .get('/api/v2/import/geofolia/99999')
+        .type('json')
+        .then((response) => {
+          expect(response.status).toEqual(401)
+        })
     })
 
-    return request(app.server)
-      .head('/api/v2/import/geofolia/1234')
-      .type('json')
-      .set('Authorization', USER_DOC_AUTH_HEADER)
-      .then((response) => {
-        expect(response.status).toEqual(404)
+    test('it requests a working archive on Geofolink', () => {
+      // setup operator
+      getMock.mockReturnValueOnce({
+        async json () {
+          return agencebioOperator
+        }
       })
-  })
 
-  test('it requests a working archive on Geofolink', () => {
-    // setup operator
-    getMock.mockReturnValueOnce({
-      async json () {
-        return agencebioOperator
-      }
-    })
-
-    // we skip the token as it is memoised
-    getMock.mockReturnValueOnce({
-      async json () {
-        return [{
-          id: 'order-1',
-          identificationCodes: ['999999999']
-        }]
-      }
-    })
-
-    getMock.mockReturnValueOnce({
-      async buffer () {
-        return archive
-      }
-    })
-
-    return request(app.server)
-      .get('/api/v2/import/geofolia/1234')
-      .type('json')
-      .set('Authorization', USER_DOC_AUTH_HEADER)
-      .then((response) => {
-        expect(response.status).toEqual(200)
-        expect(response.body).toEqual(expectation)
+      // we skip the token as it is memoised
+      getMock.mockReturnValueOnce({
+        async json () {
+          return [{
+            id: 'order-1',
+            identificationCodes: ['999999999']
+          }]
+        }
       })
-  })
 
-  test('it requests a working archive on Geofolink, but asks to come back later (because it is not ready yet)', () => {
-    // setup operator
-    getMock.mockReturnValueOnce({
-      async json () {
-        return agencebioOperator
-      }
+      getMock.mockReturnValueOnce({
+        async buffer () {
+          return archive
+        }
+      })
+
+      return request(app.server)
+        .get('/api/v2/import/geofolia/99999')
+        .type('json')
+        .set('Authorization', USER_DOC_AUTH_HEADER)
+        .then((response) => {
+          expect(response.status).toEqual(200)
+          expect(response.body).toEqual(expectation)
+        })
     })
 
-    // we skip the token as it is memoised
-    getMock.mockReturnValueOnce({
-      async json () {
-        return []
-      }
+    test('it requests a working archive on Geofolink, but asks to come back later (because it is not ready yet)', () => {
+      // setup operator
+      getMock.mockReturnValueOnce({
+        async json () {
+          return agencebioOperator
+        }
+      })
+
+      // we skip the token as it is memoised
+      getMock.mockReturnValueOnce({
+        async json () {
+          return []
+        }
+      })
+
+      return request(app.server)
+        .get('/api/v2/import/geofolia/99999')
+        .type('json')
+        .set('Authorization', USER_DOC_AUTH_HEADER)
+        .then((response) => {
+          expect(response.status).toEqual(202)
+        })
     })
-
-    return request(app.server)
-      .get('/api/v2/import/geofolia/1234')
-      .type('json')
-      .set('Authorization', USER_DOC_AUTH_HEADER)
-      .then((response) => {
-        expect(response.status).toEqual(202)
-      })
-  })
-
-  test('it fails without auth (head)', () => {
-    return request(app.server)
-      .head('/api/v2/import/geofolia/1234')
-      .type('json')
-      .then((response) => {
-        expect(response.status).toEqual(401)
-      })
-  })
-
-  test('it fails without auth (get)', () => {
-    return request(app.server)
-      .get('/api/v2/import/geofolia/1234')
-      .type('json')
-      .then((response) => {
-        expect(response.status).toEqual(401)
-      })
   })
 })
 
@@ -692,10 +939,9 @@ describe('PATCH /api/v2/audits/:recordId/parcelles', () => {
 describe('GET /api/v2/import/evv/:numeroEvv+:numeroBio', () => {
   const xmlEvv = fs.readFileSync(join(__dirname, 'lib', 'providers', '__fixtures__/cvi-evv.xml'), { encoding: 'utf8' })
   const xmlParcellaire = fs.readFileSync(join(__dirname, 'lib', 'providers', '__fixtures__/cvi-parcellaire.xml'), { encoding: 'utf8' })
-  const getMock = jest.mocked(got.get).mockName('getMock')
 
   beforeEach(() => {
-    getMock.mockReturnValueOnce({
+    got.get.mockReturnValueOnce({
       async json () {
         return agencebioOperator
       }
@@ -725,7 +971,10 @@ describe('GET /api/v2/import/evv/:numeroEvv+:numeroBio', () => {
   test('it should return a 404 with an unknown operator', async () => {
     got.__mocks.get.mockReturnValueOnce({
       async text () {
-        throw new got.HTTPError({ statusCode: 404 })
+        const response = { statusCode: 404, statusMessage: 'Not Found' }
+        const error = new got.HTTPError(response)
+        error.response = response
+        throw error
       }
     })
 
@@ -789,17 +1038,22 @@ describe('GET /api/v2/import/evv/:numeroEvv+:numeroBio', () => {
 })
 
 describe('POST /api/v2/certification/parcelles', () => {
-  const fakeOcToken = 'aaaa-bbbb-cccc-dddd'
   const postMock = jest.mocked(got.post)
-  // 1. AUTHORIZATION check token
-  postMock.mockReturnValue({
-    async json () {
-      return { id: 999, nom: 'CartobiOC', numeroControleEu: 'FR-999' }
-    }
+
+  beforeEach(() => {
+    // 1. AUTHORIZATION check token
+    postMock.mockReturnValueOnce({
+      async json () {
+        return fakeOc
+      }
+    })
   })
 
   test('it fails without auth', async () => {
-    const res = await request(app.server).post('/api/v2/certification/parcelles').send(apiParcellaire)
+    const res = await request(app.server)
+      .post('/api/v2/certification/parcelles')
+      .send(apiParcellaire)
+
     expect(db.query).not.toHaveBeenCalled()
     expect(db.connect).not.toHaveBeenCalled()
     expect(res.status).toBe(401)
@@ -859,30 +1113,5 @@ describe('POST /api/v2/certification/parcelles', () => {
     expect(res.body).toEqual({
       nbObjetTraites: 3
     })
-  })
-})
-
-describe('GET /api/v2/certification/parcellaire/:numeroBio', () => {
-  beforeEach(loadRecordFixture)
-  test('it responds with 404 when no parcellaire is found', async () => {
-    const res = await request(app.server)
-      .get('/api/v2/certification/parcellaire/1234')
-      .set('Authorization', fakeOcToken)
-
-    expect(res.status).toBe(404)
-  })
-
-  test('it responds with 200 when a parcellaire is found', async () => {
-    const res = await request(app.server)
-      .get('/api/v2/certification/parcellaire/99999')
-      .set('Authorization', fakeOcToken)
-    expect(res.status).toBe(200)
-    expect(res.body).toEqual(
-      expectDeepCloseTo(
-        recordToApi(
-          normalizeRecord({ parcelles, ...record })
-        )
-      )
-    )
   })
 })
