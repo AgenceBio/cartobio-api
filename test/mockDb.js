@@ -1,6 +1,29 @@
 const { expect } = require('@jest/globals')
 
+const isISO8601 = require('validator/lib/isISO8601.js')
+
 expect.extend({
+  stringMatchingISODate (actual) {
+    const result = isISO8601(actual, { strict: true, strictSeparator: true })
+    console.log({ result })
+
+    if (result) {
+      return {
+        pass: true,
+        message () {
+          return ''
+        }
+      }
+    } else {
+      return {
+        pass: false,
+        message () {
+          return `expected ${this.utils.printReceived(actual)} to be a valid ISO 8601 date with timestamp`
+        }
+      }
+    }
+  },
+
   toBeAFeatureId (actual) {
     const val = typeof actual === 'number' ? actual : parseInt(actual, 10)
 
@@ -8,7 +31,7 @@ expect.extend({
       return {
         pass: true,
         message () {
-          ''
+          return ''
         }
       }
     } else {
