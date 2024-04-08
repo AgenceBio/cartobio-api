@@ -1,6 +1,6 @@
 {
   "name": "@agencebio/cartobio-types",
-  "version": "1.4.5",
+  "version": "1.4.6",
   "main": "types.d.ts",
   "files": [
     "**/*.d.ts",

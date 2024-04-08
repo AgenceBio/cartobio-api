@@ -22,11 +22,11 @@ const sign = createSigner({ key: config.get('jwtSecret') })
 const fakeOcToken = 'aaaa-bbbb-cccc-dddd'
 const fakeOc = { id: 999, nom: 'CartobiOC', numeroControleEu: 'FR-BIO-999' }
 const fakeUser = { id: 1, prenom: 'Tonio', nom: 'Est', test: true, organismeCertificateur: fakeOc }
-const USER_DOC_AUTH_TOKEN = sign(fakeUser, { expiresIn: '10m' })
+const USER_DOC_AUTH_TOKEN = sign(fakeUser)
 const USER_DOC_AUTH_HEADER = `Bearer ${USER_DOC_AUTH_TOKEN}`
 
 const otherFakeOc = { id: 1111, nom: 'Certificator', numeroControleEu: 'FR-BIO-1111' }
-const OTHER_USER_DOC_AUTH_TOKEN = sign({ id: 2, prenom: 'Tania', nom: 'Ouest', test: true, organismeCertificateur: otherFakeOc }, { expiresIn: '10m' })
+const OTHER_USER_DOC_AUTH_TOKEN = sign({ id: 2, prenom: 'Tania', nom: 'Ouest', test: true, organismeCertificateur: otherFakeOc })
 const OTHER_OC_AUTH_TOKEN = 'zzzz-zzzz-zzzz-zzzz'
 
 // start and stop server
@@ -346,7 +346,7 @@ describe('GET /api/v2/audits/:recordId', () => {
     expect(res.status).toBe(404)
   })
 
-  test.skip('it fails with a non-matching user token', async () => {
+  test('it fails with a non-matching user token', async () => {
     const response = await request(app.server)
       .get('/api/v2/audits/054f0d70-c3da-448f-823e-81fcf7c11112')
       .set('Authorization', `Bearer ${OTHER_USER_DOC_AUTH_TOKEN}`)
@@ -428,7 +428,10 @@ describe('POST /api/v2/convert/telepac/geojson', () => {
       .attach('archive', 'test/fixtures/parcels.json')
       .then((response) => {
         expect(response.status).toEqual(400)
-        expect(response.body).toHaveProperty('error', 'Format de fichier non-reconnu.')
+        expect(response.body).toMatchObject({
+          error: 'Bad Request',
+          message: 'Format de fichier non-reconnu.'
+        })
       })
   })
 
