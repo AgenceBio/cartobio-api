@@ -45,7 +45,7 @@ exports.up = async function(db) {
 };
 
 exports.down = function(db) {
-  db.truncate('communes')
+  return db.runSql('TRUNCATE communes')
 };
 
 exports._meta = {

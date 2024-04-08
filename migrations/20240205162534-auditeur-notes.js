@@ -14,15 +14,16 @@ exports.setup = function(options, seedLink) {
   seed = seedLink;
 };
 
-exports.up = function(db) {
-  db.addColumn(
+exports.up = async function(db) {
+  await db.addColumn(
     'cartobio_parcelles',
     'auditeur_notes',
     {
       type: 'text'
     }
   )
-  db.runSql(/*sql*/`
+
+  await db.runSql(/*sql*/`
     UPDATE cartobio_parcelles SET auditeur_notes = (
       SELECT auditeur_notes
       FROM cartobio_operators, jsonb_array_elements(parcelles)
@@ -30,12 +31,10 @@ exports.up = function(db) {
       AND cartobio_operators.record_id = cartobio_parcelles.record_id
     )
   `)
-  return null;
 };
 
 exports.down = function(db) {
-  db.removeColumn('cartobio_parcelles', 'auditeur_notes');
-  return null;
+  return db.removeColumn('cartobio_parcelles', 'auditeur_notes');
 };
 
 exports._meta = {
