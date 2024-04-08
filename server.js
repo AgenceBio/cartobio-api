@@ -394,7 +394,7 @@ app.register(async (app) => {
         if (!siret) {
           throw new NotFoundApiError('Ce numéro EVV est introuvable')
         } else if (siret !== expectedSiret) {
-          throw new UnauthorizedApiError('Les numéros SIRET du nCVI et de l\'opérateur Agence Bio ne correspondent pas.')
+          throw new UnauthorizedApiError('les numéros SIRET du nCVI et de l\'opérateur Agence Bio ne correspondent pas.')
         }
       })
       .then(() => evvParcellaire({ numeroEvv }))
@@ -453,7 +453,7 @@ app.register(async (app) => {
     const { error, decodedToken, token } = verifyNotificationAuthorization(request.headers.authorization)
 
     if (error) {
-      return new UnauthorizedApiError('Unable to verify the provided token', error)
+      return new UnauthorizedApiError('impossible de vérifier ce jeton', { cause: error })
     }
 
     const [operator, userProfile] = await Promise.all([

@@ -119,7 +119,8 @@ describe('GET /api/v2/test', () => {
         expect(response.status).toEqual(401)
         expect(response.header['content-type']).toBe('application/json; charset=utf-8')
         expect(response.body).toMatchObject({
-          error: "Un jeton d'API est nécessaire pour accéder à ce contenu."
+          error: 'Unauthorized',
+          message: "Accès refusé : un jeton d'API est nécessaire pour accéder à ce contenu."
         })
       })
   })
@@ -136,7 +137,8 @@ describe('GET /api/v2/test', () => {
         expect(response.status).toEqual(401)
         expect(response.header['content-type']).toBe('application/json; charset=utf-8')
         expect(response.body).toMatchObject({
-          error: "Nous n'avons pas réussi à vérifier le jeton d'authentification."
+          error: 'Unauthorized',
+          message: "Accès refusé : ce jeton n'est plus valide (FAST_JWT_INVALID_SIGNATURE)."
         })
       })
   })
@@ -321,7 +323,10 @@ describe('GET /api/v2/audits/:recordId', () => {
       .type('json')
 
     expect(response.status).toEqual(401)
-    expect(response.body.error).toMatch("Un jeton d'API est nécessaire")
+    expect(response.body).toMatchObject({
+      error: 'Unauthorized',
+      message: "Accès refusé : un jeton d'API est nécessaire pour accéder à ce contenu."
+    })
   })
 
   test('it fails with an inexisting record', async () => {
@@ -435,7 +440,10 @@ describe('POST /api/v2/convert/telepac/geojson', () => {
       .attach('archive', 'test/fixtures/geofolia-parcelles.zip')
       .then((response) => {
         expect(response.status).toEqual(400)
-        expect(response.body).toHaveProperty('error', 'Impossible de trouver l\'archive Telepac dans ce fichier.')
+        expect(response.body).toMatchObject({
+          error: 'Bad Request',
+          message: 'Impossible de trouver l\'archive Telepac dans ce fichier.'
+        })
       })
   })
 
@@ -447,7 +455,10 @@ describe('POST /api/v2/convert/telepac/geojson', () => {
       .attach('archive', 'test/fixtures/geofolia-parcelles.zip')
       .then((response) => {
         expect(response.status).toEqual(400)
-        expect(response.body).toHaveProperty('error', 'Impossible de trouver l\'archive Telepac dans ce fichier.')
+        expect(response.body).toMatchObject({
+          error: 'Bad Request',
+          message: 'Impossible de trouver l\'archive Telepac dans ce fichier.'
+        })
       })
   })
 
@@ -983,7 +994,10 @@ describe('GET /api/v2/import/evv/:numeroEvv+:numeroBio', () => {
       .set('Authorization', USER_DOC_AUTH_HEADER)
 
     expect(res.status).toBe(404)
-    expect(res.body.error).toBe('Ce numéro EVV est introuvable')
+    expect(res.body).toMatchObject({
+      error: 'Not Found',
+      message: 'Ce numéro EVV est introuvable'
+    })
   })
 
   test('it should return a 404 with empty features', async () => {
@@ -1003,7 +1017,10 @@ describe('GET /api/v2/import/evv/:numeroEvv+:numeroBio', () => {
       .set('Authorization', USER_DOC_AUTH_HEADER)
 
     expect(res.status).toBe(404)
-    expect(res.body.error).toBe('Ce numéro EVV ne retourne pas de parcelles.')
+    expect(res.body).toMatchObject({
+      error: 'Not Found',
+      message: 'Ce numéro EVV ne retourne pas de parcelles.'
+    })
   })
 
   test('it should return a 401 with a non-matching evv/siret', async () => {
@@ -1018,7 +1035,10 @@ describe('GET /api/v2/import/evv/:numeroEvv+:numeroBio', () => {
       .set('Authorization', USER_DOC_AUTH_HEADER)
 
     expect(res.status).toBe(401)
-    expect(res.body.error).toMatch('ne correspondent pas')
+    expect(res.body).toMatchObject({
+      error: 'Unauthorized',
+      message: "Accès refusé : les numéros SIRET du nCVI et de l'opérateur Agence Bio ne correspondent pas."
+    })
   })
 
   test('it should return a 500 with an unavailable remote server', async () => {
