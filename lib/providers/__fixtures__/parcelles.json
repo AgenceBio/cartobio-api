@@ -32,7 +32,9 @@
     "cultures": [
       {
         "id": 1,
-        "CPF": "01.19.10.8"
+        "CPF": "01.19.10.8",
+        "date_semis": "",
+        "variete": ""
       }
     ]
   },
@@ -70,12 +72,15 @@
       {
         "id": 1,
         "CPF": "01.13.42",
-        "variete": "spéciale pour ail noir"
+        "variete": "spéciale pour ail noir",
+        "date_semis": ""
       },
       {
         "id": 2,
         "CPF": "01.23.11",
-        "surface": "0.5"
+        "surface": "0.5",
+        "date_semis": "",
+        "variete": ""
       }
     ]
   },
@@ -222,7 +227,9 @@
     "cultures": [
       {
         "id": 1,
-        "CPF": "01.19.10.8"
+        "CPF": "01.19.10.8",
+        "date_semis": "",
+        "variete": ""
       }
     ]
   }

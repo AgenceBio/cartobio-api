@@ -27,7 +27,7 @@
     "db-migrate-pg": "^1.2.2",
     "deepmerge": "^4.2.2",
     "dotenv": "^16.0.3",
-    "fast-jwt": "^2.0.2",
+    "fast-jwt": "^4.0.0",
     "fast-xml-parser": "^4.3.2",
     "fastify": "^4.11.0",
     "form-data": "^4.0.0",
@@ -67,7 +67,6 @@
     "eslint-plugin-promise": "^4.3.1",
     "jest": "^29.3.1",
     "minimist": "^1.2.8",
-    "nodemon": "^2.0.19",
     "supertest": "^6.3.3",
     "typescript": "^5.3.3"
   },
@@ -83,7 +82,7 @@
     "posttest": "npm run lint && npm run test:types",
     "test:types": "tsc",
     "prewatch": "npm run build:geo-data && ./node_modules/.bin/db-migrate up",
-    "watch": "nodemon server.js"
+    "watch": "node --watch server.js"
   },
   "repository": {
     "type": "git",

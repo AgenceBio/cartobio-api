@@ -16,6 +16,7 @@ export type DBOperatorRecord = {
     certification_state: CertificationState;
     created_at: string;
     updated_at: string;
+    oc_id: number;
     parcelles?: DBParcelle[];
     metadata: any;
     audit_history: HistoryEntry[];
