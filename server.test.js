@@ -1195,8 +1195,8 @@ describe('POST /api/v2/certification/parcelles', () => {
             {
               CPF: '01.92',
               date_semis: '2023-10-10',
-              surface: 0.230000,
-              unite: 'ha',
+              surface: 25,
+              unit: '%',
               variete: ''
             }
           ],

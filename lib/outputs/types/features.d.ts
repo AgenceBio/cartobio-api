@@ -46,7 +46,7 @@ export type CartoBioCulture = {
      * - La surface en hectares
      */
     surface?: string | number | undefined;
-    unit?: string | undefined;
+    unit?: '%' | 'ha' | undefined;
     date_semis?: string | undefined;
 };
 export type CartoBioFeature = Feature<Polygon, CartoBioFeatureProperties>;
