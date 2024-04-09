@@ -6,6 +6,7 @@ export type InputApiRecord = {
     numeroClient: number | string;
     anneeReferenceControle: number;
     anneeAssolement: number;
+    commentaire?: string;
     dateAudit: string;
     dateCertificationDebut?: string;
     dateCertificationFin?: string;

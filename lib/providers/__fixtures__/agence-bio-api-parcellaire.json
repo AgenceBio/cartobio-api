@@ -8,6 +8,7 @@
    "dateCertificationDebut": "2023-01-01",
    "dateCertificationFin": "2025-03-31",
    "numeroPacage": "084012821",
+   "commentaire": "notes d'audit",
    "parcelles": [
      {
        "id": "45742",
