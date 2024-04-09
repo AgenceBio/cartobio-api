@@ -5,6 +5,8 @@
    "anneeReferenceControle": 2022,
    "anneeAssolement": 2022,
    "dateAudit": "2023-04-27",
+   "dateCertificationDebut": "2023-01-01",
+   "dateCertificationFin": "2025-03-31",
    "numeroPacage": "084012821",
    "parcelles": [
      {

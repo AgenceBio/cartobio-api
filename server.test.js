@@ -14,7 +14,7 @@ const parcellesPatched = require('./lib/providers/__fixtures__/parcelles-patched
 const apiParcellaire = require('./lib/providers/__fixtures__/agence-bio-api-parcellaire.json')
 const { normalizeOperator } = require('./lib/outputs/operator.js')
 const { normalizeRecord } = require('./lib/outputs/record')
-const { recordToApi } = require('./lib/outputs/api')
+const { parcelleToApi, recordToApi } = require('./lib/outputs/api.js')
 const { loadRecordFixture, expectDeepCloseTo } = require('./test/utils')
 
 const sign = createSigner({ key: config.get('jwtSecret') })
@@ -1136,5 +1136,82 @@ describe('POST /api/v2/certification/parcelles', () => {
     expect(res.body).toEqual({
       nbObjetTraites: 3
     })
+  })
+
+  test('it stores well all the data', async () => {
+    const validApiParcellaire = JSON.parse(JSON.stringify(apiParcellaire))
+    const d = validApiParcellaire.at(0)
+    d.parcelles.at(0).geom = '[[[0,0],[0,1],[1,1],[1,0],[0,0]]]'
+
+    let response = await request(app.server)
+      .post('/api/v2/certification/parcelles')
+      .set('Authorization', fakeOcToken)
+      .send([d])
+
+    expect(response.status).toBe(202)
+    expect(response.body).toEqual({
+      nbObjetTraites: 1
+    })
+
+    postMock.mockReturnValueOnce({
+      async json () {
+        return fakeOc
+      }
+    })
+
+    got.get.mockReturnValueOnce({
+      async json () {
+        return agencebioOperator
+      }
+    })
+
+    response = await request(app.server)
+      .get('/api/v2/certification/parcellaire/99999')
+      .set('Authorization', fakeOcToken)
+
+    expect(response.body).toMatchObject({
+      numeroBio: d.numeroBio,
+      certification: {
+        statut: 'CERTIFIED',
+        dateAudit: d.dateAudit,
+        dateDebut: d.dateCertificationDebut,
+        dateFin: d.dateCertificationFin,
+        demandesAudit: '',
+        notesAudit: d.commentaire
+      }
+    })
+
+    expect(response.body.parcellaire.features.at(2)).toMatchObject(
+      parcelleToApi({
+        id: '45742',
+        geometry: {
+          type: 'Polygon',
+          coordinates: JSON.parse('[[[0,0],[0,1],[1,1],[1,0],[0,0]]]')
+        },
+        properties: {
+          id: '45742',
+          COMMUNE: null,
+          cultures: [
+            {
+              CPF: '01.92',
+              date_semis: '2023-10-10',
+              surface: 0.230000,
+              unite: 'ha',
+              variete: ''
+            }
+          ],
+          conversion_niveau: 'AB',
+          engagement_date: '2023-04-27',
+          auditeur_notes: 'Parcelle 5 ILOT 12 PAC 2023 0C 1271',
+          annotations: [],
+          createdAt: expect.stringMatchingISODate(),
+          updatedAt: expect.stringMatchingISODate(),
+          NOM: null,
+          PACAGE: d.numeroPacage,
+          NUMERO_I: '12',
+          NUMERO_P: '5'
+        }
+      })
+    )
   })
 })

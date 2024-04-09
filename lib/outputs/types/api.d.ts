@@ -7,6 +7,8 @@ export type InputApiRecord = {
     anneeReferenceControle: number;
     anneeAssolement: number;
     dateAudit: string;
+    dateCertificationDebut?: string;
+    dateCertificationFin?: string;
     numeroPacage: number | string;
     parcelles: InputApiParcelle[];
 };
