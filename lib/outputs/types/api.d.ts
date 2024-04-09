@@ -26,8 +26,10 @@ export type InputApiParcelle = {
 };
 export type InputApiCulture = {
     codeCPF: string;
+    dateSemis?: string | undefined;
     variete?: string | undefined;
     quantite: number | string;
+    unite?: 'ha' | '%'
 };
 
 
