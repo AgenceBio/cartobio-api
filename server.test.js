@@ -1071,6 +1071,7 @@ describe('POST /api/v2/certification/parcelles', () => {
       }
     })
   })
+  afterEach(() => postMock.mockReset())
 
   test('it fails without auth', async () => {
     const res = await request(app.server)
@@ -1210,6 +1211,93 @@ describe('POST /api/v2/certification/parcelles', () => {
           PACAGE: d.numeroPacage,
           NUMERO_I: '12',
           NUMERO_P: '5'
+        }
+      })
+    )
+  })
+
+  test('it maintains the value of optional fields', async () => {
+    await loadRecordFixture()
+
+    const payload = {
+      dateAudit: '2022-05-01',
+      numeroBio: '99999',
+      dateCertificationDebut: null,
+      dateCertificationFin: null,
+      commentaire: null,
+      numeroPacage: null,
+      parcelles: [
+        {
+          id: '1',
+          geom: null,
+          cultures: [{ codeCPF: '01.19.10.8' }],
+          commentaire: null,
+          dateEngagement: null,
+          etatProduction: null
+        }
+      ]
+    }
+
+    let response = await request(app.server)
+      .post('/api/v2/certification/parcelles')
+      .set('Authorization', fakeOcToken)
+      .send([payload])
+
+    postMock.mockReturnValueOnce({
+      async json () {
+        return fakeOc
+      }
+    })
+
+    got.get.mockReturnValueOnce({
+      async json () {
+        return agencebioOperator
+      }
+    })
+
+    response = await request(app.server)
+      .get('/api/v2/certification/parcellaire/99999')
+      .set('Authorization', fakeOcToken)
+
+    expect(response.body).toMatchObject({
+      numeroBio: '99999',
+      certification: {
+        statut: 'CERTIFIED',
+        dateAudit: '2022-05-01',
+        dateDebut: '2022-01-01',
+        dateFin: '2024-03-31',
+        notesAudit: 'notes 2022'
+      }
+    })
+
+    expect(response.body.parcellaire.features).toHaveLength(1)
+    expect(response.body.parcellaire.features.at(0)).toMatchObject(
+      parcelleToApi({
+        id: '1',
+        geometry: expectDeepCloseTo(parcelles.at(0).geometry),
+        properties: {
+          id: '1',
+          COMMUNE: '26108',
+          cultures: [
+            {
+              id: '3bbf1551-6361-4180-ad80-8bc413dc2275',
+              CPF: '01.19.10.8',
+              date_semis: '2022-03-24',
+              surface: 25,
+              unit: '%',
+              variete: 'rouge bleue'
+            }
+          ],
+          conversion_niveau: 'AB',
+          engagement_date: '2015-01-01',
+          auditeur_notes: '',
+          annotations: null,
+          createdAt: expect.stringMatchingISODate(),
+          updatedAt: expect.stringMatchingISODate(),
+          NOM: null,
+          PACAGE: '999999999',
+          NUMERO_I: '1',
+          NUMERO_P: '2'
         }
       })
     )

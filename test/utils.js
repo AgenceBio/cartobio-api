@@ -6,22 +6,24 @@ module.exports.loadRecordFixture = async function () {
   await Promise.all(records.map(record => db.query(
     /* sql */`
       INSERT INTO cartobio_operators
-      (record_id, version_name, numerobio, certification_state, certification_date_debut, certification_date_fin, audit_date, audit_history, metadata, oc_id, oc_label)
+      (record_id, version_name, numerobio, certification_state, certification_date_debut, certification_date_fin, audit_date, audit_notes, audit_demandes, audit_history, metadata, oc_id, oc_label)
       VALUES
-      ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10, $11)
+      ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, $12, $13)
       `,
     [
-      record.record_id,
-      record.version_name,
-      record.numerobio,
-      record.certification_state,
-      record.certification_date_debut,
-      record.certification_date_fin,
-      record.audit_date,
-      JSON.stringify(record.audit_history),
-      record.metadata,
-      record.oc_id,
-      record.oc_label
+      /*  $1 */ record.record_id,
+      /*  $2 */ record.version_name,
+      /*  $3 */ record.numerobio,
+      /*  $4 */ record.certification_state,
+      /*  $5 */ record.certification_date_debut,
+      /*  $6 */ record.certification_date_fin,
+      /*  $7 */ record.audit_date,
+      /*  $8 */ record.audit_notes,
+      /*  $9 */ record.audit_demandes,
+      /* $10 */ JSON.stringify(record.audit_history),
+      /* $11 */ record.metadata,
+      /* $12 */ record.oc_id,
+      /* $13 */ record.oc_label
     ]
   )))
 
@@ -30,16 +32,21 @@ module.exports.loadRecordFixture = async function () {
       return db.query(
         /* sql */`
           INSERT INTO cartobio_parcelles
-          (record_id, id, geometry, commune, cultures)
+          (record_id, id, geometry, commune, cultures, created, conversion_niveau, engagement_date, numero_ilot_pac, numero_parcelle_pac, commentaire)
           VALUES
-          ($1, $2, $3::geometry, $4, $5::jsonb)
+          ($1, $2, $3::geometry, $4, $5::jsonb, 'now', $6, $7, $8, $9, $10)
           `,
         [
           id,
           parcelle.id,
           parcelle.geometry,
           parcelle.commune,
-          JSON.stringify(parcelle.cultures)
+          JSON.stringify(parcelle.cultures),
+          parcelle.conversion_niveau,
+          parcelle.engagement_date,
+          parcelle.NUMERO_I,
+          parcelle.NUMERO_P,
+          parcelle.commentaire
         ]
       )
     })

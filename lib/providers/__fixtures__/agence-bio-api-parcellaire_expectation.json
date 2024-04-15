@@ -42,7 +42,8 @@
             "cultures": [
               {
                 "CPF": "01.92",
-                "surface": 0.23,
+                "surface": 25,
+                "unit": "%",
                 "variete": ""
               }
             ],
