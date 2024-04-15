@@ -1182,7 +1182,7 @@ describe('POST /api/v2/certification/parcelles', () => {
       }
     })
 
-    expect(response.body.parcellaire.features.at(2)).toMatchObject(
+    expect(response.body.parcellaire.features.at(1)).toMatchObject(
       parcelleToApi({
         id: '45742',
         geometry: {
