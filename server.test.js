@@ -1257,4 +1257,45 @@ describe('POST /api/v2/certification/parcelles', () => {
     expect(parcelles[0].conversion_niveau).toBe('AB')
     expect(parcelles[0].engagement_date).toBe('2015-01-01')
   })
+
+  test('it deletes fields value', async () => {
+    await loadRecordFixture()
+
+    const payload = {
+      dateAudit: '2022-05-01',
+      numeroBio: '99999',
+      dateCertificationDebut: '',
+      dateCertificationFin: '',
+      commentaire: '',
+      parcelles: [
+        {
+          id: '1',
+          geom: null,
+          cultures: [{ codeCPF: '01.19.10.8' }],
+          commentaire: '',
+          dateEngagement: '',
+          etatProduction: ''
+        }
+      ]
+    }
+
+    await request(app.server)
+      .post('/api/v2/certification/parcelles')
+      .set('Authorization', fakeOcToken)
+      .send([payload])
+
+    const { rows } = await db.query('SELECT * FROM cartobio_operators WHERE numerobio = $1 AND audit_date = $2', ['99999', '2022-05-01'])
+    expect(rows).toHaveLength(1)
+    expect(rows[0].certification_date_debut).toBeNull()
+    expect(rows[0].certification_date_fin).toBeNull()
+    expect(rows[0].audit_notes).toBe('')
+
+    const { rows: parcelles } = await db.query('SELECT * FROM cartobio_parcelles WHERE record_id = $1', [rows[0].record_id])
+    expect(parcelles).toHaveLength(1)
+    expect(parcelles[0].cultures).toHaveLength(1)
+    expect(parcelles[0].cultures[0].CPF).toBe('01.19.10.8')
+    expect(parcelles[0].commune).toBe('26108')
+    expect(parcelles[0].conversion_niveau).toBe('')
+    expect(parcelles[0].engagement_date).toBeNull()
+  })
 })
