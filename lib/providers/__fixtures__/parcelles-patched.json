@@ -29,6 +29,10 @@
       ]
     },
     "commune": "26108",
+    "conversion_niveau": "AB",
+    "engagement_date": "2015-01-01",
+    "numero_ilot_pac": "1",
+    "numero_parcelle_pac": "2",
     "cultures": [
       { "id": "5910f110-96cb-4557-957c-fb77cae8695f", "CPF": "01.21.12" }
     ]

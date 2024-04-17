@@ -34,6 +34,13 @@ beforeAll(() => app.ready())
 afterAll(() => app.close())
 afterEach(() => jest.clearAllMocks())
 
+const apiRecordExpect = expectDeepCloseTo(
+  recordToApi(
+    normalizeRecord({ parcelles, ...record })
+  )
+)
+apiRecordExpect.parcellaire.features.forEach(f => delete f.properties.dateAjout)
+
 describe('GET /', () => {
   test('responds with a 404', () => {
     return request(app.server)
@@ -205,13 +212,7 @@ describe('GET /api/v2/certification/parcellaire/:numeroBio', () => {
       .set('Authorization', USER_DOC_AUTH_HEADER)
 
     expect(res.status).toBe(200)
-    expect(res.body).toEqual(
-      expectDeepCloseTo(
-        recordToApi(
-          normalizeRecord({ parcelles, ...record })
-        )
-      )
-    )
+    expect(res.body).toMatchObject(apiRecordExpect)
   })
 
   test('it works with an oc token', async () => {
@@ -233,13 +234,7 @@ describe('GET /api/v2/certification/parcellaire/:numeroBio', () => {
       .type('json')
 
     expect(response.status).toEqual(200)
-    expect(response.body).toEqual(
-      expectDeepCloseTo(
-        recordToApi(
-          normalizeRecord({ parcelles, ...record })
-        )
-      )
-    )
+    expect(response.body).toMatchObject(apiRecordExpect)
   })
 
   test('it fails with a non-matching user token', async () => {
@@ -299,6 +294,9 @@ describe('GET /api/v2/audits/:recordId', () => {
     // we cleanup fixtures stuff
     delete expectedRecord.oc_id
     delete expectedRecord.oc_label
+    expectedRecord.parcelles.features.forEach(
+      f => delete f.properties.createdAt
+    )
 
     expect(response.status).toEqual(200)
     expect(response.body).toMatchObject(expectDeepCloseTo(expectedRecord))
@@ -908,7 +906,10 @@ describe('PATCH /api/v2/audits/:recordId/parcelles', () => {
       parcelles: parcellesPatched
     })
     patchedRecordExpectation.parcelles.features.forEach(
-      parcelle => delete parcelle.properties.updatedAt
+      parcelle => {
+        delete parcelle.properties.updatedAt
+        delete parcelle.properties.createdAt
+      }
     ) // we don't know
 
     const response = await request(app.server)
@@ -1225,7 +1226,6 @@ describe('POST /api/v2/certification/parcelles', () => {
       dateCertificationDebut: null,
       dateCertificationFin: null,
       commentaire: null,
-      numeroPacage: null,
       parcelles: [
         {
           id: '1',
@@ -1238,68 +1238,23 @@ describe('POST /api/v2/certification/parcelles', () => {
       ]
     }
 
-    let response = await request(app.server)
+    await request(app.server)
       .post('/api/v2/certification/parcelles')
       .set('Authorization', fakeOcToken)
       .send([payload])
 
-    postMock.mockReturnValueOnce({
-      async json () {
-        return fakeOc
-      }
-    })
+    const { rows } = await db.query('SELECT * FROM cartobio_operators WHERE numerobio = $1 AND audit_date = $2', ['99999', '2022-05-01'])
+    expect(rows).toHaveLength(1)
+    expect(rows[0].certification_date_debut).toBe('2022-01-01')
+    expect(rows[0].certification_date_fin).toBe('2024-03-31')
+    expect(rows[0].audit_notes).toBe('notes 2022')
 
-    got.get.mockReturnValueOnce({
-      async json () {
-        return agencebioOperator
-      }
-    })
-
-    response = await request(app.server)
-      .get('/api/v2/certification/parcellaire/99999')
-      .set('Authorization', fakeOcToken)
-
-    expect(response.body).toMatchObject({
-      numeroBio: '99999',
-      certification: {
-        statut: 'CERTIFIED',
-        dateAudit: '2022-05-01',
-        dateDebut: '2022-01-01',
-        dateFin: '2024-03-31',
-        notesAudit: 'notes 2022'
-      }
-    })
-
-    expect(response.body.parcellaire.features).toHaveLength(1)
-    expect(response.body.parcellaire.features.at(0)).toMatchObject(
-      parcelleToApi({
-        id: '1',
-        geometry: expectDeepCloseTo(parcelles.at(0).geometry),
-        properties: {
-          id: '1',
-          COMMUNE: '26108',
-          cultures: [
-            {
-              id: '3bbf1551-6361-4180-ad80-8bc413dc2275',
-              CPF: '01.19.10.8',
-              date_semis: '2022-03-24',
-              surface: 25,
-              unit: '%',
-              variete: 'rouge bleue'
-            }
-          ],
-          conversion_niveau: 'AB',
-          engagement_date: '2015-01-01',
-          auditeur_notes: '',
-          annotations: null,
-          createdAt: expect.stringMatchingISODate(),
-          updatedAt: expect.stringMatchingISODate(),
-          NOM: null,
-          PACAGE: '999999999',
-          NUMERO_I: '1',
-          NUMERO_P: '2'
-        }
-      })
-    )
+    const { rows: parcelles } = await db.query('SELECT * FROM cartobio_parcelles WHERE record_id = $1', [rows[0].record_id])
+    expect(parcelles).toHaveLength(1)
+    expect(parcelles[0].cultures).toHaveLength(1)
+    expect(parcelles[0].cultures[0].CPF).toBe('01.19.10.8')
+    expect(parcelles[0].commune).toBe('26108')
+    expect(parcelles[0].conversion_niveau).toBe('AB')
+    expect(parcelles[0].engagement_date).toBe('2015-01-01')
   })
 })

@@ -31,8 +31,8 @@
     "commune": "26108",
     "conversion_niveau": "AB",
     "engagement_date": "2015-01-01",
-    "NUMERO_I": "1",
-    "NUMERO_P": "2",
+    "numero_ilot_pac": "1",
+    "numero_parcelle_pac": "2",
     "cultures": [
       {
         "id": 1,

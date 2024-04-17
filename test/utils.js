@@ -44,8 +44,8 @@ module.exports.loadRecordFixture = async function () {
           JSON.stringify(parcelle.cultures),
           parcelle.conversion_niveau,
           parcelle.engagement_date,
-          parcelle.NUMERO_I,
-          parcelle.NUMERO_P,
+          parcelle.numero_ilot_pac,
+          parcelle.numero_parcelle_pac,
           parcelle.commentaire
         ]
       )
