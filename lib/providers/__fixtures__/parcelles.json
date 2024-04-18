@@ -29,12 +29,19 @@
       ]
     },
     "commune": "26108",
+    "conversion_niveau": "AB",
+    "engagement_date": "2015-01-01",
+    "numero_ilot_pac": "1",
+    "numero_parcelle_pac": "2",
     "cultures": [
       {
         "id": 1,
+        "commentaire": "commentaire parcelle",
         "CPF": "01.19.10.8",
-        "date_semis": "",
-        "variete": ""
+        "surface": 25,
+        "unit": "%",
+        "date_semis": "2022-03-24",
+        "variete": "rouge bleue"
       }
     ]
   },

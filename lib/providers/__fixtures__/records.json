@@ -27,8 +27,8 @@
         }
       }
     ],
-    "audit_notes": "",
-    "audit_demandes": ""
+    "audit_notes": "notes 2023",
+    "audit_demandes": "demandes 2023"
   },
   {
     "record_id": "054f0d70-c3da-448f-823e-81fcf7c11112",
@@ -64,8 +64,8 @@
         }
       }
     ],
-    "audit_notes": "",
-    "audit_demandes": ""
+    "audit_notes": "notes 2022",
+    "audit_demandes": "demandes 2022"
   },
   {
     "record_id": "054f0d70-c3da-448f-823e-12fcf7c20002",

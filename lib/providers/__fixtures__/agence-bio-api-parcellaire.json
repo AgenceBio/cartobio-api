@@ -5,7 +5,10 @@
    "anneeReferenceControle": 2022,
    "anneeAssolement": 2022,
    "dateAudit": "2023-04-27",
+   "dateCertificationDebut": "2023-01-01",
+   "dateCertificationFin": "2025-03-31",
    "numeroPacage": "084012821",
+   "commentaire": "notes d'audit",
    "parcelles": [
      {
        "id": "45742",
@@ -16,9 +19,10 @@
        "culture": [
         {
          "codeCPF": "01.92",
+         "dateSemis": "2023-10-10",
          "variete": "",
-         "quantite": 0.230000,
-         "unite": "ha"
+         "quantite": 25,
+         "unite": "%"
         }
        ]
     },

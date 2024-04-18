@@ -6,7 +6,10 @@ export type InputApiRecord = {
     numeroClient: number | string;
     anneeReferenceControle: number;
     anneeAssolement: number;
+    commentaire?: string;
     dateAudit: string;
+    dateCertificationDebut?: string;
+    dateCertificationFin?: string;
     numeroPacage: number | string;
     parcelles: InputApiParcelle[];
 };
@@ -23,8 +26,10 @@ export type InputApiParcelle = {
 };
 export type InputApiCulture = {
     codeCPF: string;
+    dateSemis?: string | undefined;
     variete?: string | undefined;
     quantite: number | string;
+    unite?: 'ha' | '%'
 };
 
 
