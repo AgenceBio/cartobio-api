@@ -51,7 +51,7 @@ const { createSigner } = require('fast-jwt')
 
 const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators } = require('./lib/providers/agence-bio.js')
 const { addRecordFeature, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords } = require('./lib/providers/cartobio.js')
-const { evvLookup, evvParcellaire, pacageLookup, getParcellesStats, getDataGouvStats } = require('./lib/providers/cartobio.js')
+const { evvLookup, evvParcellaire, pacageLookup, getDataGouvStats } = require('./lib/providers/cartobio.js')
 const { parseTelepacArchive } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive, geofoliaLookup, geofoliaParcellaire } = require('./lib/providers/geofolia.js')
 const { InvalidRequestApiError, NotFoundApiError } = require('./lib/errors.js')
@@ -72,6 +72,7 @@ const { FastifyErrorHandler, UnauthorizedApiError } = require('./lib/errors.js')
 const { normalizeRecord } = require('./lib/outputs/record')
 const { recordToApi } = require('./lib/outputs/api')
 const sign = createSigner({ key: config.get('jwtSecret'), expiresIn: DURATION_ONE_DAY * 30 })
+const statsSign = createSigner({ key: config.get('metabase.secretKey'), expiresIn: DURATION_ONE_MINUTE * 5 })
 
 app.setErrorHandler(new FastifyErrorHandler())
 if (reportErrors) {
@@ -176,11 +177,22 @@ app.register(async (app) => {
 
   app.get('/api/v2/stats', internalSchema, async (request, reply) => {
     const [dataGouv, stats] = await Promise.all([
-      getDataGouvStats(),
-      getParcellesStats()
+      getDataGouvStats()
     ])
 
     return reply.code(200).send({ stats, dataGouv })
+  })
+
+  app.get('/api/v2/stats/embed', internalSchema, async (request, reply) => {
+    const token = statsSign({
+      params: {},
+      resource: {
+        dashboard: config.get('metabase.statsDashboardId')
+      }
+    })
+
+    const url = `${config.get('metabase.endpoint')}/embed/dashboard/${token}#theme=transparent&bordered=false&titled=false`
+    return reply.code(200).send(url)
   })
 
   /**

@@ -49,6 +49,8 @@ jobs:
       run: >
         docker run
         -e DATABASE_URL
+        -e METABASE_SECRET_KEY
+        -e METABASE_SITE_URL
         -e NOTIFICATIONS_AB_CARTOBIO_USER
         -e NOTIFICATIONS_AB_CARTOBIO_PASSWORD
         -e NOTIFICATIONS_AB_SSO_CLIENT_ID
@@ -75,6 +77,8 @@ jobs:
         GEOFOLIA_OAUTH_CLIENT_SECRET: "test"
         GEOFOLIA_API_HOST: "https://test-api.azure-api.net/"
         GEOFOLIA_API_SUBSCRIPTION_KEY: "test"
+        METABASE_SECRET_KEY: "test"
+        METABASE_SITE_URL: "https://metabase.cartobio.agencebio.org"
         NOTIFICATIONS_AB_SSO_CLIENT_ID: "test"
         NOTIFICATIONS_AB_SSO_CLIENT_SECRET: "test"
         NOTIFICATIONS_AB_CARTOBIO_USER: "test"
