@@ -1249,13 +1249,14 @@ describe('POST /api/v2/certification/parcelles', () => {
     expect(rows[0].certification_date_fin).toBe('2024-03-31')
     expect(rows[0].audit_notes).toBe('notes 2022')
 
-    const { rows: parcelles } = await db.query('SELECT * FROM cartobio_parcelles WHERE record_id = $1', [rows[0].record_id])
-    expect(parcelles).toHaveLength(1)
-    expect(parcelles[0].cultures).toHaveLength(1)
-    expect(parcelles[0].cultures[0].CPF).toBe('01.19.10.8')
-    expect(parcelles[0].commune).toBe('26108')
-    expect(parcelles[0].conversion_niveau).toBe('AB')
-    expect(parcelles[0].engagement_date).toBe('2015-01-01')
+    const { rows: updatedParcelles } = await db.query('SELECT *, ST_AsGeoJSON(geometry)::json AS geometry FROM cartobio_parcelles WHERE record_id = $1', [rows[0].record_id])
+    expect(updatedParcelles).toHaveLength(1)
+    expect(updatedParcelles[0].geometry).toEqual(expectDeepCloseTo(parcelles.at(0).geometry))
+    expect(updatedParcelles[0].cultures).toHaveLength(1)
+    expect(updatedParcelles[0].cultures[0].CPF).toBe('01.19.10.8')
+    expect(updatedParcelles[0].commune).toBe('26108')
+    expect(updatedParcelles[0].conversion_niveau).toBe('AB')
+    expect(updatedParcelles[0].engagement_date).toBe('2015-01-01')
   })
 
   test('it deletes fields value', async () => {
