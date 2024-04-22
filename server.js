@@ -52,6 +52,7 @@ const { createSigner } = require('fast-jwt')
 const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators } = require('./lib/providers/agence-bio.js')
 const { addRecordFeature, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords } = require('./lib/providers/cartobio.js')
 const { evvLookup, evvParcellaire, pacageLookup, getParcellesStats, getDataGouvStats } = require('./lib/providers/cartobio.js')
+const { parseAnyGeographicalArchive } = require('./lib/providers/gdal.js')
 const { parseTelepacArchive } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive, geofoliaLookup, geofoliaParcellaire } = require('./lib/providers/geofolia.js')
 const { InvalidRequestApiError, NotFoundApiError } = require('./lib/errors.js')
@@ -335,6 +336,16 @@ app.register(async (app) => {
     const data = await request.file()
 
     return parseGeofoliaArchive(await data.toBuffer())
+      .then(geojson => reply.send(geojson))
+  })
+
+  /**
+   * Turn a geographical file workeable FeatureCollection
+   * It's essentially used during an import process to preview its content
+   * @private
+   */
+  app.post('/api/v2/convert/anygeo/geojson', deepmerge(protectedWithToken()), async (request, reply) => {
+    return parseAnyGeographicalArchive(request.file())
       .then(geojson => reply.send(geojson))
   })
 

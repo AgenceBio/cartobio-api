@@ -1,0 +1,99 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {},
+      "geometry": {
+        "coordinates": [2.429924078463955, 46.539002955188636],
+        "type": "Point"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "1706610187364",
+      "properties": {
+        "id": "1706610187364",
+        "COMMUNE": "89118",
+        "cultures": [
+          {
+            "id": "257665e8-91ff-4cb1-b606-a1f4c0d1e8f3",
+            "CPF": "01.91",
+            "surface": "1.17"
+          }
+        ],
+        "conversion_niveau": "CONV",
+        "engagement_date": null,
+        "commentaires": null,
+        "auditeur_notes": null,
+        "annotations": [],
+        "NOM": "ilôt 22 - Coulanges-la-Vineuse / Jachère Côte de Groix Milieu",
+        "PACAGE": null,
+        "NUMERO_I": null,
+        "NUMERO_P": null,
+        "cadastre": null,
+        "createdAt": "2024-01-30T09:17:36.000Z",
+        "updatedAt": "2024-01-30T09:18:03.000Z"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            [2.4233240622616847, 47.83172448343794],
+            [2.437363182363441, 47.831010493223005],
+            [2.4324707617218166, 47.83795958047449],
+            [2.4233240622616847, 47.83172448343794]
+          ]
+        ],
+        "type": "Polygon"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "107946933094511",
+      "properties": {
+        "id": "107946933094511",
+        "COMMUNE": "89118",
+        "COMMUNE_LABEL": "Coulanges-la-Vineuse",
+        "cultures": [
+          {
+            "id": "72ac54ce-3c22-47b8-9093-f64983bea580",
+            "CPF": "01.21.12",
+            "TYPE": "VRC",
+            "surface": "0.3",
+            "variete": "Pinot Noir"
+          }
+        ],
+        "conversion_niveau": "AB",
+        "engagement_date": "2019-12-20",
+        "commentaires": null,
+        "auditeur_notes": null,
+        "annotations": [
+          {
+            "id": "40be59a3-6749-49c4-bb11-1e7b5767779f",
+            "code": "surveyed",
+            "date": "2024-04-23T07:56:23.315Z"
+          }
+        ],
+        "NOM": "Coulanges-la-vineuse Montfaucon (Moussu) / AOP Bourgogne Coulanges la vineuse Rouge",
+        "PACAGE": "089156290",
+        "NUMERO_I": "19",
+        "NUMERO_P": "1",
+        "cadastre": null,
+        "createdAt": null,
+        "updatedAt": "2024-04-23T05:56:34.771Z"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            [2.4305563362534883, 47.82491737715435],
+            [2.435094233659754, 47.81958531380704],
+            [2.4430355541222184, 47.82010902285319],
+            [2.4407666054184745, 47.826202703354625],
+            [2.4305563362534883, 47.82491737715435]
+          ]
+        ],
+        "type": "Polygon"
+      }
+    }
+  ]
+}
