@@ -49,8 +49,6 @@ jobs:
       run: >
         docker run
         -e DATABASE_URL
-        -e NOTIFICATIONS_AB_CARTOBIO_USER
-        -e NOTIFICATIONS_AB_CARTOBIO_PASSWORD
         -e NOTIFICATIONS_AB_SSO_CLIENT_ID
         -e NOTIFICATIONS_AB_SSO_CLIENT_SECRET
         -e NOTIFICATIONS_AB_ENDPOINT
@@ -77,8 +75,6 @@ jobs:
         GEOFOLIA_API_SUBSCRIPTION_KEY: "test"
         NOTIFICATIONS_AB_SSO_CLIENT_ID: "test"
         NOTIFICATIONS_AB_SSO_CLIENT_SECRET: "test"
-        NOTIFICATIONS_AB_CARTOBIO_USER: "test"
-        NOTIFICATIONS_AB_CARTOBIO_PASSWORD: "test"
 
     - name: Login to Docker Hub
       run: echo "${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}" | docker login -u ${{ secrets.DOCKER_HUB_USERNAME }} --password-stdin
