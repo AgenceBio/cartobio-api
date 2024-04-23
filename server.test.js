@@ -370,48 +370,24 @@ describe('POST /api/v2/convert/telepac/geojson', () => {
       })
   })
 
-  test('it converts a L93 multi-feature XML Telepac 2024v4 file to WGS84 GeoJSON', () => {
+  test.each(['telepac-multi-2024v4.xml', 'telepac-multi-2024v3.xml'])('it converts a L93 multi-feature XML %s to WGS84 GeoJSON', (filename) => {
     return request(app.server)
       .post('/api/v2/convert/telepac/geojson')
       .type('json')
       .set('Authorization', USER_DOC_AUTH_HEADER)
-      .attach('archive', 'test/fixtures/telepac-multi-2024v4.xml')
+      .attach('archive', `test/fixtures/${filename}`)
       .then((response) => {
         expect(response.status).toEqual(200)
         expect(response.body).toMatchObject(multi)
       })
   })
 
-  test('it converts a L93 multi-feature XML Telepac 2024v3 file to WGS84 GeoJSON', () => {
+  test.each(['telepac-single-2024v3.xml', 'telepac-single-2024v4.xml'])('it converts a L93 single-feature XML %s to WGS84 GeoJSON', (filename) => {
     return request(app.server)
       .post('/api/v2/convert/telepac/geojson')
       .type('json')
       .set('Authorization', USER_DOC_AUTH_HEADER)
-      .attach('archive', 'test/fixtures/telepac-multi-2024v3.xml')
-      .then((response) => {
-        expect(response.status).toEqual(200)
-        expect(response.body).toMatchObject(multi)
-      })
-  })
-
-  test('it converts a L93 single-feature XML 2024v3 file to WGS84 GeoJSON', () => {
-    return request(app.server)
-      .post('/api/v2/convert/telepac/geojson')
-      .type('json')
-      .set('Authorization', USER_DOC_AUTH_HEADER)
-      .attach('archive', 'test/fixtures/telepac-single-2024v3.xml')
-      .then((response) => {
-        expect(response.status).toEqual(200)
-        expect(response.body).toMatchObject(single)
-      })
-  })
-
-  test('it converts a L93 single-feature XML 2024v4 file to WGS84 GeoJSON', () => {
-    return request(app.server)
-      .post('/api/v2/convert/telepac/geojson')
-      .type('json')
-      .set('Authorization', USER_DOC_AUTH_HEADER)
-      .attach('archive', 'test/fixtures/telepac-single-2024v4.xml')
+      .attach('archive', `test/fixtures/${filename}`)
       .then((response) => {
         expect(response.status).toEqual(200)
         expect(response.body).toMatchObject(single)
@@ -433,32 +409,17 @@ describe('POST /api/v2/convert/telepac/geojson', () => {
       })
   })
 
-  test('it fails when sending a non-recognized format', () => {
+  test.each(['geofolia-parcelles.zip', 'anygeo/anygeo-test.zip'])('it fails when sending a non-recognized format (%s)', (filepath) => {
     return request(app.server)
       .post('/api/v2/convert/telepac/geojson')
       .type('json')
       .set('Authorization', USER_DOC_AUTH_HEADER)
-      .attach('archive', 'test/fixtures/geofolia-parcelles.zip')
+      .attach('archive', `test/fixtures/${filepath}`)
       .then((response) => {
         expect(response.status).toEqual(400)
         expect(response.body).toMatchObject({
           error: 'Bad Request',
-          message: 'Impossible de trouver l\'archive Telepac dans ce fichier.'
-        })
-      })
-  })
-
-  test('it fails when sending a geographical without numero_i/numero_p data', () => {
-    return request(app.server)
-      .post('/api/v2/convert/telepac/geojson')
-      .type('json')
-      .set('Authorization', USER_DOC_AUTH_HEADER)
-      .attach('archive', 'test/fixtures/geofolia-parcelles.zip')
-      .then((response) => {
-        expect(response.status).toEqual(400)
-        expect(response.body).toMatchObject({
-          error: 'Bad Request',
-          message: 'Impossible de trouver l\'archive Telepac dans ce fichier.'
+          message: 'Il ne s\'agit pas d\'un fichier Telepac "Parcelles déclarées" ou "Parcelles instruites".'
         })
       })
   })
