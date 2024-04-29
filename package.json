@@ -32,6 +32,7 @@
     "fastify": "^4.11.0",
     "file-type": "^16.5.4",
     "form-data": "^4.0.0",
+    "gdal-async": "^3.8.5",
     "get-stream": "^6.0.0",
     "got": "^11.8.6",
     "jsonstream-next": "^3.0.0",
@@ -44,7 +45,6 @@
     "strip-bom-stream": "^4.0.0",
     "through2": "^4.0.2",
     "validator": "^13.7.0",
-    "verrazzano": "^2.3.0",
     "wkt": "^0.1.1"
   },
   "engines": {
