@@ -34,8 +34,6 @@ jobs:
         GEOFOLIA_API_SUBSCRIPTION_KEY: "test"
         NOTIFICATIONS_AB_SSO_CLIENT_ID: "test"
         NOTIFICATIONS_AB_SSO_CLIENT_SECRET: "test"
-        NOTIFICATIONS_AB_CARTOBIO_USER: "test"
-        NOTIFICATIONS_AB_CARTOBIO_PASSWORD: "test"
         DATABASE_URL: postgresql://docker:docker@127.0.0.1:5432/gis
 
     - name: Coveralls
