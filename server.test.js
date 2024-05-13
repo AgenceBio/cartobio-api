@@ -625,6 +625,48 @@ describe('HEAD/GET /api/v2/import/geofolia/:numeroBio', () => {
   })
 })
 
+describe('POST /api/v2/convert/anygeo/geojson', () => {
+  test('it fails without auth (get)', () => {
+    return request(app.server)
+      .post('/api/v2/convert/anygeo/geojson')
+      .type('json')
+      .then((response) => {
+        expect(response.status).toEqual(401)
+      })
+  })
+
+  test.each(['.kml', '.geojson', '.gpkg', '.gpkg.zip', '.kmz', '.zip'])('it responds to anygeo-test%s with 2 features', (ext) => {
+    return request(app.server)
+      .post('/api/v2/convert/anygeo/geojson')
+      .attach('archive', `test/fixtures/anygeo/anygeo-test${ext}`)
+      .type('json')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+      .then((response) => {
+        expect(response.status).toEqual(200)
+        expect(response.body).toHaveProperty('type', 'FeatureCollection')
+        expect(response.body.features).toHaveLength(2)
+        expect(response.body.features.at(0)).toHaveProperty('properties', {
+          id: expect.any(Number)
+        })
+      })
+  })
+
+  test.each(['geofolia-parcelles.zip', '../../package.json', 'anygeo/anygeo-test.xlsx'])('it fails with non-anygeo file %s', (filepath) => {
+    return request(app.server)
+      .post('/api/v2/convert/anygeo/geojson')
+      .attach('archive', `test/fixtures/${filepath}`)
+      .type('json')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+      .then((response) => {
+        expect(response.status).toEqual(400)
+        expect(response.body).toMatchObject({
+          error: 'Bad Request',
+          message: 'Format de fichier non-reconnu.'
+        })
+      })
+  })
+})
+
 describe('GET /api/v2/certification/search', () => {
   const getMock = jest.mocked(got.get)
 
