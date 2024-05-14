@@ -6,6 +6,7 @@ const got = require('got')
 const fs = require('node:fs')
 const { join } = require('node:path')
 const db = require('./lib/db.js')
+const area = require('@turf/area').default
 
 const agencebioOperator = require('./lib/providers/__fixtures__/agence-bio-operateur.json')
 const [, record] = require('./lib/providers/__fixtures__/records.json')
@@ -636,18 +637,18 @@ describe('POST /api/v2/convert/anygeo/geojson', () => {
       })
   })
 
-  test.each(['.kml', '.geojson', '.gpkg', '.gpkg.zip', '.kmz', '.zip'])('it responds to anygeo-test%s with 2 features', (ext) => {
+  test.each(['anygeo-test.kml', 'anygeo-test.geojson', 'anygeo-test-cartobio.json', 'anygeo-test.gpkg', 'anygeo-test.gpkg.zip', 'anygeo-test.kmz', 'anygeo-test.zip'])('it responds to %s with 2 features', (filename) => {
     return request(app.server)
       .post('/api/v2/convert/anygeo/geojson')
-      .attach('archive', `test/fixtures/anygeo/anygeo-test${ext}`)
+      .attach('archive', `test/fixtures/anygeo/${filename}`)
       .type('json')
       .set('Authorization', USER_DOC_AUTH_HEADER)
       .then((response) => {
         expect(response.status).toEqual(200)
-        expect(response.body).toHaveProperty('type', 'FeatureCollection')
+        expect(area(response.body)).toBeCloseTo(457013.20 + 391240.70, 1)
         expect(response.body.features).toHaveLength(2)
         expect(response.body.features.at(0)).toHaveProperty('properties', {
-          id: expect.any(Number)
+          id: expect.toBeAFeatureId()
         })
       })
   })
