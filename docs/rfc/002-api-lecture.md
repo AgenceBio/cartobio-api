@@ -38,16 +38,27 @@ le chemin `/api/oc/check-token`.
 Par défaut, l'API renvoie les données de la version la plus récemment modifiée du parcellaire.
 Il est possible de spécifier des filtres pour obtenir les données d'une version spécifique.
 
-| Paramètre       | Type     | Description                                                                                            |
-|-----------------|----------|--------------------------------------------------------------------------------------------------------|
-| `anneeAudit` | `string` | Année de l'audit                                                                     |
-| `statut`        | `string` | Statut de certification ([cf. statuts de certification](#valeurs-possibles--statuts-de-certification)) |
+| Paramètre      | Type     | Description                                                                                            |
+|----------------|----------|--------------------------------------------------------------------------------------------------------|
+| `anneeAudit`   | `string` | Année de l'audit                                                                     |
+| `statut`       | `string` | Statut de certification ([cf. statuts de certification](#valeurs-possibles--statuts-de-certification)) |
 
 ```bash
 curl -H 'Accept: application/json' \
   -H 'Content-Type: application/json' \
   -H 'Authorization: ...' \
   https://cartobio.agencebio.org/api/v2/certification/parcellaire/:numeroBio?anneeAudit=2024&statut=OPERATOR_DRAFT
+```
+
+Il est possible de récupérer les données de tous les opérateurs d'un organisme de certification en une seule requête.
+Dans ce cas, une liste d'objets est retournée. Un seul objet est retourné par opérateur, et les mêmes filtres
+sont disponibles.
+
+```bash
+curl -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization
+    https://cartobio.agencebio.org/api/v2/certification/parcellaires?anneeAudit=2024&statut=OPERATOR_DRAFT
 ```
 
 ### Réponses

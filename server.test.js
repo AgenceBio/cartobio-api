@@ -10,6 +10,7 @@ const db = require('./lib/db.js')
 const agencebioOperator = require('./lib/providers/__fixtures__/agence-bio-operateur.json')
 const [, record] = require('./lib/providers/__fixtures__/records.json')
 const parcelles = require('./lib/providers/__fixtures__/parcelles.json')
+const records = require('./lib/providers/__fixtures__/records.json')
 const parcellesPatched = require('./lib/providers/__fixtures__/parcelles-patched.json')
 const apiParcellaire = require('./lib/providers/__fixtures__/agence-bio-api-parcellaire.json')
 const { normalizeOperator } = require('./lib/outputs/operator.js')
@@ -888,6 +889,10 @@ describe('PATCH /api/v2/audits/:recordId/parcelles', () => {
   const postMock = jest.mocked(got.post)
 
   beforeEach(loadRecordFixture)
+  afterEach(() => {
+    getMock.mockReset()
+    postMock.mockReset()
+  })
 
   test('it updates only the patched properties of the features', async () => {
     // 1. fetchAuthToken
@@ -1064,6 +1069,86 @@ describe('GET /api/v2/import/evv/:numeroEvv+:numeroBio', () => {
   })
 })
 
+describe('GET /api/v2/certification/parcellaires', () => {
+  const postMock = jest.mocked(got.post)
+
+  beforeEach(async () => {
+    // 1. AUTHORIZATION check token
+    postMock.mockReturnValueOnce({
+      async json () {
+        return fakeOc
+      }
+    })
+    await loadRecordFixture()
+  })
+  afterEach(() => postMock.mockReset())
+
+  const expectedResult = records.reverse().reduce((acc, record) => {
+    record = expectDeepCloseTo(
+      recordToApi(
+        normalizeRecord({ parcelles, ...record })
+      )
+    )
+    record.parcellaire.features.forEach(f => delete f.properties.dateAjout)
+
+    // take only the last record for each numeroBio
+    if (acc.find(r => r.numeroBio === record.numeroBio)) {
+      return acc
+    } else {
+      acc.push(record)
+    }
+
+    return acc
+  }, [])
+
+  test('it should return a list of parcellaire', async () => {
+    const res = await request(app.server)
+      .get('/api/v2/certification/parcellaires')
+      .set('Authorization', fakeOcToken)
+
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(expectedResult.length)
+    expect(res.body).toMatchObject(expectedResult)
+  })
+
+  test('we can filter on status', async () => {
+    const res = await request(app.server)
+      .get('/api/v2/certification/parcellaires?statut=CERTIFIED')
+      .set('Authorization', fakeOcToken)
+
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(2)
+  })
+
+  test('we can filter on year', async () => {
+    const res = await request(app.server)
+      .get('/api/v2/certification/parcellaires?anneeAudit=2023')
+      .set('Authorization', fakeOcToken)
+
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(1)
+  })
+
+  test('it should only return this oc\'s parcellaire', async () => {
+    await db.query(`
+      UPDATE cartobio_operators SET oc_id = '1' WHERE numerobio = '99999';
+    `)
+    const res = await request(app.server)
+      .get('/api/v2/certification/parcellaires')
+      .set('Authorization', OTHER_OC_AUTH_TOKEN)
+
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(expectedResult.length - 1)
+  })
+
+  test('it should return a 401 without auth', async () => {
+    const res = await request(app.server)
+      .get('/api/v2/certification/parcellaires')
+
+    expect(res.status).toBe(401)
+  })
+})
+
 describe('POST /api/v2/certification/parcelles', () => {
   const postMock = jest.mocked(got.post)
 
@@ -1186,7 +1271,7 @@ describe('POST /api/v2/certification/parcelles', () => {
       }
     })
 
-    expect(response.body.parcellaire.features.at(1)).toMatchObject(
+    expect(response.body.parcellaire.features.find(f => f.id === '45742')).toMatchObject(
       parcelleToApi({
         id: '45742',
         geometry: {

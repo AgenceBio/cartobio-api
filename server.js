@@ -46,12 +46,14 @@ const stripBom = require('strip-bom-stream')
 const LRUCache = require('mnemonist/lru-map-with-delete')
 const { randomUUID } = require('node:crypto')
 const { PassThrough } = require('stream')
+const stream = require('node:stream')
+const JSONStream = require('jsonstream-next')
 
 const { createSigner } = require('fast-jwt')
 
 const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators } = require('./lib/providers/agence-bio.js')
 const { addRecordFeature, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords } = require('./lib/providers/cartobio.js')
-const { evvLookup, evvParcellaire, pacageLookup, getParcellesStats, getDataGouvStats } = require('./lib/providers/cartobio.js')
+const { evvLookup, evvParcellaire, pacageLookup, getParcellesStats, getDataGouvStats, iterateOperatorLastRecords } = require('./lib/providers/cartobio.js')
 const { parseAnyGeographicalArchive } = require('./lib/providers/gdal.js')
 const { parseTelepacArchive } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive, geofoliaLookup, geofoliaParcellaire } = require('./lib/providers/geofolia.js')
@@ -441,6 +443,27 @@ app.register(async (app) => {
     return reply.code(202).send({
       nbObjetTraites: count
     })
+  })
+
+  app.get('/api/v2/certification/parcellaires', deepmerge(protectedWithToken({ oc: true })), async (request, reply) => {
+    reply.header('Content-Type', 'application/json')
+    const records = iterateOperatorLastRecords(
+      request.organismeCertificateur.id,
+      {
+        anneeAudit: request.query.anneeAudit,
+        statut: request.query.statut
+      }
+    )
+    // pass all records through recordToApi
+    const apiRecords = async function * () {
+      for await (const record of records) {
+        yield recordToApi(record)
+      }
+    }
+
+    const outputStream = JSONStream.stringify()
+    stream.Readable.from(apiRecords()).pipe(outputStream)
+    return reply.code(200).send(outputStream)
   })
 
   app.get('/api/v2/certification/parcellaire/:numeroBio', deepmerge(protectedWithToken({ oc: true }), operatorFromNumeroBio), async (request, reply) => {

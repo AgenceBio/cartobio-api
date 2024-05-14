@@ -39,6 +39,7 @@
     "mnemonist": "^0.39.5",
     "p-memoize": "^4.0.4",
     "pg": "^8.7.3",
+    "pg-cursor": "^2.10.5",
     "pg-query-stream": "^4.2.4",
     "reproject": "^1.2.6",
     "socks-proxy-agent": "^8.0.2",
