@@ -1,4 +1,5 @@
 const app = require('./server.js')
+const { isHandledError } = require('./lib/errors')
 const config = require('./lib/config.js')
 const request = require('supertest')
 const { createSigner } = require('fast-jwt')
@@ -30,8 +31,19 @@ const otherFakeOc = { id: 1111, nom: 'Certificator', numeroControleEu: 'FR-BIO-1
 const OTHER_USER_DOC_AUTH_TOKEN = sign({ id: 2, prenom: 'Tania', nom: 'Ouest', test: true, organismeCertificateur: otherFakeOc })
 const OTHER_OC_AUTH_TOKEN = 'zzzz-zzzz-zzzz-zzzz'
 
+const mockSentry = jest.fn()
+
 // start and stop server
-beforeAll(() => app.ready())
+beforeAll(() => {
+  app.addHook('onError', async (req, res, error) => {
+    if (isHandledError(error)) {
+      return
+    }
+
+    mockSentry(error)
+  })
+  return app.ready()
+})
 afterAll(() => app.close())
 afterEach(() => jest.clearAllMocks())
 
@@ -49,6 +61,7 @@ describe('GET /', () => {
       .type('json')
       .then((response) => {
         expect(response.status).toEqual(404)
+        expect(mockSentry).not.toHaveBeenCalled()
         expect(response.header['content-type']).toBe('application/json; charset=utf-8')
         expect(response.body).toHaveProperty('error', 'Not Found')
       })
@@ -116,61 +129,79 @@ describe('GET /api/v2/user/verify', () => {
         expect(response.body).toMatchObject(fakeOc)
       })
   })
+
+  test('handle AgenceBio upstream errors', async () => {
+    const postMock = jest.mocked(got.post)
+    postMock.mockReturnValueOnce({
+      async json () {
+        throw new got.HTTPError({ statusCode: 500 })
+      }
+    })
+    const response = await request(app.server)
+      .get('/api/v2/user/verify')
+      .set('Authorization', fakeOcToken)
+      .type('json')
+
+    expect(response.status).toEqual(502)
+    expect(mockSentry).toHaveBeenCalled()
+    expect(response.body).toMatchObject({
+      error: 'Bad Gateway',
+      message: 'Erreur serveur : Le portail d\'authentification de l\'Agence Bio n\'a pas pu être contacté.'
+    })
+  })
 })
 
 describe('GET /api/v2/test', () => {
-  test('fails when JWT is missing, or invalid', () => {
-    return request(app.server)
+  test('fails when JWT is missing, or invalid', async () => {
+    const response = await request(app.server)
       .get('/api/v2/test')
       .type('json')
-      .then((response) => {
-        expect(response.status).toEqual(401)
-        expect(response.header['content-type']).toBe('application/json; charset=utf-8')
-        expect(response.body).toMatchObject({
-          error: 'Unauthorized',
-          message: "Accès refusé : un jeton d'API est nécessaire pour accéder à ce contenu."
-        })
-      })
+
+    expect(response.status).toEqual(401)
+    expect(mockSentry).not.toHaveBeenCalled()
+    expect(response.header['content-type']).toBe('application/json; charset=utf-8')
+    expect(response.body).toMatchObject({
+      error: 'Unauthorized',
+      message: "Accès refusé : un jeton d'API est nécessaire pour accéder à ce contenu."
+    })
   })
 
-  test('fails when JWT cannot be verified', () => {
+  test('fails when JWT cannot be verified', async () => {
     const sign = createSigner({ key: 'aaaaa' })
     const wrongUserToken = sign(fakeUser)
 
-    return request(app.server)
+    const response = await request(app.server)
       .get('/api/v2/test')
       .type('json')
       .set('Authorization', `Bearer ${wrongUserToken}`)
-      .then((response) => {
-        expect(response.status).toEqual(401)
-        expect(response.header['content-type']).toBe('application/json; charset=utf-8')
-        expect(response.body).toMatchObject({
-          error: 'Unauthorized',
-          message: "Accès refusé : ce jeton n'est plus valide (FAST_JWT_INVALID_SIGNATURE)."
-        })
-      })
+
+    expect(response.status).toEqual(401)
+    expect(mockSentry).not.toHaveBeenCalled()
+    expect(response.header['content-type']).toBe('application/json; charset=utf-8')
+    expect(response.body).toMatchObject({
+      error: 'Unauthorized',
+      message: "Accès refusé : ce jeton n'est plus valide (FAST_JWT_INVALID_SIGNATURE)."
+    })
   })
 
-  test('responds well with an Authorization header', () => {
-    return request(app.server)
+  test('responds well with an Authorization header', async () => {
+    const response = await request(app.server)
       .get('/api/v2/test')
       .type('json')
       .set('Authorization', USER_DOC_AUTH_HEADER)
-      .then((response) => {
-        expect(response.status).toEqual(200)
-        expect(response.header['content-type']).toBe('application/json; charset=utf-8')
-        expect(response.body).toEqual({ message: 'OK' })
-      })
+
+    expect(response.status).toEqual(200)
+    expect(response.header['content-type']).toBe('application/json; charset=utf-8')
+    expect(response.body).toEqual({ message: 'OK' })
   })
 
-  test('responds well with an access_token query string value', () => {
-    return request(app.server)
+  test('responds well with an access_token query string value', async () => {
+    const response = await request(app.server)
       .get('/api/v2/test')
       .query({ access_token: USER_DOC_AUTH_TOKEN })
       .type('json')
-      .then((response) => {
-        expect(response.status).toEqual(200)
-      })
+
+    expect(response.status).toEqual(200)
   })
 })
 
@@ -184,7 +215,7 @@ describe('GET /api/v2/certification/parcellaire/:numeroBio', () => {
     getMock.mockReset()
   })
 
-  test('it responds with 404 when no parcellaire is found', async () => {
+  test('it responds with 404 when no operator is found on AgenceBio API', async () => {
     getMock.mockReturnValueOnce({
       async json () {
         const response = { statusCode: 404, statusMessage: 'Not Found' }
@@ -199,6 +230,7 @@ describe('GET /api/v2/certification/parcellaire/:numeroBio', () => {
       .set('Authorization', USER_DOC_AUTH_HEADER)
 
     expect(res.status).toBe(404)
+    expect(mockSentry).not.toHaveBeenCalled()
   })
 
   test('it responds with 200 when a parcellaire is found', async () => {
@@ -251,6 +283,11 @@ describe('GET /api/v2/certification/parcellaire/:numeroBio', () => {
       .type('json')
 
     expect(response.status).toEqual(401)
+    expect(mockSentry).not.toHaveBeenCalled()
+    expect(response.body).toMatchObject({
+      error: 'Unauthorized',
+      message: "Accès refusé : vous n'êtes pas autorisé·e à accéder à ce contenu avec vos identifiants."
+    })
   })
 
   test('it fails with a non-matching oc token', async () => {
@@ -272,6 +309,11 @@ describe('GET /api/v2/certification/parcellaire/:numeroBio', () => {
       .type('json')
 
     expect(response.status).toEqual(401)
+    expect(mockSentry).not.toHaveBeenCalled()
+    expect(response.body).toMatchObject({
+      error: 'Unauthorized',
+      message: "Accès refusé : vous n'êtes pas autorisé·e à accéder à ce contenu avec vos identifiants."
+    })
   })
 })
 
@@ -322,6 +364,7 @@ describe('GET /api/v2/audits/:recordId', () => {
       .type('json')
 
     expect(response.status).toEqual(401)
+    expect(mockSentry).not.toHaveBeenCalled()
     expect(response.body).toMatchObject({
       error: 'Unauthorized',
       message: "Accès refusé : un jeton d'API est nécessaire pour accéder à ce contenu."
@@ -352,6 +395,11 @@ describe('GET /api/v2/audits/:recordId', () => {
       .type('json')
 
     expect(response.status).toEqual(401)
+    expect(mockSentry).not.toHaveBeenCalled()
+    expect(response.body).toMatchObject({
+      error: 'Unauthorized',
+      message: "Accès refusé : vous n'êtes pas autorisé·e à accéder à ce contenu avec vos identifiants."
+    })
   })
 })
 
@@ -395,44 +443,48 @@ describe('POST /api/v2/convert/telepac/geojson', () => {
       })
   })
 
-  test('it fails when sending a non-recognized file', () => {
-    return request(app.server)
+  test('it fails when sending a non-recognized file', async () => {
+    const response = await request(app.server)
       .post('/api/v2/convert/telepac/geojson')
       .type('json')
       .set('Authorization', USER_DOC_AUTH_HEADER)
       .attach('archive', 'test/fixtures/parcels.json')
-      .then((response) => {
-        expect(response.status).toEqual(400)
-        expect(response.body).toMatchObject({
-          error: 'Bad Request',
-          message: 'Format de fichier non-reconnu.'
-        })
-      })
+
+    expect(response.status).toEqual(400)
+    expect(mockSentry).not.toHaveBeenCalled()
+    expect(response.body).toMatchObject({
+      error: 'Bad Request',
+      message: 'Format de fichier non-reconnu.'
+    })
   })
 
-  test.each(['geofolia-parcelles.zip', 'anygeo/anygeo-test.zip'])('it fails when sending a non-recognized format (%s)', (filepath) => {
-    return request(app.server)
+  test.each(['geofolia-parcelles.zip', 'anygeo/anygeo-test.zip'])('it fails when sending a non-recognized format (%s)', async (filepath) => {
+    const response = await request(app.server)
       .post('/api/v2/convert/telepac/geojson')
       .type('json')
       .set('Authorization', USER_DOC_AUTH_HEADER)
       .attach('archive', `test/fixtures/${filepath}`)
-      .then((response) => {
-        expect(response.status).toEqual(400)
-        expect(response.body).toMatchObject({
-          error: 'Bad Request',
-          message: 'Il ne s\'agit pas d\'un fichier Telepac "Parcelles déclarées" ou "Parcelles instruites".'
-        })
-      })
+
+    expect(response.status).toEqual(400)
+    expect(mockSentry).not.toHaveBeenCalled()
+    expect(response.body).toMatchObject({
+      error: 'Bad Request',
+      message: 'Il ne s\'agit pas d\'un fichier Telepac "Parcelles déclarées" ou "Parcelles instruites".'
+    })
   })
 
-  test('it fails without auth', () => {
-    return request(app.server)
+  test('it fails without auth', async () => {
+    const response = await request(app.server)
       .post('/api/v2/convert/telepac/geojson')
       .type('json')
       .attach('archive', 'test/fixtures/telepac-multi-2024v4.xml')
-      .then((response) => {
-        expect(response.status).toEqual(401)
-      })
+
+    expect(response.status).toEqual(401)
+    expect(mockSentry).not.toHaveBeenCalled()
+    expect(response.body).toMatchObject({
+      error: 'Unauthorized',
+      message: "Accès refusé : un jeton d'API est nécessaire pour accéder à ce contenu."
+    })
   })
 })
 
@@ -451,14 +503,18 @@ describe('POST /api/v2/convert/geofolia/geojson', () => {
       })
   })
 
-  test('it fails without auth', () => {
-    return request(app.server)
+  test('it fails without auth', async () => {
+    const response = await request(app.server)
       .post('/api/v2/convert/geofolia/geojson')
       .type('json')
       .attach('archive', 'test/fixtures/geofolia-parcelles.zip')
-      .then((response) => {
-        expect(response.status).toEqual(401)
-      })
+
+    expect(response.status).toEqual(401)
+    expect(mockSentry).not.toHaveBeenCalled()
+    expect(response.body).toMatchObject({
+      error: 'Unauthorized',
+      message: "Accès refusé : un jeton d'API est nécessaire pour accéder à ce contenu."
+    })
   })
 })
 
@@ -479,13 +535,46 @@ describe('HEAD/GET /api/v2/import/geofolia/:numeroBio', () => {
       postMock.mockReset()
     })
 
-    test('it fails without auth (head)', () => {
-      return request(app.server)
+    test('it fails without auth (head)', async () => {
+      const response = await request(app.server)
         .head('/api/v2/import/geofolia/99999')
         .type('json')
-        .then((response) => {
-          expect(response.status).toEqual(401)
-        })
+
+      expect(response.status).toEqual(401)
+      expect(mockSentry).not.toHaveBeenCalled()
+    })
+
+    test('it should return a 502 with unavailable remote server', async () => {
+      // setup operator
+      getMock.mockReturnValueOnce({
+        async json () {
+          return agencebioOperator
+        }
+      })
+
+      // fake Geofolia token request
+      postMock.mockReturnValueOnce({
+        async json () {
+          return { access_token: 'test-token' }
+        }
+      })
+
+      // fail reaching Geofolia
+      postMock.mockReturnValueOnce({
+        async json () {
+          throw new got.HTTPError({
+            statusCode: 500
+          })
+        }
+      })
+
+      const response = await request(app.server)
+        .head('/api/v2/import/geofolia/99999')
+        .type('json')
+        .set('Authorization', USER_DOC_AUTH_HEADER)
+
+      expect(response.status).toEqual(502)
+      expect(mockSentry).toHaveBeenCalled()
     })
 
     test('it checks the availability of a customer on Geofolink', () => {
@@ -557,13 +646,17 @@ describe('HEAD/GET /api/v2/import/geofolia/:numeroBio', () => {
       postMock.mockReset()
     })
 
-    test('it fails without auth (get)', () => {
-      return request(app.server)
+    test('it fails without auth (get)', async () => {
+      const response = await request(app.server)
         .get('/api/v2/import/geofolia/99999')
         .type('json')
-        .then((response) => {
-          expect(response.status).toEqual(401)
-        })
+
+      expect(response.status).toEqual(401)
+      expect(mockSentry).not.toHaveBeenCalled()
+      expect(response.body).toMatchObject({
+        error: 'Unauthorized',
+        message: "Accès refusé : un jeton d'API est nécessaire pour accéder à ce contenu."
+      })
     })
 
     test('it requests a working archive on Geofolink', () => {
@@ -627,13 +720,17 @@ describe('HEAD/GET /api/v2/import/geofolia/:numeroBio', () => {
 })
 
 describe('POST /api/v2/convert/anygeo/geojson', () => {
-  test('it fails without auth (get)', () => {
-    return request(app.server)
+  test('it fails without auth (get)', async () => {
+    const response = await request(app.server)
       .post('/api/v2/convert/anygeo/geojson')
       .type('json')
-      .then((response) => {
-        expect(response.status).toEqual(401)
-      })
+
+    expect(response.status).toEqual(401)
+    expect(mockSentry).not.toHaveBeenCalled()
+    expect(response.body).toMatchObject({
+      error: 'Unauthorized',
+      message: "Accès refusé : un jeton d'API est nécessaire pour accéder à ce contenu."
+    })
   })
 
   test.each(['.kml', '.geojson', '.gpkg', '.gpkg.zip', '.kmz', '.zip'])('it responds to anygeo-test%s with 2 features', (ext) => {
@@ -652,19 +749,19 @@ describe('POST /api/v2/convert/anygeo/geojson', () => {
       })
   })
 
-  test.each(['geofolia-parcelles.zip', '../../package.json', 'anygeo/anygeo-test.xlsx'])('it fails with non-anygeo file %s', (filepath) => {
-    return request(app.server)
+  test.each(['geofolia-parcelles.zip', '../../package.json', 'anygeo/anygeo-test.xlsx'])('it fails with non-anygeo file %s', async (filepath) => {
+    const response = await request(app.server)
       .post('/api/v2/convert/anygeo/geojson')
       .attach('archive', `test/fixtures/${filepath}`)
       .type('json')
       .set('Authorization', USER_DOC_AUTH_HEADER)
-      .then((response) => {
-        expect(response.status).toEqual(400)
-        expect(response.body).toMatchObject({
-          error: 'Bad Request',
-          message: 'Format de fichier non-reconnu.'
-        })
-      })
+
+    expect(response.status).toEqual(400)
+    expect(mockSentry).not.toHaveBeenCalled()
+    expect(response.body).toMatchObject({
+      error: 'Bad Request',
+      message: 'Format de fichier non-reconnu.'
+    })
   })
 })
 
@@ -1047,13 +1144,14 @@ describe('GET /api/v2/import/evv/:numeroEvv+:numeroBio', () => {
       .set('Authorization', USER_DOC_AUTH_HEADER)
 
     expect(res.status).toBe(401)
+    expect(mockSentry).not.toHaveBeenCalled()
     expect(res.body).toMatchObject({
       error: 'Unauthorized',
       message: "Accès refusé : les numéros SIRET du nCVI et de l'opérateur Agence Bio ne correspondent pas."
     })
   })
 
-  test('it should return a 500 with an unavailable remote server', async () => {
+  test('it should return a 502 with an unavailable remote server', async () => {
     got.__mocks.get.mockReturnValueOnce({
       async text () {
         throw new got.TimeoutError()
@@ -1064,8 +1162,9 @@ describe('GET /api/v2/import/evv/:numeroEvv+:numeroBio', () => {
       .get('/api/v2/import/evv/01234+99999')
       .set('Authorization', USER_DOC_AUTH_HEADER)
 
-    expect(res.status).toBe(500)
-    expect(res.body.message).toMatch('Impossible de communiquer')
+    expect(res.status).toBe(502)
+    expect(mockSentry).toHaveBeenCalled()
+    expect(res.body.message).toMatch('Impossible de communiquer avec l\'API CVI')
   })
 })
 
@@ -1146,6 +1245,11 @@ describe('GET /api/v2/certification/parcellaires', () => {
       .get('/api/v2/certification/parcellaires')
 
     expect(res.status).toBe(401)
+    expect(mockSentry).not.toHaveBeenCalled()
+    expect(res.body).toMatchObject({
+      error: 'Unauthorized',
+      message: "Accès refusé : un jeton d'API est nécessaire pour accéder à ce contenu."
+    })
   })
 })
 
@@ -1170,6 +1274,11 @@ describe('POST /api/v2/certification/parcelles', () => {
     expect(db.query).not.toHaveBeenCalled()
     expect(db.connect).not.toHaveBeenCalled()
     expect(res.status).toBe(401)
+    expect(mockSentry).not.toHaveBeenCalled()
+    expect(res.body).toMatchObject({
+      error: 'Unauthorized',
+      message: "Accès refusé : un jeton d'API est nécessaire pour accéder à ce contenu."
+    })
   })
 
   test('it responds with 400 when body is not valid JSON', async () => {
@@ -1182,6 +1291,7 @@ describe('POST /api/v2/certification/parcelles', () => {
     expect(db.connect).toHaveBeenCalled()
     expect(db._clientQuery).toHaveBeenCalledWith('ROLLBACK;')
     expect(db._clientRelease).toHaveBeenCalled()
+    expect(mockSentry).not.toHaveBeenCalled()
     expect(res.status).toBe(400)
   })
 
@@ -1195,6 +1305,7 @@ describe('POST /api/v2/certification/parcelles', () => {
     expect(db._clientQuery).toHaveBeenCalledWith('ROLLBACK;')
     expect(db._clientRelease).toHaveBeenCalled()
     expect(res.status).toBe(400)
+    expect(mockSentry).not.toHaveBeenCalled()
     expect(res.body).toEqual({
       nbObjetTraites: 4,
       nbObjetAcceptes: 1,
