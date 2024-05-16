@@ -17,6 +17,14 @@ if (reportErrors) {
       Sentry.extraErrorDataIntegration(),
       Sentry.localVariablesIntegration()
     ],
+    beforeSend (event, hint) {
+      const error = hint.originalException
+      if (isHandledError(error)) {
+        return null
+      }
+
+      return event
+    },
     tracesSampleRate: config.get('environment') === 'production' ? 0.2 : 1
   }
 
@@ -71,12 +79,13 @@ const DURATION_ONE_HOUR = DURATION_ONE_MINUTE * 60
 const DURATION_ONE_DAY = DURATION_ONE_HOUR * 24
 
 const db = require('./lib/db.js')
-const { FastifyErrorHandler, UnauthorizedApiError } = require('./lib/errors.js')
+const { UnauthorizedApiError, errorHandler } = require('./lib/errors.js')
 const { normalizeRecord } = require('./lib/outputs/record')
 const { recordToApi } = require('./lib/outputs/api')
+const { isHandledError } = require('./lib/errors')
 const sign = createSigner({ key: config.get('jwtSecret'), expiresIn: DURATION_ONE_DAY * 30 })
 
-app.setErrorHandler(new FastifyErrorHandler())
+app.setErrorHandler(errorHandler)
 if (reportErrors) {
   Sentry.setupFastifyErrorHandler(app)
 }
