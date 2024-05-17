@@ -170,7 +170,6 @@ app.addSchema(commonSchema)
 // Expose OpenAPI schema and Swagger documentation
 app.register(fastifySwagger, swaggerConfig)
 app.register(fastifySwaggerUi, {
-  baseDir: '/api',
   routePrefix: '/api/documentation'
 })
 
