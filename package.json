@@ -4,9 +4,6 @@
   "description": "api for cartobio",
   "main": "app.js",
   "private": true,
-  "bin": {
-    "cartobio-export-asp": "./bin/export-asp.js"
-  },
   "engines": {
     "node": ">=20",
     "npm": ">=8"
@@ -57,12 +54,10 @@
     "got": "^11.8.6",
     "jest": "^29.3.1",
     "jsonstream-next": "^3.0.0",
-    "minimist": "^1.2.8",
     "mnemonist": "^0.39.5",
     "p-memoize": "^4.0.4",
     "pg": "^8.7.3",
     "pg-cursor": "^2.10.5",
-    "pg-query-stream": "^4.2.4",
     "reproject": "^1.2.6",
     "socks-proxy-agent": "^8.0.2",
     "strip-bom-stream": "^4.0.0",
@@ -76,8 +71,6 @@
   "scripts": {
     "load:communes-table": "node bin/load-communes-table.js",
     "build:geo-data": "node bin/build-geo-data.js",
-    "export-asp": "node bin/export-asp.js --numerobio-path cartobio-asp.csv | ogr2ogr cartobio-asp.gpkg /vsistdin/",
-    "export-asp-c1": "node bin/export-asp.js --only-c1 --numerobio-path cartobio-asp-c1.csv | ogr2ogr cartobio-asp-c1.gpkg /vsistdin/",
     "prestart": "npm run build:geo-data && ./node_modules/.bin/db-migrate up",
     "lint": "eslint --ignore-pattern 'migrations/*' .",
     "test": "NODE_ENV=test node --trace-warnings --trace-uncaught ./node_modules/.bin/jest --collectCoverage --coverageReporters html --coverageReporters text-summary --coverageReporters lcovonly --detectOpenHandles",
