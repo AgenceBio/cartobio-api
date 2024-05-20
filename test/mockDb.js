@@ -67,16 +67,16 @@ jest.mock('../lib/db.js', () => {
   })
 
   // this mock will be return by the pool.connect()
-  const _clientQuery = jest.fn(async (...args) => {
-    if (args[0].startsWith('BEGIN')) {
+  const _clientQuery = jest.fn((...args) => {
+    if (typeof args[0] === 'string' && args[0].startsWith('BEGIN')) {
       return client.query.bind(client)('SAVEPOINT test')
     }
 
-    if (args[0].startsWith('ROLLBACK')) {
+    if (typeof args[0] === 'string' && args[0].startsWith('ROLLBACK')) {
       return client.query.bind(client)('ROLLBACK TO SAVEPOINT test')
     }
 
-    if (args[0].startsWith('COMMIT')) {
+    if (typeof args[0] === 'string' && args[0].startsWith('COMMIT')) {
       return client.query.bind(client)('RELEASE SAVEPOINT test')
     }
 
