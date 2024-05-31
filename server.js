@@ -93,7 +93,7 @@ if (reportErrors) {
 // Configure server
 app.register(fastifyCors, {
   origin: true,
-  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Accept-Encoding', 'Authorization']
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Accept-Encoding', 'Authorization', 'If-Unmodified-Since']
 })
 
 // Accept incoming files and forms (GeoJSON, ZIP files, etc.)
@@ -293,7 +293,7 @@ app.register(async (app) => {
   /**
    * Partial update a feature collection (ie: mass action from the collection screen)
    *
-   * It's non-destructive — matching ids are updated, new ids are added, non-existent ids are kept as is
+   * Matching features are updated, features not present in payload or database are ignored
    */
   app.patch('/api/v2/audits/:recordId/parcelles', deepmerge(protectedWithToken(), patchFeatureCollectionSchema, routeWithRecordId), (request, reply) => {
     const { body: featureCollection, user, record } = request
@@ -303,11 +303,12 @@ app.register(async (app) => {
   })
 
   /**
-   * Full update a single feature (ie: feature form from an editing modal)
+   * Partial update a single feature (ie: feature form from an editing modal)
    *
-   * It's destructive — non-matching ids are removed (ie: crops)
+   * Absent properties are kept as is, new properties are added, existing properties are updated
+   * ('culture' field is not a special case, it's just a regular property that can be replaced)
    */
-  app.put('/api/v2/audits/:recordId/parcelles/:featureId', deepmerge(protectedWithToken(), updateFeaturePropertiesSchema, routeWithRecordId), (request, reply) => {
+  app.patch('/api/v2/audits/:recordId/parcelles/:featureId', deepmerge(protectedWithToken(), updateFeaturePropertiesSchema, routeWithRecordId), (request, reply) => {
     const { body: feature, user, record } = request
     const { featureId } = request.params
 

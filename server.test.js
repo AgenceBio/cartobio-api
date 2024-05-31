@@ -986,13 +986,8 @@ describe('PATCH /api/v2/audits/:recordId/parcelles', () => {
   const getMock = jest.mocked(got.get)
   const postMock = jest.mocked(got.post)
 
-  beforeEach(loadRecordFixture)
-  afterEach(() => {
-    getMock.mockReset()
-    postMock.mockReset()
-  })
-
-  test('it updates only the patched properties of the features', async () => {
+  beforeEach(async () => {
+    await loadRecordFixture()
     // 1. fetchAuthToken
     postMock.mockReturnValueOnce({
       async json () {
@@ -1006,7 +1001,14 @@ describe('PATCH /api/v2/audits/:recordId/parcelles', () => {
         return agencebioOperator
       }
     })
+  })
 
+  afterEach(() => {
+    getMock.mockReset()
+    postMock.mockReset()
+  })
+
+  test('it updates only the patched properties of the features', async () => {
     const patchedRecordExpectation = normalizeRecord({
       ...record,
       parcelles: parcellesPatched
@@ -1054,6 +1056,36 @@ describe('PATCH /api/v2/audits/:recordId/parcelles', () => {
     expect(response.body.audit_history).toHaveLength(2)
     expect(db._clientRelease).toHaveBeenCalled()
     expect(response.body.parcelles).toMatchObject(expectDeepCloseTo(patchedRecordExpectation.parcelles))
+  })
+
+  test('it fails if if-unmodified-since does not match', async () => {
+    const updatedDiff = (new Date()).getTime() - 1000 * 60 * 5 // there should be less than 5 minutes since fixture loading
+    const ifModifiedSince = (new Date(updatedDiff)).toUTCString()
+    const response = await request(app.server)
+      .patch('/api/v2/audits/054f0d70-c3da-448f-823e-81fcf7c2bf6e/parcelles')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+      .set('If-Unmodified-Since', ifModifiedSince)
+      .send({
+        type: 'FeatureCollection',
+        features: []
+      })
+
+    expect(response.status).toBe(412)
+  })
+
+  test('it works if if-unmodified-since matches', async () => {
+    const updatedDiff = (new Date()).getTime() + 1000 * 60 * 5 // there should be less than 5 minutes since fixture loading
+    const ifModifiedSince = (new Date(updatedDiff)).toUTCString()
+    const response = await request(app.server)
+      .patch('/api/v2/audits/054f0d70-c3da-448f-823e-81fcf7c2bf6e/parcelles')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+      .set('If-Unmodified-Since', ifModifiedSince)
+      .send({
+        type: 'FeatureCollection',
+        features: []
+      })
+
+    expect(response.status).toBe(200)
   })
 })
 
