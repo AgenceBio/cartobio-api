@@ -1,10 +1,10 @@
 {
-  "numeroBio": "99999",
-  "data": {
-    "ocId": 1,
-    "ocLabel": "Ecocert France",
-    "auditDate": "2023-04-27T00:00:00.000Z",
-    "geojson": {
+  "record": {
+    "numerobio": "99999",
+    "oc_id": 1,
+    "oc_label": "Ecocert France",
+    "audit_date": "2023-04-27T00:00:00.000Z",
+    "parcelles": {
       "type": "FeatureCollection",
       "features": [
         {

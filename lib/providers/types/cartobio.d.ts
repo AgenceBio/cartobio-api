@@ -17,6 +17,7 @@ export type DBOperatorRecord = {
     created_at: string;
     updated_at: string;
     oc_id: number;
+    oc_label: string;
     parcelles?: DBParcelle[];
     metadata: any;
     audit_history: HistoryEntry[];
