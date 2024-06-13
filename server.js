@@ -67,7 +67,7 @@ const { parseTelepacArchive } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive, geofoliaLookup, geofoliaParcellaire } = require('./lib/providers/geofolia.js')
 const { InvalidRequestApiError, NotFoundApiError } = require('./lib/errors.js')
 
-const { deepmerge, commonSchema, swaggerConfig, CartoBioDecoratorsPlugin } = require('./lib/routes/index.js')
+const { mergeSchemas, swaggerConfig, CartoBioDecoratorsPlugin } = require('./lib/routes/index.js')
 const { sandboxSchema, internalSchema, hiddenSchema } = require('./lib/routes/index.js')
 const { operatorFromNumeroBio, protectedWithToken, routeWithRecordId, routeWithPacage } = require('./lib/routes/index.js')
 const { certificationBodySearchSchema } = require('./lib/routes/index.js')
@@ -165,8 +165,6 @@ app.register(fastifyOauth, {
   callbackUri: 'http://127.0.0.1:8000/api/login/geofolia/callback'
 })
 
-app.addSchema(commonSchema)
-
 // Expose OpenAPI schema and Swagger documentation
 app.register(fastifySwagger, swaggerConfig)
 app.register(fastifySwaggerUi, {
@@ -181,7 +179,7 @@ app.register(async (app) => {
     return reply.send({ version: config.get('version') })
   })
 
-  app.get('/api/v2/test', deepmerge(sandboxSchema, protectedWithToken({ oc: true, cartobio: true })), (_, reply) => {
+  app.get('/api/v2/test', mergeSchemas(sandboxSchema, protectedWithToken({ oc: true, cartobio: true })), (_, reply) => {
     return reply.send({ message: 'OK' })
   })
 
@@ -197,7 +195,7 @@ app.register(async (app) => {
   /**
    * @private
    */
-  app.post('/api/v2/certification/search', deepmerge(certificationBodySearchSchema, protectedWithToken()), async (request, reply) => {
+  app.post('/api/v2/certification/search', mergeSchemas(certificationBodySearchSchema, protectedWithToken()), async (request, reply) => {
     const { input, page, sort, order } = request.body
     const { id: ocId } = request.user.organismeCertificateur
 
@@ -210,7 +208,7 @@ app.register(async (app) => {
    * @private
    * Retrieve operators for a given user
    */
-  app.get('/api/v2/operators', deepmerge(protectedWithToken({ cartobio: true })), (request, reply) => {
+  app.get('/api/v2/operators', mergeSchemas(protectedWithToken({ cartobio: true })), (request, reply) => {
     const { id: userId } = request.user
 
     return fetchUserOperators(userId)
@@ -221,7 +219,7 @@ app.register(async (app) => {
    * @private
    * Retrieve an operator
    */
-  app.get('/api/v2/operator/:numeroBio', deepmerge(protectedWithToken(), operatorFromNumeroBio), (request, reply) => {
+  app.get('/api/v2/operator/:numeroBio', mergeSchemas(protectedWithToken(), operatorFromNumeroBio), (request, reply) => {
     return reply.code(200).send(request.operator)
   })
 
@@ -229,7 +227,7 @@ app.register(async (app) => {
    * @private
    * Retrieve an operator records
    */
-  app.get('/api/v2/operator/:numeroBio/records', deepmerge(protectedWithToken(), operatorFromNumeroBio), async (request, reply) => {
+  app.get('/api/v2/operator/:numeroBio/records', mergeSchemas(protectedWithToken(), operatorFromNumeroBio), async (request, reply) => {
     const records = await getRecords(request.params.numeroBio)
     return reply.code(200).send(records)
   })
@@ -237,24 +235,23 @@ app.register(async (app) => {
   /**
    * Retrieve a given Record
    */
-  app.get('/api/v2/audits/:recordId', deepmerge(routeWithRecordId, protectedWithToken()), (request, reply) => {
+  app.get('/api/v2/audits/:recordId', mergeSchemas(routeWithRecordId, protectedWithToken()), (request, reply) => {
     return reply.code(200).send(request.record)
   })
 
   /**
    * Create a new Record for a given Operator
    */
-  app.post('/api/v2/operator/:numeroBio/records', deepmerge(
+  app.post('/api/v2/operator/:numeroBio/records', mergeSchemas(
     createRecordSchema,
     operatorFromNumeroBio,
     protectedWithToken()
   ), async (request, reply) => {
     const { numeroBio } = request.params
     const { id: ocId, nom: ocLabel } = request.operator.organismeCertificateur
-    const { geojson, metadata, versionName, importPrevious } = request.body
     const record = await createOrUpdateOperatorRecord(
-      { numeroBio, ocId, ocLabel, geojson, metadata, versionName },
-      { user: request.user, oldRecord: request.record, copyParcellesData: importPrevious }
+      { numerobio: numeroBio, oc_id: ocId, oc_label: ocLabel, ...request.body },
+      { user: request.user, copyParcellesData: request.body.importPrevious }
     )
     return reply.code(200).send(normalizeRecord(record))
   })
@@ -262,7 +259,7 @@ app.register(async (app) => {
   /**
    * Delete a given Record
    */
-  app.delete('/api/v2/audits/:recordId', deepmerge(routeWithRecordId, protectedWithToken()), async (request, reply) => {
+  app.delete('/api/v2/audits/:recordId', mergeSchemas(routeWithRecordId, protectedWithToken()), async (request, reply) => {
     const { user, record } = request
     await deleteRecord({ user, record })
     return reply.code(204).send()
@@ -272,7 +269,7 @@ app.register(async (app) => {
    * Partial update Record's metadata (top-level properties except features)
    * It also keep track of new HistoryEvent along the way, depending who and when you update feature properties
    */
-  app.patch('/api/v2/audits/:recordId', deepmerge(protectedWithToken(), patchRecordSchema, routeWithRecordId), (request, reply) => {
+  app.patch('/api/v2/audits/:recordId', mergeSchemas(protectedWithToken(), patchRecordSchema, routeWithRecordId), (request, reply) => {
     const { body: patch, user, record } = request
 
     return updateAuditRecordState({ user, record }, patch)
@@ -282,7 +279,7 @@ app.register(async (app) => {
   /**
    * Add new feature entries to an existing collection
    */
-  app.post('/api/v2/audits/:recordId/parcelles', deepmerge(protectedWithToken(), createFeatureSchema, routeWithRecordId), (request, reply) => {
+  app.post('/api/v2/audits/:recordId/parcelles', mergeSchemas(protectedWithToken(), createFeatureSchema, routeWithRecordId), (request, reply) => {
     const { feature } = request.body
     const { user, record } = request
 
@@ -295,7 +292,7 @@ app.register(async (app) => {
    *
    * Matching features are updated, features not present in payload or database are ignored
    */
-  app.patch('/api/v2/audits/:recordId/parcelles', deepmerge(protectedWithToken(), patchFeatureCollectionSchema, routeWithRecordId), (request, reply) => {
+  app.patch('/api/v2/audits/:recordId/parcelles', mergeSchemas(protectedWithToken(), patchFeatureCollectionSchema, routeWithRecordId), (request, reply) => {
     const { body: featureCollection, user, record } = request
 
     return patchFeatureCollection({ user, record }, featureCollection.features)
@@ -308,7 +305,7 @@ app.register(async (app) => {
    * Absent properties are kept as is, new properties are added, existing properties are updated
    * ('culture' field is not a special case, it's just a regular property that can be replaced)
    */
-  app.patch('/api/v2/audits/:recordId/parcelles/:featureId', deepmerge(protectedWithToken(), updateFeaturePropertiesSchema, routeWithRecordId), (request, reply) => {
+  app.patch('/api/v2/audits/:recordId/parcelles/:featureId', mergeSchemas(protectedWithToken(), updateFeaturePropertiesSchema, routeWithRecordId), (request, reply) => {
     const { body: feature, user, record } = request
     const { featureId } = request.params
 
@@ -319,7 +316,7 @@ app.register(async (app) => {
   /**
    * Delete a single feature
    */
-  app.delete('/api/v2/audits/:recordId/parcelles/:featureId', deepmerge(protectedWithToken(), deleteSingleFeatureSchema, routeWithRecordId), (request, reply) => {
+  app.delete('/api/v2/audits/:recordId/parcelles/:featureId', mergeSchemas(protectedWithToken(), deleteSingleFeatureSchema, routeWithRecordId), (request, reply) => {
     const { user, record } = request
     const { reason } = request.body
     const { featureId } = request.params
@@ -333,7 +330,7 @@ app.register(async (app) => {
    * It's essentially used during an import process to preview its content
    * @private
    */
-  app.post('/api/v2/convert/telepac/geojson', deepmerge(protectedWithToken({ oc: true, cartobio: true })), async (request, reply) => {
+  app.post('/api/v2/convert/telepac/geojson', mergeSchemas(protectedWithToken({ oc: true, cartobio: true })), async (request, reply) => {
     return parseTelepacArchive(request.file())
       .then(geojson => reply.send(geojson))
   })
@@ -343,7 +340,7 @@ app.register(async (app) => {
    * It's essentially used during an import process to preview its content
    * @private
    */
-  app.post('/api/v2/convert/geofolia/geojson', deepmerge(protectedWithToken()), async (request, reply) => {
+  app.post('/api/v2/convert/geofolia/geojson', mergeSchemas(protectedWithToken()), async (request, reply) => {
     const data = await request.file()
 
     return parseGeofoliaArchive(await data.toBuffer())
@@ -355,7 +352,7 @@ app.register(async (app) => {
    * It's essentially used during an import process to preview its content
    * @private
    */
-  app.post('/api/v2/convert/anygeo/geojson', deepmerge(protectedWithToken()), async (request, reply) => {
+  app.post('/api/v2/convert/anygeo/geojson', mergeSchemas(protectedWithToken()), async (request, reply) => {
     return parseAnyGeographicalArchive(request.file())
       .then(geojson => reply.send(geojson))
   })
@@ -363,7 +360,7 @@ app.register(async (app) => {
   /**
    * Retrieves all features associated to a PACAGE as a workeable FeatureCollection
    */
-  app.get('/api/v2/import/pacage/:numeroPacage', deepmerge(protectedWithToken({ cartobio: true, oc: true }), routeWithPacage), async (request, reply) => {
+  app.get('/api/v2/import/pacage/:numeroPacage', mergeSchemas(protectedWithToken({ cartobio: true, oc: true }), routeWithPacage), async (request, reply) => {
     const { numeroPacage } = request.params
 
     return pacageLookup({ numeroPacage })
@@ -374,7 +371,7 @@ app.register(async (app) => {
    * Checks if an operator has Geofolink features
    * It triggers a data order, which has the benefit to break the waiting time in two
    */
-  app.head('/api/v2/import/geofolia/:numeroBio', deepmerge(protectedWithToken({ cartobio: true, oc: true }), operatorFromNumeroBio, geofoliaImportSchema), async (request, reply) => {
+  app.head('/api/v2/import/geofolia/:numeroBio', mergeSchemas(protectedWithToken({ cartobio: true, oc: true }), operatorFromNumeroBio, geofoliaImportSchema), async (request, reply) => {
     const { siret } = request.operator
     const { year } = request.query
 
@@ -386,7 +383,7 @@ app.register(async (app) => {
   /**
    * Retrieves all features associated to a given SIRET linked to a numeroBio
    */
-  app.get('/api/v2/import/geofolia/:numeroBio', deepmerge(protectedWithToken({ cartobio: true, oc: true }), operatorFromNumeroBio), async (request, reply) => {
+  app.get('/api/v2/import/geofolia/:numeroBio', mergeSchemas(protectedWithToken({ cartobio: true, oc: true }), operatorFromNumeroBio), async (request, reply) => {
     const { siret } = request.operator
 
     const featureCollection = await geofoliaParcellaire(siret)
@@ -403,7 +400,7 @@ app.register(async (app) => {
    * You still have to add geometries to the collection.
    * Features contains a 'cadastre' property with references to fetch
    */
-  app.get('/api/v2/import/evv/:numeroEvv(\\d+)+:numeroBio(\\d+)', deepmerge(protectedWithToken({ cartobio: true, oc: true }), operatorFromNumeroBio), async (request, reply) => {
+  app.get('/api/v2/import/evv/:numeroEvv(\\d+)+:numeroBio(\\d+)', mergeSchemas(protectedWithToken({ cartobio: true, oc: true }), operatorFromNumeroBio), async (request, reply) => {
     const { numeroEvv } = request.params
     const { siret: expectedSiret } = request.operator
 
@@ -429,7 +426,7 @@ app.register(async (app) => {
       })
   })
 
-  app.post('/api/v2/certification/parcelles', deepmerge(protectedWithToken({ oc: true }), {
+  app.post('/api/v2/certification/parcelles', mergeSchemas(protectedWithToken({ oc: true }), {
     preParsing: async (request, reply, payload) => {
       const stream = payload.pipe(stripBom())
 
@@ -454,7 +451,7 @@ app.register(async (app) => {
     })
   })
 
-  app.get('/api/v2/certification/parcellaires', deepmerge(protectedWithToken({ oc: true })), async (request, reply) => {
+  app.get('/api/v2/certification/parcellaires', mergeSchemas(protectedWithToken({ oc: true })), async (request, reply) => {
     reply.header('Content-Type', 'application/json')
     const records = iterateOperatorLastRecords(
       request.organismeCertificateur.id,
@@ -475,7 +472,7 @@ app.register(async (app) => {
     return reply.code(200).send(outputStream)
   })
 
-  app.get('/api/v2/certification/parcellaire/:numeroBio', deepmerge(protectedWithToken({ oc: true }), operatorFromNumeroBio), async (request, reply) => {
+  app.get('/api/v2/certification/parcellaire/:numeroBio', mergeSchemas(protectedWithToken({ oc: true }), operatorFromNumeroBio), async (request, reply) => {
     const record = await getOperatorLastRecord(request.params.numeroBio, {
       anneeAudit: request.query.anneeAudit,
       statut: request.query.statut
@@ -483,7 +480,7 @@ app.register(async (app) => {
     return reply.code(200).send(recordToApi(record))
   })
 
-  app.get('/api/v2/user/verify', deepmerge(protectedWithToken({ oc: true, cartobio: true }), sandboxSchema, internalSchema), (request, reply) => {
+  app.get('/api/v2/user/verify', mergeSchemas(protectedWithToken({ oc: true, cartobio: true }), sandboxSchema, internalSchema), (request, reply) => {
     const { user, organismeCertificateur } = request
 
     return reply.send(user ?? organismeCertificateur)
@@ -515,7 +512,7 @@ app.register(async (app) => {
 
   // usefull only in dev mode
   app.get('/auth-provider/agencebio/login', hiddenSchema, (request, reply) => reply.redirect('/api/auth-provider/agencebio/login'))
-  app.get('/api/auth-provider/agencebio/callback', deepmerge(sandboxSchema, hiddenSchema), async (request, reply) => {
+  app.get('/api/auth-provider/agencebio/callback', mergeSchemas(sandboxSchema, hiddenSchema), async (request, reply) => {
     // forwards to the UI the user-selected tab
     const { mode = '', returnto = '' } = stateCache.get(request.query.state)
     const { token } = await app.agenceBioOAuth2.getAccessTokenFromAuthorizationCodeFlow(request)
