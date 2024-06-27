@@ -119,7 +119,7 @@ if (process.argv.length < 4) {
             const id = names.includes('id') ? feature.fields.get('id') : getRandomFeatureId()
             const properties = feature.fields.toObject()
 
-            const { AGRIBIO, CAMPAGNE, CODE_VAR, COMMUNE, NUMERO_I, NUMERO_P, PACAGE, TYPE } = properties
+            const { BIO, CODE_CULT, PRECISION, NUM_ILOT: NUMERO_I, NUM_PARCEL: NUMERO_P, PACAGE } = properties
 
             featureCollection.features.push(/** @type {Feature} */{
               type: 'Feature',
@@ -127,17 +127,15 @@ if (process.argv.length < 4) {
               geometry: geometry.toObject(),
               properties: {
                 id,
-                BIO: AGRIBIO,
-                CAMPAGNE,
-                COMMUNE,
+                BIO,
                 cultures: [
                   {
                     id: randomUUID(),
-                    CPF: fromCodePacStrict(TYPE, CODE_VAR)?.code_cpf,
-                    TYPE
+                    CPF: fromCodePacStrict(CODE_CULT, PRECISION)?.code_cpf,
+                    CODE_CULT
                   }
                 ],
-                conversion_niveau: AGRIBIO === 1 ? 'AB?' : EtatProduction.NB,
+                conversion_niveau: BIO === 1 ? EtatProduction.BIO : EtatProduction.NB,
                 NUMERO_I,
                 NUMERO_P,
                 PACAGE
@@ -176,6 +174,7 @@ if (process.argv.length < 4) {
     process.exit(1)
   } finally {
     await client.query('COMMIT;')
+    await client.release()
   }
 
   progress.stop()
