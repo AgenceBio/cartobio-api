@@ -1,3 +1,4 @@
+const { EtatProduction } = require('../../lib/enums')
 const UUIDRe = /^[a-f0-9]+-[a-f0-9]+-[a-f0-9]+-[a-f0-9]+-[a-f0-9]+$/
 
 module.exports = {
@@ -105,7 +106,7 @@ module.exports = {
           NUMERO_I: '2',
           NUMERO_P: '4',
           PACAGE: expect.stringMatching(/^(999000000|026532467)$/),
-          conversion_niveau: 'AB?',
+          conversion_niveau: EtatProduction.BIO,
           cultures: [
             {
               CPF: '01.11.12',
