@@ -1340,14 +1340,15 @@ describe('POST /api/v2/certification/parcelles', () => {
     expect(res.status).toBe(400)
     expect(mockSentry).not.toHaveBeenCalled()
     expect(res.body).toEqual({
-      nbObjetTraites: 4,
+      nbObjetTraites: 5,
       nbObjetAcceptes: 1,
-      nbObjetRefuses: 3,
+      nbObjetRefuses: 4,
       listeProblemes: [
         // in case of error, check `createOrUpdateOperatorRecord()` SQL arity
         '[#2] champ dateAudit incorrect',
         '[#3] champ geom incorrect : Expected \',\' or \']\' after array element in JSON at position 32635',
-        '[#4] La donnée géographique est manquante ou invalide.'
+        '[#4] Impossible de créer une parcelle sans donnée géographique.',
+        '[#5] Les dates de certification sont manquantes.'
       ]
     })
   })
@@ -1357,6 +1358,8 @@ describe('POST /api/v2/certification/parcelles', () => {
     validApiParcellaire.splice(1, 1)
     validApiParcellaire[1].parcelles[0].geom = '[[[0,0],[0,1],[1,1],[1,0],[0,0]]]'
     validApiParcellaire[2].parcelles[0].geom = '[[[0,0],[0,1],[1,1],[1,0],[0,0]]]'
+    validApiParcellaire[3].dateCertificationDebut = '2023-01-01'
+    validApiParcellaire[3].dateCertificationFin = '2024-01-01'
     const res = await request(app.server)
       .post('/api/v2/certification/parcelles')
       .set('Authorization', fakeOcToken)
@@ -1368,7 +1371,7 @@ describe('POST /api/v2/certification/parcelles', () => {
     expect(db._clientRelease).toHaveBeenCalled()
     expect(res.status).toBe(202)
     expect(res.body).toEqual({
-      nbObjetTraites: 3
+      nbObjetTraites: 4
     })
   })
 
@@ -1496,8 +1499,6 @@ describe('POST /api/v2/certification/parcelles', () => {
     const payload = {
       dateAudit: '2022-05-01',
       numeroBio: '99999',
-      dateCertificationDebut: '',
-      dateCertificationFin: '',
       commentaire: '',
       parcelles: [
         {
@@ -1518,8 +1519,6 @@ describe('POST /api/v2/certification/parcelles', () => {
 
     const { rows } = await db.query('SELECT * FROM cartobio_operators WHERE numerobio = $1 AND audit_date = $2', ['99999', '2022-05-01'])
     expect(rows).toHaveLength(1)
-    expect(rows[0].certification_date_debut).toBeNull()
-    expect(rows[0].certification_date_fin).toBeNull()
     expect(rows[0].audit_notes).toBe('')
 
     const { rows: parcelles } = await db.query('SELECT * FROM cartobio_parcelles WHERE record_id = $1', [rows[0].record_id])

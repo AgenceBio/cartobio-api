@@ -84,6 +84,8 @@
   "numeroClient": "47.587297194859907]",
   "anneeReferenceControle": "[6.2689223281516595",
   "anneeAssolement": "[6.2689223281516595",
+  "dateCertificationDebut": "2023-01-01",
+  "dateCertificationFin": "2025-03-31",
   "dateAudit": "47.58729719931943]",
   "numeroPacage": "[6.268988943193694",
   "commentaire": "47.58751047029709]",
@@ -108,6 +110,8 @@
   "numeroBio": 101903,
   "numeroClient": 110077,
   "anneeReferenceControle": 2023,
+  "dateCertificationDebut": "2023-01-01",
+  "dateCertificationFin": "2025-03-31",
   "anneeAssolement": 2023,
   "dateAudit": "2023-06-23",
   "numeroPacage": 70015772,
@@ -133,6 +137,8 @@
   "numeroClient": 195931,
   "anneeReferenceControle": 2023,
   "anneeAssolement": 2023,
+  "dateCertificationDebut": "2023-01-01",
+  "dateCertificationFin": "2025-03-31",
   "dateAudit": "2023-03-30",
   "numeroPacage": 32165694,
   "parcelles": [
@@ -150,5 +156,34 @@
       ]
      }
   ]
-}
+ },
+  {
+    "numeroBio": "88888",
+    "numeroClient": "100012",
+    "anneeReferenceControle": 2022,
+    "anneeAssolement": 2022,
+    "dateAudit": "2023-04-27",
+    "dateCertificationDebut": null,
+    "dateCertificationFin": null,
+    "numeroPacage": "084012821",
+    "commentaire": "notes d'audit",
+    "parcelles": [
+      {
+        "id": "45742",
+        "dateEngagement": "2023-04-27",
+        "etatProduction": "AB",
+        "geom": "[[[4.8740990843182042,44.255949709765304],[4.8739614029301244,44.255016135661734],[4.8736532263747678,44.255001848456033],[4.8738004728368587,44.255928756333255],[4.8740990843182042,44.255949709765304]]]}",
+        "commentaire": "Parcelle 5 ILOT 12 PAC 2023 0C 1271",
+        "culture": [
+          {
+            "codeCPF": "01.92",
+            "dateSemis": "2023-10-10",
+            "variete": "",
+            "quantite": 25,
+            "unite": "%"
+          }
+        ]
+      }
+    ]
+  }
 ]
