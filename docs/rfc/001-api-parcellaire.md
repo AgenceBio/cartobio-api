@@ -117,24 +117,24 @@ Si le JSON est invalide, le message d'erreur est simplement le suivant :
 | `anneeReferenceControle` | integer | **oui**     | année de référence de l'audit AB                 |
 | `anneeAssolement`        | integer | non         | année de l'assolement concerné [^1]              |
 | `dateAudit`              | string  | **oui**     | date d'audit au format [ISO 8601] (`YYYY-MM-DD`) |
-| `dateCertificationDebut` | string  | non         | date de début de validité de certification des parcelles  |
-| `dateCertificationFin`   | string  | non         | date de fin de validité de certification des parcelles    |
+| `dateCertificationDebut` | string  | **oui**     | date de début de validité de certification des parcelles  |
+| `dateCertificationFin`   | string  | **oui**     | date de fin de validité de certification des parcelles    |
 | `numeroPacage`           | string  | non         | numéro pacage de l'opérateur (si applicable)     |
 | `commentaire`            | string  | non         | notes d'audit                                    |
 | `parcelles`              | array   | **oui**     | liste d'éléments de type [Parcelle](#parcelle)   |
 
 #### Parcelle
 
-| Chemin           | Type   | Obligatoire | Description                                                                                                                                                                                                                                |
-|------------------|--------|-------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `id`             | string | **oui**     | identifiant unique de parcelle (souvent appelé `PK`, `Primary Key` ou `Clé primaire`)                                                                                                                                                      |
-| `etatProduction` | enum   | **oui**     | `AB`, `C1`, `C2`, `C3` ou `NB`                                                                                                                                                                                                             |
-| `dateEngagement` | string | non         | date d'engagement (si connue) au format [ISO 8601] (`YYYY-MM-DD`)=> uniquement pour les parcelles en conversion (voir si on peut avoir                                              la date d'import et la date de conversion différencier |
-| `numeroIlot`     | string | non         | numéro d'ilot PAC (si applicable)                                                                                                                                                                                                          |
-| `numeroParcelle` | string | non         | numéro de parcelle PAC (si applicable)                                                                                                                                                                                                     |
-| `geom`           | string | non         | coordonnées géographiques. Obligatoire si la parcelle est nouvelle. Équivalent du champ `geometry.coordinates` d'une [_feature_ GeoJSON]                                                                                                   |
-| `commentaire`    | string | non         | notes d'audit spécifiques à la parcelle                                                                                                                                                                                                    |
-| `cultures`       | array  | **oui**     | liste d'éléments de type [Culture](#culture)                                                                                                                                                                                               |
+| Chemin           | Type   | Obligatoire | Description                                                                                                                                                                                                                        |
+|------------------|--------|-------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `id`             | string | **oui**     | identifiant unique de parcelle (souvent appelé `PK`, `Primary Key` ou `Clé primaire`)                                                                                                                                              |
+| `etatProduction` | enum   | **oui**     | `AB`, `C1`, `C2`, `C3` ou `NB`                                                                                                                                                                                                     |
+| `dateEngagement` | string | non         | date d'engagement au format [ISO 8601] (`YYYY-MM-DD`), **obligatoire** pour les parcelles en conversion (voir si on peut avoir                                              la date d'import et la date de conversion différencier |
+| `numeroIlot`     | string | non         | numéro d'ilot PAC (si applicable)                                                                                                                                                                                                  |
+| `numeroParcelle` | string | non         | numéro de parcelle PAC (si applicable)                                                                                                                                                                                             |
+| `geom`           | string | non         | coordonnées géographiques. Obligatoire si la parcelle est nouvelle. Équivalent du champ `geometry.coordinates` d'une [_feature_ GeoJSON]                                                                                           |
+| `commentaire`    | string | non         | notes d'audit spécifiques à la parcelle                                                                                                                                                                                            |
+| `cultures`       | array  | **oui**     | liste d'éléments de type [Culture](#culture)                                                                                                                                                                                       |
 
 #### Culture
 
