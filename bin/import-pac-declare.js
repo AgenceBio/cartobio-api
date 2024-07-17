@@ -38,10 +38,22 @@ const OC = {
 async function * groupByPACAGE (features) {
   let recordFeatures = []
   let currentPACAGE = null
-  for await (const feature of features) {
+  // Sort by PACAGE
+  const sortedFeatures = Array.from(features).sort((a, b) => {
+    if (!a.fields.get('PACAGE') || !b.fields.get('PACAGE')) {
+      throw new Error('Feature without PACAGE:', a, b)
+    }
+
+    if (a.fields.get('PACAGE') === b.fields.get('PACAGE')) {
+      return 0
+    }
+
+    return a.fields.get('PACAGE') < b.fields.get('PACAGE') ? -1 : 1
+  })
+
+  for await (const feature of sortedFeatures) {
     // group features by properties.PACAGE
-    const properties = feature.fields.toObject()
-    const { PACAGE } = properties
+    const PACAGE = feature.fields.get('PACAGE')
     if (!PACAGE) {
       throw new Error('Feature without PACAGE:', feature)
     }
