@@ -8,12 +8,11 @@ const getStream = require('get-stream')
 const gdal = require('gdal-async')
 const { fromCodePacStrict } = require('@agencebio/rosetta-cultures')
 
-const { createOrUpdateOperatorRecord, getRecord, patchFeatureCollection } = require('../lib/providers/cartobio')
+const { createOrUpdateOperatorRecord } = require('../lib/providers/cartobio')
 const { CertificationState, EtatProduction } = require('../lib/enums.js')
 const pool = require('../lib/db')
 const { unzipGeographicalContent, detectSrs, wgs84 } = require('../lib/providers/gdal')
 const { getRandomFeatureId } = require('../lib/outputs/features')
-const { normalizeRecord } = require('../lib/outputs/record')
 
 /**
  * Ce script lit la grande FeatureCollection des parcellaires déclarés de l'ASP
