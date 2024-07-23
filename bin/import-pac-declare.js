@@ -156,22 +156,6 @@ if (process.argv.length < 4) {
             })
           }
 
-          let firstRecord = null
-          const currentRecord = await pool.query(/* sql */
-            `
-                SELECT cartobio_operators.record_id 
-                FROM cartobio_operators
-                LEFT JOIN cartobio_parcelles cp on cartobio_operators.record_id = cp.record_id
-                WHERE numerobio = $1
-                AND numero_pacage = $2 LIMIT 1
-            `,
-            [operator.numerobio, pacage]
-          )
-
-          if (currentRecord.rows.length) {
-            firstRecord = await getRecord(currentRecord.rows[0].record_id)
-          }
-
           /**
            * @type {import('../outputs/types/record').NormalizedRecord}
            */
@@ -191,13 +175,7 @@ if (process.argv.length < 4) {
             }
           }
 
-          const newRecord = normalizeRecord(await createOrUpdateOperatorRecord(record, { copyParcellesData: true }, client))
-          if (firstRecord) {
-            await patchFeatureCollection({ record: firstRecord }, newRecord.parcelles.features)
-            await pool.query(`
-              DELETE FROM cartobio_operators WHERE record_id = $1
-            `, [newRecord.record_id])
-          }
+          await createOrUpdateOperatorRecord(record, { copyParcellesData: true }, client)
           i++
           progress.increment()
         }
