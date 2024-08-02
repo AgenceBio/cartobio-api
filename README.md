@@ -1,41 +1,126 @@
-# CartoBio-API
+# CartoBio - API
 
 > API des données parcellaires bio en France.
 
-Elle a vocation à être intégrée à [`cartobio-front`][cartobio-front] et aux outils
+Elle est utilisée par [`cartobio-front`](https://github.com/agencebio/cartobio-front) et aux outils
 métiers des organismes de certification du bio en France.
 
+Cette API est réalisée en node avec [Fastify](https://fastify.dev/) et [swagger-ui](https://swagger.io/tools/swagger-ui/) entre autres et la base de données maintenue avec [db-migrate-pg](https://github.com/db-migrate/pg). Les données sont stockées dans une base [PostgreSQL](https://www.postgresql.org/) avec la cartouche spatiale [PostGIS](https://postgis.net/).
 
-**Pré-requis** : `node@20`, `postgres@15`, `postgis@3.3`.
+Les erreurs sont centralisées avec [Sentry](https://github.com/getsentry/sentry).
 
-**📚 Table des matières**
+## Développement
 
-- [CartoBio-API](#cartobio-api)
-  - [Fonctionnement](#fonctionnement)
-    - [Routes](#routes)
-    - [Variables d'environnement](#variables-denvironnement)
-  - [Tests](#tests)
-  - [Développer localement](#développer-localement)
-- [Manuel d'utilisation](#manuel-dutilisation)
-  - [Brancher au Webservice des Douanes](#brancher-au-webservice-des-douanes)
-  - [Sauvegarder et restaurer la base de données](#sauvegarder-et-restaurer-la-base-de-données-en-production)
-  - [Intégration des données du RPG bio](#intégration-des-données-du-rpg-bio)
-  - [Générer les fonds de carte](#générer-les-fonds-de-carte)
-  - [Exporter pour l'ASP](#exporter-pour-lasp)
-    - [La couche au 15 mai (tout)](#la-couche-au-15-mai-tout)
-    - [La couche au 12 octobre (C1 uniquement)](#la-couche-au-12-octobre-c1-uniquement)
+### Outils nécessaires
+
+* `docker` avec `compose 2`
+* `node` 20
+
+On pourra utiliser `nvm` pour faciliter la gestion de différentes versions de node (cf. [`.nvmrc`](.nvmrc)) :
+```sh
+nvm install && nvm use
+```
+
+### Configuration
+
+Créer un fichier `.env` inspiré de `.example.env`.
+
+### Dépendances
+
+Démarrer le serveur de données :
+```sh
+docker compose up db --force-recreate
+```
+
+### Application
+
+Récupérer les dépendances :
+```sh
+# Versions verrouillées
+npm ci
+
+# Et/ou en les mettant à jour
+npm install
+```
+
+Démarrer :
+```sh
+npm start
+
+# Ou en rechargeant automatiquement
+npm run watch
+```
+
+Ouvrir :
+* http://localhost:8000/api/version
+* http://localhost:8000/api/v2/test
+* http://localhost:8000/api/documentation/static/index.html
+
+💡 Le démarrage du serveur lance automatiquement les migrations du schéma de base de données avec [**db-migrate**](https://db-migrate.readthedocs.io/en/latest/). Se réferrer à sa documentation pour en savoir plus sur les commandes et les API de migration.
+
+### Données de tests dans la base
+
+```sh
+# Ajouter
+./node_modules/.bin/db-migrate up:fixtures
+
+# Retirer
+./node_modules/.bin/db-migrate down:fixtures
+```
+
+### Exécution des tests
+
+Les test utilisent [Jest](https://jestjs.io/docs/en/getting-started) et [supertest](https://github.com/visionmedia/supertest#readme) pour leur organisation et pour lancer les appels HTTP.
+
+```sh
+npm test
+```
+
+## Déploiement
+
+### Environnement de test
+
+
+### Environnement de préproduction et production
+
+Le workflow [Docker Image CI](https://github.com/AgenceBio/cartobio-api/blob/main/.github/workflows/docker.yml) dispose de trois jobs :
+* `build`
+  * construit les images docker [agencebio/cartobio-api](https://hub.docker.com/r/agencebio/cartobio-api/tags)
+* `deploy-staging`
+  * déclenché par un nouveau commit dans la branche `main`
+  * déploie l'API de préproduction
+* `deploy-production`
+  * déclenché par un nouvrau tag
+  * déploie l'API de production
+
+Pour créer un tag :
+
+```sh
+# Lors d'ajout de fonctionnalités
+npm version minor
+
+# Lors d'un correctif ou ajout très mineur
+npm version patch
+```
+
+Puis :
+
+```sh
+git push --version
+```
+
+
+
+
+
+---
+
+<details>
+<summary><b>Autres informations</b></summary>
+
+# TODO : reprendre
 
 ## Fonctionnement
-
-```shell
-$ npm start
-```
-
-Et en développement :
-
-```shell
-$ npm run watch
-```
 
 ### Routes
 
@@ -50,7 +135,7 @@ $ npm run watch
 | `GET`   | `/api/v1/parcels`              | Liste des parcelles des clients d'un Organisme de Certification.                          |
 | `GET`   | `/api/v1/parcels/operator/:id` | Liste des parcelles d'un opérateur donné.                                                 |
 
-L'authentification est assurée grâce à des [jetons JWT][jwt], issus à la main.
+L'authentification est assurée grâce à des [jetons JWT](https://jwt.io/), issus à la main.
 
 
 ### Variables d'environnement
@@ -64,46 +149,7 @@ L'application lit les variables définies dans un fichier `.env`.
 | `DATABASE_URL`                       | `http://docker:docker@api-db:15432/cartobio` | URL de la base de données PostGIS qui contient les couches géographiques, et les données métiers CartoBio |
 | `SENTRY_DSN`                         | ``                                           | DSN Sentry pour le suivi des erreurs applicatives                                                         |
 | `CARTOBIO_JWT_SECRET`                | ``                                           | Secret JSON Web Token, pour vérifier l'authenticité des tokens                                            |
-| `NOTIFICATIONS_AB_ENDPOINT`          | `https://back.agencebio.org`                 | Point d'accès aux [notifications de l'Agence Bio][api-ab]                                                 |
-
-## Tests
-
-Les test utilisent [Jest] et [supertest] pour leur organisation,
-et pour lancer les appels HTTP.
-
-```bash
-$ npm test
-```
-
-## Développer localement
-
-```bash
-$ docker compose run --name api-db --publish=127.0.0.1:15432:5432 --detach db
-$ # ou
-$ # docker compose run --rm --name api-db --publish=127.0.0.1:15432:5432 db
-$ npm run watch
-```
-
-Le démarrage du serveur lance automatiquement les migrations du schéma de base de données.
-
----
-
-Pour avoir quelques données en base :
-
-```bash
-$ ./node_modules/.bin/db-migrate up:fixtures
-```
-
-Et pour les retirer :
-
-```bash
-$ ./node_modules/.bin/db-migrate down:fixtures
-```
-
-💡 [**db-migrate**](https://db-migrate.readthedocs.io/en/latest/) : se réferrer
-    à sa documentation pour en savoir plus sur les commandes et les API de migration.
-
-# Manuel d'utilisation
+| `NOTIFICATIONS_AB_ENDPOINT`          | `https://back.agencebio.org`                 | Point d'accès aux [notifications de l'Agence Bio](https://preprod-notification.agencebio.org/)                                                 |
 
 ## Brancher au Webservice des Douanes
 
@@ -115,13 +161,13 @@ ssh -A -N -C -D 5000 -J user@ip-serveur-cartobio user@ip-serveur-bdd
 
 ## Sauvegarder et restaurer la base de données en production
 
-```bash
+```sh
 docker run --rm postgres:15 pg_dump --clean -t cartobio_operators -t cartobio_parcelles --data-only -U postgres -h bdd-cartobio -p 5433 postgres > dump-production-data-only.sql
 ```
 
 Puis restaurer (en préprod) :
 
-```bash
+```sh
 docker run -i --rm postgres:15 psql -v ON_ERROR_STOP=1 -U postgres -h bdd-cartobio -p 5434 postgres < dump-production-data-only.sql
 ```
 
@@ -145,7 +191,7 @@ ogr2ogr -f PostgreSQL \
 
 Les fonds de carte sont servis statiquement, et générés à l'aide de l'outil en ligne de commande [tippecanoe] :
 
-```bash
+```sh
 # Décompresser tous les fichiers ZIP départementaux dans un même dossier,
 # de telle sorte à ce que tous les fichiers .dbf .prj .shp .shx soient dans un même dossier.
 for f in *.zip; do unzip "$f"; done
@@ -156,10 +202,4 @@ ogr2ogr rpg.geojson rpg.gpkg
 tippecanoe -Z10 -z14 --extend-zooms-if-still-dropping --no-tile-compression --simplify-only-low-zooms --drop-densest-as-needed --output-to-directory rpg-202x --projection EPSG:3857 --name "RPG 202x" --layer "rpg202x" --exclude NUM_ILOT --exclude NUM_PARCEL --exclude PACAGE --force rpg.geojson
 ```
 
-[cartobio-front]: https://github.com/agencebio/cartobio-front
-[jwt]: https://jwt.io/
-
-[api-ab]: https://preprod-notification.agencebio.org/
-
-[Jest]: https://jestjs.io/docs/en/getting-started
-[supertest]: https://github.com/visionmedia/supertest#readme
+</details>
