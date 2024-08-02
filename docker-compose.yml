@@ -1,5 +1,3 @@
-version: '3.7'
-
 volumes:
   geo-db-data:
 
@@ -29,6 +27,8 @@ services:
       ALLOW_IP_RANGE: "0.0.0.0/0" # we need that to allow 'api' to connect
       POSTGRES_USER: docker
       POSTGRES_PASS: docker
+    ports:
+    - 15432:5432
     networks:
     - internal
 
