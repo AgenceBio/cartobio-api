@@ -1,6 +1,7 @@
 coverage
 node_modules
 .env*
+.idea
 
 # built with npm run build:communes-centroids
 data/communes.json
