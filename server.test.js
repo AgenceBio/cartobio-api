@@ -1532,3 +1532,33 @@ describe('POST /api/v2/certification/parcelles', () => {
     expect(parcelles[0].engagement_date).toBeNull()
   })
 })
+
+describe('GET /api/v2/operators', () => {
+  const getMock = jest.mocked(got.get)
+
+  afterEach(() => {
+    getMock.mockReset()
+  })
+
+  test('it returns the correct list of operators for a given user', async () => {
+    getMock.mockReturnValueOnce({
+      async json () {
+        return {
+          nbTotal: 10,
+          items: Array(5).fill(agencebioOperator)
+        }
+      }
+    })
+
+    const response = await request(app.server)
+      .get('/api/v2/operators')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+      .query({ limit: 5, offset: 0 })
+
+    expect(response.status).toBe(200)
+    expect(response.body).toHaveProperty('nbTotal', 10)
+    expect(response.body).toHaveProperty('operators')
+    expect(response.body.operators).toHaveLength(5)
+    expect(response.body.operators[0]).toMatchObject(normalizeOperator(agencebioOperator))
+  })
+})
