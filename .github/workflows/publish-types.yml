@@ -2,14 +2,14 @@ name: Check and publish types package
 on:
   pull_request:
     paths:
-      - 'lib/**/*.d.ts'
-      - 'lib/package.json'
+      - "lib/**/*.d.ts"
+      - "lib/package.json"
   push:
     branches:
       - main
     paths:
-      - 'lib/**/*.d.ts'
-      - 'lib/package.json'
+      - "lib/**/*.d.ts"
+      - "lib/package.json"
 jobs:
   publish-types:
     runs-on: ubuntu-latest
@@ -18,8 +18,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          registry-url: 'https://registry.npmjs.org/'
-          scope: '@agencebio'
+          registry-url: "https://registry.npmjs.org/"
+          scope: "@agencebio"
 
       # Get the version from the package.json file and check its different from the last version published
       - run: echo "version=$(node -p "require('./lib/package.json').version")" >> $GITHUB_ENV

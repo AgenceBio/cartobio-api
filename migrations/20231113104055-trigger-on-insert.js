@@ -1,31 +1,30 @@
-'use strict'
+"use strict";
 
-let dbm
-let type
-let seed
+let dbm;
+let type;
+let seed;
 
 /**
-  * We receive the dbmigrate dependency from dbmigrate initially.
-  * This enables us to not have to rely on NODE_PATH.
-  */
+ * We receive the dbmigrate dependency from dbmigrate initially.
+ * This enables us to not have to rely on NODE_PATH.
+ */
 exports.setup = function (options, seedLink) {
-  dbm = options.dbmigrate
-  type = dbm.dataType
-  seed = seedLink
-}
+  dbm = options.dbmigrate;
+  type = dbm.dataType;
+  seed = seedLink;
+};
 
 exports.up = function (db) {
-  db.runSql('DROP TRIGGER update_communes ON cartobio_operators')
+  db.runSql("DROP TRIGGER update_communes ON cartobio_operators");
 
-  db.runSql(/* sql */`
+  db.runSql(/* sql */ `
     CREATE TRIGGER update_communes
     BEFORE UPDATE OF parcelles OR INSERT ON cartobio_operators
     FOR EACH ROW
     EXECUTE FUNCTION update_communes()
-  `)
+  `);
 
-  db.runSql(
-    /* sql */`
+  db.runSql(/* sql */ `
     CREATE OR REPLACE FUNCTION has_geometry() RETURNS trigger AS $$
     BEGIN
         IF EXISTS (
@@ -40,35 +39,34 @@ exports.up = function (db) {
         RETURN NEW;
     END;
     $$ LANGUAGE plpgsql;
-  `)
+  `);
 
-  db.runSql(
-    /* sql */`
+  db.runSql(/* sql */ `
     CREATE TRIGGER has_geometry
     AFTER UPDATE OF parcelles OR INSERT ON cartobio_operators
     FOR EACH ROW
     EXECUTE FUNCTION has_geometry()
-  `)
+  `);
 
-  return null
-}
+  return null;
+};
 
 exports.down = function (db) {
-  db.runSql('DROP TRIGGER update_communes ON cartobio_operators')
+  db.runSql("DROP TRIGGER update_communes ON cartobio_operators");
 
-  db.runSql(/* sql */`
+  db.runSql(/* sql */ `
     CREATE TRIGGER update_communes
     BEFORE UPDATE OF parcelles ON cartobio_operators
     FOR EACH ROW
     EXECUTE FUNCTION update_communes()
-  `)
+  `);
 
-  db.runSql('DROP TRIGGER has_geometry ON cartobio_operators')
-  db.runSql('DROP FUNCTION has_geometry()')
+  db.runSql("DROP TRIGGER has_geometry ON cartobio_operators");
+  db.runSql("DROP FUNCTION has_geometry()");
 
-  return null
-}
+  return null;
+};
 
 exports._meta = {
-  version: 1
-}
+  version: 1,
+};

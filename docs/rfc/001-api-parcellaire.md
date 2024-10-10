@@ -3,9 +3,9 @@ title: API d'envoi des parcellaires
 date: 2023-04-12
 updated_at: 2023-07-07
 contributors:
-- Laetita L (Ecocert)
-- Maud R (CartoBio)
-- Thomas P (CartoBio)
+  - Laetita L (Ecocert)
+  - Maud R (CartoBio)
+  - Thomas P (CartoBio)
 ---
 
 # Mise en place d'une API Parcellaire
@@ -68,7 +68,7 @@ le chemin `/api/oc/check-token`.
 En cas de statut `202`, un objet représente le nombre d'objets traités.
 
 | Chemin           | Type    | Description           |
-|------------------|---------|-----------------------|
+| ---------------- | ------- | --------------------- |
 | `nbObjetTraites` | integer | nombre d'objets reçus |
 
 ```json
@@ -80,7 +80,7 @@ En cas de statut `202`, un objet représente le nombre d'objets traités.
 En cas de statut `400`, un objet représente les objets acceptés et refusés. Aucune donnée n'est enregistrée.
 
 | Chemin             | Type    | Description                                          |
-|--------------------|---------|------------------------------------------------------|
+| ------------------ | ------- | ---------------------------------------------------- |
 | `nbObjetTraites`   | integer | nombre d'objets reçus                                |
 | `nbObjectAcceptes` | integer | nombre d'objets validés                              |
 | `nbObjetRefuses`   | integer | nombre d'objets refusés pour cause d'erreur          |
@@ -91,10 +91,7 @@ En cas de statut `400`, un objet représente les objets acceptés et refusés. A
   "nbObjetTraites": 3,
   "nbObjectAcceptes": 1,
   "nbObjetRefuses": 2,
-  "listeProblemes": [
-    "[#2] Numéro bio manquant",
-    "[#3] Numéro CPF invalide pour la parcelle 2"
-  ]
+  "listeProblemes": ["[#2] Numéro bio manquant", "[#3] Numéro CPF invalide pour la parcelle 2"]
 }
 ```
 
@@ -110,36 +107,36 @@ Si le JSON est invalide, le message d'erreur est simplement le suivant :
 
 #### Audit
 
-| Chemin                   | Type    | Obligatoire | Description                                      |
-|--------------------------|---------|-------------|--------------------------------------------------|
-| `numeroBio`              | string  | **oui**     | numéro bio de l'opérateur                        |
-| `numeroClient`           | string  | **oui**     | numéro client de l'opérateur                     |
-| `anneeReferenceControle` | integer | **oui**     | année de référence de l'audit AB                 |
-| `anneeAssolement`        | integer | non         | année de l'assolement concerné [^1]              |
-| `dateAudit`              | string  | **oui**     | date d'audit au format [ISO 8601] (`YYYY-MM-DD`) |
-| `dateCertificationDebut` | string  | **oui**     | date de début de validité de certification des parcelles  |
-| `dateCertificationFin`   | string  | **oui**     | date de fin de validité de certification des parcelles    |
-| `numeroPacage`           | string  | non         | numéro pacage de l'opérateur (si applicable)     |
-| `commentaire`            | string  | non         | notes d'audit                                    |
-| `parcelles`              | array   | **oui**     | liste d'éléments de type [Parcelle](#parcelle)   |
+| Chemin                   | Type    | Obligatoire | Description                                              |
+| ------------------------ | ------- | ----------- | -------------------------------------------------------- |
+| `numeroBio`              | string  | **oui**     | numéro bio de l'opérateur                                |
+| `numeroClient`           | string  | **oui**     | numéro client de l'opérateur                             |
+| `anneeReferenceControle` | integer | **oui**     | année de référence de l'audit AB                         |
+| `anneeAssolement`        | integer | non         | année de l'assolement concerné [^1]                      |
+| `dateAudit`              | string  | **oui**     | date d'audit au format [ISO 8601] (`YYYY-MM-DD`)         |
+| `dateCertificationDebut` | string  | **oui**     | date de début de validité de certification des parcelles |
+| `dateCertificationFin`   | string  | **oui**     | date de fin de validité de certification des parcelles   |
+| `numeroPacage`           | string  | non         | numéro pacage de l'opérateur (si applicable)             |
+| `commentaire`            | string  | non         | notes d'audit                                            |
+| `parcelles`              | array   | **oui**     | liste d'éléments de type [Parcelle](#parcelle)           |
 
 #### Parcelle
 
-| Chemin           | Type   | Obligatoire | Description                                                                                                                                                                                                                        |
-|------------------|--------|-------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `id`             | string | **oui**     | identifiant unique de parcelle (souvent appelé `PK`, `Primary Key` ou `Clé primaire`)                                                                                                                                              |
-| `etatProduction` | enum   | **oui**     | `AB`, `C1`, `C2`, `C3` ou `NB`                                                                                                                                                                                                     |
-| `dateEngagement` | string | non         | date d'engagement au format [ISO 8601] (`YYYY-MM-DD`), **obligatoire** pour les parcelles en conversion (voir si on peut avoir                                              la date d'import et la date de conversion différencier |
-| `numeroIlot`     | string | non         | numéro d'ilot PAC (si applicable)                                                                                                                                                                                                  |
-| `numeroParcelle` | string | non         | numéro de parcelle PAC (si applicable)                                                                                                                                                                                             |
-| `geom`           | string | non         | coordonnées géographiques. Obligatoire si la parcelle est nouvelle. Équivalent du champ `geometry.coordinates` d'une [_feature_ GeoJSON]                                                                                           |
-| `commentaire`    | string | non         | notes d'audit spécifiques à la parcelle                                                                                                                                                                                            |
-| `cultures`       | array  | **oui**     | liste d'éléments de type [Culture](#culture)                                                                                                                                                                                       |
+| Chemin           | Type   | Obligatoire | Description                                                                                                                                                                           |
+| ---------------- | ------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`             | string | **oui**     | identifiant unique de parcelle (souvent appelé `PK`, `Primary Key` ou `Clé primaire`)                                                                                                 |
+| `etatProduction` | enum   | **oui**     | `AB`, `C1`, `C2`, `C3` ou `NB`                                                                                                                                                        |
+| `dateEngagement` | string | non         | date d'engagement au format [ISO 8601] (`YYYY-MM-DD`), **obligatoire** pour les parcelles en conversion (voir si on peut avoir la date d'import et la date de conversion différencier |
+| `numeroIlot`     | string | non         | numéro d'ilot PAC (si applicable)                                                                                                                                                     |
+| `numeroParcelle` | string | non         | numéro de parcelle PAC (si applicable)                                                                                                                                                |
+| `geom`           | string | non         | coordonnées géographiques. Obligatoire si la parcelle est nouvelle. Équivalent du champ `geometry.coordinates` d'une [_feature_ GeoJSON]                                              |
+| `commentaire`    | string | non         | notes d'audit spécifiques à la parcelle                                                                                                                                               |
+| `cultures`       | array  | **oui**     | liste d'éléments de type [Culture](#culture)                                                                                                                                          |
 
 #### Culture
 
 | Chemin      | Type   | Obligatoire | Description                                       |
-|-------------|--------|-------------|---------------------------------------------------|
+| ----------- | ------ | ----------- | ------------------------------------------------- |
 | `codeCPF`   | string | **oui**     | code culture (nomenclature CPF Bio)               |
 | `variete`   | string | non         | variété de culture (si applicable)                |
 | `dateSemis` | string | non         | date de semis au format [ISO 8601] (`YYYY-MM-DD`) |
@@ -153,76 +150,76 @@ Exemple de fichier JSON relatif à un audit de 2 parcelles. Elles comportent res
 ```json
 [
   {
-   "numeroBio": "110994",
-   "numeroClient": "100012",
-   "anneeReferenceControle": 2022,
-   "anneeAssolement": 2022,
-   "dateAudit": "2023-02-23",
-   "dateCertificationDebut": "2023-03-01",
-   "dateCertificationFin": "2024-12-31",
-   "numeroPacage": "084012821",
-   "commentaire": "",
-   "parcelles": [
-     {
-       "id": "45742",
-       "dateEngagement": "2018-01-01",
-       "etatProduction": "AB",
-       "numeroIlot": "28",
-       "numeroParcelle": "1",
-       "commentaire": "à revisiter l'année prochaine\nune autre ligne",
-       "geom": "[[[4.8740990843182042,44.255949709765304],[4.8739614029301244,44.255016135661734],[4.8736532263747678,44.255001848456033],[4.8738004728368587,44.255928756333255],[4.8740990843182042,44.255949709765304]]]",
-       "cultures": [
-         {
-           "codeCPF": "01.19.10.8",
-           "variete": "syrah",
-           "quantite": 0.25,
-           "unite": "ha"
-         }
-       ]
-    },
-    {
-       "id": "45743",
-       "dateEngagement": "2018-01-01",
-       "etatProduction": "C1",
-       "numeroIlot": "28",
-       "numeroParcelle": "2",
-       "cultures": [
-         {
-           "codeCPF": "01.21.12",
-           "variete": "syrah",
-           "quantite": 2,
-           "unite": "ha"
-         },
-         {
-           "codeCPF": "01.19.10.8",
-           "quantite": 0.5,
-           "unite": "ha",
-           "commentaire": "pâturé par des moutons en été"
-         }
-       ]
-    },
-    {
-       "id": "45744",
-       "etatProduction": "AB",
-       "numeroIlot": "28",
-       "numeroParcelle": "3",
-       "cultures": [
-         {
-           "codeCPF": "01.11.12",
-           "variete": "rieti, mottet blanc",
-           "dateSemis": "2023-10-10",
-           "quantite": 10,
-           "unite": "ha"
-         },
-         {
-           "codeCPF": "01.11.95",
-           "dateSemis": "2023-07-01",
-           "quantite": 10,
-           "unite": "ha"
-         }
-       ]
-    }
-   ]
+    "numeroBio": "110994",
+    "numeroClient": "100012",
+    "anneeReferenceControle": 2022,
+    "anneeAssolement": 2022,
+    "dateAudit": "2023-02-23",
+    "dateCertificationDebut": "2023-03-01",
+    "dateCertificationFin": "2024-12-31",
+    "numeroPacage": "084012821",
+    "commentaire": "",
+    "parcelles": [
+      {
+        "id": "45742",
+        "dateEngagement": "2018-01-01",
+        "etatProduction": "AB",
+        "numeroIlot": "28",
+        "numeroParcelle": "1",
+        "commentaire": "à revisiter l'année prochaine\nune autre ligne",
+        "geom": "[[[4.8740990843182042,44.255949709765304],[4.8739614029301244,44.255016135661734],[4.8736532263747678,44.255001848456033],[4.8738004728368587,44.255928756333255],[4.8740990843182042,44.255949709765304]]]",
+        "cultures": [
+          {
+            "codeCPF": "01.19.10.8",
+            "variete": "syrah",
+            "quantite": 0.25,
+            "unite": "ha"
+          }
+        ]
+      },
+      {
+        "id": "45743",
+        "dateEngagement": "2018-01-01",
+        "etatProduction": "C1",
+        "numeroIlot": "28",
+        "numeroParcelle": "2",
+        "cultures": [
+          {
+            "codeCPF": "01.21.12",
+            "variete": "syrah",
+            "quantite": 2,
+            "unite": "ha"
+          },
+          {
+            "codeCPF": "01.19.10.8",
+            "quantite": 0.5,
+            "unite": "ha",
+            "commentaire": "pâturé par des moutons en été"
+          }
+        ]
+      },
+      {
+        "id": "45744",
+        "etatProduction": "AB",
+        "numeroIlot": "28",
+        "numeroParcelle": "3",
+        "cultures": [
+          {
+            "codeCPF": "01.11.12",
+            "variete": "rieti, mottet blanc",
+            "dateSemis": "2023-10-10",
+            "quantite": 10,
+            "unite": "ha"
+          },
+          {
+            "codeCPF": "01.11.95",
+            "dateSemis": "2023-07-01",
+            "quantite": 10,
+            "unite": "ha"
+          }
+        ]
+      }
+    ]
   }
 ]
 ```
@@ -241,9 +238,10 @@ avec les nouvelles valeurs. Pour supprimer une valeur existante pour un champ, i
 ### Parcelles
 
 Le cas particulier des parcelles est traité de la manière suivante :
-* si une parcelle avec le même identifiant est déjà enregistrée pour un opérateur, elle est mise à jour avec les nouvelles valeurs
-* si aucune personne avec le même identifiant n'est pas déjà enregistrée pour un opérateur, elle est ajoutée
-* si une parcelle est déjà enregistrée pour un opérateur mais qu'aucune parcelle avec le même identifiant n'est présente dans les données envoyées, elle est supprimée
+
+- si une parcelle avec le même identifiant est déjà enregistrée pour un opérateur, elle est mise à jour avec les nouvelles valeurs
+- si aucune personne avec le même identifiant n'est pas déjà enregistrée pour un opérateur, elle est ajoutée
+- si une parcelle est déjà enregistrée pour un opérateur mais qu'aucune parcelle avec le même identifiant n'est présente dans les données envoyées, elle est supprimée
 
 ## Implémentation technique
 

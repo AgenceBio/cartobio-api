@@ -1,7 +1,7 @@
 /** @type {import('jest').Config} */
 const config = {
-  globalSetup: './test/setup.js',
-  setupFilesAfterEnv: ['./test/mockDb.js']
-}
+  globalSetup: "./test/setup.js",
+  setupFilesAfterEnv: ["./test/mockDb.js"],
+};
 
-module.exports = config
+module.exports = config;

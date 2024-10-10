@@ -1,22 +1,22 @@
-'use strict';
+"use strict";
 
 var dbm;
 var type;
 var seed;
 
 /**
-  * We receive the dbmigrate dependency from dbmigrate initially.
-  * This enables us to not have to rely on NODE_PATH.
-  */
-exports.setup = function(options, seedLink) {
+ * We receive the dbmigrate dependency from dbmigrate initially.
+ * This enables us to not have to rely on NODE_PATH.
+ */
+exports.setup = function (options, seedLink) {
   dbm = options.dbmigrate;
   type = dbm.dataType;
   seed = seedLink;
 };
 
-exports.up = async function(db) {
+exports.up = async function (db) {
   // create a function for projecting a geometry in correct legal projection
-  await db.runSql(/* sql */`
+  await db.runSql(/* sql */ `
     CREATE OR REPLACE FUNCTION public.to_legal_projection(
       geom geometry
     ) RETURNS geometry AS $$
@@ -35,15 +35,15 @@ exports.up = async function(db) {
         ), 2154));    
       END;
     $$ LANGUAGE plpgsql;
-  `)
+  `);
 };
 
-exports.down = async function(db) {
-  await db.runSql(/* sql */`
+exports.down = async function (db) {
+  await db.runSql(/* sql */ `
     DROP FUNCTION public.to_legal_projection(geometry);
-  `)
+  `);
 };
 
 exports._meta = {
-  "version": 1
+  version: 1,
 };

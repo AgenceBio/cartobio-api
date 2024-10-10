@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
   push:
     paths-ignore:
-    - 'docs/**'
+      - "docs/**"
     branches:
-    - '**'
+      - "**"
     tags:
-    - v*
+      - v*
 
 env:
   DOCKER_BUILDKIT: 1
@@ -37,66 +37,66 @@ jobs:
       version: ${{ steps.version.outputs.name }}
 
     steps:
-    - uses: actions/checkout@v4
-    - uses: docker/setup-buildx-action@v3
-    - run: docker build -t agencebio/cartobio-api .
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - run: docker build -t agencebio/cartobio-api .
 
-    - name: Get services bridge network name
-      id: network
-      run: echo "SERVICES_NETWORK=$(docker network ls --filter name=github --format '{{.Name}}')" >> "${GITHUB_ENV}"
+      - name: Get services bridge network name
+        id: network
+        run: echo "SERVICES_NETWORK=$(docker network ls --filter name=github --format '{{.Name}}')" >> "${GITHUB_ENV}"
 
-    - name: Test the Docker image
-      run: >
-        docker run
-        -e DATABASE_URL
-        -e NOTIFICATIONS_AB_SSO_CLIENT_ID
-        -e NOTIFICATIONS_AB_SSO_CLIENT_SECRET
-        -e NOTIFICATIONS_AB_ENDPOINT
-        -e CARTOBIO_JWT_SECRET
-        -e GEOFOLIA_OAUTH_HOST
-        -e GEOFOLIA_OAUTH_TENANT
-        -e GEOFOLIA_OAUTH_CLIENT_ID
-        -e GEOFOLIA_OAUTH_CLIENT_SECRET
-        -e GEOFOLIA_API_HOST
-        -e GEOFOLIA_API_SUBSCRIPTION_KEY
-        -e CI
-        --network ${{ env.SERVICES_NETWORK }}
-        agencebio/cartobio-api npm test
-      env:
-        CI: true
-        DATABASE_URL: postgresql://docker:docker@postgres:5432/gis
-        NOTIFICATIONS_AB_ENDPOINT: https://preprod-notifications.agencebio.org:444
-        CARTOBIO_JWT_SECRET: zzzzz
-        GEOFOLIA_OAUTH_HOST: https://login.microsoftonline.com
-        GEOFOLIA_OAUTH_TENANT: "test"
-        GEOFOLIA_OAUTH_CLIENT_ID: "test"
-        GEOFOLIA_OAUTH_CLIENT_SECRET: "test"
-        GEOFOLIA_API_HOST: "https://test-api.azure-api.net/"
-        GEOFOLIA_API_SUBSCRIPTION_KEY: "test"
-        NOTIFICATIONS_AB_SSO_CLIENT_ID: "test"
-        NOTIFICATIONS_AB_SSO_CLIENT_SECRET: "test"
+      - name: Test the Docker image
+        run: >
+          docker run
+          -e DATABASE_URL
+          -e NOTIFICATIONS_AB_SSO_CLIENT_ID
+          -e NOTIFICATIONS_AB_SSO_CLIENT_SECRET
+          -e NOTIFICATIONS_AB_ENDPOINT
+          -e CARTOBIO_JWT_SECRET
+          -e GEOFOLIA_OAUTH_HOST
+          -e GEOFOLIA_OAUTH_TENANT
+          -e GEOFOLIA_OAUTH_CLIENT_ID
+          -e GEOFOLIA_OAUTH_CLIENT_SECRET
+          -e GEOFOLIA_API_HOST
+          -e GEOFOLIA_API_SUBSCRIPTION_KEY
+          -e CI
+          --network ${{ env.SERVICES_NETWORK }}
+          agencebio/cartobio-api npm test
+        env:
+          CI: true
+          DATABASE_URL: postgresql://docker:docker@postgres:5432/gis
+          NOTIFICATIONS_AB_ENDPOINT: https://preprod-notifications.agencebio.org:444
+          CARTOBIO_JWT_SECRET: zzzzz
+          GEOFOLIA_OAUTH_HOST: https://login.microsoftonline.com
+          GEOFOLIA_OAUTH_TENANT: "test"
+          GEOFOLIA_OAUTH_CLIENT_ID: "test"
+          GEOFOLIA_OAUTH_CLIENT_SECRET: "test"
+          GEOFOLIA_API_HOST: "https://test-api.azure-api.net/"
+          GEOFOLIA_API_SUBSCRIPTION_KEY: "test"
+          NOTIFICATIONS_AB_SSO_CLIENT_ID: "test"
+          NOTIFICATIONS_AB_SSO_CLIENT_SECRET: "test"
 
-    - name: Login to Docker Hub
-      run: echo "${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}" | docker login -u ${{ secrets.DOCKER_HUB_USERNAME }} --password-stdin
+      - name: Login to Docker Hub
+        run: echo "${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}" | docker login -u ${{ secrets.DOCKER_HUB_USERNAME }} --password-stdin
 
-    - name: Assign Docker ref
-      id: publish
-      run: |
-        if [[ $GITHUB_REF == 'refs/heads/main' ]]; then
-          echo "tag=latest" >> $GITHUB_OUTPUT
-        else
-          echo "tag=${GITHUB_REF_NAME#v*}" >> $GITHUB_OUTPUT
-        fi
+      - name: Assign Docker ref
+        id: publish
+        run: |
+          if [[ $GITHUB_REF == 'refs/heads/main' ]]; then
+            echo "tag=latest" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${GITHUB_REF_NAME#v*}" >> $GITHUB_OUTPUT
+          fi
 
-    - name: Publish to Docker Hub
-      if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
-      run: |
-        docker tag agencebio/cartobio-api agencebio/cartobio-api:${{ steps.publish.outputs.tag }}
-        docker push agencebio/cartobio-api:${{ steps.publish.outputs.tag }}
+      - name: Publish to Docker Hub
+        if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
+        run: |
+          docker tag agencebio/cartobio-api agencebio/cartobio-api:${{ steps.publish.outputs.tag }}
+          docker push agencebio/cartobio-api:${{ steps.publish.outputs.tag }}
 
-    - name: Get package.json version
-      id: version
-      run: echo name=$(node -p "require('./package.json').version") >> $GITHUB_OUTPUT
+      - name: Get package.json version
+        id: version
+        run: echo name=$(node -p "require('./package.json').version") >> $GITHUB_OUTPUT
 
   deploy-staging:
     needs: [build]
@@ -104,21 +104,21 @@ jobs:
     environment: staging
     runs-on: ubuntu-latest
     steps:
-    - uses: garygrossgarten/github-action-ssh@0.7.0
-      with:
-        host: ${{ secrets.AGENCEBIO_SSH_HOST }}
-        username: ${{ secrets.AGENCEBIO_SSH_USERNAME }}
-        privateKey: ${{ secrets.AGENCEBIO_SSH_PRIVATE_KEY }}
-        command: |
-          docker pull ${{ needs.build.outputs.image }} \
-          && docker stop cartobio-api-staging \
-          && docker container rm cartobio-api-staging \
-          && docker run -d --restart unless-stopped \
-            -p 127.0.0.1:7500:8000 \
-            --env-file=.env.cartobio-api-staging \
-            --env SENTRY_RELEASE=${{ needs.build.outputs.version }}-dev-${{ github.sha }} \
-            --name cartobio-api-staging \
-            ${{ needs.build.outputs.image }}
+      - uses: garygrossgarten/github-action-ssh@0.7.0
+        with:
+          host: ${{ secrets.AGENCEBIO_SSH_HOST }}
+          username: ${{ secrets.AGENCEBIO_SSH_USERNAME }}
+          privateKey: ${{ secrets.AGENCEBIO_SSH_PRIVATE_KEY }}
+          command: |
+            docker pull ${{ needs.build.outputs.image }} \
+            && docker stop cartobio-api-staging \
+            && docker container rm cartobio-api-staging \
+            && docker run -d --restart unless-stopped \
+              -p 127.0.0.1:7500:8000 \
+              --env-file=.env.cartobio-api-staging \
+              --env SENTRY_RELEASE=${{ needs.build.outputs.version }}-dev-${{ github.sha }} \
+              --name cartobio-api-staging \
+              ${{ needs.build.outputs.image }}
 
   deploy-production:
     needs: [build]
@@ -126,17 +126,17 @@ jobs:
     environment: production
     runs-on: ubuntu-latest
     steps:
-    - uses: garygrossgarten/github-action-ssh@0.7.0
-      with:
-        host: ${{ secrets.AGENCEBIO_SSH_HOST }}
-        username: ${{ secrets.AGENCEBIO_SSH_USERNAME }}
-        privateKey: ${{ secrets.AGENCEBIO_SSH_PRIVATE_KEY }}
-        command: |
-          docker pull ${{ needs.build.outputs.image }} \
-          && docker stop cartobio-api-production \
-          && docker container rm cartobio-api-production \
-          && docker run -d --restart unless-stopped \
-            -p 127.0.0.1:8000:8000 \
-            --env-file=.env.cartobio-api-production \
-            --name cartobio-api-production \
-            ${{ needs.build.outputs.image }}
+      - uses: garygrossgarten/github-action-ssh@0.7.0
+        with:
+          host: ${{ secrets.AGENCEBIO_SSH_HOST }}
+          username: ${{ secrets.AGENCEBIO_SSH_USERNAME }}
+          privateKey: ${{ secrets.AGENCEBIO_SSH_PRIVATE_KEY }}
+          command: |
+            docker pull ${{ needs.build.outputs.image }} \
+            && docker stop cartobio-api-production \
+            && docker container rm cartobio-api-production \
+            && docker run -d --restart unless-stopped \
+              -p 127.0.0.1:8000:8000 \
+              --env-file=.env.cartobio-api-production \
+              --name cartobio-api-production \
+              ${{ needs.build.outputs.image }}

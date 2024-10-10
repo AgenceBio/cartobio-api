@@ -3,7 +3,6 @@ name: Test the application in Node
 on: [push]
 
 jobs:
-
   node-test:
     services:
       postgres:
@@ -17,24 +16,24 @@ jobs:
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-node@v4
-      with:
-        node-version-file: .nvmrc
-    - run: npm clean-install-test
-      env:
-        CI: true
-        NOTIFICATIONS_AB_ENDPOINT: https://preprod-notifications.agencebio.org:444
-        CARTOBIO_JWT_SECRET: zzzzz
-        GEOFOLIA_OAUTH_HOST: https://login.microsoftonline.com
-        GEOFOLIA_OAUTH_TENANT: "test"
-        GEOFOLIA_OAUTH_CLIENT_ID: "test"
-        GEOFOLIA_OAUTH_CLIENT_SECRET: "test"
-        GEOFOLIA_API_HOST: "https://test-api.azure-api.net/"
-        GEOFOLIA_API_SUBSCRIPTION_KEY: "test"
-        NOTIFICATIONS_AB_SSO_CLIENT_ID: "test"
-        NOTIFICATIONS_AB_SSO_CLIENT_SECRET: "test"
-        DATABASE_URL: postgresql://docker:docker@127.0.0.1:5432/gis
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - run: npm clean-install-test
+        env:
+          CI: true
+          NOTIFICATIONS_AB_ENDPOINT: https://preprod-notifications.agencebio.org:444
+          CARTOBIO_JWT_SECRET: zzzzz
+          GEOFOLIA_OAUTH_HOST: https://login.microsoftonline.com
+          GEOFOLIA_OAUTH_TENANT: "test"
+          GEOFOLIA_OAUTH_CLIENT_ID: "test"
+          GEOFOLIA_OAUTH_CLIENT_SECRET: "test"
+          GEOFOLIA_API_HOST: "https://test-api.azure-api.net/"
+          GEOFOLIA_API_SUBSCRIPTION_KEY: "test"
+          NOTIFICATIONS_AB_SSO_CLIENT_ID: "test"
+          NOTIFICATIONS_AB_SSO_CLIENT_SECRET: "test"
+          DATABASE_URL: postgresql://docker:docker@127.0.0.1:5432/gis
 
-    - name: Coveralls
-      uses: coverallsapp/github-action@v2
+      - name: Coveralls
+        uses: coverallsapp/github-action@v2

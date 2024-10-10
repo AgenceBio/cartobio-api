@@ -1,85 +1,91 @@
-'use strict'
+"use strict";
 
-let dbm
-let type
-let seed
+let dbm;
+let type;
+let seed;
 
 /**
-  * We receive the dbmigrate dependency from dbmigrate initially.
-  * This enables us to not have to rely on NODE_PATH.
-  */
+ * We receive the dbmigrate dependency from dbmigrate initially.
+ * This enables us to not have to rely on NODE_PATH.
+ */
 exports.setup = function (options, seedLink) {
-  dbm = options.dbmigrate
-  type = dbm.dataType
-  seed = seedLink
-}
+  dbm = options.dbmigrate;
+  type = dbm.dataType;
+  seed = seedLink;
+};
 
 exports.up = async function (db) {
-  await db.createTable('cartobio_parcelles', {
+  await db.createTable("cartobio_parcelles", {
     record_id: {
-      type: 'uuid',
+      type: "uuid",
       notNull: true,
-      primaryKey: true
+      primaryKey: true,
     },
     id: {
-      type: 'string',
+      type: "string",
       notNull: true,
-      primaryKey: true
+      primaryKey: true,
     },
     geometry: {
-      type: 'geometry(GEOMETRY, 4326)',
-      notNull: true
+      type: "geometry(GEOMETRY, 4326)",
+      notNull: true,
     },
     commune: {
-      type: 'string'
+      type: "string",
     },
     cultures: {
-      type: 'jsonb',
-      notNull: true
+      type: "jsonb",
+      notNull: true,
     },
     conversion_niveau: {
-      type: 'string'
+      type: "string",
     },
     engagement_date: {
-      type: 'date'
+      type: "date",
     },
     commentaire: {
-      type: 'string'
+      type: "string",
     },
     annotations: {
-      type: 'jsonb'
+      type: "jsonb",
     },
     created: {
-      type: 'datetime',
-      timezone: false
+      type: "datetime",
+      timezone: false,
     },
     updated: {
-      type: 'datetime',
-      timezone: false
+      type: "datetime",
+      timezone: false,
     },
     name: {
-      type: 'string'
+      type: "string",
     },
     numero_pacage: {
-      type: 'string'
+      type: "string",
     },
     numero_ilot_pac: {
-      type: 'string'
+      type: "string",
     },
     numero_parcelle_pac: {
-      type: 'string'
+      type: "string",
     },
     reference_cadastre: {
-      type: 'text[]'
-    }
-  })
+      type: "text[]",
+    },
+  });
 
-  await db.addForeignKey('cartobio_parcelles', 'cartobio_operators', 'record_id_foreign', {
-    record_id: 'record_id'
-  }, {
-    onDelete: 'CASCADE',
-    onUpdate: 'RESTRICT'
-  })
+  await db.addForeignKey(
+    "cartobio_parcelles",
+    "cartobio_operators",
+    "record_id_foreign",
+    {
+      record_id: "record_id",
+    },
+    {
+      onDelete: "CASCADE",
+      onUpdate: "RESTRICT",
+    }
+  );
 
   /** copy data from cartobio_operators.parcelles to cartobio_features */
   await db.runSql(
@@ -146,16 +152,15 @@ exports.up = async function (db) {
     WHERE jsonb_path_exists(cartobio_operators.parcelles, '$.features ? (@.type() == "object")')
       AND ST_GeomFromGeoJSON(feature->'geometry') IS NOT NULL
     `
-  )
+  );
 
-  db.runSql('DROP TRIGGER update_communes ON cartobio_operators')
-  db.runSql('DROP FUNCTION update_communes()')
+  db.runSql("DROP TRIGGER update_communes ON cartobio_operators");
+  db.runSql("DROP FUNCTION update_communes()");
 
-  db.runSql('DROP TRIGGER has_geometry ON cartobio_operators')
-  db.runSql('DROP FUNCTION has_geometry()')
+  db.runSql("DROP TRIGGER has_geometry ON cartobio_operators");
+  db.runSql("DROP FUNCTION has_geometry()");
 
-  db.runSql(
-    /* sql */`
+  db.runSql(/* sql */ `
     CREATE OR REPLACE FUNCTION update_communes() RETURNS trigger AS $$
     BEGIN
         NEW.commune = (SELECT CASE
@@ -174,19 +179,17 @@ exports.up = async function (db) {
         RETURN NEW;
     END;
     $$ LANGUAGE plpgsql;
-  `)
-  db.runSql(
-    /* sql */`
+  `);
+  db.runSql(/* sql */ `
     CREATE TRIGGER update_communes
     BEFORE INSERT OR UPDATE ON cartobio_parcelles
     FOR EACH ROW EXECUTE PROCEDURE update_communes();
-  `)
-}
+  `);
+};
 
 exports.down = async function (db) {
-  db.dropTable('cartobio_parcelles')
-  db.runSql(
-    /* sql */`
+  db.dropTable("cartobio_parcelles");
+  db.runSql(/* sql */ `
     CREATE OR REPLACE FUNCTION update_communes() RETURNS trigger AS $$
     BEGIN
         NEW.parcelles = jsonb_set(
@@ -227,10 +230,9 @@ exports.down = async function (db) {
         RETURN NEW;
     END;
     $$ LANGUAGE plpgsql;
-  `)
+  `);
 
-  db.runSql(
-    /* sql */`
+  db.runSql(/* sql */ `
     CREATE OR REPLACE FUNCTION has_geometry() RETURNS trigger AS $$
     BEGIN
         IF EXISTS (
@@ -245,24 +247,23 @@ exports.down = async function (db) {
         RETURN NEW;
     END;
     $$ LANGUAGE plpgsql;
-  `)
+  `);
 
-  db.runSql(
-    /* sql */`
+  db.runSql(/* sql */ `
     CREATE TRIGGER has_geometry
     AFTER UPDATE OF parcelles OR INSERT ON cartobio_operators
     FOR EACH ROW
     EXECUTE FUNCTION has_geometry()
-  `)
+  `);
 
-  db.runSql(/* sql */`
+  db.runSql(/* sql */ `
     CREATE TRIGGER update_communes
     BEFORE UPDATE OF parcelles OR INSERT ON cartobio_operators
     FOR EACH ROW
     EXECUTE FUNCTION update_communes()
-  `)
-}
+  `);
+};
 
 exports._meta = {
-  version: 1
-}
+  version: 1,
+};
