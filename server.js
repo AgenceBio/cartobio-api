@@ -252,7 +252,7 @@ app.register(async (app) => {
     const { id: ocId, nom: ocLabel } = request.operator.organismeCertificateur
     const record = await createOrUpdateOperatorRecord(
       { numerobio: numeroBio, oc_id: ocId, oc_label: ocLabel, ...request.body },
-      { user: request.user, copyParcellesData: request.body.importPrevious }
+      { user: request.user, copyParcellesData: request.body.importPrevious, previousRecordId: request.body.recordId }
     )
     return reply.code(200).send(normalizeRecord(record))
   })
