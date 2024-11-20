@@ -1,0 +1,33 @@
+{
+    "record_id": "5e9c219b-0e90-4758-87e1-9802a6eb7d28",
+    "numerobio": "1234321",
+    "version_name": "audit 2023",
+    "certification_date_debut": null,
+    "certification_date_fin": null,
+    "certification_state": "PENDING_CERTIFICATION",
+    "audit_date": "2024-09-08",
+    "created_at": "2024-09-06 16:55:36.325 +0200",
+    "updated_at": "2024-09-07 16:55:36.325 +0200",
+    "oc_id": 999,
+    "oc_label": "CartobiOC",
+    "metadata": {
+        "campagne": "2023",
+        "pacage": "999999999",
+        "source": "telepac",
+        "sourceLastUpdate": "2023-09-07T13:25:16.435Z"
+    },
+    "audit_history": [
+        {
+            "date": "2023-09-07T13:25:16.435Z",
+            "type": "FeatureCollectionCreation",
+            "state": "PENDING_CERTIFICATION",
+            "metadata": {
+                "campagne": "2023",
+                "pacage": "999999999",
+                "source": "telepac"
+            }
+        }
+    ],
+    "audit_notes": "notes 2023",
+    "audit_demandes": "demandes 2023"
+}
