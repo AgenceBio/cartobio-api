@@ -1,0 +1,45 @@
+{
+  "record": {
+    "numerobio": "172301",
+    "certification_state": "CERTIFIED",
+    "oc_id": 1,
+    "oc_label": "Ecocert France",
+    "parcelles": {
+      "type": "FeatureCollection",
+      "features": 
+      [
+        {
+          "type": "Feature",
+          "id": 124300,
+          "properties": {
+            "id": 124300,
+            "cultures": 
+            [
+              {
+                "CPF": "",
+                "date_semis": "",
+                "surface": null,
+                "variete": ""
+              }
+            ],
+            "NUMERO_I": "309",
+            "NUMERO_P": "1",
+            "PACAGE": "32165694",
+            "conversion_niveau": "C1",
+            "engagement_date": "2022-08-17",
+            "auditeur_notes": null
+          },
+          "geometry": null
+        }
+      ]
+    },
+    "certification_date_debut": "2023-01-01",
+    "certification_date_fin": "2025-03-31",
+    "audit_date": "2023-03-30T00:00:00.000Z",
+    "metadata": {
+      "source": "API Parcellaire",
+      "anneeReferenceControle": 2023,
+      "anneeAssolement": 2023
+    }
+  }
+}
