@@ -132,6 +132,64 @@
   ]
  },
  {
+  "numeroBio": 123456,
+  "numeroClient": 123456,
+  "anneeReferenceControle": 2025,
+  "anneeAssolement": 2023,
+  "dateCertificationDebut": "2023-01-01",
+  "dateCertificationFin": "2025-03-31",
+  "dateAudit": "2023-03-30",
+  "numeroPacage": 32165694,
+  "parcelles": [
+    {
+      "activites": "1",
+      "id": "45738",
+      "dateEngagement": "2024-04-27",
+      "etatProduction": "AB",
+      "numeroIlot": 50,
+      "numeroParcelle": "à valider",
+      "geom": "[[[-15.0870109245850585,45.98650622886373],[-15.024692286421157,45.96832731369807],[-14.940253935064703,46.002107859293716],[-15.0093398589019955,46.03231508547694],[-15.0870109245850585,45.98650622886373]]]",
+      "cultures": [
+        {
+          "codeCPF": "01.21.12",
+          "dateSemis": "2023-04-27",
+          "quantite": 1,
+          "unite": "ha"
+        }
+      ]
+    }
+  ]
+ },
+ {
+  "numeroBio": 654321,
+  "numeroClient": 654321,
+  "anneeReferenceControle": 2025,
+  "anneeAssolement": 2023,
+  "dateCertificationDebut": "2023-01-01",
+  "dateCertificationFin": "2025-03-31",
+  "dateAudit": "2023-03-30",
+  "numeroPacage": 32165694,
+  "parcelles": [
+    {
+      "activites": "1",
+      "id": "4213174",
+      "dateEngagement": "2024-04-27",
+      "etatProduction": "AB",
+      "numeroIlot": 50,
+      "numeroParcelle": "à valider",
+      "geom": "[[[-61.04349055792852,14.723261389183236],[-61.043394367539705,14.72324278279335],[-61.04332156461696,14.72331866766676],[-61.043473960371315,14.723338733374248],[-61.04349055792852,14.723261389183236]]]",
+      "cultures": [
+        {
+          "codeCPF": "01.21.12",
+          "dateSemis": "2023-04-27",
+          "quantite": 1,
+          "unite": "ha"
+        }
+      ]
+    }
+  ]
+ },
+ {
   "numeroBio": 172301,
   "numeroClient": 195931,
   "anneeReferenceControle": 2023,
