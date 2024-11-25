@@ -19,6 +19,7 @@ export type AgenceBioNormalizedOperator = {
     commune: string;
     codePostal: string;
     notifications: any[];
+    isProduction : boolean;
 };
 
 // TODO : this is a bit of duplicate with NormalizedRecord
