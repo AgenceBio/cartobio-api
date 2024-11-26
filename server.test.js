@@ -787,7 +787,7 @@ describe('GET /api/v2/certification/search', () => {
     test('search with no results', async () => {
       getMock.mockReset().mockReturnValueOnce({
         async json () {
-          return []
+          return { total: 0, operateurs: [] }
         }
       })
 
