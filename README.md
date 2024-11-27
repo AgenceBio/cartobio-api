@@ -111,7 +111,7 @@ npm version patch
 Puis :
 
 ```sh
-git push --version
+git push --tags
 ```
 
 ---
