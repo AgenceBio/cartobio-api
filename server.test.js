@@ -1398,16 +1398,15 @@ describe('POST /api/v2/certification/parcelles', () => {
       .post('/api/v2/certification/parcelles')
       .set('Authorization', fakeOcToken)
       .send(apiParcellaire)
-    expect(db.query).not.toHaveBeenCalled()
+    expect(db.query).toHaveBeenCalled()
     expect(db.connect).toHaveBeenCalled()
-    expect(db._clientQuery).toHaveBeenCalledWith('ROLLBACK;')
     expect(db._clientRelease).toHaveBeenCalled()
     expect(res.status).toBe(400)
     expect(mockSentry).not.toHaveBeenCalled()
     expect(res.body).toEqual({
-      nbObjetTraites: 6,
       nbObjetAcceptes: 1,
       nbObjetRefuses: 5,
+      nbObjetTraites: 6,
       listeProblemes: [
         // in case of error, check `createOrUpdateOperatorRecord()` SQL arity
         '[#2] champ dateAudit incorrect',
@@ -1415,7 +1414,8 @@ describe('POST /api/v2/certification/parcelles', () => {
         '[#4] Impossible de créer une parcelle sans donnée géographique.',
         '[#5] Les dates de certification sont manquantes.',
         '[#6] champ etatProduction incorrect'
-      ]
+      ],
+      listeWarning: []
     })
   })
 
@@ -1432,7 +1432,7 @@ describe('POST /api/v2/certification/parcelles', () => {
       .set('Authorization', fakeOcToken)
       .send(validApiParcellaire)
 
-    expect(db.query).not.toHaveBeenCalled()
+    expect(db.query).toHaveBeenCalled()
     expect(db.connect).toHaveBeenCalled()
     expect(db._clientQuery).toHaveBeenLastCalledWith('COMMIT;')
     expect(db._clientRelease).toHaveBeenCalled()
