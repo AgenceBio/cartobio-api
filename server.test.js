@@ -1339,9 +1339,9 @@ describe('POST /api/v2/certification/parcelles', () => {
     expect(res.status).toBe(400)
     expect(mockSentry).not.toHaveBeenCalled()
     expect(res.body).toEqual({
-      nbObjetTraites: 8,
-      nbObjetAcceptes: 2,
-      nbObjetRefuses: 6,
+      nbObjetTraites: 6,
+      nbObjetAcceptes: 1,
+      nbObjetRefuses: 5,
       listeWarning: [],
       listeProblemes: [
         // in case of error, check `createOrUpdateOperatorRecord()` SQL arity
