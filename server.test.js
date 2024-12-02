@@ -1292,6 +1292,7 @@ describe('POST /api/v2/certification/parcelles', () => {
     expect(res.status).toBe(400)
     expect(mockSentry).not.toHaveBeenCalled()
     expect(res.body).toEqual({
+      listeWarning: [],
       nbObjetTraites: 8,
       nbObjetAcceptes: 2,
       nbObjetRefuses: 6,
