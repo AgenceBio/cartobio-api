@@ -31,7 +31,9 @@
         "PACAGE": null,
         "NUMERO_I": null,
         "NUMERO_P": null,
-        "cadastre": null,
+        "cadastre": [
+          "70421000ZP0072"
+        ],
         "createdAt": "2024-01-30T09:17:36.000Z",
         "updatedAt": "2024-01-30T09:18:03.000Z"
       },

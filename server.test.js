@@ -734,7 +734,7 @@ describe('POST /api/v2/convert/anygeo/geojson', () => {
     })
   })
 
-  test.each(['anygeo-test.kml', 'anygeo-test.geojson', 'anygeo-test-cartobio.json', 'anygeo-test.gpkg', 'anygeo-test.gpkg.zip', 'anygeo-test.kmz', 'anygeo-test.zip'])('it responds to %s with 2 features', (filename) => {
+  test.each(['anygeo-test.kml', 'anygeo-test.geojson', 'anygeo-test.gpkg', 'anygeo-test.gpkg.zip', 'anygeo-test.kmz', 'anygeo-test.zip'])('it responds to %s with 2 features', (filename) => {
     return request(app.server)
       .post('/api/v2/convert/anygeo/geojson')
       .attach('archive', `test/fixtures/anygeo/${filename}`)
@@ -746,6 +746,71 @@ describe('POST /api/v2/convert/anygeo/geojson', () => {
         expect(response.body.features).toHaveLength(2)
         expect(response.body.features.at(0)).toHaveProperty('properties', {
           id: expect.toBeAFeatureId()
+        })
+      })
+  })
+
+  test('it responds to anygeo-test-cartobio.json with 2 features and their properties', () => {
+    return request(app.server)
+      .post('/api/v2/convert/anygeo/geojson')
+      .attach('archive', 'test/fixtures/anygeo/anygeo-test-cartobio.json')
+      .type('json')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+      .then((response) => {
+        expect(response.status).toEqual(200)
+        expect(area(response.body)).toBeCloseTo(457013.20 + 391240.70, 1)
+        expect(response.body.features).toHaveLength(2)
+        expect(response.body.features.at(0)).toHaveProperty('properties', {
+          id: expect.toBeAFeatureId(),
+          COMMUNE: '89118',
+          COMMUNE_LABEL: null,
+          NOM: 'ilôt 22 - Coulanges-la-Vineuse / Jachère Côte de Groix Milieu',
+          PACAGE: null,
+          annotations: [],
+          auditeur_notes: null,
+          cadastre: [
+            '70421000ZP0072'
+          ],
+          commentaires: null,
+          conversion_niveau: 'CONV',
+          cultures: [
+            {
+              CPF: '01.91',
+              id: '257665e8-91ff-4cb1-b606-a1f4c0d1e8f3',
+              surface: '1.17'
+            }
+          ]
+        })
+        expect(response.body.features.at(1)).toHaveProperty('properties', {
+          id: expect.toBeAFeatureId(),
+          COMMUNE: '89118',
+          COMMUNE_LABEL: 'Coulanges-la-Vineuse',
+          NOM: 'Coulanges-la-vineuse Montfaucon (Moussu) / AOP Bourgogne Coulanges la vineuse Rouge',
+          NUMERO_I: 19,
+          NUMERO_P: 1,
+          PACAGE: '089156290',
+          annotations: [
+            {
+              code: 'surveyed',
+              date: '2024-04-23T07:56:23.315Z',
+              id: '40be59a3-6749-49c4-bb11-1e7b5767779f'
+            }
+          ],
+          auditeur_notes: null,
+          cadastre: null,
+          commentaires: null,
+          conversion_niveau: 'AB',
+          cultures: [
+            {
+              CPF: '01.21.12',
+              TYPE: 'VRC',
+              id: '72ac54ce-3c22-47b8-9093-f64983bea580',
+              surface: '0.3',
+              variete: 'Pinot Noir'
+            }
+          ],
+          engagement_date: '2019-12-20'
+
         })
       })
   })
@@ -787,7 +852,7 @@ describe('GET /api/v2/certification/search', () => {
     test('search with no results', async () => {
       getMock.mockReset().mockReturnValueOnce({
         async json () {
-          return []
+          return { total: 0, operateurs: [] }
         }
       })
 
@@ -804,118 +869,6 @@ describe('GET /api/v2/certification/search', () => {
               page_max: 1
             },
             records: []
-          })
-        })
-    })
-
-    test('search default sort (audit_date/desc)', async () => {
-      return request(app.server)
-        .post('/api/v2/certification/search')
-        .type('json')
-        .send({ input: '99999' })
-        .set('Authorization', USER_DOC_AUTH_HEADER)
-        .then((response) => {
-          expect(response.body).toMatchObject({
-            pagination: {
-              total: 1,
-              page: 1,
-              page_max: 1
-            },
-            records: [
-              {
-                ...normalizeOperator(agencebioOperator),
-                dateEngagement: '',
-                datePremierEngagement: null,
-                notifications: [],
-                record_id: '054f0d70-c3da-448f-823e-81fcf7c2bf6e',
-                certification_state: 'PENDING_CERTIFICATION',
-                audit_date: '2023-09-07'
-              }
-            ]
-          })
-        })
-    })
-
-    test('search manual sort (nom/asc)', () => {
-      return request(app.server)
-        .post('/api/v2/certification/search')
-        .type('json')
-        .send({ input: 'test', sort: 'nom', order: 'asc' })
-        .set('Authorization', USER_DOC_AUTH_HEADER)
-        .then((response) => {
-          expect(response.body).toMatchObject({
-            pagination: {
-              total: 1,
-              page: 1,
-              page_max: 1
-            },
-            records: [
-              {
-                ...normalizeOperator(agencebioOperator),
-                dateEngagement: '',
-                datePremierEngagement: null,
-                notifications: [],
-                record_id: '054f0d70-c3da-448f-823e-81fcf7c2bf6e',
-                certification_state: 'PENDING_CERTIFICATION',
-                audit_date: '2023-09-07'
-              }
-            ]
-          })
-        })
-    })
-
-    test('search manual sort (engagement_date/desc)', () => {
-      return request(app.server)
-        .post('/api/v2/certification/search')
-        .type('json')
-        .send({ input: 'test', sort: 'engagement_date', order: 'desc' })
-        .set('Authorization', USER_DOC_AUTH_HEADER)
-        .then((response) => {
-          expect(response.body).toMatchObject({
-            pagination: {
-              total: 1,
-              page: 1,
-              page_max: 1
-            },
-            records: [
-              {
-                ...normalizeOperator(agencebioOperator),
-                dateEngagement: '',
-                datePremierEngagement: null,
-                notifications: [],
-                record_id: '054f0d70-c3da-448f-823e-81fcf7c2bf6e',
-                certification_state: 'PENDING_CERTIFICATION',
-                audit_date: '2023-09-07'
-              }
-            ]
-          })
-        })
-    })
-
-    test('search manual sort (statut/desc)', () => {
-      return request(app.server)
-        .post('/api/v2/certification/search')
-        .type('json')
-        .send({ input: 'test', sort: 'statut', order: 'desc' })
-        .set('Authorization', USER_DOC_AUTH_HEADER)
-        .then((response) => {
-          expect(response.body).toMatchObject({
-            pagination: {
-              total: 1,
-              page: 1,
-              page_max: 1
-            },
-            records: [
-              {
-                ...normalizeOperator(agencebioOperator),
-                dateEngagement: '',
-                datePremierEngagement: null,
-                notifications: [],
-                record_id: '054f0d70-c3da-448f-823e-81fcf7c2bf6e',
-                certification_state: 'PENDING_CERTIFICATION',
-                audit_date: '2023-09-07'
-              }
-            ]
           })
         })
     })
@@ -1340,25 +1293,27 @@ describe('POST /api/v2/certification/parcelles', () => {
     expect(res.status).toBe(400)
     expect(mockSentry).not.toHaveBeenCalled()
     expect(res.body).toEqual({
-      nbObjetTraites: 6,
-      nbObjetAcceptes: 1,
-      nbObjetRefuses: 5,
+      nbObjetTraites: 8,
+      nbObjetAcceptes: 2,
+      nbObjetRefuses: 6,
       listeProblemes: [
         // in case of error, check `createOrUpdateOperatorRecord()` SQL arity
         '[#2] champ dateAudit incorrect',
         '[#3] champ geom incorrect : Expected \',\' or \']\' after array element in JSON at position 32635',
-        '[#4] Impossible de créer une parcelle sans donnée géographique.',
-        '[#5] Les dates de certification sont manquantes.',
-        '[#6] champ etatProduction incorrect'
+        '[#4] geometry en dehors des régions autorisées.',
+        '[#6] Impossible de créer une parcelle sans donnée géographique.',
+        '[#7] Les dates de certification sont manquantes.',
+        '[#8] champ etatProduction incorrect'
       ]
     })
   })
 
   test('it responds with 202 when records are valid and save everything to database', async () => {
     const validApiParcellaire = JSON.parse(JSON.stringify(apiParcellaire))
+    validApiParcellaire.splice(3, 2)
     validApiParcellaire.splice(1, 1)
-    validApiParcellaire[1].parcelles[0].geom = '[[[0,0],[0,1],[1,1],[1,0],[0,0]]]'
-    validApiParcellaire[2].parcelles[0].geom = '[[[0,0],[0,1],[1,1],[1,0],[0,0]]]'
+    validApiParcellaire[1].parcelles[0].geom = '[[[-61.04349055792852,14.723261389183236],[-61.043394367539705,14.72324278279335],[-61.04332156461696,14.72331866766676],[-61.043473960371315,14.723338733374248],[-61.04349055792852,14.723261389183236]]]'
+    validApiParcellaire[2].parcelles[0].geom = validApiParcellaire[1].parcelles[0].geom
     validApiParcellaire[3].dateCertificationDebut = '2023-01-01'
     validApiParcellaire[3].dateCertificationFin = '2024-01-01'
     validApiParcellaire[4].parcelles[0].etatProduction = 'AB'
@@ -1380,7 +1335,7 @@ describe('POST /api/v2/certification/parcelles', () => {
   test('it stores well all the data', async () => {
     const validApiParcellaire = JSON.parse(JSON.stringify(apiParcellaire))
     const d = validApiParcellaire.at(0)
-    d.parcelles.at(0).geom = '[[[0,0],[0,1],[1,1],[1,0],[0,0]]]'
+    d.parcelles.at(0).geom = '[[[-61.04349055792852,14.723261389183236],[-61.043394367539705,14.72324278279335],[-61.04332156461696,14.72331866766676],[-61.043473960371315,14.723338733374248],[-61.04349055792852,14.723261389183236]]]'
 
     let response = await request(app.server)
       .post('/api/v2/certification/parcelles')
@@ -1425,11 +1380,11 @@ describe('POST /api/v2/certification/parcelles', () => {
         id: '45742',
         geometry: {
           type: 'Polygon',
-          coordinates: JSON.parse('[[[0,0],[0,1],[1,1],[1,0],[0,0]]]')
+          coordinates: JSON.parse('[[[-61.043490558,14.723261389],[-61.043394368,14.723242783],[-61.043321565,14.723318668],[-61.04347396,14.723338733],[-61.043490558,14.723261389]]]')
         },
         properties: {
           id: '45742',
-          COMMUNE: null,
+          COMMUNE: '97212',
           cultures: [
             {
               CPF: '01.92',

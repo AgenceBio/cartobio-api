@@ -2,9 +2,9 @@ const db = require('../lib/db')
 const records = require('../lib/providers/__fixtures__/records.json')
 const parcelles = require('../lib/providers/__fixtures__/parcelles.json')
 
-module.exports.loadRecordFixture = async function () {
-  for (let i = 0; i < records.length; i++) {
-    const record = records[i]
+module.exports.loadRecordFixture = async function (data = records) {
+  for (let i = 0; i < data.length; i++) {
+    const record = data[i]
     await db.query(
       /* sql */`
         INSERT INTO cartobio_operators
@@ -31,8 +31,8 @@ module.exports.loadRecordFixture = async function () {
     )
   }
 
-  for (let i = 0; i < records.length; i++) {
-    const record = records[i]
+  for (let i = 0; i < data.length; i++) {
+    const record = data[i]
     for (let j = 0; j < parcelles.length; j++) {
       const parcelle = parcelles[j]
       await db.query(

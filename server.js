@@ -60,7 +60,7 @@ const JSONStream = require('jsonstream-next')
 const { createSigner } = require('fast-jwt')
 
 const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators } = require('./lib/providers/agence-bio.js')
-const { addRecordFeature, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords } = require('./lib/providers/cartobio.js')
+const { addRecordFeature, addDividFeature, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords } = require('./lib/providers/cartobio.js')
 const { evvLookup, evvParcellaire, pacageLookup, getParcellesStats, getDataGouvStats, iterateOperatorLastRecords } = require('./lib/providers/cartobio.js')
 const { parseAnyGeographicalArchive } = require('./lib/providers/gdal.js')
 const { parseTelepacArchive } = require('./lib/providers/telepac.js')
@@ -213,6 +213,7 @@ app.register(async (app) => {
     const { limit, offset } = request.query
 
     return fetchUserOperators(userId, limit, offset)
+      .then(res => { res.operators = res.operators.filter((e) => e.isProduction === true); return res })
       .then(res => reply.code(200).send(res))
   })
 
@@ -252,7 +253,7 @@ app.register(async (app) => {
     const { id: ocId, nom: ocLabel } = request.operator.organismeCertificateur
     const record = await createOrUpdateOperatorRecord(
       { numerobio: numeroBio, oc_id: ocId, oc_label: ocLabel, ...request.body },
-      { user: request.user, copyParcellesData: request.body.importPrevious }
+      { user: request.user, copyParcellesData: request.body.importPrevious, previousRecordId: request.body.recordId }
     )
     return reply.code(200).send(normalizeRecord(record))
   })
@@ -324,6 +325,15 @@ app.register(async (app) => {
 
     return deleteSingleFeature({ featureId, user, record }, { reason })
       .then(record => reply.code(200).send(normalizeRecord(record)))
+  })
+
+  app.post('/api/v2/audits/:recordId/parcelles/:featureId/', mergeSchemas(protectedWithToken(), routeWithRecordId), (request, reply) => {
+    const { user, record } = request
+    const reason = request.body
+    const featureId = request.params
+
+    return addDividFeature(user, record, reason, featureId)
+      .then(reply.code(200).send({ message: 'OK' }))
   })
 
   /**
