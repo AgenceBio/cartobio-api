@@ -21,7 +21,7 @@ async function fetchCommunesBoundaries () {
   }
 
   const FILENAME = 'communes-50m.geojson.gz'
-  const SOURCE = 'http://etalab-datasets.geo.data.gouv.fr/contours-administratifs/2022/geojson/' + FILENAME
+  const SOURCE = 'http://etalab-datasets.geo.data.gouv.fr/contours-administratifs/latest/geojson/' + FILENAME
 
   return pipeline([
     got.stream(SOURCE),
