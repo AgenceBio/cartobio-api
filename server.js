@@ -436,14 +436,15 @@ app.register(async (app) => {
       return new PassThrough().end('{}')
     }
   }), (request, reply) => {
-    const { count, errors } = request.APIResult
+    const { count, errors, warnings } = request.APIResult
 
     if (errors.length > 0) {
       return reply.code(400).send({
         nbObjetTraites: count,
         nbObjetAcceptes: count - errors.length,
         nbObjetRefuses: errors.length,
-        listeProblemes: errors.map(([index, message]) => `[#${index}] ${message}`)
+        listeProblemes: errors.map(([index, message]) => `[#${index}] ${message}`),
+        listeWarning: warnings && warnings.length > 0 ? warnings.map(([index, message]) => `[#${index}] ${message}`) : []
       })
     }
 
