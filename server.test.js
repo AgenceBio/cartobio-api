@@ -1340,25 +1340,27 @@ describe('POST /api/v2/certification/parcelles', () => {
     expect(res.status).toBe(400)
     expect(mockSentry).not.toHaveBeenCalled()
     expect(res.body).toEqual({
-      nbObjetTraites: 6,
-      nbObjetAcceptes: 1,
-      nbObjetRefuses: 5,
+      nbObjetTraites: 8,
+      nbObjetAcceptes: 2,
+      nbObjetRefuses: 6,
       listeProblemes: [
         // in case of error, check `createOrUpdateOperatorRecord()` SQL arity
         '[#2] champ dateAudit incorrect',
         '[#3] champ geom incorrect : Expected \',\' or \']\' after array element in JSON at position 32635',
-        '[#4] Impossible de créer une parcelle sans donnée géographique.',
-        '[#5] Les dates de certification sont manquantes.',
-        '[#6] champ etatProduction incorrect'
+        '[#4] geometry en dehors des régions autorisées.',
+        '[#6] Impossible de créer une parcelle sans donnée géographique.',
+        '[#7] Les dates de certification sont manquantes.',
+        '[#8] champ etatProduction incorrect'
       ]
     })
   })
 
   test('it responds with 202 when records are valid and save everything to database', async () => {
     const validApiParcellaire = JSON.parse(JSON.stringify(apiParcellaire))
+    validApiParcellaire.splice(3, 2)
     validApiParcellaire.splice(1, 1)
-    validApiParcellaire[1].parcelles[0].geom = '[[[0,0],[0,1],[1,1],[1,0],[0,0]]]'
-    validApiParcellaire[2].parcelles[0].geom = '[[[0,0],[0,1],[1,1],[1,0],[0,0]]]'
+    validApiParcellaire[1].parcelles[0].geom = '[[[-61.04349055792852,14.723261389183236],[-61.043394367539705,14.72324278279335],[-61.04332156461696,14.72331866766676],[-61.043473960371315,14.723338733374248],[-61.04349055792852,14.723261389183236]]]'
+    validApiParcellaire[2].parcelles[0].geom = validApiParcellaire[1].parcelles[0].geom
     validApiParcellaire[3].dateCertificationDebut = '2023-01-01'
     validApiParcellaire[3].dateCertificationFin = '2024-01-01'
     validApiParcellaire[4].parcelles[0].etatProduction = 'AB'
@@ -1380,7 +1382,7 @@ describe('POST /api/v2/certification/parcelles', () => {
   test('it stores well all the data', async () => {
     const validApiParcellaire = JSON.parse(JSON.stringify(apiParcellaire))
     const d = validApiParcellaire.at(0)
-    d.parcelles.at(0).geom = '[[[0,0],[0,1],[1,1],[1,0],[0,0]]]'
+    d.parcelles.at(0).geom = '[[[-61.04349055792852,14.723261389183236],[-61.043394367539705,14.72324278279335],[-61.04332156461696,14.72331866766676],[-61.043473960371315,14.723338733374248],[-61.04349055792852,14.723261389183236]]]'
 
     let response = await request(app.server)
       .post('/api/v2/certification/parcelles')
@@ -1425,11 +1427,11 @@ describe('POST /api/v2/certification/parcelles', () => {
         id: '45742',
         geometry: {
           type: 'Polygon',
-          coordinates: JSON.parse('[[[0,0],[0,1],[1,1],[1,0],[0,0]]]')
+          coordinates: JSON.parse('[[[-61.043490558,14.723261389],[-61.043394368,14.723242783],[-61.043321565,14.723318668],[-61.04347396,14.723338733],[-61.043490558,14.723261389]]]')
         },
         properties: {
           id: '45742',
-          COMMUNE: null,
+          COMMUNE: '97212',
           cultures: [
             {
               CPF: '01.92',
