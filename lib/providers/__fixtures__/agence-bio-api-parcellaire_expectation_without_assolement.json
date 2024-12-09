@@ -1,0 +1,70 @@
+{
+  "record": {
+    "numerobio": "88888",
+    "certification_state": "CERTIFIED",
+    "oc_id": 1,
+    "oc_label": "Ecocert France",
+    "parcelles": {
+      "type": "FeatureCollection",
+      "features": [
+        {
+          "type": "Feature",
+          "id": 45742,
+          "properties": {
+            "id": 45742,
+            "cultures": [
+              {
+                "CPF": "01.92",
+                "date_semis": "2023-10-10",
+                "surface": 25,
+                "unit": "%",
+                "variete": ""
+              }
+            ],
+            "NUMERO_I": "12",
+            "NUMERO_P": "5",
+            "PACAGE": "084012821",
+            "conversion_niveau": "AB",
+            "engagement_date": "2023-04-27",
+            "auditeur_notes": "Parcelle 5 ILOT 12 PAC 2023 0C 1271"
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  4.874099084318204,
+                  44.255949709765304
+                ],
+                [
+                  4.873961402930124,
+                  44.255016135661734
+                ],
+                [
+                  4.873653226374768,
+                  44.25500184845603
+                ],
+                [
+                  4.873800472836859,
+                  44.255928756333255
+                ],
+                [
+                  4.874099084318204,
+                  44.255949709765304
+                ]
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    "audit_notes": "notes d'audit",
+    "certification_date_debut": null,
+    "certification_date_fin": null,
+    "audit_date": "2023-04-27T00:00:00.000Z",
+    "metadata": {
+      "source": "API Parcellaire",
+      "anneeReferenceControle": 2022
+    }
+  }
+}
