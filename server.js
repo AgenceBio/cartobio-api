@@ -332,7 +332,7 @@ app.register(async (app) => {
     const featureId = request.params
 
     return addDividFeature(user, record, reason, featureId)
-      .then(reply.code(200).send({ message: 'OK' }))
+      .then(record => reply.code(200).send(normalizeRecord(record)))
   })
 
   /**
