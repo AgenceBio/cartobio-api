@@ -734,7 +734,7 @@ describe('POST /api/v2/convert/anygeo/geojson', () => {
     })
   })
 
-  test.each(['anygeo-test.kml', 'anygeo-test.geojson', 'anygeo-test-cartobio.json', 'anygeo-test.gpkg', 'anygeo-test.gpkg.zip', 'anygeo-test.kmz', 'anygeo-test.zip'])('it responds to %s with 2 features', (filename) => {
+  test.each(['anygeo-test.kml', 'anygeo-test.geojson', 'anygeo-test.gpkg', 'anygeo-test.gpkg.zip', 'anygeo-test.kmz', 'anygeo-test.zip'])('it responds to %s with 2 features', (filename) => {
     return request(app.server)
       .post('/api/v2/convert/anygeo/geojson')
       .attach('archive', `test/fixtures/anygeo/${filename}`)
@@ -746,6 +746,71 @@ describe('POST /api/v2/convert/anygeo/geojson', () => {
         expect(response.body.features).toHaveLength(2)
         expect(response.body.features.at(0)).toHaveProperty('properties', {
           id: expect.toBeAFeatureId()
+        })
+      })
+  })
+
+  test('it responds to anygeo-test-cartobio.json with 2 features and their properties', () => {
+    return request(app.server)
+      .post('/api/v2/convert/anygeo/geojson')
+      .attach('archive', 'test/fixtures/anygeo/anygeo-test-cartobio.json')
+      .type('json')
+      .set('Authorization', USER_DOC_AUTH_HEADER)
+      .then((response) => {
+        expect(response.status).toEqual(200)
+        expect(area(response.body)).toBeCloseTo(457013.20 + 391240.70, 1)
+        expect(response.body.features).toHaveLength(2)
+        expect(response.body.features.at(0)).toHaveProperty('properties', {
+          id: expect.toBeAFeatureId(),
+          COMMUNE: '89118',
+          COMMUNE_LABEL: null,
+          NOM: 'ilôt 22 - Coulanges-la-Vineuse / Jachère Côte de Groix Milieu',
+          PACAGE: null,
+          annotations: [],
+          auditeur_notes: null,
+          cadastre: [
+            '70421000ZP0072'
+          ],
+          commentaires: null,
+          conversion_niveau: 'CONV',
+          cultures: [
+            {
+              CPF: '01.91',
+              id: '257665e8-91ff-4cb1-b606-a1f4c0d1e8f3',
+              surface: '1.17'
+            }
+          ]
+        })
+        expect(response.body.features.at(1)).toHaveProperty('properties', {
+          id: expect.toBeAFeatureId(),
+          COMMUNE: '89118',
+          COMMUNE_LABEL: 'Coulanges-la-Vineuse',
+          NOM: 'Coulanges-la-vineuse Montfaucon (Moussu) / AOP Bourgogne Coulanges la vineuse Rouge',
+          NUMERO_I: 19,
+          NUMERO_P: 1,
+          PACAGE: '089156290',
+          annotations: [
+            {
+              code: 'surveyed',
+              date: '2024-04-23T07:56:23.315Z',
+              id: '40be59a3-6749-49c4-bb11-1e7b5767779f'
+            }
+          ],
+          auditeur_notes: null,
+          cadastre: null,
+          commentaires: null,
+          conversion_niveau: 'AB',
+          cultures: [
+            {
+              CPF: '01.21.12',
+              TYPE: 'VRC',
+              id: '72ac54ce-3c22-47b8-9093-f64983bea580',
+              surface: '0.3',
+              variete: 'Pinot Noir'
+            }
+          ],
+          engagement_date: '2019-12-20'
+
         })
       })
   })
