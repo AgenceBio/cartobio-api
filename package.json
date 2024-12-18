@@ -71,7 +71,6 @@
     "wkt": "^0.1.1"
   },
   "scripts": {
-    "load:communes-table": "node bin/load-communes-table.js",
     "build:geo-data": "node bin/build-geo-data.js",
     "prestart": "npm run build:geo-data && ./node_modules/.bin/db-migrate up",
     "lint": "eslint --ignore-pattern 'migrations/*' .",
