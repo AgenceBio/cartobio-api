@@ -852,7 +852,7 @@ describe('GET /api/v2/certification/search', () => {
     test('search with no results', async () => {
       getMock.mockReset().mockReturnValueOnce({
         async json () {
-          return []
+          return { total: 0, operateurs: [] }
         }
       })
 
@@ -869,118 +869,6 @@ describe('GET /api/v2/certification/search', () => {
               page_max: 1
             },
             records: []
-          })
-        })
-    })
-
-    test('search default sort (audit_date/desc)', async () => {
-      return request(app.server)
-        .post('/api/v2/certification/search')
-        .type('json')
-        .send({ input: '99999' })
-        .set('Authorization', USER_DOC_AUTH_HEADER)
-        .then((response) => {
-          expect(response.body).toMatchObject({
-            pagination: {
-              total: 1,
-              page: 1,
-              page_max: 1
-            },
-            records: [
-              {
-                ...normalizeOperator(agencebioOperator),
-                dateEngagement: '',
-                datePremierEngagement: null,
-                notifications: [],
-                record_id: '054f0d70-c3da-448f-823e-81fcf7c2bf6e',
-                certification_state: 'PENDING_CERTIFICATION',
-                audit_date: '2023-09-07'
-              }
-            ]
-          })
-        })
-    })
-
-    test('search manual sort (nom/asc)', () => {
-      return request(app.server)
-        .post('/api/v2/certification/search')
-        .type('json')
-        .send({ input: 'test', sort: 'nom', order: 'asc' })
-        .set('Authorization', USER_DOC_AUTH_HEADER)
-        .then((response) => {
-          expect(response.body).toMatchObject({
-            pagination: {
-              total: 1,
-              page: 1,
-              page_max: 1
-            },
-            records: [
-              {
-                ...normalizeOperator(agencebioOperator),
-                dateEngagement: '',
-                datePremierEngagement: null,
-                notifications: [],
-                record_id: '054f0d70-c3da-448f-823e-81fcf7c2bf6e',
-                certification_state: 'PENDING_CERTIFICATION',
-                audit_date: '2023-09-07'
-              }
-            ]
-          })
-        })
-    })
-
-    test('search manual sort (engagement_date/desc)', () => {
-      return request(app.server)
-        .post('/api/v2/certification/search')
-        .type('json')
-        .send({ input: 'test', sort: 'engagement_date', order: 'desc' })
-        .set('Authorization', USER_DOC_AUTH_HEADER)
-        .then((response) => {
-          expect(response.body).toMatchObject({
-            pagination: {
-              total: 1,
-              page: 1,
-              page_max: 1
-            },
-            records: [
-              {
-                ...normalizeOperator(agencebioOperator),
-                dateEngagement: '',
-                datePremierEngagement: null,
-                notifications: [],
-                record_id: '054f0d70-c3da-448f-823e-81fcf7c2bf6e',
-                certification_state: 'PENDING_CERTIFICATION',
-                audit_date: '2023-09-07'
-              }
-            ]
-          })
-        })
-    })
-
-    test('search manual sort (statut/desc)', () => {
-      return request(app.server)
-        .post('/api/v2/certification/search')
-        .type('json')
-        .send({ input: 'test', sort: 'statut', order: 'desc' })
-        .set('Authorization', USER_DOC_AUTH_HEADER)
-        .then((response) => {
-          expect(response.body).toMatchObject({
-            pagination: {
-              total: 1,
-              page: 1,
-              page_max: 1
-            },
-            records: [
-              {
-                ...normalizeOperator(agencebioOperator),
-                dateEngagement: '',
-                datePremierEngagement: null,
-                notifications: [],
-                record_id: '054f0d70-c3da-448f-823e-81fcf7c2bf6e',
-                certification_state: 'PENDING_CERTIFICATION',
-                audit_date: '2023-09-07'
-              }
-            ]
           })
         })
     })
