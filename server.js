@@ -61,7 +61,7 @@ const { createSigner } = require('fast-jwt')
 
 const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators } = require('./lib/providers/agence-bio.js')
 const { addRecordFeature, addDividFeature, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords } = require('./lib/providers/cartobio.js')
-const { evvLookup, evvParcellaire, pacageLookup, getParcellesStats, getDataGouvStats, iterateOperatorLastRecords } = require('./lib/providers/cartobio.js')
+const { evvLookup, evvParcellaire, pacageLookup, iterateOperatorLastRecords } = require('./lib/providers/cartobio.js')
 const { parseAnyGeographicalArchive } = require('./lib/providers/gdal.js')
 const { parseTelepacArchive } = require('./lib/providers/telepac.js')
 const { parseGeofoliaArchive, geofoliaLookup, geofoliaParcellaire } = require('./lib/providers/geofolia.js')
@@ -181,15 +181,6 @@ app.register(async (app) => {
 
   app.get('/api/v2/test', mergeSchemas(sandboxSchema, protectedWithToken({ oc: true, cartobio: true })), (_, reply) => {
     return reply.send({ message: 'OK' })
-  })
-
-  app.get('/api/v2/stats', internalSchema, async (request, reply) => {
-    const [dataGouv, stats] = await Promise.all([
-      getDataGouvStats(),
-      getParcellesStats()
-    ])
-
-    return reply.code(200).send({ stats, dataGouv })
   })
 
   /**
