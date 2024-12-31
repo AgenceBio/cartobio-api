@@ -1,45 +1,55 @@
 {
-  "record": {
-    "numerobio": "172301",
-    "certification_state": "CERTIFIED",
-    "oc_id": 1,
-    "oc_label": "Ecocert France",
-    "parcelles": {
-      "type": "FeatureCollection",
-      "features": 
-      [
-        {
-          "type": "Feature",
-          "id": 124300,
-          "properties": {
-            "id": 124300,
-            "cultures": 
-            [
-              {
-                "CPF": "",
-                "date_semis": "",
-                "surface": null,
-                "variete": ""
-              }
-            ],
-            "NUMERO_I": "309",
-            "NUMERO_P": "1",
-            "PACAGE": "32165694",
-            "conversion_niveau": "C1",
-            "engagement_date": "2022-08-17",
-            "auditeur_notes": null
-          },
-          "geometry": null
+    "record": {
+        "numerobio": "654321",
+        "certification_state": "CERTIFIED",
+        "oc_id": 1,
+        "oc_label": "Ecocert France",
+        "parcelles": {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "id": 4213174,
+                    "properties": {
+                        "id": 4213174,
+                        "cultures": [
+                            {
+                                "CPF": "01.21.12",
+                                "date_semis": "2023-04-27",
+                                "surface": 1,
+                                "unit": "ha",
+                                "variete": ""
+                            }
+                        ],
+                        "NUMERO_I": "50",
+                        "NUMERO_P": null,
+                        "PACAGE": "32165694",
+                        "conversion_niveau": "AB",
+                        "engagement_date": "2024-04-27",
+                        "auditeur_notes": null
+                    },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [
+                            [
+                                [-61.04349055792852, 14.723261389183236],
+                                [-61.043394367539705, 14.72324278279335],
+                                [-61.04332156461696, 14.72331866766676],
+                                [-61.043473960371315, 14.723338733374248],
+                                [-61.04349055792852, 14.723261389183236]
+                            ]
+                        ]
+                    }
+                }
+            ]
+        },
+        "certification_date_debut": "2023-01-01",
+        "certification_date_fin": "2025-03-31",
+        "audit_date": "2023-03-30T00:00:00.000Z",
+        "metadata": {
+            "source": "API Parcellaire",
+            "anneeReferenceControle": 2025,
+            "anneeAssolement": 2023
         }
-      ]
-    },
-    "certification_date_debut": "2023-01-01",
-    "certification_date_fin": "2025-03-31",
-    "audit_date": "2023-03-30T00:00:00.000Z",
-    "metadata": {
-      "source": "API Parcellaire",
-      "anneeReferenceControle": 2023,
-      "anneeAssolement": 2023
     }
-  }
 }

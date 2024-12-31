@@ -37,6 +37,7 @@ export type AgenceBioOperator = {
     departementId: number;
     photo: any[];
     sitesWeb: string[];
+    activites: AgenceBioActivity[];
     notifications?: AgenceBioNotification[] | undefined;
     certificats?: AgenceBioCertificate[] | undefined;
     adressesOperateurs?: AgenceBioAdresses[];
