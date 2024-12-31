@@ -1404,11 +1404,12 @@ describe('POST /api/v2/certification/parcelles', () => {
     expect(res.status).toBe(400)
     expect(mockSentry).not.toHaveBeenCalled()
     expect(res.body).toEqual({
-      nbObjetAcceptes: 3,
-      nbObjetRefuses: 5,
+      nbObjetAcceptes: 2,
+      nbObjetRefuses: 6,
       nbObjetTraites: 8,
       listeProblemes: [
         // in case of error, check `createOrUpdateOperatorRecord()` SQL arity
+        '[#1] Impossible de créer une parcelle sans donnée géographique.',
         '[#2] champ dateAudit incorrect',
         '[#3] champ geom incorrect : Expected \',\' or \']\' after array element in JSON at position 32635',
         '[#6] Impossible de créer une parcelle sans donnée géographique.',
@@ -1421,6 +1422,7 @@ describe('POST /api/v2/certification/parcelles', () => {
 
   test('it responds with 202 when records are valid and save everything to database', async () => {
     const validApiParcellaire = JSON.parse(JSON.stringify(apiParcellaire))
+    validApiParcellaire[0].parcelles.splice(1, 3)
     validApiParcellaire.splice(3, 2)
     validApiParcellaire.splice(1, 1)
     validApiParcellaire[1].parcelles[0].geom = '[[[-61.04349055792852,14.723261389183236],[-61.043394367539705,14.72324278279335],[-61.04332156461696,14.72331866766676],[-61.043473960371315,14.723338733374248],[-61.04349055792852,14.723261389183236]]]'
@@ -1445,6 +1447,7 @@ describe('POST /api/v2/certification/parcelles', () => {
 
   test('it stores well all the data', async () => {
     const validApiParcellaire = JSON.parse(JSON.stringify(apiParcellaire))
+    validApiParcellaire[0].parcelles.splice(1, 3)
     const d = validApiParcellaire.at(0)
     d.parcelles.at(0).geom = '[[[-61.04349055792852,14.723261389183236],[-61.043394367539705,14.72324278279335],[-61.04332156461696,14.72331866766676],[-61.043473960371315,14.723338733374248],[-61.04349055792852,14.723261389183236]]]'
 
