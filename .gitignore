@@ -10,6 +10,7 @@ data/guyane.json
 data/reunion.json
 data/mayotte.json
 data/metropole.json
+data/territoires.gpkg
 
 cartobio-asp*.gpkg*
 
