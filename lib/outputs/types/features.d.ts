@@ -1,7 +1,7 @@
-import {Feature, FeatureCollection, Polygon} from "geojson";
+import { Feature, FeatureCollection, Polygon } from "geojson";
 
 export type CartoBioFeatureProperties = {
-    id?: string|number;
+    id?: string | number;
     createdAt?: string;
     updatedAt?: string;
     COMMUNE_LABEL?: string;
@@ -17,6 +17,7 @@ export type CartoBioFeatureProperties = {
     NUMERO_I?: string;
     NUMERO_P?: string;
     cadastre?: string[];
+    etranger?: boolean;
     /**
      * @deprecated
      */
@@ -38,7 +39,7 @@ export type CartoBioFeatureProperties = {
  * Cartobio specific GeoJson definitions
  */
 export type CartoBioCulture = {
-    id: import('crypto').UUID;
+    id: import("crypto").UUID;
     CPF: string;
     TYPE?: string | undefined;
     variete?: string | undefined;
@@ -46,9 +47,16 @@ export type CartoBioCulture = {
      * - La surface en hectares
      */
     surface?: string | number | undefined;
-    unit?: '%' | 'ha' | undefined;
+    unit?: "%" | "ha" | undefined;
     date_semis?: string | undefined;
 };
 export type CartoBioFeature = Feature<Polygon, CartoBioFeatureProperties>;
-export type CartoBioFeatureCollection = FeatureCollection<Polygon, CartoBioFeatureProperties>;
-export type CartoBioGeoJson = CartoBioFeatureProperties | CartoBioFeature | CartoBioFeatureCollection | Array<CartoBioGeoJson>;
+export type CartoBioFeatureCollection = FeatureCollection<
+    Polygon,
+    CartoBioFeatureProperties
+>;
+export type CartoBioGeoJson =
+    | CartoBioFeatureProperties
+    | CartoBioFeature
+    | CartoBioFeatureCollection
+    | Array<CartoBioGeoJson>;

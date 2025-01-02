@@ -185,6 +185,18 @@ ogr2ogr -f PostgreSQL \
   --config PG_USE_COPY YES --config OGR_TRUNCATE YES
 ```
 
+## Intégration des données des départements avec le demaine maritime
+
+Ces données sont utilisées lors du déclencheur (`update_communes`) d'ajout de commune à une parcelle afin de trouver la commune la plus proche pour les parcelles aquacoles et de marquer les parcelles frontalières comme `etranger`.
+Elles sont basées sur les géométries des [régions](https://etalab-datasets.geo.data.gouv.fr/contours-administratifs/latest/geojson/) modifiées via QGIS pour rajouter le domaine maritimes francais.
+
+```sh
+ogr2ogr -f PostgreSQL \
+  PG:'postgresql://postgres@bdd-cartobio:5433/postgres' territoires.gpkg \
+  -preserve_fid -nln territoires -nlt POLYGON \
+  --config PG_USE_COPY YES --config OGR_TRUNCATE YES
+```
+
 ## Générer les fonds de carte
 
 **Remarque** : Les fonds de carte étaient auparavant servis avec le logiciel Geoserver.
