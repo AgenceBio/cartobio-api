@@ -1498,7 +1498,7 @@ describe('POST /api/v2/certification/parcelles', () => {
         },
         properties: {
           id: '45742',
-          COMMUNE: '97212',
+          COMMUNE: null,
           cultures: [
             {
               CPF: '01.92',
