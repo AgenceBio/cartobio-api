@@ -214,4 +214,20 @@ ogr2ogr rpg.geojson rpg.gpkg
 tippecanoe -Z10 -z14 --extend-zooms-if-still-dropping --no-tile-compression --simplify-only-low-zooms --drop-densest-as-needed --output-to-directory rpg-202x --projection EPSG:3857 --name "RPG 202x" --layer "rpg202x" --exclude NUM_ILOT --exclude NUM_PARCEL --exclude PACAGE --force rpg.geojson
 ```
 
+## Autodétéction des communes
+
+Les communes sont ajoutées automatiquement pour un déclencheur en BDD
+
+Via la fonction :
+
+```sql
+update_communes()
+```
+
+Déclenchée par :
+
+```sql
+BEFORE INSERT OR UPDATE ON cartobio_parcelles
+```
+
 </details>
