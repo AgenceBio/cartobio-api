@@ -1,5 +1,5 @@
-import {Feature, FeatureCollection, Polygon} from "geojson";
-import {CertificationState, EtatProduction } from "../../enums";
+import { Feature, FeatureCollection, Polygon } from "geojson";
+import { CertificationState, EtatProduction } from "../../enums";
 
 export type InputApiRecord = {
     numeroBio: number | string;
@@ -20,6 +20,8 @@ export type InputApiParcelle = {
     numeroIlot?: string | undefined;
     numeroParcelle?: string | undefined;
     commentaire?: string | undefined;
+    codeCulture?: string | undefined;
+    codePrecision?: string | undefined;
     geom: string;
     culture: InputApiCulture[];
     cultures?: InputApiCulture[] | undefined;
@@ -29,9 +31,8 @@ export type InputApiCulture = {
     dateSemis?: string | undefined;
     variete?: string | undefined;
     quantite: number | string;
-    unite?: 'ha' | '%'
+    unite?: "ha" | "%";
 };
-
 
 export type OutputApiRecord = {
     numeroBio: string;
@@ -51,10 +52,10 @@ export type OutputApiCertification = {
 export type OutputApiCulture = {
     cpf: string;
     surface?: number;
-    unite?: 'ha' | '%';
+    unite?: "ha" | "%";
     variete?: string;
     dateSemis?: string;
-}
+};
 
 export type OutputApiFeatureProperties = {
     id: string;
@@ -74,5 +75,8 @@ export type OutputApiFeatureProperties = {
     referenceCadastrale?: string;
 };
 
-export type OutputApiFeatureCollection = FeatureCollection<Polygon, OutputApiFeatureProperties>;
+export type OutputApiFeatureCollection = FeatureCollection<
+    Polygon,
+    OutputApiFeatureProperties
+>;
 export type OutputApiParcelle = Feature<Polygon, OutputApiFeatureProperties>;
