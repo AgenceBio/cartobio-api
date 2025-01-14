@@ -810,7 +810,6 @@ describe('POST /api/v2/convert/anygeo/geojson', () => {
             }
           ],
           engagement_date: '2019-12-20'
-
         })
       })
   })
