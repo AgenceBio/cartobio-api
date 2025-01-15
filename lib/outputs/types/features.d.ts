@@ -17,15 +17,13 @@ export type CartoBioFeatureProperties = {
     NUMERO_I?: string;
     NUMERO_P?: string;
     cadastre?: string[];
+    TYPE?: string;
+    CODE_VAR?: string;
     etranger?: boolean;
     /**
      * @deprecated
      */
     CPF?: string;
-    /**
-     * @deprecated
-     */
-    TYPE?: string;
     /**
      * @deprecated
      */
@@ -35,6 +33,20 @@ export type CartoBioFeatureProperties = {
      */
     variete?: string;
 };
+/**
+ *  id: 44592208968963,
+    BIO: 0,
+    CAMPAGNE: 2024,
+    COMMUNE: '70421',
+    cultures: [ [Object] ],
+    conversion_niveau: 'CONV',
+    NUMERO_I: '2',
+    NUMERO_P: '1',
+    PACAGE: '999100540',
+    TYPE: 'PTR',
+    CODE_VAR: ''
+
+ */
 /**
  * Cartobio specific GeoJson definitions
  */
