@@ -19,6 +19,7 @@ export type CartoBioFeatureProperties = {
     cadastre?: string[];
     TYPE?: string;
     CODE_VAR?: string;
+    etranger?: boolean;
     /**
      * @deprecated
      */
