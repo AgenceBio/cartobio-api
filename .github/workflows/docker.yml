@@ -155,7 +155,7 @@ jobs:
           docker pull ${{ needs.build.outputs.image }} \
           && docker stop cartobio-api-production \
           && docker container rm cartobio-api-production \
-          && docker run -d --restart unless-stopped \
+          && docker run -d --restart always \
             -p 127.0.0.1:8000:8000 \
             --env-file=.env.cartobio-api-production \
             --name cartobio-api-production \
