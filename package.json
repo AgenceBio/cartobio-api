@@ -79,7 +79,8 @@
     "posttest": "npm run lint && npm run test:types",
     "test:types": "tsc",
     "prewatch": "npm run build:geo-data && ./node_modules/.bin/db-migrate up",
-    "watch": "node --watch server.js"
+    "watch": "node --watch server.js",
+    "clean-records": "node bin/clean-records.js"
   },
   "repository": {
     "type": "git",
