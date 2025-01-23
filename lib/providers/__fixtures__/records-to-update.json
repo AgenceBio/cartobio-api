@@ -2,6 +2,7 @@
     "record_id": "5e9c219b-0e90-4758-87e1-9802a6eb7d28",
     "numerobio": "1234321",
     "version_name": "audit 2023",
+    "annee_reference_controle": 2023,
     "certification_date_debut": null,
     "certification_date_fin": null,
     "certification_state": "PENDING_CERTIFICATION",
