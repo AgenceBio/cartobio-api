@@ -1,5 +1,6 @@
 const { Client } = require('pg')
 const DBMigrate = require('db-migrate')
+const { initTerritoires } = require('./init-territoires.js')
 
 module.exports = async function () {
   const connectionString = require('../lib/config.js').get('databaseUrl')
@@ -43,6 +44,9 @@ module.exports = async function () {
   await dbmigrate.up()
 
   await testClient.query('TRUNCATE TABLE cartobio_operators CASCADE')
+
+  await initTerritoires(testClient)
+
   await testClient.end()
 
   process.env.DATABASE_URL = connectionString

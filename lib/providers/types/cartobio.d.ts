@@ -11,6 +11,7 @@ export type DBOperatorRecord = {
     record_id: number;
     numerobio: string;
     version_name: string;
+    annee_reference_controle: number | null;
     certification_date_debut: string;
     certification_date_fin: string;
     certification_state: CertificationState;
@@ -61,4 +62,5 @@ type DBParcelle = {
     reference_cadastre?: string[];
     code_culture_pac?: string;
     code_precision_pac?: string;
+    etranger: boolean;
 };

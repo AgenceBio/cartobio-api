@@ -69,7 +69,7 @@ const { InvalidRequestApiError, NotFoundApiError } = require('./lib/errors.js')
 
 const { mergeSchemas, swaggerConfig, CartoBioDecoratorsPlugin } = require('./lib/routes/index.js')
 const { sandboxSchema, internalSchema, hiddenSchema } = require('./lib/routes/index.js')
-const { operatorFromNumeroBio, protectedWithToken, routeWithRecordId, routeWithPacage } = require('./lib/routes/index.js')
+const { operatorFromNumeroBio, operatorFromRecordId, protectedWithToken, routeWithRecordId, routeWithPacage } = require('./lib/routes/index.js')
 const { operatorsSchema, certificationBodySearchSchema } = require('./lib/routes/index.js')
 const { createFeatureSchema, createRecordSchema, deleteSingleFeatureSchema, patchFeatureCollectionSchema, patchRecordSchema, updateFeaturePropertiesSchema } = require('./lib/routes/records.js')
 const { geofoliaImportSchema } = require('./lib/routes/index.js')
@@ -204,6 +204,7 @@ app.register(async (app) => {
     const { limit, offset } = request.query
 
     return fetchUserOperators(userId, limit, offset)
+      .then(res => { res.operators = res.operators.filter((e) => e.isProduction === true); return res })
       .then(res => reply.code(200).send(res))
   })
 
@@ -221,13 +222,18 @@ app.register(async (app) => {
    */
   app.get('/api/v2/operator/:numeroBio/records', mergeSchemas(protectedWithToken(), operatorFromNumeroBio), async (request, reply) => {
     const records = await getRecords(request.params.numeroBio)
-    return reply.code(200).send(records)
+
+    if (!request.user.organismeCertificateur || request.user.organismeCertificateur.id === request.operator.organismeCertificateur.id) {
+      return reply.code(200).send(records)
+    }
+
+    return reply.code(200).send(records.filter((r) => r.oc_id === request.user.organismeCertificateur.id))
   })
 
   /**
    * Retrieve a given Record
    */
-  app.get('/api/v2/audits/:recordId', mergeSchemas(routeWithRecordId, protectedWithToken()), (request, reply) => {
+  app.get('/api/v2/audits/:recordId', mergeSchemas(protectedWithToken(), operatorFromRecordId), (request, reply) => {
     return reply.code(200).send(request.record)
   })
 
@@ -251,7 +257,7 @@ app.register(async (app) => {
   /**
    * Delete a given Record
    */
-  app.delete('/api/v2/audits/:recordId', mergeSchemas(routeWithRecordId, protectedWithToken()), async (request, reply) => {
+  app.delete('/api/v2/audits/:recordId', mergeSchemas(protectedWithToken(), routeWithRecordId), async (request, reply) => {
     const { user, record } = request
     await deleteRecord({ user, record })
     return reply.code(204).send()
@@ -436,14 +442,15 @@ app.register(async (app) => {
       return new PassThrough().end('{}')
     }
   }), (request, reply) => {
-    const { count, errors } = request.APIResult
+    const { count, errors, warnings } = request.APIResult
 
     if (errors.length > 0) {
       return reply.code(400).send({
         nbObjetTraites: count,
         nbObjetAcceptes: count - errors.length,
         nbObjetRefuses: errors.length,
-        listeProblemes: errors.map(([index, message]) => `[#${index}] ${message}`)
+        listeProblemes: errors.map(([index, message]) => `[#${index}] ${message}`),
+        listeWarning: warnings && warnings.length > 0 ? warnings.map(([index, message]) => `[#${index}] ${message}`) : []
       })
     }
 
