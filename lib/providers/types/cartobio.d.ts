@@ -60,5 +60,7 @@ type DBParcelle = {
     numero_ilot_pac?: string;
     numero_parcelle_pac?: string;
     reference_cadastre?: string[];
+    code_culture_pac?: string;
+    code_precision_pac?: string;
     etranger: boolean;
 };
