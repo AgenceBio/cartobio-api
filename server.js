@@ -246,12 +246,25 @@ app.register(async (app) => {
     protectedWithToken()
   ), async (request, reply) => {
     const { numeroBio } = request.params
-    const { id: ocId, nom: ocLabel } = request.operator.organismeCertificateur
-    const record = await createOrUpdateOperatorRecord(
-      { numerobio: numeroBio, oc_id: ocId, oc_label: ocLabel, ...request.body },
-      { user: request.user, copyParcellesData: request.body.importPrevious, previousRecordId: request.body.recordId }
-    )
-    return reply.code(200).send(normalizeRecord(record))
+    const array = request.operator.certificats ?? request.operator.notifications ?? []
+
+    let currentStatut
+    for (const notif of array) {
+      currentStatut = notif.etatCertification || notif.status
+      if (currentStatut !== 'BROUILLON') {
+        continue
+      }
+    }
+    if (currentStatut !== 'ARRETEE' && request.user.organismeCertificateur === request.operator.organismeCertificateur) {
+      const { id: ocId, nom: ocLabel } = request.operator.organismeCertificateur
+      const record = await createOrUpdateOperatorRecord(
+        { numerobio: numeroBio, oc_id: ocId, oc_label: ocLabel, ...request.body },
+        { user: request.user, copyParcellesData: request.body.importPrevious, previousRecordId: request.body.recordId }
+      )
+      return reply.code(200).send(normalizeRecord(record))
+    } else {
+      return reply.code(403).send("Vous n'avez pas les droits de créer ou de dupliquer une version")
+    }
   })
 
   /**
