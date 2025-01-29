@@ -69,7 +69,7 @@ const { InvalidRequestApiError, NotFoundApiError } = require('./lib/errors.js')
 
 const { mergeSchemas, swaggerConfig, CartoBioDecoratorsPlugin } = require('./lib/routes/index.js')
 const { sandboxSchema, internalSchema, hiddenSchema } = require('./lib/routes/index.js')
-const { operatorFromNumeroBio, operatorFromRecordId, protectedWithToken, routeWithRecordId, routeWithPacage } = require('./lib/routes/index.js')
+const { operatorFromNumeroBio, operatorFromRecordId, protectedWithToken, routeWithRecordId, routeWithPacage, checkCertificationStatus } = require('./lib/routes/index.js')
 const { operatorsSchema, certificationBodySearchSchema } = require('./lib/routes/index.js')
 const { createFeatureSchema, createRecordSchema, deleteSingleFeatureSchema, patchFeatureCollectionSchema, patchRecordSchema, updateFeaturePropertiesSchema } = require('./lib/routes/records.js')
 const { geofoliaImportSchema } = require('./lib/routes/index.js')
@@ -243,28 +243,16 @@ app.register(async (app) => {
   app.post('/api/v2/operator/:numeroBio/records', mergeSchemas(
     createRecordSchema,
     operatorFromNumeroBio,
+    checkCertificationStatus,
     protectedWithToken()
   ), async (request, reply) => {
     const { numeroBio } = request.params
-    const array = request.operator.certificats ?? request.operator.notifications ?? []
-
-    let currentStatut
-    for (const notif of array) {
-      currentStatut = notif.etatCertification || notif.status
-      if (currentStatut !== 'BROUILLON') {
-        continue
-      }
-    }
-    if (currentStatut !== 'ARRETEE' && request.user.organismeCertificateur === request.operator.organismeCertificateur) {
-      const { id: ocId, nom: ocLabel } = request.operator.organismeCertificateur
-      const record = await createOrUpdateOperatorRecord(
-        { numerobio: numeroBio, oc_id: ocId, oc_label: ocLabel, ...request.body },
-        { user: request.user, copyParcellesData: request.body.importPrevious, previousRecordId: request.body.recordId }
-      )
-      return reply.code(200).send(normalizeRecord(record))
-    } else {
-      return reply.code(403).send("Vous n'avez pas les droits de créer ou de dupliquer une version")
-    }
+    const { id: ocId, nom: ocLabel } = request.operator.organismeCertificateur
+    const record = await createOrUpdateOperatorRecord(
+      { numerobio: numeroBio, oc_id: ocId, oc_label: ocLabel, ...request.body },
+      { user: request.user, copyParcellesData: request.body.importPrevious, previousRecordId: request.body.recordId }
+    )
+    return reply.code(200).send(normalizeRecord(record))
   })
 
   /**
