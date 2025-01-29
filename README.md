@@ -218,4 +218,28 @@ Déclenchée par :
 BEFORE INSERT OR UPDATE ON cartobio_parcelles
 ```
 
+## Cron
+
+Pour lister les cron:
+
+```sh
+crontab -l
+```
+
+Pour mettre à jour:
+
+```sh
+crontab -e
+```
+
+Tous les mois les parcellaires marqués comme supprimés (`deleted_at`) depuis plus de 6 mois, sont supprimés dans la base de données.
+
+Le script supprimant les parcellaires est utilisable via `npm run clean-records`
+
+Exemple d'utilisation dans le crontab:
+
+```sh
+* 1 * * * (date && docker exec cartobio-api-test npm run clean-records) >> /var/log/cron.log
+```
+
 </details>
