@@ -69,7 +69,7 @@ const { InvalidRequestApiError, NotFoundApiError } = require('./lib/errors.js')
 
 const { mergeSchemas, swaggerConfig, CartoBioDecoratorsPlugin } = require('./lib/routes/index.js')
 const { sandboxSchema, internalSchema, hiddenSchema } = require('./lib/routes/index.js')
-const { operatorFromNumeroBio, operatorFromRecordId, protectedWithToken, routeWithRecordId, routeWithPacage } = require('./lib/routes/index.js')
+const { operatorFromNumeroBio, operatorFromRecordId, protectedWithToken, routeWithRecordId, routeWithPacage, checkCertificationStatus } = require('./lib/routes/index.js')
 const { operatorsSchema, certificationBodySearchSchema } = require('./lib/routes/index.js')
 const { createFeatureSchema, createRecordSchema, deleteSingleFeatureSchema, patchFeatureCollectionSchema, patchRecordSchema, updateFeaturePropertiesSchema } = require('./lib/routes/records.js')
 const { geofoliaImportSchema } = require('./lib/routes/index.js')
@@ -243,6 +243,7 @@ app.register(async (app) => {
   app.post('/api/v2/operator/:numeroBio/records', mergeSchemas(
     createRecordSchema,
     operatorFromNumeroBio,
+    checkCertificationStatus,
     protectedWithToken()
   ), async (request, reply) => {
     const { numeroBio } = request.params
