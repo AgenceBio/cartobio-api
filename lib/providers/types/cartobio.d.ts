@@ -1,8 +1,8 @@
 import { CertificationState, EtatProduction } from "../../enums";
-import {CartoBioCulture} from "../../outputs/types/features";
-import {HistoryEntry} from "../../outputs/types/history";
-import {AgenceBioUserGroup, OrganismeCertificateur} from "./agence-bio";
-import {Polygon} from "geojson";
+import { CartoBioCulture } from "../../outputs/types/features";
+import { HistoryEntry } from "../../outputs/types/history";
+import { AgenceBioUserGroup, OrganismeCertificateur } from "./agence-bio";
+import { Polygon } from "geojson";
 
 /**
  * An operator record as we store it in CartoBio database
@@ -59,4 +59,5 @@ type DBParcelle = {
     numero_ilot_pac?: string;
     numero_parcelle_pac?: string;
     reference_cadastre?: string[];
+    etranger: boolean;
 };
