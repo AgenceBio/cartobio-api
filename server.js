@@ -268,21 +268,31 @@ app.register(async (app) => {
    * Partial update Record's metadata (top-level properties except features)
    * It also keep track of new HistoryEvent along the way, depending who and when you update feature properties
    */
-  app.patch('/api/v2/audits/:recordId', mergeSchemas(protectedWithToken(), patchRecordSchema, routeWithRecordId), (request, reply) => {
-    const { body: patch, user, record } = request
+  app.patch('/api/v2/audits/:recordId', mergeSchemas(
+    protectedWithToken(),
+    patchRecordSchema,
+    operatorFromRecordId,
+    routeWithRecordId
+  ), (request, reply) => {
+    const { body: patch, user, record, operator } = request
 
-    return updateAuditRecordState({ user, record }, patch)
+    return updateAuditRecordState({ user, record, operator }, patch)
       .then(record => reply.code(200).send(normalizeRecord(record)))
   })
 
   /**
    * Add new feature entries to an existing collection
    */
-  app.post('/api/v2/audits/:recordId/parcelles', mergeSchemas(protectedWithToken(), createFeatureSchema, routeWithRecordId), (request, reply) => {
+  app.post('/api/v2/audits/:recordId/parcelles', mergeSchemas(
+    protectedWithToken(),
+    createFeatureSchema,
+    routeWithRecordId,
+    operatorFromRecordId
+  ), (request, reply) => {
     const { feature } = request.body
-    const { user, record } = request
+    const { user, record, operator } = request
 
-    return addRecordFeature({ user, record }, feature)
+    return addRecordFeature({ user, record, operator }, feature)
       .then(record => reply.code(200).send(normalizeRecord(record)))
   })
 
@@ -291,10 +301,15 @@ app.register(async (app) => {
    *
    * Matching features are updated, features not present in payload or database are ignored
    */
-  app.patch('/api/v2/audits/:recordId/parcelles', mergeSchemas(protectedWithToken(), patchFeatureCollectionSchema, routeWithRecordId), (request, reply) => {
-    const { body: featureCollection, user, record } = request
+  app.patch('/api/v2/audits/:recordId/parcelles', mergeSchemas(
+    protectedWithToken(),
+    patchFeatureCollectionSchema,
+    routeWithRecordId,
+    operatorFromRecordId
+  ), (request, reply) => {
+    const { body: featureCollection, user, record, operator } = request
 
-    return patchFeatureCollection({ user, record }, featureCollection.features)
+    return patchFeatureCollection({ user, record, operator }, featureCollection.features)
       .then(record => reply.code(200).send(normalizeRecord(record)))
   })
 
@@ -315,21 +330,26 @@ app.register(async (app) => {
   /**
    * Delete a single feature
    */
-  app.delete('/api/v2/audits/:recordId/parcelles/:featureId', mergeSchemas(protectedWithToken(), deleteSingleFeatureSchema, routeWithRecordId), (request, reply) => {
-    const { user, record } = request
+  app.delete('/api/v2/audits/:recordId/parcelles/:featureId', mergeSchemas(
+    protectedWithToken(),
+    deleteSingleFeatureSchema,
+    routeWithRecordId,
+    operatorFromRecordId
+  ), (request, reply) => {
+    const { user, record, operator } = request
     const { reason } = request.body
     const { featureId } = request.params
 
-    return deleteSingleFeature({ featureId, user, record }, { reason })
+    return deleteSingleFeature({ featureId, user, record, operator }, { reason })
       .then(record => reply.code(200).send(normalizeRecord(record)))
   })
 
-  app.post('/api/v2/audits/:recordId/parcelles/:featureId/', mergeSchemas(protectedWithToken(), routeWithRecordId), (request, reply) => {
-    const { user, record } = request
+  app.post('/api/v2/audits/:recordId/parcelles/:featureId/', mergeSchemas(protectedWithToken(), routeWithRecordId, operatorFromRecordId), (request, reply) => {
+    const { user, record, operator } = request
     const reason = request.body
     const featureId = request.params
 
-    return addDividFeature(user, record, reason, featureId)
+    return addDividFeature(user, record, operator, reason, featureId)
       .then(record => reply.code(200).send(normalizeRecord(record)))
   })
 
