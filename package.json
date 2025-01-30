@@ -9,10 +9,10 @@
     "npm": ">=8"
   },
   "devDependencies": {
-    "@agencebio/rosetta-cultures": "^2.1.0",
+    "@agencebio/rosetta-cultures": "^2.3.1",
     "@fastify/cors": "^9.0.1",
     "@fastify/formbody": "^7.4.0",
-    "@fastify/multipart": "^8.2.0",
+    "@fastify/multipart": "^8.3.1",
     "@fastify/oauth2": "^7.0.0",
     "@fastify/swagger": "^8.2.1",
     "@fastify/swagger-ui": "^3.0.0",
@@ -79,7 +79,8 @@
     "posttest": "npm run lint && npm run test:types",
     "test:types": "tsc",
     "prewatch": "npm run build:geo-data && ./node_modules/.bin/db-migrate up",
-    "watch": "node --watch server.js"
+    "watch": "node --watch server.js",
+    "clean-records": "node bin/clean-records.js"
   },
   "repository": {
     "type": "git",

@@ -106,15 +106,15 @@ jobs:
     steps:
     - uses: garygrossgarten/github-action-ssh@0.7.0
       with:
-        host: ${{ secrets.AGENCEBIO_SSH_HOST }}
+        host: ${{ secrets.AGENCEBIO_PREPROD_SSH_HOST }}
         username: ${{ secrets.AGENCEBIO_SSH_USERNAME }}
         privateKey: ${{ secrets.AGENCEBIO_SSH_PRIVATE_KEY }}
         command: |
           docker pull ${{ needs.build.outputs.image }} \
-          && docker stop cartobio-api-staging \
-          && docker container rm cartobio-api-staging \
-          && docker run -d --restart unless-stopped \
-            -p 127.0.0.1:7500:8000 \
+          && docker stop cartobio-api-staging || true \
+          && docker container rm cartobio-api-staging || true \
+          && docker run -d --restart always \
+            -p 7500:8000 \
             --env-file=.env.cartobio-api-staging \
             --env SENTRY_RELEASE=${{ needs.build.outputs.version }}-dev-${{ github.sha }} \
             --name cartobio-api-staging \
@@ -127,21 +127,19 @@ jobs:
     steps:
     - uses: garygrossgarten/github-action-ssh@0.7.0
       with:
-        host: ${{ secrets.AGENCEBIO_SSH_HOST }}
+        host: ${{ secrets.AGENCEBIO_PREPROD_SSH_HOST }}
         username: ${{ secrets.AGENCEBIO_SSH_USERNAME }}
         privateKey: ${{ secrets.AGENCEBIO_SSH_PRIVATE_KEY }}
         command: |
           docker pull ${{ needs.build.outputs.image }} \
-          && docker stop cartobio-api-test \
-          && docker container rm cartobio-api-test \
-          && docker run -d --restart unless-stopped \
-            --network cartobio-test \
-            -p 127.0.0.1:7501:8000 \
+          && docker stop cartobio-api-test || true \
+          && docker container rm cartobio-api-test || true \
+          && docker run -d --restart always \
+            -p 7501:8000 \
             --env-file=.env.cartobio-api-test \
             --env SENTRY_RELEASE=${{ needs.build.outputs.version }}-test-${{ github.sha }} \
             --name cartobio-api-test \
-            ${{ needs.build.outputs.image }} \
-          && docker network connect bridge cartobio-api-test
+            ${{ needs.build.outputs.image }}
   deploy-production:
     needs: [build]
     if: startsWith(github.ref, 'refs/tags/')
@@ -157,7 +155,7 @@ jobs:
           docker pull ${{ needs.build.outputs.image }} \
           && docker stop cartobio-api-production \
           && docker container rm cartobio-api-production \
-          && docker run -d --restart unless-stopped \
+          && docker run -d --restart always \
             -p 127.0.0.1:8000:8000 \
             --env-file=.env.cartobio-api-production \
             --name cartobio-api-production \
