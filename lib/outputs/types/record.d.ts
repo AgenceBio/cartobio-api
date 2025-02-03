@@ -1,22 +1,29 @@
-import type {DBOperatorRecord} from "../../providers/types/cartobio.d.ts";
-import type {AgenceBioNormalizedOperator} from "./operator.d.ts";
-import type {CartoBioFeatureCollection} from "./features.d.ts";
+import type { DBOperatorRecord } from "../../providers/types/cartobio.d.ts";
+import type { AgenceBioNormalizedOperator } from "./operator.d.ts";
+import type { CartoBioFeatureCollection } from "./features.d.ts";
 
 /**
  * A database record normalized to be used in Cartobio, with operator data from Agence Bio
  */
 export type NormalizedRecord = Omit<
     DBOperatorRecord,
-    'parcelles' | 'audit_date' | 'certification_date_debut' | 'certification_date_fin'
+    | "parcelles"
+    | "audit_date"
+    | "certification_date_debut"
+    | "certification_date_fin"
+    | "oc_id"
+    | "audit_notes"
 > & {
     audit_date?: string;
     certification_date_debut?: string;
     certification_date_fin?: string;
-    parcelles: CartoBioFeatureCollection ;
+    parcelles: CartoBioFeatureCollection;
     operator?: AgenceBioNormalizedOperator;
+    oc_id?: number;
+    audit_notes?: string;
 };
 
-export type NormalizedRecordSummary = Omit<NormalizedRecord, 'parcelles'> & {
-    parcelles: number,
-    surface: number
+export type NormalizedRecordSummary = Omit<NormalizedRecord, "parcelles"> & {
+    parcelles: number;
+    surface: number;
 };
