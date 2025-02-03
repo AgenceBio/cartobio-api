@@ -10,8 +10,8 @@ module.exports.loadRecordFixture = async function (data = records) {
         INSERT INTO cartobio_operators
         (record_id, version_name, numerobio, certification_state, certification_date_debut,
          certification_date_fin, audit_date, audit_notes, audit_demandes, audit_history, metadata, oc_id,
-         oc_label, updated_at, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, $12, $13, now(), now())
+         oc_label, updated_at, created_at, annee_reference_controle)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, $12, $13, now(), now(), $14)
       `,
       [
       /*  $1 */ record.record_id,
@@ -26,7 +26,8 @@ module.exports.loadRecordFixture = async function (data = records) {
         /* $10 */ JSON.stringify(record.audit_history),
         /* $11 */ record.metadata,
         /* $12 */ record.oc_id,
-        /* $13 */ record.oc_label
+        /* $13 */ record.oc_label,
+        /* $14 */ record.annee_reference_controle
       ]
     )
   }
