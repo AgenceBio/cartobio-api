@@ -344,7 +344,7 @@ app.register(async (app) => {
       .then(record => reply.code(200).send(normalizeRecord(record)))
   })
 
-  app.post('/api/v2/audits/:recordId/parcelles/:featureId/', mergeSchemas(protectedWithToken(), routeWithRecordId, operatorFromRecordId), (request, reply) => {
+  app.post('/api/v2/audits/:recordId/parcelles/:featureId', mergeSchemas(protectedWithToken(), routeWithRecordId, operatorFromRecordId), (request, reply) => {
     const { user, record, operator } = request
     const reason = request.body
     const featureId = request.params
