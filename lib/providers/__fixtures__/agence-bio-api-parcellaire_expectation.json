@@ -181,9 +181,9 @@
         }
       ]
     },
+    "annee_reference_controle": 2022,
     "metadata": {
       "anneeAssolement": 2022,
-      "anneeReferenceControle": 2022,
       "source": "API Parcellaire"
     }
   }

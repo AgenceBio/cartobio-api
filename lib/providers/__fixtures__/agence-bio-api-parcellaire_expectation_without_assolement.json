@@ -62,9 +62,9 @@
     "certification_date_debut": null,
     "certification_date_fin": null,
     "audit_date": "2023-04-27T00:00:00.000Z",
+    "annee_reference_controle": 2022,
     "metadata": {
-      "source": "API Parcellaire",
-      "anneeReferenceControle": 2022
+      "source": "API Parcellaire"
     }
   }
 }
