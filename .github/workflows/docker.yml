@@ -77,6 +77,7 @@ jobs:
         NOTIFICATIONS_AB_SSO_CLIENT_SECRET: "test"
 
     - name: Login to Docker Hub
+      if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/test' || startsWith(github.ref, 'refs/tags/') }}
       run: echo "${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}" | docker login -u ${{ secrets.DOCKER_HUB_USERNAME }} --password-stdin
 
     - name: Assign Docker ref
