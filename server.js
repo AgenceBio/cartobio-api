@@ -319,11 +319,16 @@ app.register(async (app) => {
    * Absent properties are kept as is, new properties are added, existing properties are updated
    * ('culture' field is not a special case, it's just a regular property that can be replaced)
    */
-  app.patch('/api/v2/audits/:recordId/parcelles/:featureId', mergeSchemas(protectedWithToken(), updateFeaturePropertiesSchema, routeWithRecordId), (request, reply) => {
-    const { body: feature, user, record } = request
+  app.patch('/api/v2/audits/:recordId/parcelles/:featureId', mergeSchemas(
+    protectedWithToken(),
+    updateFeaturePropertiesSchema,
+    routeWithRecordId,
+    operatorFromRecordId
+  ), (request, reply) => {
+    const { body: feature, user, record, operator } = request
     const { featureId } = request.params
 
-    return updateFeature({ featureId, user, record }, feature)
+    return updateFeature({ featureId, user, record, operator }, feature)
       .then(record => reply.code(200).send(normalizeRecord(record)))
   })
 
