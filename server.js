@@ -60,7 +60,7 @@ const JSONStream = require('jsonstream-next')
 const { createSigner } = require('fast-jwt')
 
 const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators } = require('./lib/providers/agence-bio.js')
-const { addRecordFeature, addDividFeature, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords } = require('./lib/providers/cartobio.js')
+const { addRecordFeature, addDividFeature, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, exportDataOcId } = require('./lib/providers/cartobio.js')
 const { evvLookup, evvParcellaire, pacageLookup, iterateOperatorLastRecords } = require('./lib/providers/cartobio.js')
 const { parseAnyGeographicalArchive } = require('./lib/providers/gdal.js')
 const { parseTelepacArchive } = require('./lib/providers/telepac.js')
@@ -523,6 +523,11 @@ app.register(async (app) => {
     const cartobioToken = sign(userProfile)
 
     return reply.redirect(`${config.get('frontendUrl')}/login?mode=${mode}&returnto=${returnto}#token=${cartobioToken}`)
+  })
+
+  app.get('/api/v2/exportParcellaire', mergeSchemas(protectedWithToken({ oc: true, cartobio: true })), async (request, reply) => {
+    const data = await exportDataOcId(request.user.organismeCertificateur.id)
+    return reply.code(200).send(data)
   })
 })
 
