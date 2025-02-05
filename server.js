@@ -69,7 +69,7 @@ const { InvalidRequestApiError, NotFoundApiError } = require('./lib/errors.js')
 
 const { mergeSchemas, swaggerConfig, CartoBioDecoratorsPlugin } = require('./lib/routes/index.js')
 const { sandboxSchema, internalSchema, hiddenSchema } = require('./lib/routes/index.js')
-const { operatorFromNumeroBio, protectedWithToken, routeWithRecordId, routeWithPacage } = require('./lib/routes/index.js')
+const { operatorFromNumeroBio, operatorFromRecordId, protectedWithToken, routeWithRecordId, routeWithPacage, checkCertificationStatus } = require('./lib/routes/index.js')
 const { operatorsSchema, certificationBodySearchSchema } = require('./lib/routes/index.js')
 const { createFeatureSchema, createRecordSchema, deleteSingleFeatureSchema, patchFeatureCollectionSchema, patchRecordSchema, updateFeaturePropertiesSchema } = require('./lib/routes/records.js')
 const { geofoliaImportSchema } = require('./lib/routes/index.js')
@@ -222,13 +222,18 @@ app.register(async (app) => {
    */
   app.get('/api/v2/operator/:numeroBio/records', mergeSchemas(protectedWithToken(), operatorFromNumeroBio), async (request, reply) => {
     const records = await getRecords(request.params.numeroBio)
-    return reply.code(200).send(records)
+
+    if (!request.user.organismeCertificateur || request.user.organismeCertificateur.id === request.operator.organismeCertificateur.id) {
+      return reply.code(200).send(records)
+    }
+
+    return reply.code(200).send(records.filter((r) => r.oc_id === request.user.organismeCertificateur.id))
   })
 
   /**
    * Retrieve a given Record
    */
-  app.get('/api/v2/audits/:recordId', mergeSchemas(routeWithRecordId, protectedWithToken()), (request, reply) => {
+  app.get('/api/v2/audits/:recordId', mergeSchemas(protectedWithToken(), operatorFromRecordId), (request, reply) => {
     return reply.code(200).send(request.record)
   })
 
@@ -238,6 +243,7 @@ app.register(async (app) => {
   app.post('/api/v2/operator/:numeroBio/records', mergeSchemas(
     createRecordSchema,
     operatorFromNumeroBio,
+    checkCertificationStatus,
     protectedWithToken()
   ), async (request, reply) => {
     const { numeroBio } = request.params
@@ -252,7 +258,7 @@ app.register(async (app) => {
   /**
    * Delete a given Record
    */
-  app.delete('/api/v2/audits/:recordId', mergeSchemas(routeWithRecordId, protectedWithToken()), async (request, reply) => {
+  app.delete('/api/v2/audits/:recordId', mergeSchemas(protectedWithToken(), routeWithRecordId), async (request, reply) => {
     const { user, record } = request
     await deleteRecord({ user, record })
     return reply.code(204).send()
@@ -262,21 +268,31 @@ app.register(async (app) => {
    * Partial update Record's metadata (top-level properties except features)
    * It also keep track of new HistoryEvent along the way, depending who and when you update feature properties
    */
-  app.patch('/api/v2/audits/:recordId', mergeSchemas(protectedWithToken(), patchRecordSchema, routeWithRecordId), (request, reply) => {
-    const { body: patch, user, record } = request
+  app.patch('/api/v2/audits/:recordId', mergeSchemas(
+    protectedWithToken(),
+    patchRecordSchema,
+    operatorFromRecordId,
+    routeWithRecordId
+  ), (request, reply) => {
+    const { body: patch, user, record, operator } = request
 
-    return updateAuditRecordState({ user, record }, patch)
+    return updateAuditRecordState({ user, record, operator }, patch)
       .then(record => reply.code(200).send(normalizeRecord(record)))
   })
 
   /**
    * Add new feature entries to an existing collection
    */
-  app.post('/api/v2/audits/:recordId/parcelles', mergeSchemas(protectedWithToken(), createFeatureSchema, routeWithRecordId), (request, reply) => {
+  app.post('/api/v2/audits/:recordId/parcelles', mergeSchemas(
+    protectedWithToken(),
+    createFeatureSchema,
+    routeWithRecordId,
+    operatorFromRecordId
+  ), (request, reply) => {
     const { feature } = request.body
-    const { user, record } = request
+    const { user, record, operator } = request
 
-    return addRecordFeature({ user, record }, feature)
+    return addRecordFeature({ user, record, operator }, feature)
       .then(record => reply.code(200).send(normalizeRecord(record)))
   })
 
@@ -285,10 +301,15 @@ app.register(async (app) => {
    *
    * Matching features are updated, features not present in payload or database are ignored
    */
-  app.patch('/api/v2/audits/:recordId/parcelles', mergeSchemas(protectedWithToken(), patchFeatureCollectionSchema, routeWithRecordId), (request, reply) => {
-    const { body: featureCollection, user, record } = request
+  app.patch('/api/v2/audits/:recordId/parcelles', mergeSchemas(
+    protectedWithToken(),
+    patchFeatureCollectionSchema,
+    routeWithRecordId,
+    operatorFromRecordId
+  ), (request, reply) => {
+    const { body: featureCollection, user, record, operator } = request
 
-    return patchFeatureCollection({ user, record }, featureCollection.features)
+    return patchFeatureCollection({ user, record, operator }, featureCollection.features)
       .then(record => reply.code(200).send(normalizeRecord(record)))
   })
 
@@ -298,32 +319,42 @@ app.register(async (app) => {
    * Absent properties are kept as is, new properties are added, existing properties are updated
    * ('culture' field is not a special case, it's just a regular property that can be replaced)
    */
-  app.patch('/api/v2/audits/:recordId/parcelles/:featureId', mergeSchemas(protectedWithToken(), updateFeaturePropertiesSchema, routeWithRecordId), (request, reply) => {
-    const { body: feature, user, record } = request
+  app.patch('/api/v2/audits/:recordId/parcelles/:featureId', mergeSchemas(
+    protectedWithToken(),
+    updateFeaturePropertiesSchema,
+    routeWithRecordId,
+    operatorFromRecordId
+  ), (request, reply) => {
+    const { body: feature, user, record, operator } = request
     const { featureId } = request.params
 
-    return updateFeature({ featureId, user, record }, feature)
+    return updateFeature({ featureId, user, record, operator }, feature)
       .then(record => reply.code(200).send(normalizeRecord(record)))
   })
 
   /**
    * Delete a single feature
    */
-  app.delete('/api/v2/audits/:recordId/parcelles/:featureId', mergeSchemas(protectedWithToken(), deleteSingleFeatureSchema, routeWithRecordId), (request, reply) => {
-    const { user, record } = request
+  app.delete('/api/v2/audits/:recordId/parcelles/:featureId', mergeSchemas(
+    protectedWithToken(),
+    deleteSingleFeatureSchema,
+    routeWithRecordId,
+    operatorFromRecordId
+  ), (request, reply) => {
+    const { user, record, operator } = request
     const { reason } = request.body
     const { featureId } = request.params
 
-    return deleteSingleFeature({ featureId, user, record }, { reason })
+    return deleteSingleFeature({ featureId, user, record, operator }, { reason })
       .then(record => reply.code(200).send(normalizeRecord(record)))
   })
 
-  app.post('/api/v2/audits/:recordId/parcelles/:featureId/', mergeSchemas(protectedWithToken(), routeWithRecordId), (request, reply) => {
-    const { user, record } = request
+  app.post('/api/v2/audits/:recordId/parcelles/:featureId', mergeSchemas(protectedWithToken(), routeWithRecordId, operatorFromRecordId), (request, reply) => {
+    const { user, record, operator } = request
     const reason = request.body
     const featureId = request.params
 
-    return addDividFeature(user, record, reason, featureId)
+    return addDividFeature(user, record, operator, reason, featureId)
       .then(record => reply.code(200).send(normalizeRecord(record)))
   })
 

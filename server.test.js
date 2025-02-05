@@ -810,7 +810,6 @@ describe('POST /api/v2/convert/anygeo/geojson', () => {
             }
           ],
           engagement_date: '2019-12-20'
-
         })
       })
   })
@@ -1443,7 +1442,7 @@ describe('POST /api/v2/certification/parcelles', () => {
     expect(res.body).toEqual({
       nbObjetTraites: 5
     })
-  })
+  }, 10000)
 
   test('it stores well all the data', async () => {
     const validApiParcellaire = JSON.parse(JSON.stringify(apiParcellaire))

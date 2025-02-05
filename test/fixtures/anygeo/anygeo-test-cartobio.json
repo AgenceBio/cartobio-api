@@ -34,6 +34,8 @@
         "cadastre": [
           "70421000ZP0072"
         ],
+        "TYPE": "type",
+        "CODE_VAR": null,
         "createdAt": "2024-01-30T09:17:36.000Z",
         "updatedAt": "2024-01-30T09:18:03.000Z"
       },
@@ -82,7 +84,9 @@
         "NUMERO_P": "1",
         "cadastre": null,
         "createdAt": null,
-        "updatedAt": "2024-04-23T05:56:34.771Z"
+        "updatedAt": "2024-04-23T05:56:34.771Z",
+        "TYPE": "test",
+        "CODE_VAR": "0007"
       },
       "geometry": {
         "coordinates": [

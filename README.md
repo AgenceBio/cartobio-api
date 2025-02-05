@@ -67,10 +67,10 @@ Ouvrir :
 
 ```sh
 # Ajouter
-./node_modules/.bin/db-migrate up:fixtures
+./node_modules/.bin/db-migrate up
 
 # Retirer
-./node_modules/.bin/db-migrate down:fixtures
+./node_modules/.bin/db-migrate down
 ```
 
 ### Exécution des tests
