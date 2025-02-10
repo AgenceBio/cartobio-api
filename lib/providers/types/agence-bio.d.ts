@@ -37,67 +37,40 @@ export type AgenceBioOperator = {
     departementId: number;
     photo: any[];
     sitesWeb: string[];
-    activites: AgenceBioActivity[];
     notifications?: AgenceBioNotification[] | undefined;
-    certificats?: AgenceBioCertificate[] | undefined;
     adressesOperateurs?: AgenceBioAdresses[];
 };
-export type AgenceBioCertificate = {
-    organisme: string;
-    date: string;
-    url: string;
-    /**
-     * - TODO check it does really exists and otherwise update deriveOrganismeCertificateurFromOperator
-     */
-    organismeCertificateurId: number;
-};
+
 export type AgenceBioNotification = {
     id: number;
-    active: boolean;
     dateArret?: string | undefined;
-    dateChangementEffet?: string | undefined;
     dateDemarrage?: string | undefined;
-    dateFinRetrait?: string | undefined;
-    dateFinSuspension?: string | undefined;
-    dateHabilitation?: string | undefined;
-    dateRetrait?: string | undefined;
-    dateSignatureContrat?: string | undefined;
-    dateSuspension?: string | undefined;
-    dispenseOc: boolean;
-    dispenseOcMotif?: string | undefined;
     etatCertification: string;
-    motifRefus?: string | undefined;
-    motifDelete?: string | undefined;
-    operateurId: number;
-    organismeCertificateur: OrganismeCertificateur;
-    numeroNotification?: string | undefined;
     numeroClient?: string | undefined;
-    organisme: string;
-    date: string;
     status: string;
-    url?: string | undefined;
-    activites: AgenceBioActivity[];
-    productions: AgenceBioProduction[];
+    organismeCertificateurId: number | null;
+    organisme: string | null;
+    activites: AgenceBioActivity[] | null;
 };
 
 /**
  * This is what we output
  */
 export type AgenceBioAdresseGeo = {
-  codeCommune: string,
-  lat: number,
-  long: number,
-}
+    codeCommune: string;
+    lat: number;
+    long: number;
+};
 
 /**
  * This is what we consume
  */
 export type AgenceBioAdresses = AgenceBioAdresseGeo & {
-  active: boolean;
-  lieu: string;
-  dates: string;
-  codePostal: string;
-  ville: string
+    active: boolean;
+    lieu: string;
+    dates: string;
+    codePostal: string;
+    ville: string;
 };
 /**
  * Only some endpoints provide this data
