@@ -12,20 +12,19 @@
   "codeNAF": "",
   "departementId": 1,
   "sitesWeb": ["http://example.com"],
-  "activites": [
-    {
-      "id": 1,
-      "nom": "Production"
-    }
-  ],
   "productions": [],
-  "notifications": [],
-  "certificats": [
+  "notifications": [
     {
       "organismeCertificateurId": 999,
       "organisme": "OC fictif",
       "date": "2023-01-01",
-      "url": "http://example.net/certificats/id/1-2-3-4"
+      "url": "http://example.net/certificats/id/1-2-3-4",
+      "activites": [
+        {
+          "id": 1,
+          "nom": "Production"
+        }
+      ]
     }
   ]
 }

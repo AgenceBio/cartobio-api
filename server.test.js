@@ -890,7 +890,6 @@ describe('GET /api/v2/certification/search', () => {
                 ...normalizeOperator(agencebioOperator),
                 dateEngagement: '',
                 datePremierEngagement: null,
-                notifications: [],
                 record_id: '054f0d70-c3da-448f-823e-81fcf7c2bf6e',
                 certification_state: 'PENDING_CERTIFICATION',
                 audit_date: '2023-09-07'
@@ -918,7 +917,6 @@ describe('GET /api/v2/certification/search', () => {
                 ...normalizeOperator(agencebioOperator),
                 dateEngagement: '',
                 datePremierEngagement: null,
-                notifications: [],
                 record_id: '054f0d70-c3da-448f-823e-81fcf7c2bf6e',
                 certification_state: 'PENDING_CERTIFICATION',
                 audit_date: '2023-09-07'
@@ -946,7 +944,6 @@ describe('GET /api/v2/certification/search', () => {
                 ...normalizeOperator(agencebioOperator),
                 dateEngagement: '',
                 datePremierEngagement: null,
-                notifications: [],
                 record_id: '054f0d70-c3da-448f-823e-81fcf7c2bf6e',
                 certification_state: 'PENDING_CERTIFICATION',
                 audit_date: '2023-09-07'
@@ -974,7 +971,6 @@ describe('GET /api/v2/certification/search', () => {
                 ...normalizeOperator(agencebioOperator),
                 dateEngagement: '',
                 datePremierEngagement: null,
-                notifications: [],
                 record_id: '054f0d70-c3da-448f-823e-81fcf7c2bf6e',
                 certification_state: 'PENDING_CERTIFICATION',
                 audit_date: '2023-09-07'
@@ -1611,20 +1607,15 @@ describe('GET /api/v2/operators', () => {
   test('it returns the correct list of operators for a given user', async () => {
     getMock.mockReturnValueOnce({
       async json () {
-        return {
-          nbTotal: 10,
-          items: Array(5).fill(agencebioOperator)
-        }
+        return Array(5).fill(agencebioOperator)
       }
     })
 
     const response = await request(app.server)
       .get('/api/v2/operators')
       .set('Authorization', USER_DOC_AUTH_HEADER)
-      .query({ limit: 5, offset: 0 })
 
     expect(response.status).toBe(200)
-    expect(response.body).toHaveProperty('nbTotal', 10)
     expect(response.body).toHaveProperty('operators')
     expect(response.body.operators).toHaveLength(5)
     expect(response.body.operators[0]).toMatchObject(normalizeOperator(agencebioOperator))

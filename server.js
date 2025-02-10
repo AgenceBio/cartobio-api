@@ -70,7 +70,7 @@ const { InvalidRequestApiError, NotFoundApiError } = require('./lib/errors.js')
 const { mergeSchemas, swaggerConfig, CartoBioDecoratorsPlugin } = require('./lib/routes/index.js')
 const { sandboxSchema, internalSchema, hiddenSchema } = require('./lib/routes/index.js')
 const { operatorFromNumeroBio, operatorFromRecordId, protectedWithToken, routeWithRecordId, routeWithPacage, checkCertificationStatus } = require('./lib/routes/index.js')
-const { operatorsSchema, certificationBodySearchSchema } = require('./lib/routes/index.js')
+const { certificationBodySearchSchema } = require('./lib/routes/index.js')
 const { createFeatureSchema, createRecordSchema, deleteSingleFeatureSchema, patchFeatureCollectionSchema, patchRecordSchema, updateFeaturePropertiesSchema } = require('./lib/routes/records.js')
 const { geofoliaImportSchema } = require('./lib/routes/index.js')
 
@@ -199,11 +199,11 @@ app.register(async (app) => {
    * @private
    * Retrieve operators for a given user
    */
-  app.get('/api/v2/operators', mergeSchemas(protectedWithToken({ cartobio: true }), operatorsSchema), (request, reply) => {
+  app.get('/api/v2/operators', mergeSchemas(protectedWithToken({ cartobio: true })/*, operatorsSchema */), (request, reply) => {
     const { id: userId } = request.user
-    const { limit, offset } = request.query
+    //  const { limit, offset } = request.query
 
-    return fetchUserOperators(userId, limit, offset)
+    return fetchUserOperators(userId)
       .then(res => { res.operators = res.operators.filter((e) => e.isProduction === true); return res })
       .then(res => reply.code(200).send(res))
   })
