@@ -215,7 +215,8 @@ app.register(async (app) => {
 
         return e.denominationCourante.toLowerCase().includes(userInput) ||
           e.numeroBio.toString().includes(userInput) ||
-          e.nom.toLowerCase().includes(userInput)
+          e.nom.toLowerCase().includes(userInput) ||
+          e.siret.toLowerCase().includes(userInput)
       })
       .toSorted(recordSorts('fn', 'notifications', 'desc'))
       .slice(offset, offset + limit)
