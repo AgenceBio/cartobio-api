@@ -60,7 +60,7 @@ const JSONStream = require('jsonstream-next')
 const { createSigner } = require('fast-jwt')
 
 const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators } = require('./lib/providers/agence-bio.js')
-const { addRecordFeature, addDividFeature, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords } = require('./lib/providers/cartobio.js')
+const { addRecordFeature, addDividFeature, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, recordSorts } = require('./lib/providers/cartobio.js')
 const { evvLookup, evvParcellaire, pacageLookup, iterateOperatorLastRecords } = require('./lib/providers/cartobio.js')
 const { parseAnyGeographicalArchive } = require('./lib/providers/gdal.js')
 const { parseTelepacArchive } = require('./lib/providers/telepac.js')
@@ -70,7 +70,7 @@ const { InvalidRequestApiError, NotFoundApiError } = require('./lib/errors.js')
 const { mergeSchemas, swaggerConfig, CartoBioDecoratorsPlugin } = require('./lib/routes/index.js')
 const { sandboxSchema, internalSchema, hiddenSchema } = require('./lib/routes/index.js')
 const { operatorFromNumeroBio, operatorFromRecordId, protectedWithToken, routeWithRecordId, routeWithPacage, checkCertificationStatus } = require('./lib/routes/index.js')
-const { certificationBodySearchSchema } = require('./lib/routes/index.js')
+const { operatorsSchema, certificationBodySearchSchema } = require('./lib/routes/index.js')
 const { createFeatureSchema, createRecordSchema, deleteSingleFeatureSchema, patchFeatureCollectionSchema, patchRecordSchema, updateFeaturePropertiesSchema } = require('./lib/routes/records.js')
 const { geofoliaImportSchema } = require('./lib/routes/index.js')
 
@@ -199,12 +199,29 @@ app.register(async (app) => {
    * @private
    * Retrieve operators for a given user
    */
-  app.get('/api/v2/operators', mergeSchemas(protectedWithToken({ cartobio: true })/*, operatorsSchema */), (request, reply) => {
+  app.get('/api/v2/operators', mergeSchemas(protectedWithToken({ cartobio: true }), operatorsSchema), async (request, reply) => {
     const { id: userId } = request.user
-    //  const { limit, offset } = request.query
+    const { search, limit, offset } = request.query
 
-    return fetchUserOperators(userId)
-      .then(res => reply.code(200).send(res))
+    const { operators } = await fetchUserOperators(userId)
+
+    const paginatedOperators = operators
+      .filter((e) => {
+        if (!search) {
+          return true
+        }
+
+        const userInput = search.toLowerCase().trim()
+
+        return e.denominationCourante.toLowerCase().includes(userInput) ||
+          e.numeroBio.toString().includes(userInput) ||
+          e.nom.toLowerCase().includes(userInput) ||
+          e.siret.toLowerCase().includes(userInput)
+      })
+      .toSorted(recordSorts('fn', 'notifications', 'desc'))
+      .slice(offset, offset + limit)
+
+    return reply.code(200).send({ nbTotal: operators.length, operators: paginatedOperators })
   })
 
   /**

@@ -1614,8 +1614,10 @@ describe('GET /api/v2/operators', () => {
     const response = await request(app.server)
       .get('/api/v2/operators')
       .set('Authorization', USER_DOC_AUTH_HEADER)
+      .query({ limit: 5, offset: 0 })
 
     expect(response.status).toBe(200)
+    expect(response.body).toHaveProperty('nbTotal', 5)
     expect(response.body).toHaveProperty('operators')
     expect(response.body.operators).toHaveLength(5)
     expect(response.body.operators[0]).toMatchObject(normalizeOperator(agencebioOperator))
