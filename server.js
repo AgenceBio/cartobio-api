@@ -60,7 +60,7 @@ const JSONStream = require('jsonstream-next')
 const { createSigner } = require('fast-jwt')
 
 const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators, fetchUserOperatorsForDashboard } = require('./lib/providers/agence-bio.js')
-const { addRecordFeature, addDividFeature, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, recordSorts, pinOperator, unpinOperator, consultOperator } = require('./lib/providers/cartobio.js')
+const { addRecordFeature, addDividFeature, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, getDepartement, recordSorts, pinOperator, unpinOperator, consultOperator } = require('./lib/providers/cartobio.js')
 const { evvLookup, evvParcellaire, pacageLookup, iterateOperatorLastRecords } = require('./lib/providers/cartobio.js')
 const { parseAnyGeographicalArchive } = require('./lib/providers/gdal.js')
 const { parseTelepacArchive } = require('./lib/providers/telepac.js')
@@ -188,12 +188,12 @@ app.register(async (app) => {
    * @private
    */
   app.post('/api/v2/certification/search', mergeSchemas(certificationBodySearchSchema, protectedWithToken()), async (request, reply) => {
-    const { input, page, sort, order } = request.body
+    const { input, page, sort, order, filter } = request.body
     const { id: ocId } = request.user.organismeCertificateur
 
     return Promise.all(
       [
-        searchControlBodyRecords({ ocId, input, page, sort, order }),
+        searchControlBodyRecords({ ocId, input, page, sort, order, filter }),
         getPinnedOperators(request.user.id)
       ]
     ).then(([{ pagination, records }, pinnedOperators]) => {
@@ -625,6 +625,11 @@ app.register(async (app) => {
       // @todo use Notification pubkey and time based token to passthrough the requests to both Agence Bio and CartoBio APIs
       token: sign(userProfile)
     })
+  })
+
+  app.get('/api/v2/departements', mergeSchemas(protectedWithToken()), async (request, reply) => {
+    const departements = await getDepartement()
+    return reply.code(200).send(departements)
   })
 
   // usefull only in dev mode
