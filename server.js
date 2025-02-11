@@ -204,7 +204,6 @@ app.register(async (app) => {
     const { limit, offset } = request.query
 
     return fetchUserOperators(userId, limit, offset)
-      .then(res => { res.operators = res.operators.filter((e) => e.isProduction === true); return res })
       .then(res => reply.code(200).send(res))
   })
 
