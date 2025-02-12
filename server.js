@@ -60,7 +60,11 @@ const JSONStream = require('jsonstream-next')
 const { createSigner } = require('fast-jwt')
 
 const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators } = require('./lib/providers/agence-bio.js')
+<<<<<<< Updated upstream
 const { addRecordFeature, addDividFeature, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, recordSorts } = require('./lib/providers/cartobio.js')
+=======
+const { addRecordFeature, addDividFeature, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, pinOperator, unpinOperator } = require('./lib/providers/cartobio.js')
+>>>>>>> Stashed changes
 const { evvLookup, evvParcellaire, pacageLookup, iterateOperatorLastRecords } = require('./lib/providers/cartobio.js')
 const { parseAnyGeographicalArchive } = require('./lib/providers/gdal.js')
 const { parseTelepacArchive } = require('./lib/providers/telepac.js')
@@ -83,6 +87,7 @@ const { UnauthorizedApiError, errorHandler } = require('./lib/errors.js')
 const { normalizeRecord } = require('./lib/outputs/record')
 const { recordToApi } = require('./lib/outputs/api')
 const { isHandledError } = require('./lib/errors')
+const { getPinnedOperators } = require('./lib/outputs/operator.js')
 const sign = createSigner({ key: config.get('jwtSecret'), expiresIn: DURATION_ONE_DAY * 30 })
 
 app.setErrorHandler(errorHandler)
@@ -203,9 +208,14 @@ app.register(async (app) => {
     const { id: userId } = request.user
     const { search, limit, offset } = request.query
 
-    const { operators } = await fetchUserOperators(userId)
+    return Promise.all(
+      [
+        fetchUserOperators(userId, limit, offset),
+        getPinnedOperators(request.user.id)
+      ]
+    ).then(([res, pinnedOperators]) => {
 
-    const paginatedOperators = operators
+      const paginatedOperators = operators
       .filter((e) => {
         if (!search) {
           return true
@@ -220,18 +230,46 @@ app.register(async (app) => {
       })
       .toSorted(recordSorts('fn', 'notifications', 'desc'))
       .slice(offset, offset + limit)
+      .map((o) => ({ ...o, epingle: pinnedOperators.includes(+o.numeroBio) }))
 
-    return reply.code(200).send({ nbTotal: operators.length, operators: paginatedOperators })
+      return reply.code(200).send({ nbTotal: operators.length, operators: paginatedOperators })
+    })
   })
 
   /**
    * @private
    * Retrieve an operator
    */
-  app.get('/api/v2/operator/:numeroBio', mergeSchemas(protectedWithToken(), operatorFromNumeroBio), (request, reply) => {
+  app.get('/api/v2/operator/:numeroBio', mergeSchemas(protectedWithToken(), operatorFromNumeroBio), async (request, reply) => {
+    const pinnedOperators = await getPinnedOperators(request.user.id)
+
+    console.log(pinnedOperators)
+    request.operator.epingle = pinnedOperators.includes(+request.operator.numeroBio)
+
     return reply.code(200).send(request.operator)
   })
 
+  /**
+   * @private
+   * Pin an operator
+   */
+  app.post('/api/v2/operator/:numeroBio/pin', mergeSchemas(protectedWithToken(), operatorFromNumeroBio), async (request, reply) => {
+    await pinOperator(request.operator.numeroBio, request.user.id)
+
+    return reply.code(200).send({ ...request.operator, epingle: true })
+  })
+
+  /**
+   * @private
+   * Unin an operator
+   */
+  app.post('/api/v2/operator/:numeroBio/unpin', mergeSchemas(protectedWithToken(), operatorFromNumeroBio), async (request, reply) => {
+    await unpinOperator(request.operator.numeroBio, request.user.id)
+
+    return reply.code(200).send({ ...request.operator, epingle: false })
+  })
+
+  /**
   /**
    * @private
    * Retrieve an operator records
