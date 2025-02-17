@@ -59,12 +59,8 @@ const JSONStream = require('jsonstream-next')
 
 const { createSigner } = require('fast-jwt')
 
-const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators } = require('./lib/providers/agence-bio.js')
-<<<<<<< Updated upstream
-const { addRecordFeature, addDividFeature, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, recordSorts } = require('./lib/providers/cartobio.js')
-=======
-const { addRecordFeature, addDividFeature, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, pinOperator, unpinOperator } = require('./lib/providers/cartobio.js')
->>>>>>> Stashed changes
+const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators, fetchUserOperatorsForDashboard } = require('./lib/providers/agence-bio.js')
+const { addRecordFeature, addDividFeature, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, recordSorts, pinOperator, unpinOperator } = require('./lib/providers/cartobio.js')
 const { evvLookup, evvParcellaire, pacageLookup, iterateOperatorLastRecords } = require('./lib/providers/cartobio.js')
 const { parseAnyGeographicalArchive } = require('./lib/providers/gdal.js')
 const { parseTelepacArchive } = require('./lib/providers/telepac.js')
@@ -195,9 +191,16 @@ app.register(async (app) => {
     const { input, page, sort, order } = request.body
     const { id: ocId } = request.user.organismeCertificateur
 
-    const { pagination, records } = await searchControlBodyRecords({ ocId, input, page, sort, order })
+    return Promise.all(
+      [
+        searchControlBodyRecords({ ocId, input, page, sort, order }),
+        getPinnedOperators(request.user.id)
+      ]
+    ).then(([{ pagination, records }, pinnedOperators]) => {
+      const recordsWithPinnedStatus = records.map((r) => ({ ...r, epingle: pinnedOperators.includes(+r.numeroBio) }))
 
-    return reply.code(200).send({ pagination, records })
+      return reply.code(200).send({ pagination, records: recordsWithPinnedStatus })
+    })
   })
 
   /**
@@ -214,26 +217,37 @@ app.register(async (app) => {
         getPinnedOperators(request.user.id)
       ]
     ).then(([res, pinnedOperators]) => {
+      const paginatedOperators = res.operators
+        .filter((e) => {
+          if (!search) {
+            return true
+          }
 
-      const paginatedOperators = operators
-      .filter((e) => {
-        if (!search) {
-          return true
-        }
+          const userInput = search.toLowerCase().trim()
 
-        const userInput = search.toLowerCase().trim()
+          return e.denominationCourante.toLowerCase().includes(userInput) ||
+            e.numeroBio.toString().includes(userInput) ||
+            e.nom.toLowerCase().includes(userInput) ||
+            e.siret.toLowerCase().includes(userInput)
+        })
+        .toSorted(recordSorts('fn', 'notifications', 'desc'))
+        .slice(offset, offset + limit)
+        .map((o) => ({ ...o, epingle: pinnedOperators.includes(+o.numeroBio) }))
 
-        return e.denominationCourante.toLowerCase().includes(userInput) ||
-          e.numeroBio.toString().includes(userInput) ||
-          e.nom.toLowerCase().includes(userInput) ||
-          e.siret.toLowerCase().includes(userInput)
-      })
-      .toSorted(recordSorts('fn', 'notifications', 'desc'))
-      .slice(offset, offset + limit)
-      .map((o) => ({ ...o, epingle: pinnedOperators.includes(+o.numeroBio) }))
-
-      return reply.code(200).send({ nbTotal: operators.length, operators: paginatedOperators })
+      return reply.code(200).send({ nbTotal: res.operators.length, operators: paginatedOperators })
     })
+  })
+
+  /**
+ * @private
+ * Retrieve operators for a given user for their dashboard
+ */
+  app.get('/api/v2/operators/dashboard', mergeSchemas(protectedWithToken({ cartobio: true })), async (request, reply) => {
+    const { id: userId } = request.user
+
+    const numerobios = await getPinnedOperators(userId)
+    return fetchUserOperatorsForDashboard(numerobios)
+      .then(res => reply.code(200).send(res))
   })
 
   /**
@@ -243,7 +257,6 @@ app.register(async (app) => {
   app.get('/api/v2/operator/:numeroBio', mergeSchemas(protectedWithToken(), operatorFromNumeroBio), async (request, reply) => {
     const pinnedOperators = await getPinnedOperators(request.user.id)
 
-    console.log(pinnedOperators)
     request.operator.epingle = pinnedOperators.includes(+request.operator.numeroBio)
 
     return reply.code(200).send(request.operator)
@@ -253,18 +266,18 @@ app.register(async (app) => {
    * @private
    * Pin an operator
    */
-  app.post('/api/v2/operator/:numeroBio/pin', mergeSchemas(protectedWithToken(), operatorFromNumeroBio), async (request, reply) => {
-    await pinOperator(request.operator.numeroBio, request.user.id)
+  app.post('/api/v2/operator/:numeroBio/pin', mergeSchemas(protectedWithToken()), async (request, reply) => {
+    await pinOperator(request.params.numeroBio, request.user.id)
 
-    return reply.code(200).send({ ...request.operator, epingle: true })
+    return reply.code(200).send({ epingle: true })
   })
 
   /**
    * @private
    * Unin an operator
    */
-  app.post('/api/v2/operator/:numeroBio/unpin', mergeSchemas(protectedWithToken(), operatorFromNumeroBio), async (request, reply) => {
-    await unpinOperator(request.operator.numeroBio, request.user.id)
+  app.post('/api/v2/operator/:numeroBio/unpin', mergeSchemas(protectedWithToken()), async (request, reply) => {
+    await unpinOperator(request.params.numeroBio, request.user.id)
 
     return reply.code(200).send({ ...request.operator, epingle: false })
   })
