@@ -331,6 +331,7 @@ app.register(async (app) => {
   ), async (request, reply) => {
     const { numeroBio } = request.params
     const { id: ocId, nom: ocLabel } = request.operator.organismeCertificateur
+    console.log(request.operator)
     const record = await createOrUpdateOperatorRecord(
       { numerobio: numeroBio, oc_id: ocId, oc_label: ocLabel, ...request.body },
       { user: request.user, copyParcellesData: request.body.importPrevious, previousRecordId: request.body.recordId }
