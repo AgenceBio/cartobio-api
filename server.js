@@ -60,7 +60,7 @@ const JSONStream = require('jsonstream-next')
 const { createSigner } = require('fast-jwt')
 
 const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators, fetchUserOperatorsForDashboard } = require('./lib/providers/agence-bio.js')
-const { addRecordFeature, addDividFeature, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, recordSorts, pinOperator, unpinOperator } = require('./lib/providers/cartobio.js')
+const { addRecordFeature, addDividFeature, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, recordSorts, pinOperator, unpinOperator, consultOperator } = require('./lib/providers/cartobio.js')
 const { evvLookup, evvParcellaire, pacageLookup, iterateOperatorLastRecords } = require('./lib/providers/cartobio.js')
 const { parseAnyGeographicalArchive } = require('./lib/providers/gdal.js')
 const { parseTelepacArchive } = require('./lib/providers/telepac.js')
@@ -83,7 +83,7 @@ const { UnauthorizedApiError, errorHandler } = require('./lib/errors.js')
 const { normalizeRecord } = require('./lib/outputs/record')
 const { recordToApi } = require('./lib/outputs/api')
 const { isHandledError } = require('./lib/errors')
-const { getPinnedOperators } = require('./lib/outputs/operator.js')
+const { getPinnedOperators, getConsultedOperators } = require('./lib/outputs/operator.js')
 const sign = createSigner({ key: config.get('jwtSecret'), expiresIn: DURATION_ONE_DAY * 30 })
 
 app.setErrorHandler(errorHandler)
@@ -239,15 +239,21 @@ app.register(async (app) => {
   })
 
   /**
- * @private
- * Retrieve operators for a given user for their dashboard
- */
+   * @private
+   * Retrieve operators for a given user for their dashboard
+   */
   app.get('/api/v2/operators/dashboard', mergeSchemas(protectedWithToken({ cartobio: true })), async (request, reply) => {
     const { id: userId } = request.user
 
-    const numerobios = await getPinnedOperators(userId)
-    return fetchUserOperatorsForDashboard(numerobios)
-      .then(res => reply.code(200).send(res))
+    return Promise.all([getPinnedOperators(userId), getConsultedOperators(userId)])
+      .then(async ([pinnedNumerobios, consultedNumerobio]) => {
+        const uniqueNumerobios = [...new Set([...pinnedNumerobios, ...consultedNumerobio])]
+        const operators = await fetchUserOperatorsForDashboard(uniqueNumerobios)
+        return await reply.code(200).send({
+          pinnedOperators: pinnedNumerobios.map((numeroBio) => ({ ...operators.find((o) => o.numeroBio === numeroBio), epingle: true })),
+          consultedOperators: consultedNumerobio.map((numeroBio) => ({ ...operators.find((o) => o.numeroBio === numeroBio), epingle: pinnedNumerobios.includes(numeroBio) }))
+        })
+      })
   })
 
   /**
@@ -274,12 +280,22 @@ app.register(async (app) => {
 
   /**
    * @private
-   * Unin an operator
+   * Unpin an operator
    */
   app.post('/api/v2/operator/:numeroBio/unpin', mergeSchemas(protectedWithToken()), async (request, reply) => {
     await unpinOperator(request.params.numeroBio, request.user.id)
 
-    return reply.code(200).send({ ...request.operator, epingle: false })
+    return reply.code(200).send({ epingle: false })
+  })
+
+  /**
+   * @private
+   * Mark an operator as consulted
+   */
+  app.post('/api/v2/operator/:numeroBio/consulte', mergeSchemas(protectedWithToken()), async (request, reply) => {
+    await consultOperator(request.params.numeroBio, request.user.id)
+
+    return reply.code(204).send()
   })
 
   /**
