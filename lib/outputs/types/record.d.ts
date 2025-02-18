@@ -21,6 +21,7 @@ export type NormalizedRecord = Omit<
     operator?: AgenceBioNormalizedOperator;
     oc_id?: number;
     audit_notes?: string;
+    annee_reference_controle?: number;
 };
 
 export type NormalizedRecordSummary = Omit<NormalizedRecord, "parcelles"> & {

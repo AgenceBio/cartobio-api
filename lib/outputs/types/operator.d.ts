@@ -20,7 +20,7 @@ export type AgenceBioNormalizedOperator = {
     departement: string;
     commune: string;
     codePostal: string;
-    notifications: any[];
+    notifications: any;
     isProduction: boolean;
 };
 
