@@ -27,7 +27,7 @@ export type AgenceBioNormalizedOperator = {
 // TODO : this is a bit of duplicate with NormalizedRecord
 //  (we should not have to different objects for sending operator + record)
 export type AgenceBioNormalizedOperatorWithRecord =
-    AgenceBioNormalizedOperator & (NormalizedRecord | { metadata: any });
+    AgenceBioNormalizedOperator & (NormalizedRecord & { metadata: any });
 
 export type AgenceBioNormalizedOperatorWithPinnedStatus =
     AgenceBioNormalizedOperator & { epingle: boolean };
