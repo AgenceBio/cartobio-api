@@ -193,7 +193,7 @@ app.register(async (app) => {
 
     return Promise.all(
       [
-        searchControlBodyRecords({ ocId, input, page, sort, order, filter }),
+        searchControlBodyRecords({ ocId, userId: request.user.id, input, page, sort, order, filter }),
         getPinnedOperators(request.user.id)
       ]
     ).then(([{ pagination, records }, pinnedOperators]) => {
@@ -342,7 +342,6 @@ app.register(async (app) => {
   ), async (request, reply) => {
     const { numeroBio } = request.params
     const { id: ocId, nom: ocLabel } = request.operator.organismeCertificateur
-    console.log(request.operator)
     const record = await createOrUpdateOperatorRecord(
       { numerobio: numeroBio, oc_id: ocId, oc_label: ocLabel, ...request.body },
       { user: request.user, copyParcellesData: request.body.importPrevious, previousRecordId: request.body.recordId }
