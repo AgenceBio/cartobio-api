@@ -82,7 +82,61 @@ async function fetchRegionsBoundaries () {
   }
 }
 
+async function fetchDepartementBoundaries () {
+  // Skip if file already exists
+  const outFile = join(__dirname, '..', 'data', 'departements.json')
+  if (fs.existsSync(outFile)) {
+    console.log('Departement boundaries file already exists, skipping')
+    return
+  }
+
+  const FILENAME = 'departements-50m.geojson.gz'
+  const SOURCE = 'https://etalab-datasets.geo.data.gouv.fr/contours-administratifs/latest/geojson/' + FILENAME
+
+  return pipeline([
+    got.stream(SOURCE),
+    createGunzip(),
+    JSONStream.parse(['features', true]),
+    (source) => stream.Readable.from(source).map(feature => ({
+      code: feature.properties.code,
+      nom: feature.properties.nom,
+      geometry: feature.geometry
+    })),
+    JSONStream.stringify('[\n', ',\n', '\n]'),
+    createWriteStream(outFile)
+  ])
+}
+
+async function fetchAtOnceRegionsBoundaries () {
+  // Skip if file already exists
+  const outFile = join(__dirname, '..', 'data', 'regions.json')
+  if (fs.existsSync(outFile)) {
+    console.log('Departement boundaries file already exists, skipping')
+    return
+  }
+
+  const FILENAME = 'regions-50m.geojson.gz'
+  const SOURCE = 'https://etalab-datasets.geo.data.gouv.fr/contours-administratifs/latest/geojson/' + FILENAME
+
+  const goodCodes = ['11', '24', '27', '28', '32', '44', '52', '53', '75', '76', '84', '93', '94', '01', '02', '03', '04', '06']
+
+  return pipeline([
+    got.stream(SOURCE),
+    createGunzip(),
+    JSONStream.parse(['features', true]),
+    (source) => stream.Readable.from(source).filter(feature => goodCodes.includes(feature.properties.code)).map(feature => ({
+      code: feature.properties.code,
+      nom: feature.properties.nom,
+      geometry: feature.geometry
+    })),
+    JSONStream.stringify('[\n', ',\n', '\n]'),
+    createWriteStream(outFile)
+  ])
+}
+
 (async function () {
   await fetchCommunesBoundaries()
   await fetchRegionsBoundaries()
+  await fetchDepartementBoundaries()
+  await fetchAtOnceRegionsBoundaries()
 })()
