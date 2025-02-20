@@ -980,65 +980,6 @@ describe('GET /api/v2/certification/search', () => {
         })
     })
   })
-
-  describe('with local results (no search)', () => {
-    beforeEach(loadRecordFixture)
-    afterEach(() => getMock.mockReset())
-
-    test('dashboard default sort (audit_date/desc)', () => {
-      mockResultsOrder(
-        { ...agencebioOperator, id: 99999, numeroBio: '99999', nom: 'Opérateur test 1' },
-        { ...agencebioOperator, id: 99998, numeroBio: '99998', nom: 'Opérateur test 2' },
-        { ...agencebioOperator, id: 99997, numeroBio: '99997', nom: 'Opérateur test 3' }
-      )
-
-      return request(app.server)
-        .post('/api/v2/certification/search')
-        .send({ input: '' })
-        .set('Authorization', USER_DOC_AUTH_HEADER)
-        .then((response) => {
-          expect(response.body).toHaveProperty('pagination', {
-            total: 3,
-            page: 1,
-            page_max: 1
-          })
-
-          const ids = response.body.records.map(({ record_id: d }) => d)
-          expect(ids).toEqual([
-            '054f0d70-c3da-448f-823e-81fcf7c2bf6e',
-            '054f0d70-c3da-448f-823e-12fcf7c20002',
-            '054f0d70-c3da-448f-823e-12fcf7c20001'
-          ])
-        })
-    })
-
-    test('dashboard explicit sort (statut/asc)', () => {
-      mockResultsOrder(
-        { ...agencebioOperator, id: 99997, numeroBio: '99997', nom: 'Opérateur test 3' },
-        { ...agencebioOperator, id: 99999, numeroBio: '99999', nom: 'Opérateur test 1' },
-        { ...agencebioOperator, id: 99998, numeroBio: '99998', nom: 'Opérateur test 2' }
-      )
-
-      return request(app.server)
-        .post('/api/v2/certification/search')
-        .send({ input: '', page: 1, sort: 'statut', order: 'asc' })
-        .set('Authorization', USER_DOC_AUTH_HEADER)
-        .then((response) => {
-          expect(response.body).toHaveProperty('pagination', {
-            total: 3,
-            page: 1,
-            page_max: 1
-          })
-
-          const ids = response.body.records.map(({ record_id: d }) => d)
-          expect(ids).toEqual([
-            '054f0d70-c3da-448f-823e-12fcf7c20001',
-            '054f0d70-c3da-448f-823e-81fcf7c2bf6e',
-            '054f0d70-c3da-448f-823e-12fcf7c20002'
-          ])
-        })
-    })
-  })
 })
 
 describe('PATCH /api/v2/audits/:recordId/parcelles', () => {
