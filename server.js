@@ -188,12 +188,12 @@ app.register(async (app) => {
    * @private
    */
   app.post('/api/v2/certification/search', mergeSchemas(certificationBodySearchSchema, protectedWithToken()), async (request, reply) => {
-    const { input, page, sort, order, filter } = request.body
+    const { input, page, filter } = request.body
     const { id: ocId } = request.user.organismeCertificateur
 
     return Promise.all(
       [
-        searchControlBodyRecords({ ocId, userId: request.user.id, input, page, sort, order, filter }),
+        searchControlBodyRecords({ ocId, userId: request.user.id, input, page, filter }),
         getPinnedOperators(request.user.id)
       ]
     ).then(([{ pagination, records }, pinnedOperators]) => {
