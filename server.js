@@ -242,7 +242,7 @@ app.register(async (app) => {
    * @private
    * Retrieve operators for a given user for their dashboard
    */
-  app.get('/api/v2/operators/dashboard', mergeSchemas(protectedWithToken({ cartobio: true })), async (request, reply) => {
+  app.get('/api/v2/operators/dashboard', mergeSchemas(protectedWithToken({ oc: true, cartobio: true })), async (request, reply) => {
     const { id: userId } = request.user
 
     return Promise.all([getPinnedOperators(userId), getConsultedOperators(userId)])
@@ -260,7 +260,7 @@ app.register(async (app) => {
    * @private
    * Retrieve operators for a given user for their dashboard
    */
-  app.post('/api/v2/operators/dashboard-summary', mergeSchemas(dashboardSummarySchema, protectedWithToken({ cartobio: true })), async (request, reply) => {
+  app.post('/api/v2/operators/dashboard-summary', mergeSchemas(dashboardSummarySchema, protectedWithToken({ oc: true, cartobio: true })), async (request, reply) => {
     const { departements, anneeReferenceControle } = request.body
     const { id: ocId } = request.user.organismeCertificateur
 
