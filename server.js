@@ -191,16 +191,7 @@ app.register(async (app) => {
     const { input, page, filter } = request.body
     const { id: ocId } = request.user.organismeCertificateur
 
-    return Promise.all(
-      [
-        searchControlBodyRecords({ ocId, userId: request.user.id, input, page, filter }),
-        getPinnedOperators(request.user.id)
-      ]
-    ).then(([{ pagination, records }, pinnedOperators]) => {
-      const recordsWithPinnedStatus = records.map((r) => ({ ...r, epingle: pinnedOperators.includes(+r.numeroBio) }))
-
-      return reply.code(200).send({ pagination, records: recordsWithPinnedStatus })
-    })
+    return reply.code(200).send(searchControlBodyRecords({ ocId, userId: request.user.id, input, page, filter }))
   })
 
   /**

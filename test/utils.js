@@ -2,7 +2,7 @@ const db = require('../lib/db')
 const records = require('../lib/providers/__fixtures__/records.json')
 const parcelles = require('../lib/providers/__fixtures__/parcelles.json')
 
-module.exports.loadRecordFixture = async function (data = records) {
+module.exports.loadRecordFixture = async function (data = records, pinnedRecords = [], userId = 1) {
   for (let i = 0; i < data.length; i++) {
     const record = data[i]
     await db.query(
@@ -30,6 +30,18 @@ module.exports.loadRecordFixture = async function (data = records) {
         /* $14 */ record.annee_reference_controle
       ]
     )
+  }
+
+  if (pinnedRecords && pinnedRecords.length > 0) {
+    for (let i = 0; i < pinnedRecords.length; i++) {
+      await db.query(
+        /* sql */`
+        INSERT INTO operateurs_epingles (numerobio, user_id)
+        VALUES ($1, $2)
+        ON CONFLICT (numerobio, user_id) DO NOTHING`,
+        [pinnedRecords[i], userId]
+      )
+    }
   }
 
   for (let i = 0; i < data.length; i++) {
