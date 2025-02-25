@@ -1,21 +1,21 @@
-'use strict';
+"use strict";
 
 var dbm;
 var type;
 var seed;
 
 /**
-  * We receive the dbmigrate dependency from dbmigrate initially.
-  * This enables us to not have to rely on NODE_PATH.
-  */
-exports.setup = function(options, seedLink) {
+ * We receive the dbmigrate dependency from dbmigrate initially.
+ * This enables us to not have to rely on NODE_PATH.
+ */
+exports.setup = function (options, seedLink) {
   dbm = options.dbmigrate;
   type = dbm.dataType;
   seed = seedLink;
 };
 
-exports.up = function(db) {
-  db.runSql(`UPDATE cartobio_operators co
+exports.up = async function (db) {
+  await db.runSql(`UPDATE cartobio_operators co
           SET mixite = CASE
               WHEN parcelles_data.nombre_AB = parcelles_data.nombre_parcelles THEN 'AB'
               WHEN parcelles_data.total_non_conventionnel = parcelles_data.nombre_parcelles THEN 'ABCONV'
@@ -43,10 +43,10 @@ exports.up = function(db) {
   `);
 };
 
-exports.down = function(db) {
+exports.down = function (db) {
   return null;
 };
 
 exports._meta = {
-  "version": 1
+  version: 1,
 };
