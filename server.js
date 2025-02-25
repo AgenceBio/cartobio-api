@@ -188,19 +188,10 @@ app.register(async (app) => {
    * @private
    */
   app.post('/api/v2/certification/search', mergeSchemas(certificationBodySearchSchema, protectedWithToken()), async (request, reply) => {
-    const { input, page, sort, order, filter } = request.body
+    const { input, page, filter } = request.body
     const { id: ocId } = request.user.organismeCertificateur
 
-    return Promise.all(
-      [
-        searchControlBodyRecords({ ocId, userId: request.user.id, input, page, sort, order, filter }),
-        getPinnedOperators(request.user.id)
-      ]
-    ).then(([{ pagination, records }, pinnedOperators]) => {
-      const recordsWithPinnedStatus = records.map((r) => ({ ...r, epingle: pinnedOperators.includes(+r.numeroBio) }))
-
-      return reply.code(200).send({ pagination, records: recordsWithPinnedStatus })
-    })
+    return reply.code(200).send(searchControlBodyRecords({ ocId, userId: request.user.id, input, page, filter }))
   })
 
   /**
@@ -242,7 +233,7 @@ app.register(async (app) => {
    * @private
    * Retrieve operators for a given user for their dashboard
    */
-  app.get('/api/v2/operators/dashboard', mergeSchemas(protectedWithToken({ cartobio: true })), async (request, reply) => {
+  app.get('/api/v2/operators/dashboard', mergeSchemas(protectedWithToken({ oc: true, cartobio: true })), async (request, reply) => {
     const { id: userId } = request.user
 
     return Promise.all([getPinnedOperators(userId), getConsultedOperators(userId)])
@@ -260,7 +251,7 @@ app.register(async (app) => {
    * @private
    * Retrieve operators for a given user for their dashboard
    */
-  app.post('/api/v2/operators/dashboard-summary', mergeSchemas(dashboardSummarySchema, protectedWithToken({ cartobio: true })), async (request, reply) => {
+  app.post('/api/v2/operators/dashboard-summary', mergeSchemas(dashboardSummarySchema, protectedWithToken({ oc: true, cartobio: true })), async (request, reply) => {
     const { departements, anneeReferenceControle } = request.body
     const { id: ocId } = request.user.organismeCertificateur
 
