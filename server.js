@@ -59,7 +59,7 @@ const JSONStream = require('jsonstream-next')
 
 const { createSigner } = require('fast-jwt')
 
-const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators, fetchUserOperatorsForDashboard } = require('./lib/providers/agence-bio.js')
+const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators, fetchUserOperatorsForDashboard, fetchCustomersByOc } = require('./lib/providers/agence-bio.js')
 const { addRecordFeature, addDividFeature, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, getDepartement, recordSorts, pinOperator, unpinOperator, consultOperator, getDashboardSummary, exportDataOcId } = require('./lib/providers/cartobio.js')
 const { evvLookup, evvParcellaire, pacageLookup, iterateOperatorLastRecords } = require('./lib/providers/cartobio.js')
 const { parseAnyGeographicalArchive } = require('./lib/providers/gdal.js')
@@ -188,10 +188,10 @@ app.register(async (app) => {
    * @private
    */
   app.post('/api/v2/certification/search', mergeSchemas(certificationBodySearchSchema, protectedWithToken()), async (request, reply) => {
-    const { input, page, filter } = request.body
+    const { input, page, limit, filter } = request.body
     const { id: ocId } = request.user.organismeCertificateur
 
-    return reply.code(200).send(searchControlBodyRecords({ ocId, userId: request.user.id, input, page, filter }))
+    return reply.code(200).send(searchControlBodyRecords({ ocId, userId: request.user.id, input, page, limit, filter }))
   })
 
   /**
@@ -235,11 +235,12 @@ app.register(async (app) => {
    */
   app.get('/api/v2/operators/dashboard', mergeSchemas(protectedWithToken({ oc: true, cartobio: true })), async (request, reply) => {
     const { id: userId } = request.user
+    const { id: ocId } = request.user.organismeCertificateur
 
     return Promise.all([getPinnedOperators(userId), getConsultedOperators(userId)])
       .then(async ([pinnedNumerobios, consultedNumerobio]) => {
         const uniqueNumerobios = [...new Set([...pinnedNumerobios, ...consultedNumerobio])]
-        const operators = await fetchUserOperatorsForDashboard(uniqueNumerobios)
+        const operators = (await fetchCustomersByOc({ siret: '', ocId, numeroBio: '', nom: '' })).filter((operator) => uniqueNumerobios.includes(operator.numeroBio))
         return await reply.code(200).send({
           pinnedOperators: pinnedNumerobios.map((numeroBio) => ({ ...operators.find((o) => o.numeroBio === numeroBio), epingle: true })),
           consultedOperators: consultedNumerobio.map((numeroBio) => ({ ...operators.find((o) => o.numeroBio === numeroBio), epingle: pinnedNumerobios.includes(numeroBio) }))
