@@ -903,7 +903,7 @@ describe('GET /api/v2/certification/search', () => {
       return request(app.server)
         .post('/api/v2/certification/search')
         .type('json')
-        .send({ input: 'test', sort: 'nom', order: 'asc' })
+        .send({ input: 'test' })
         .set('Authorization', USER_DOC_AUTH_HEADER)
         .then((response) => {
           expect(response.body).toMatchObject({
@@ -930,7 +930,7 @@ describe('GET /api/v2/certification/search', () => {
       return request(app.server)
         .post('/api/v2/certification/search')
         .type('json')
-        .send({ input: 'test', sort: 'engagement_date', order: 'desc' })
+        .send({ input: 'test' })
         .set('Authorization', USER_DOC_AUTH_HEADER)
         .then((response) => {
           expect(response.body).toMatchObject({
@@ -957,7 +957,7 @@ describe('GET /api/v2/certification/search', () => {
       return request(app.server)
         .post('/api/v2/certification/search')
         .type('json')
-        .send({ input: 'test', sort: 'statut', order: 'desc' })
+        .send({ input: 'test' })
         .set('Authorization', USER_DOC_AUTH_HEADER)
         .then((response) => {
           expect(response.body).toMatchObject({
