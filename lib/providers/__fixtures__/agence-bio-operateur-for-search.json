@@ -388,8 +388,7 @@
     "departementId": 1,
     "sitesWeb": ["http://example.com"],
     "productions": [],
-    "notifications": [
-    ],
+    "notifications": [],
     "adressesOperateurs": [
       {
         "codeCommune": "01000"
