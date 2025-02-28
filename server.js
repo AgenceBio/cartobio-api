@@ -59,7 +59,7 @@ const JSONStream = require('jsonstream-next')
 
 const { createSigner } = require('fast-jwt')
 
-const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators, fetchUserOperatorsForDashboard, fetchCustomersByOc } = require('./lib/providers/agence-bio.js')
+const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators, fetchCustomersByOc } = require('./lib/providers/agence-bio.js')
 const { addRecordFeature, addDividFeature, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, getDepartement, recordSorts, pinOperator, unpinOperator, consultOperator, getDashboardSummary, exportDataOcId } = require('./lib/providers/cartobio.js')
 const { evvLookup, evvParcellaire, pacageLookup, iterateOperatorLastRecords } = require('./lib/providers/cartobio.js')
 const { parseAnyGeographicalArchive } = require('./lib/providers/gdal.js')
