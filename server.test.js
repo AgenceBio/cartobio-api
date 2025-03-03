@@ -845,13 +845,13 @@ describe('GET /api/v2/certification/search', () => {
 
   describe('with search', () => {
     beforeEach(loadRecordFixture)
-    beforeEach(() => mockResultsOrder([agencebioOperator]))
+    beforeEach(() => mockResultsOrder({ nbTotal: 1, operateurs: [agencebioOperator] }))
     afterEach(() => getMock.mockReset())
 
     test('search with no results', async () => {
       getMock.mockReset().mockReturnValueOnce({
         async json () {
-          return []
+          return { nbTotal: 0, operateurs: [] }
         }
       })
 
