@@ -394,5 +394,41 @@
         "codeCommune": "01000"
       }
     ]
+  },
+  {
+    "id": 12,
+    "nom": "Texte a chercher",
+    "denominationCourante": "Texte a chercher SARL",
+    "siret": "12345678912345",
+    "echeanceSiret": "",
+    "numeroBio": "462",
+    "email": "test@example.com",
+    "dateEngagement": "",
+    "datePremierEngagement": null,
+    "numeroPacage": "",
+    "codeNAF": "",
+    "departementId": 1,
+    "sitesWeb": ["http://example.com"],
+    "productions": [],
+    "notifications": [
+      {
+        "organismeCertificateurId": 1,
+        "organisme": "OC fictif",
+        "date": "2023-01-01",
+        "url": "http://example.net/certificats/id/1-2-3-4",
+        "activites": [
+          {
+            "id": 2,
+            "nom": "Vente"
+          }
+        ],
+        "etatCertification": "ENGAGEE"
+      }
+    ],
+    "adressesOperateurs": [
+      {
+        "codeCommune": "01000"
+      }
+    ]
   }
 ]

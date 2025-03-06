@@ -24,10 +24,6 @@ export type NormalizedRecord = Omit<
     annee_reference_controle?: number;
     certification_state?: string;
     lastmixitestate?: string;
-    states?: {
-        certification_state: string;
-        annee_reference_controle: number;
-    }[];
 };
 
 export type NormalizedRecordSummary = Omit<NormalizedRecord, "parcelles"> & {
