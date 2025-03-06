@@ -64,3 +64,13 @@ type DBParcelle = {
     code_culture_pac?: string;
     code_precision_pac?: string;
 };
+
+export type OperatorFilter = {
+    departement?: string[] | null;
+    engagement?: string | null;
+    pinned?: boolean | null;
+    etatCertification?: string | null;
+    anneeReferenceCertification?: number | null;
+    etatNotification?: string[] | null;
+    statutParcellaire?: string[] | null;
+};

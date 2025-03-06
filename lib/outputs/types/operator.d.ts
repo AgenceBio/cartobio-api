@@ -24,10 +24,18 @@ export type AgenceBioNormalizedOperator = {
     isProduction: boolean;
 };
 
-// TODO : this is a bit of duplicate with NormalizedRecord
-//  (we should not have to different objects for sending operator + record)
 export type AgenceBioNormalizedOperatorWithRecord =
-    AgenceBioNormalizedOperator & (NormalizedRecord & { metadata: any });
+    AgenceBioNormalizedOperator &
+        (Partial<NormalizedRecord> & { metadata: any });
 
 export type AgenceBioNormalizedOperatorWithPinnedStatus =
     AgenceBioNormalizedOperator & { epingle: boolean };
+
+export type AgenceBioNormalizedOperatorWithFilterData =
+    AgenceBioNormalizedOperator & {
+        lastmixitestate?: string;
+        states?: {
+            certification_state: string;
+            annee_reference_controle: number;
+        }[];
+    };

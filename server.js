@@ -250,7 +250,7 @@ app.register(async (app) => {
     return Promise.all([getPinnedOperators(userId), getConsultedOperators(userId)])
       .then(async ([pinnedNumerobios, consultedNumerobio]) => {
         const uniqueNumerobios = [...new Set([...pinnedNumerobios, ...consultedNumerobio])]
-        const operators = (await fetchCustomersByOc({ siret: '', ocId, numeroBio: '', nom: '' })).filter((operator) => uniqueNumerobios.includes(operator.numeroBio))
+        const operators = (await fetchCustomersByOc(ocId)).filter((operator) => uniqueNumerobios.includes(operator.numeroBio))
         return await reply.code(200).send({
           pinnedOperators: pinnedNumerobios.map((numeroBio) => ({ ...operators.find((o) => o.numeroBio === numeroBio), epingle: true })),
           consultedOperators: consultedNumerobio.map((numeroBio) => ({ ...operators.find((o) => o.numeroBio === numeroBio), epingle: pinnedNumerobios.includes(numeroBio) }))
