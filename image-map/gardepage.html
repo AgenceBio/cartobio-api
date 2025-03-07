@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Attestation de certification du parcellaire</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: #f5f5f5;
+        font-family: "Marianne", sans-serif;
+      }
+
+      .page {
+        width: 1754px;
+        height: 1240px;
+        background-color: white;
+        position: relative;
+      }
+
+      .border-container {
+        position: absolute;
+        top: 349px;
+        left: 80px;
+        width: 1594px;
+        height: 741px;
+        border: 12px solid #a4cd39;
+      }
+
+      .border-container-left {
+        position: absolute;
+        top: 349px;
+        left: 80px;
+        width: 1594px;
+        height: 741px;
+        border-left: 12px solid #a4cd39;
+        z-index: 1000;
+      }
+
+      .right-border {
+        position: absolute;
+        top: 349px;
+        left: 1662px;
+        width: 12px;
+        height: 732px;
+        background-color: #a4cd39;
+      }
+
+      .image-container {
+        position: absolute;
+        top: 428px;
+        left: 0;
+        width: 1754px;
+        height: 505px;
+        background-image: url("/img/background.png");
+        background-size: cover;
+      }
+
+      .green-header h1 {
+        position: absolute;
+        top: 715px;
+        left: 140px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+
+      .green-header h1 {
+        color: white;
+        font-size: 40px;
+        background-color: #a4cd39;
+        font-weight: bold;
+        margin: 0;
+      }
+
+      .logo-container-left {
+        position: absolute;
+        top: 80px;
+        left: 80px;
+        width: 124px;
+        height: 109px;
+      }
+
+      .logo-container-right {
+        position: absolute;
+        top: 80px;
+        left: 252px;
+        width: 70px;
+        height: 109px;
+      }
+
+      .signature-container {
+        position: absolute;
+        top: 980px;
+        left: 1397px;
+        width: 159px;
+        height: 151px;
+        background-color: white;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .signature-image {
+        width: 139px;
+        height: 181px;
+      }
+
+      .footer-text {
+        position: absolute;
+        top: 1134px;
+        left: 80px;
+        color: #007340;
+        font-size: 20px;
+        font-weight: bold;
+      }
+
+      .footer-logo-1 {
+        position: absolute;
+        top: 1020px;
+        left: 106px;
+        width: 65px;
+        height: 77px;
+      }
+
+      .footer-logo-2 {
+        position: absolute;
+        top: 1020px;
+        left: 178px;
+        width: 113px;
+        height: 77px;
+      }
+
+      .org-name {
+        position: absolute;
+        top: 252px;
+        left: 82px;
+        color: #000091;
+        font-size: 40px;
+        font-weight: bold;
+      }
+
+      .version-info {
+        position: absolute;
+        top: 259px;
+        left: 1007px;
+      }
+
+      .version-label {
+        opacity: 0.5;
+        color: #161616;
+        font-size: 18px;
+      }
+
+      .version-value {
+        color: #161616;
+        font-size: 18px;
+        margin-top: 10px;
+      }
+
+      .siret-info {
+        position: absolute;
+        top: 259px;
+        left: 1312px;
+      }
+
+      .siret-label {
+        opacity: 0.5;
+        color: #161616;
+        font-size: 18px;
+      }
+
+      .siret-value {
+        color: #161616;
+        font-size: 18px;
+        margin-top: 10px;
+      }
+
+      .pacage-info {
+        position: absolute;
+        top: 259px;
+        left: 1535px;
+      }
+
+      .pacage-label {
+        opacity: 0.5;
+        color: #161616;
+        font-size: 18px;
+      }
+
+      .pacage-value {
+        color: #161616;
+        font-size: 18px;
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <div class="border-container"></div>
+      <div class="border-container-left"></div>
+
+      <img src="img/background.png" class="image-container" />
+
+      <div class="green-header">
+        <h1>Attestation de certification du parcellaire</h1>
+      </div>
+
+      <img src="img/republique.png" class="logo-container-left" />
+      <img src="img/agencebio.png" class="logo-container-right" />
+
+      <div class="signature-container">
+        <img src="img/agencebio.png" class="signature-image" />
+      </div>
+
+      <div class="footer-text">www.agencebio.org</div>
+      <img src="img/ab.png" class="footer-logo-1" />
+      <img src="img/image.png" class="footer-logo-2" />
+
+      <div class="org-name" id="nomog"></div>
+
+      <div class="siret-info">
+        <div class="siret-label">Siret</div>
+        <div class="siret-value" id="siretnumber"></div>
+      </div>
+
+      <div class="pacage-info">
+        <div class="pacage-label">Numéro pacage</div>
+        <div class="pacage-value" id="numeropacage"></div>
+      </div>
+    </div>
+  </body>
+</html>
