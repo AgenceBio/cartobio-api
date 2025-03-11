@@ -83,7 +83,7 @@ const { UnauthorizedApiError, errorHandler } = require('./lib/errors.js')
 const { normalizeRecord } = require('./lib/outputs/record')
 const { recordToApi } = require('./lib/outputs/api')
 const { isHandledError } = require('./lib/errors')
-const { getPinnedOperators, getConsultedOperators } = require('./lib/outputs/operator.js')
+const { getPinnedOperators, getConsultedOperators, addRecordData } = require('./lib/outputs/operator.js')
 const sign = createSigner({ key: config.get('jwtSecret'), expiresIn: DURATION_ONE_DAY * 30 })
 
 app.setErrorHandler(errorHandler)
@@ -251,10 +251,13 @@ app.register(async (app) => {
       .then(async ([pinnedNumerobios, consultedNumerobio]) => {
         const uniqueNumerobios = [...new Set([...pinnedNumerobios, ...consultedNumerobio])]
         const operators = (await fetchCustomersByOc(ocId)).filter((operator) => uniqueNumerobios.includes(operator.numeroBio))
-        return await reply.code(200).send({
-          pinnedOperators: pinnedNumerobios.map((numeroBio) => ({ ...operators.find((o) => o.numeroBio === numeroBio), epingle: true })),
-          consultedOperators: consultedNumerobio.map((numeroBio) => ({ ...operators.find((o) => o.numeroBio === numeroBio), epingle: pinnedNumerobios.includes(numeroBio) }))
-        })
+
+        return Promise.all(operators.map((o) => addRecordData(o))).then(
+          (operatorsWithData) => reply.code(200).send({
+            pinnedOperators: pinnedNumerobios.map((numeroBio) => ({ ...operatorsWithData.find((o) => o.numeroBio === numeroBio), epingle: true })),
+            consultedOperators: consultedNumerobio.map((numeroBio) => ({ ...operatorsWithData.find((o) => o.numeroBio === numeroBio), epingle: pinnedNumerobios.includes(numeroBio) }))
+          })
+        )
       })
   })
 
