@@ -199,9 +199,9 @@ app.register(async (app) => {
    */
   app.get('/api/v2/certification/autocomplete', mergeSchemas(autocompleteSchema, protectedWithToken()), async (request, reply) => {
     const { search } = request.query
-    const { id: ocId } = request.user.organismeCertificateur
+    const { id: userId, organismeCertificateur } = request.user
 
-    return reply.code(200).send(searchForAutocomplete(ocId, search))
+    return reply.code(200).send(searchForAutocomplete(organismeCertificateur?.id, userId, search))
   })
 
   /**
@@ -214,7 +214,7 @@ app.register(async (app) => {
 
     return Promise.all(
       [
-        fetchUserOperators(userId, limit, offset),
+        fetchUserOperators(userId),
         getPinnedOperators(request.user.id)
       ]
     ).then(([res, pinnedOperators]) => {
