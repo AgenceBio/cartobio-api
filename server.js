@@ -250,12 +250,12 @@ app.register(async (app) => {
     return Promise.all([getPinnedOperators(userId), getConsultedOperators(userId)])
       .then(async ([pinnedNumerobios, consultedNumerobio]) => {
         const uniqueNumerobios = [...new Set([...pinnedNumerobios, ...consultedNumerobio])]
-        const operators = (await fetchCustomersByOc(ocId)).filter((operator) => uniqueNumerobios.includes(operator.numeroBio))
+        const operators = (await fetchCustomersByOc(ocId)).filter((operator) => uniqueNumerobios.includes(operator.numeroBio) && ['ENGAGEE', 'ENGAGEE FUTUR'].includes(operator.notifications.etatCertification))
 
         return Promise.all(operators.map((o) => addRecordData(o))).then(
           (operatorsWithData) => reply.code(200).send({
-            pinnedOperators: pinnedNumerobios.map((numeroBio) => ({ ...operatorsWithData.find((o) => o.numeroBio === numeroBio), epingle: true })),
-            consultedOperators: consultedNumerobio.map((numeroBio) => ({ ...operatorsWithData.find((o) => o.numeroBio === numeroBio), epingle: pinnedNumerobios.includes(numeroBio) }))
+            pinnedOperators: pinnedNumerobios.filter((numeroBio) => (operatorsWithData.find((o) => o.numeroBio === numeroBio))).map((numeroBio) => ({ ...operatorsWithData.find((o) => o.numeroBio === numeroBio), epingle: true })),
+            consultedOperators: consultedNumerobio.filter((numeroBio) => (operatorsWithData.find((o) => o.numeroBio === numeroBio))).map((numeroBio) => ({ ...operatorsWithData.find((o) => o.numeroBio === numeroBio), epingle: pinnedNumerobios.includes(numeroBio) }))
           })
         )
       })
@@ -662,6 +662,9 @@ app.register(async (app) => {
 
   app.get('/api/v2/exportParcellaire', mergeSchemas(protectedWithToken({ oc: true, cartobio: true })), async (request, reply) => {
     const data = await exportDataOcId(request.user.organismeCertificateur.id)
+    if (data === null) {
+      throw new Error("Une erreur s'est produite, impossible d'exporter les parcellaires")
+    }
     return reply.code(200).send(data)
   })
 })
