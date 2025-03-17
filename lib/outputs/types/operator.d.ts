@@ -38,4 +38,6 @@ export type AgenceBioNormalizedOperatorWithFilterData =
             certification_state: string;
             annee_reference_controle: number;
         }[];
+        list_oc_id: number[];
+        max_audit_date: Date | null;
     };

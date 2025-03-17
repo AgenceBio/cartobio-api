@@ -73,4 +73,5 @@ export type OperatorFilter = {
     anneeReferenceCertification?: number | null;
     etatNotification?: string[] | null;
     statutParcellaire?: string[] | null;
+    sort?: string | null;
 };
