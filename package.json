@@ -46,7 +46,7 @@
     "eslint-plugin-jest": "^24.3.2",
     "eslint-plugin-node": "^11.1.0",
     "eslint-plugin-promise": "^4.3.1",
-    "fast-jwt": "^4.0.0",
+    "fast-jwt": "^5.0.6",
     "fast-xml-parser": "^4.4.1",
     "fastify": "^4.27.0",
     "file-type": "^16.5.4",
