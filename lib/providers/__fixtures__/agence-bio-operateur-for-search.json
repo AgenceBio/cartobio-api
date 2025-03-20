@@ -1,0 +1,434 @@
+[
+  {
+    "id": 1,
+    "nom": "Alfred",
+    "denominationCourante": "Opérateur Test SARL",
+    "siret": "999999999",
+    "echeanceSiret": "",
+    "numeroBio": "1",
+    "email": "test@example.com",
+    "dateEngagement": "",
+    "datePremierEngagement": null,
+    "numeroPacage": "",
+    "codeNAF": "",
+    "departementId": 1,
+    "sitesWeb": ["http://example.com"],
+    "productions": [],
+    "notifications": [
+      {
+        "organismeCertificateurId": 1,
+        "organisme": "OC fictif",
+        "date": "2023-01-01",
+        "url": "http://example.net/certificats/id/1-2-3-4",
+        "activites": [
+          {
+            "id": 1,
+            "nom": "Production"
+          }
+        ],
+        "etatCertification": "ENGAGEE"
+      }
+    ],
+    "adressesOperateurs": [
+      {
+        "codeCommune": "01000"
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "nom": "Benoit",
+    "denominationCourante": "Opérateur Test SARL",
+    "siret": "999999999",
+    "echeanceSiret": "",
+    "numeroBio": "2",
+    "email": "test@example.com",
+    "dateEngagement": "",
+    "datePremierEngagement": null,
+    "numeroPacage": "",
+    "codeNAF": "",
+    "departementId": 1,
+    "sitesWeb": ["http://example.com"],
+    "productions": [],
+    "notifications": [
+      {
+        "organismeCertificateurId": 1,
+        "organisme": "OC fictif",
+        "date": "2023-01-01",
+        "url": "http://example.net/certificats/id/1-2-3-4",
+        "activites": [
+          {
+            "id": 1,
+            "nom": "Production"
+          }
+        ],
+        "etatCertification": "ENGAGEE"
+      }
+    ],
+    "adressesOperateurs": [
+      {
+        "codeCommune": "01123"
+      }
+    ]
+  },
+  {
+    "id": 3,
+    "nom": "33 Charles",
+    "denominationCourante": "Opérateur Test SARL",
+    "siret": "999999999",
+    "echeanceSiret": "",
+    "numeroBio": "3",
+    "email": "test@example.com",
+    "dateEngagement": "",
+    "datePremierEngagement": null,
+    "numeroPacage": "",
+    "codeNAF": "",
+    "departementId": 21,
+    "sitesWeb": ["http://example.com"],
+    "productions": [],
+    "notifications": [
+      {
+        "organismeCertificateurId": 10,
+        "organisme": "OC fictif",
+        "date": "2023-01-01",
+        "url": "http://example.net/certificats/id/1-2-3-4",
+        "activites": [
+          {
+            "id": 1,
+            "nom": "Production"
+          }
+        ],
+        "etatCertification": "ENGAGEE",
+        "_oldOC": [1]
+      }
+    ],
+    "adressesOperateurs": [
+      {
+        "codeCommune": "21000"
+      }
+    ]
+  },
+  {
+    "id": 4,
+    "nom": "3Denise",
+    "denominationCourante": "Opérateur Test SARL",
+    "siret": "999999999",
+    "echeanceSiret": "",
+    "numeroBio": "4",
+    "email": "test@example.com",
+    "dateEngagement": "",
+    "datePremierEngagement": null,
+    "numeroPacage": "",
+    "codeNAF": "",
+    "departementId": 21,
+    "sitesWeb": ["http://example.com"],
+    "productions": [],
+    "notifications": [
+      {
+        "organismeCertificateurId": 1,
+        "organisme": "OC fictif",
+        "date": "2023-01-01",
+        "url": "http://example.net/certificats/id/1-2-3-4",
+        "activites": [
+          {
+            "id": 1,
+            "nom": "Production"
+          }
+        ],
+        "etatCertification": "ENGAGEE FUTUR"
+      }
+    ],
+    "adressesOperateurs": [
+      {
+        "codeCommune": "21120"
+      }
+    ]
+  },
+  {
+    "id": 5,
+    "nom": "Édouard",
+    "denominationCourante": "Opérateur Test SARL",
+    "siret": "999999999",
+    "echeanceSiret": "",
+    "numeroBio": "5",
+    "email": "test@example.com",
+    "dateEngagement": "",
+    "datePremierEngagement": null,
+    "numeroPacage": "",
+    "codeNAF": "",
+    "departementId": 64,
+    "sitesWeb": ["http://example.com"],
+    "productions": [],
+    "notifications": [
+      {
+        "organismeCertificateurId": 1,
+        "organisme": "OC fictif",
+        "date": "2025-01-01",
+        "url": "http://example.net/certificats/id/1-2-3-4",
+        "activites": [
+          {
+            "id": 1,
+            "nom": "Production"
+          }
+        ],
+        "status": "BROUILLON"
+      },
+      {
+        "organismeCertificateurId": 1,
+        "organisme": "OC fictif",
+        "date": "2023-01-01",
+        "url": "http://example.net/certificats/id/1-2-3-4",
+        "activites": [
+          {
+            "id": 1,
+            "nom": "Production"
+          }
+        ],
+        "etatCertification": "SUSPENDUE"
+      }
+    ],
+    "adressesOperateurs": [
+      {
+        "codeCommune": "64000"
+      }
+    ]
+  },
+  {
+    "id": 6,
+    "nom": "Françoise",
+    "denominationCourante": "Opérateur Test SARL",
+    "siret": "999999999",
+    "echeanceSiret": "",
+    "numeroBio": "6",
+    "email": "test@example.com",
+    "dateEngagement": "",
+    "datePremierEngagement": null,
+    "numeroPacage": "",
+    "codeNAF": "",
+    "departementId": 92,
+    "sitesWeb": ["http://example.com"],
+    "productions": [],
+    "notifications": [
+      {
+        "organismeCertificateurId": 1,
+        "organisme": "OC fictif",
+        "date": "2023-01-01",
+        "url": "http://example.net/certificats/id/1-2-3-4",
+        "activites": [
+          {
+            "id": 1,
+            "nom": "Production"
+          }
+        ],
+        "etatCertification": "SUSPENDUE"
+      }
+    ],
+    "adressesOperateurs": [
+      {
+        "codeCommune": "92000"
+      }
+    ]
+  },
+  {
+    "id": 7,
+    "nom": "Gregoire",
+    "denominationCourante": "Opérateur Test SARL",
+    "siret": "999999999",
+    "echeanceSiret": "",
+    "numeroBio": "7",
+    "email": "test@example.com",
+    "dateEngagement": "",
+    "datePremierEngagement": null,
+    "numeroPacage": "",
+    "codeNAF": "",
+    "departementId": 18,
+    "sitesWeb": ["http://example.com"],
+    "productions": [],
+    "notifications": [
+      {
+        "organismeCertificateurId": 1,
+        "organisme": "OC fictif",
+        "date": "2023-01-01",
+        "url": "http://example.net/certificats/id/1-2-3-4",
+        "activites": [
+          {
+            "id": 1,
+            "nom": "Production"
+          }
+        ],
+        "etatCertification": "NON ENGAGEE"
+      }
+    ],
+    "adressesOperateurs": [
+      {
+        "codeCommune": "18000"
+      }
+    ]
+  },
+  {
+    "id": 8,
+    "nom": "Hectore",
+    "denominationCourante": "Opérateur Test SARL",
+    "siret": "999999999",
+    "echeanceSiret": "",
+    "numeroBio": "8",
+    "email": "test@example.com",
+    "dateEngagement": "",
+    "datePremierEngagement": null,
+    "numeroPacage": "",
+    "codeNAF": "",
+    "departementId": 1,
+    "sitesWeb": ["http://example.com"],
+    "productions": [],
+    "notifications": [
+      {
+        "organismeCertificateurId": 1,
+        "organisme": "OC fictif",
+        "date": "2023-01-01",
+        "url": "http://example.net/certificats/id/1-2-3-4",
+        "activites": [
+          {
+            "id": 1,
+            "nom": "Production"
+          }
+        ],
+        "etatCertification": "ARRETEE"
+      }
+    ],
+    "adressesOperateurs": [
+      {
+        "codeCommune": "01000"
+      }
+    ]
+  },
+  {
+    "id": 9,
+    "nom": "Irène",
+    "denominationCourante": "Opérateur Test SARL",
+    "siret": "999999999",
+    "echeanceSiret": "",
+    "numeroBio": "9",
+    "email": "test@example.com",
+    "dateEngagement": "",
+    "datePremierEngagement": null,
+    "numeroPacage": "",
+    "codeNAF": "",
+    "departementId": 1,
+    "sitesWeb": ["http://example.com"],
+    "productions": [],
+    "notifications": [
+      {
+        "organismeCertificateurId": 1,
+        "organisme": "OC fictif",
+        "date": "2023-01-01",
+        "url": "http://example.net/certificats/id/1-2-3-4",
+        "activites": [
+          {
+            "id": 1,
+            "nom": "Production"
+          }
+        ],
+        "etatCertification": "RETIREE"
+      }
+    ],
+    "adressesOperateurs": [
+      {
+        "codeCommune": "01000"
+      }
+    ]
+  },
+  {
+    "id": 10,
+    "nom": "- Joël",
+    "denominationCourante": "Opérateur Test SARL",
+    "siret": "999999999",
+    "echeanceSiret": "",
+    "numeroBio": "10",
+    "email": "test@example.com",
+    "dateEngagement": "",
+    "datePremierEngagement": null,
+    "numeroPacage": "",
+    "codeNAF": "",
+    "departementId": 1,
+    "sitesWeb": ["http://example.com"],
+    "productions": [],
+    "notifications": [
+      {
+        "organismeCertificateurId": 1,
+        "organisme": "OC fictif",
+        "date": "2023-01-01",
+        "url": "http://example.net/certificats/id/1-2-3-4",
+        "activites": [
+          {
+            "id": 1,
+            "nom": "Production"
+          }
+        ],
+        "etatCertification": "ENGAGEE FUTUR"
+      }
+    ],
+    "adressesOperateurs": [
+      {
+        "codeCommune": "01000"
+      }
+    ]
+  },
+  {
+    "id": 11,
+    "nom": "Kylian",
+    "denominationCourante": "Opérateur Test SARL",
+    "siret": "999999999",
+    "echeanceSiret": "",
+    "numeroBio": "11",
+    "email": "test@example.com",
+    "dateEngagement": "",
+    "datePremierEngagement": null,
+    "numeroPacage": "",
+    "codeNAF": "",
+    "departementId": 1,
+    "sitesWeb": ["http://example.com"],
+    "productions": [],
+    "notifications": [],
+    "adressesOperateurs": [
+      {
+        "codeCommune": "01000"
+      }
+    ]
+  },
+  {
+    "id": 12,
+    "nom": "Texte a chercher",
+    "denominationCourante": "Texte a chercher SARL",
+    "siret": "12345678912345",
+    "echeanceSiret": "",
+    "numeroBio": "462",
+    "email": "test@example.com",
+    "dateEngagement": "",
+    "datePremierEngagement": null,
+    "numeroPacage": "",
+    "codeNAF": "",
+    "departementId": 1,
+    "sitesWeb": ["http://example.com"],
+    "productions": [],
+    "notifications": [
+      {
+        "organismeCertificateurId": 1,
+        "organisme": "OC fictif",
+        "date": "2023-01-01",
+        "url": "http://example.net/certificats/id/1-2-3-4",
+        "activites": [
+          {
+            "id": 2,
+            "nom": "Vente"
+          }
+        ],
+        "etatCertification": "ENGAGEE"
+      }
+    ],
+    "adressesOperateurs": [
+      {
+        "codeCommune": "01000"
+      }
+    ]
+  }
+]

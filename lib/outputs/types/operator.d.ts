@@ -1,5 +1,8 @@
-import type {AgenceBioAdresseGeo, OrganismeCertificateur} from "../../providers/types/agence-bio.d.ts";
-import type {NormalizedRecord} from "./record.d.ts";
+import type {
+    AgenceBioAdresseGeo,
+    OrganismeCertificateur,
+} from "../../providers/types/agence-bio.d.ts";
+import type { NormalizedRecord } from "./record.d.ts";
 
 export type AgenceBioNormalizedOperator = {
     id: number;
@@ -11,17 +14,30 @@ export type AgenceBioNormalizedOperator = {
     email: string;
     dateEngagement: Date;
     datePremierEngagement: Date;
-    certificats: any[];
     organismeCertificateur: OrganismeCertificateur | {};
-    adressesOperateurs: AgenceBioAdresseGeo[],
+    adressesOperateurs: AgenceBioAdresseGeo[];
     codeCommune: string;
     departement: string;
     commune: string;
     codePostal: string;
-    notifications: any[];
-    isProduction : boolean;
+    notifications: any;
+    isProduction: boolean;
 };
 
-// TODO : this is a bit of duplicate with NormalizedRecord
-//  (we should not have to different objects for sending operator + record)
-export type AgenceBioNormalizedOperatorWithRecord = AgenceBioNormalizedOperator & (NormalizedRecord | { metadata: any });
+export type AgenceBioNormalizedOperatorWithRecord =
+    AgenceBioNormalizedOperator &
+        (Partial<NormalizedRecord> & { metadata: any });
+
+export type AgenceBioNormalizedOperatorWithPinnedStatus =
+    AgenceBioNormalizedOperator & { epingle: boolean };
+
+export type AgenceBioNormalizedOperatorWithFilterData =
+    AgenceBioNormalizedOperator & {
+        lastmixitestate?: string;
+        states?: {
+            certification_state: string;
+            annee_reference_controle: number;
+        }[];
+        list_oc_id: number[];
+        max_audit_date: Date | null;
+    };

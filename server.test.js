@@ -845,34 +845,10 @@ describe('GET /api/v2/certification/search', () => {
 
   describe('with search', () => {
     beforeEach(loadRecordFixture)
-    beforeEach(() => mockResultsOrder([agencebioOperator]))
+    beforeEach(() => mockResultsOrder({ nbTotal: 1, operateurs: [{ ...agencebioOperator, siret: '12345678912345' }] }))
     afterEach(() => getMock.mockReset())
 
-    test('search with no results', async () => {
-      getMock.mockReset().mockReturnValueOnce({
-        async json () {
-          return []
-        }
-      })
-
-      return request(app.server)
-        .post('/api/v2/certification/search')
-        .type('json')
-        .send({ input: '1234' })
-        .set('Authorization', USER_DOC_AUTH_HEADER)
-        .then((response) => {
-          expect(response.body).toMatchObject({
-            pagination: {
-              total: 0,
-              page: 1,
-              page_max: 1
-            },
-            records: []
-          })
-        })
-    })
-
-    test('search default sort (audit_date/desc)', async () => {
+    test('search numero bio', async () => {
       return request(app.server)
         .post('/api/v2/certification/search')
         .type('json')
@@ -887,10 +863,9 @@ describe('GET /api/v2/certification/search', () => {
             },
             records: [
               {
-                ...normalizeOperator(agencebioOperator),
+                ...normalizeOperator({ ...agencebioOperator, siret: '12345678912345' }),
                 dateEngagement: '',
                 datePremierEngagement: null,
-                notifications: [],
                 record_id: '054f0d70-c3da-448f-823e-81fcf7c2bf6e',
                 certification_state: 'PENDING_CERTIFICATION',
                 audit_date: '2023-09-07'
@@ -900,11 +875,11 @@ describe('GET /api/v2/certification/search', () => {
         })
     })
 
-    test('search manual sort (nom/asc)', () => {
+    test('search nom', () => {
       return request(app.server)
         .post('/api/v2/certification/search')
         .type('json')
-        .send({ input: 'test', sort: 'nom', order: 'asc' })
+        .send({ input: 'test' })
         .set('Authorization', USER_DOC_AUTH_HEADER)
         .then((response) => {
           expect(response.body).toMatchObject({
@@ -915,10 +890,9 @@ describe('GET /api/v2/certification/search', () => {
             },
             records: [
               {
-                ...normalizeOperator(agencebioOperator),
+                ...normalizeOperator({ ...agencebioOperator, siret: '12345678912345' }),
                 dateEngagement: '',
                 datePremierEngagement: null,
-                notifications: [],
                 record_id: '054f0d70-c3da-448f-823e-81fcf7c2bf6e',
                 certification_state: 'PENDING_CERTIFICATION',
                 audit_date: '2023-09-07'
@@ -928,11 +902,11 @@ describe('GET /api/v2/certification/search', () => {
         })
     })
 
-    test('search manual sort (engagement_date/desc)', () => {
+    test('search siret', () => {
       return request(app.server)
         .post('/api/v2/certification/search')
         .type('json')
-        .send({ input: 'test', sort: 'engagement_date', order: 'desc' })
+        .send({ input: '12345678912345' })
         .set('Authorization', USER_DOC_AUTH_HEADER)
         .then((response) => {
           expect(response.body).toMatchObject({
@@ -943,103 +917,15 @@ describe('GET /api/v2/certification/search', () => {
             },
             records: [
               {
-                ...normalizeOperator(agencebioOperator),
+                ...normalizeOperator({ ...agencebioOperator, siret: '12345678912345' }),
                 dateEngagement: '',
                 datePremierEngagement: null,
-                notifications: [],
                 record_id: '054f0d70-c3da-448f-823e-81fcf7c2bf6e',
                 certification_state: 'PENDING_CERTIFICATION',
                 audit_date: '2023-09-07'
               }
             ]
           })
-        })
-    })
-
-    test('search manual sort (statut/desc)', () => {
-      return request(app.server)
-        .post('/api/v2/certification/search')
-        .type('json')
-        .send({ input: 'test', sort: 'statut', order: 'desc' })
-        .set('Authorization', USER_DOC_AUTH_HEADER)
-        .then((response) => {
-          expect(response.body).toMatchObject({
-            pagination: {
-              total: 1,
-              page: 1,
-              page_max: 1
-            },
-            records: [
-              {
-                ...normalizeOperator(agencebioOperator),
-                dateEngagement: '',
-                datePremierEngagement: null,
-                notifications: [],
-                record_id: '054f0d70-c3da-448f-823e-81fcf7c2bf6e',
-                certification_state: 'PENDING_CERTIFICATION',
-                audit_date: '2023-09-07'
-              }
-            ]
-          })
-        })
-    })
-  })
-
-  describe('with local results (no search)', () => {
-    beforeEach(loadRecordFixture)
-    afterEach(() => getMock.mockReset())
-
-    test('dashboard default sort (audit_date/desc)', () => {
-      mockResultsOrder(
-        { ...agencebioOperator, id: 99999, numeroBio: '99999', nom: 'Opérateur test 1' },
-        { ...agencebioOperator, id: 99998, numeroBio: '99998', nom: 'Opérateur test 2' },
-        { ...agencebioOperator, id: 99997, numeroBio: '99997', nom: 'Opérateur test 3' }
-      )
-
-      return request(app.server)
-        .post('/api/v2/certification/search')
-        .send({ input: '' })
-        .set('Authorization', USER_DOC_AUTH_HEADER)
-        .then((response) => {
-          expect(response.body).toHaveProperty('pagination', {
-            total: 3,
-            page: 1,
-            page_max: 1
-          })
-
-          const ids = response.body.records.map(({ record_id: d }) => d)
-          expect(ids).toEqual([
-            '054f0d70-c3da-448f-823e-81fcf7c2bf6e',
-            '054f0d70-c3da-448f-823e-12fcf7c20002',
-            '054f0d70-c3da-448f-823e-12fcf7c20001'
-          ])
-        })
-    })
-
-    test('dashboard explicit sort (statut/asc)', () => {
-      mockResultsOrder(
-        { ...agencebioOperator, id: 99997, numeroBio: '99997', nom: 'Opérateur test 3' },
-        { ...agencebioOperator, id: 99999, numeroBio: '99999', nom: 'Opérateur test 1' },
-        { ...agencebioOperator, id: 99998, numeroBio: '99998', nom: 'Opérateur test 2' }
-      )
-
-      return request(app.server)
-        .post('/api/v2/certification/search')
-        .send({ input: '', page: 1, sort: 'statut', order: 'asc' })
-        .set('Authorization', USER_DOC_AUTH_HEADER)
-        .then((response) => {
-          expect(response.body).toHaveProperty('pagination', {
-            total: 3,
-            page: 1,
-            page_max: 1
-          })
-
-          const ids = response.body.records.map(({ record_id: d }) => d)
-          expect(ids).toEqual([
-            '054f0d70-c3da-448f-823e-12fcf7c20001',
-            '054f0d70-c3da-448f-823e-81fcf7c2bf6e',
-            '054f0d70-c3da-448f-823e-12fcf7c20002'
-          ])
         })
     })
   })
@@ -1611,10 +1497,7 @@ describe('GET /api/v2/operators', () => {
   test('it returns the correct list of operators for a given user', async () => {
     getMock.mockReturnValueOnce({
       async json () {
-        return {
-          nbTotal: 10,
-          items: Array(5).fill(agencebioOperator)
-        }
+        return Array(5).fill(agencebioOperator)
       }
     })
 
@@ -1624,7 +1507,7 @@ describe('GET /api/v2/operators', () => {
       .query({ limit: 5, offset: 0 })
 
     expect(response.status).toBe(200)
-    expect(response.body).toHaveProperty('nbTotal', 10)
+    expect(response.body).toHaveProperty('nbTotal', 5)
     expect(response.body).toHaveProperty('operators')
     expect(response.body.operators).toHaveLength(5)
     expect(response.body.operators[0]).toMatchObject(normalizeOperator(agencebioOperator))
