@@ -54,19 +54,6 @@
       {
         "organismeCertificateurId": 1,
         "organisme": "OC fictif",
-        "date": "2025-01-01",
-        "url": "http://example.net/certificats/id/1-2-3-4",
-        "activites": [
-          {
-            "id": 1,
-            "nom": "Production"
-          }
-        ],
-        "etatCertification": "BROUILLON"
-      },
-      {
-        "organismeCertificateurId": 1,
-        "organisme": "OC fictif",
         "date": "2023-01-01",
         "url": "http://example.net/certificats/id/1-2-3-4",
         "activites": [
@@ -173,6 +160,19 @@
     "sitesWeb": ["http://example.com"],
     "productions": [],
     "notifications": [
+      {
+        "organismeCertificateurId": 1,
+        "organisme": "OC fictif",
+        "date": "2025-01-01",
+        "url": "http://example.net/certificats/id/1-2-3-4",
+        "activites": [
+          {
+            "id": 1,
+            "nom": "Production"
+          }
+        ],
+        "status": "BROUILLON"
+      },
       {
         "organismeCertificateurId": 1,
         "organisme": "OC fictif",
@@ -364,7 +364,7 @@
             "nom": "Production"
           }
         ],
-        "etatCertification": "BROUILLON"
+        "etatCertification": "ENGAGEE FUTUR"
       }
     ],
     "adressesOperateurs": [
