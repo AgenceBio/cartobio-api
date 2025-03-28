@@ -13,7 +13,8 @@
     "checkJs": true,
     "resolveJsonModule": false,
     "lib": [
-      "es2023"
+      "es2023",
+      "dom"
     ]
   }
 }
