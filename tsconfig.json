@@ -14,7 +14,7 @@
     "resolveJsonModule": false,
     "lib": [
       "es2023",
-      "dom"
-    ]
+    ],
+    "skipLibCheck": true
   }
 }
