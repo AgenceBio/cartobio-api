@@ -40,6 +40,7 @@ COPY ./__mocks__ ./__mocks__
 COPY ./lib ./lib
 COPY ./migrations ./migrations
 COPY ./test ./test
+COPY ./image-map ./image-map
 COPY ./*.js ./
 COPY ./*.d.ts ./
 COPY ./.eslintrc.js ./.eslintrc.js
