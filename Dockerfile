@@ -2,6 +2,18 @@ FROM node:20-alpine3.19
 
 RUN apk add --update unzip gdal-dev cmake build-base python3
 
+RUN apk add --no-cache \
+      chromium \
+      nss \
+      freetype \
+      harfbuzz \
+      ca-certificates \
+      ttf-freefont \
+      nodejs \
+      yarn
+
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+
 # Create app directory
 WORKDIR /usr/src/app
 
