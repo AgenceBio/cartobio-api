@@ -2,17 +2,24 @@ FROM node:20-alpine3.19
 
 RUN apk add --update unzip gdal-dev cmake build-base python3
 
+ENV CHROME_BIN="/usr/bin/chromium-browser" \
+      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD="true"
+
 RUN apk add --no-cache \
-      chromium \
+      chromium-swiftshader \
       nss \
       freetype \
       harfbuzz \
       ca-certificates \
       ttf-freefont \
       nodejs \
-      yarn
+      yarn \
+      mesa-dri-gallium \
+      mesa-egl \
+      mesa-gl \
+      libx11-dev \
+      libxext-dev
 
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 # Create app directory
 WORKDIR /usr/src/app
@@ -51,5 +58,7 @@ EXPOSE  8000
 ENV     NODE_ENV  production
 ENV     PORT      8000
 ENV     HOST      0.0.0.0
+
+ENV CHROMIUM_FLAGS="--disable-software-rasterizer --disable-dev-shm-usage"
 
 CMD [ "npm", "start" ]
