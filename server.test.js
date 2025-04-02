@@ -1290,8 +1290,8 @@ describe('POST /api/v2/certification/parcelles', () => {
     expect(mockSentry).not.toHaveBeenCalled()
     expect(res.body).toEqual({
       nbObjetAcceptes: 2,
-      nbObjetRefuses: 6,
-      nbObjetTraites: 8,
+      nbObjetRefuses: 7,
+      nbObjetTraites: 9,
       listeProblemes: [
         // in case of error, check `createOrUpdateOperatorRecord()` SQL arity
         '[#1] Impossible de créer une parcelle sans donnée géographique.',
@@ -1299,7 +1299,8 @@ describe('POST /api/v2/certification/parcelles', () => {
         '[#3] champ geom incorrect : Expected \',\' or \']\' after array element in JSON at position 32635',
         '[#6] Impossible de créer une parcelle sans donnée géographique.',
         '[#7] Les dates de certification sont manquantes.',
-        '[#8] champ etatProduction incorrect'
+        '[#8] champ etatProduction incorrect',
+        '[#9] Champ date dengagement obligatoire lorsque que la parcelle est en conversion'
       ],
       listeWarning: []
     })
@@ -1315,6 +1316,7 @@ describe('POST /api/v2/certification/parcelles', () => {
     validApiParcellaire[3].dateCertificationDebut = '2023-01-01'
     validApiParcellaire[3].dateCertificationFin = '2024-01-01'
     validApiParcellaire[4].parcelles[0].etatProduction = 'AB'
+    validApiParcellaire[5].parcelles[0].dateEngagement = '2024-01-01'
     const res = await request(app.server)
       .post('/api/v2/certification/parcelles')
       .set('Authorization', fakeOcToken)
@@ -1326,7 +1328,7 @@ describe('POST /api/v2/certification/parcelles', () => {
     expect(db._clientRelease).toHaveBeenCalled()
     expect(res.status).toBe(202)
     expect(res.body).toEqual({
-      nbObjetTraites: 5
+      nbObjetTraites: 6
     })
   }, 10000)
 
