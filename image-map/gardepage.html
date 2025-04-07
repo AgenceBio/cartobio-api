@@ -72,7 +72,7 @@
         background-color: #a4cd39;
         font-weight: bolder;
         margin: 0;
-        padding:0;
+        padding: 0;
         width: fit-content;
         margin-bottom: 0;
       }
@@ -140,8 +140,16 @@
         top: 252px;
         left: 82px;
         color: #000091;
-        font-size: 40px;
         font-weight: bold;
+        width: 980px;
+        max-width: 980px;
+        white-space: nowrap;
+        overflow: hidden;
+        line-height: 40px;
+        font-size: 40px;
+        font-family: sans-serif;
+        transform-origin: left center;
+        align-items: center;
       }
 
       .version-info {
@@ -197,6 +205,24 @@
         font-size: 18px;
         margin-top: 10px;
       }
+
+      .nbio-info {
+        position: absolute;
+        top: 259px;
+        left: 1089px;
+      }
+
+      .nbio-label {
+        opacity: 0.5;
+        color: #161616;
+        font-size: 18px;
+      }
+
+      .nbio-value {
+        color: #161616;
+        font-size: 18px;
+        margin-top: 10px;
+      }
     </style>
   </head>
   <body>
@@ -224,6 +250,11 @@
 
       <div class="org-name" id="nomog"></div>
 
+      <div class="nbio-info">
+        <div class="nbio-label">Numéro Bio</div>
+        <div class="nbio-value" id="nbionumber"></div>
+      </div>
+
       <div class="siret-info">
         <div class="siret-label">Siret</div>
         <div class="siret-value" id="siretnumber"></div>
@@ -235,4 +266,19 @@
       </div>
     </div>
   </body>
+  <script>
+    function adjustFontSizeToFit(selector) {
+      const el = document.querySelector(selector);
+      let fontSize = parseFloat(getComputedStyle(el).fontSize);
+
+      while (el.scrollWidth > el.clientWidth && fontSize > 10) {
+        fontSize -= 1;
+        el.style.fontSize = fontSize + 'px';
+      }
+    }
+
+    window.addEventListener('load', () => adjustFontSizeToFit('.org-name'));
+    window.addEventListener('resize', () => adjustFontSizeToFit('.org-name'));
+  </script>
+
 </html>
