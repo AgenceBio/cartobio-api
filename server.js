@@ -251,8 +251,15 @@ app.register(async (app) => {
     return Promise.all([getPinnedOperators(userId), getConsultedOperators(userId)])
       .then(async ([pinnedNumerobios, consultedNumerobio]) => {
         const uniqueNumerobios = [...new Set([...pinnedNumerobios, ...consultedNumerobio])]
-        const operators = (await fetchCustomersByOc(ocId)).filter((operator) => uniqueNumerobios.includes(operator.numeroBio) && ['ENGAGEE', 'ENGAGEE FUTUR'].includes(operator.notifications.etatCertification))
-
+        const operators = (
+          await fetchCustomersByOc(ocId))
+          .filter(
+            (operator) =>
+              uniqueNumerobios.includes(operator.numeroBio) &&
+              operator.notifications.certification_state !== 'ARRETEE' &&
+              operator.notifications.organismeCertificateurId === ocId &&
+              ['ENGAGEE', 'ENGAGEE FUTUR'].includes(operator.notifications.etatCertification)
+          )
         return Promise.all(operators.map((o) => addRecordData(o))).then(
           (operatorsWithData) => reply.code(200).send({
             pinnedOperators: pinnedNumerobios.filter((numeroBio) => (operatorsWithData.find((o) => o.numeroBio === numeroBio))).map((numeroBio) => ({ ...operatorsWithData.find((o) => o.numeroBio === numeroBio), epingle: true })),
