@@ -37,17 +37,16 @@ exports.up = async function(db) {
             FOR i IN
               SELECT generate_series(1, ST_NumGeometries(validGeometry)) AS i
             LOOP
-              IF ST_Area(ST_GeometryN(validGeometry, i)) > ST_Area(tmpValidGeometry) THEN
+              IF ST_Area(ST_GeometryN(validGeometry, i), true) > ST_Area(tmpValidGeometry, true) THEN
                 tmpValidGeometry := ST_GeometryN(validGeometry, i);
               END IF;
             END LOOP;
-           validGeometry := tmpValidGeometry;
+            validGeometry := tmpValidGeometry;
           END IF;
-          initialArea := ST_Area(NEW.geometry) * 1000000;
-          makeValidArea := ST_Area(validGeometry) * 1000000;
+          initialArea := ST_Area(NEW.geometry, true);
+          makeValidArea := ST_Area(validGeometry, true);
           difference := ABS(initialArea - makeValidArea);
-			
-          IF difference < 1 AND ABS(difference / (initialArea / 100)) < 1 THEN
+          IF (difference / 1000) < 1 AND ABS(difference / (initialArea / 100)) < 1 THEN
             NEW.geometry = validGeometry;
           END IF;
         ELSE
@@ -75,7 +74,7 @@ exports.up = async function(db) {
             ST_Intersection(
               validGeometry,
               communes.geometry
-            )
+            ), true
           ) DESC,
           ST_Distance(
             validGeometry,
@@ -87,8 +86,6 @@ exports.up = async function(db) {
         RETURN NEW;
     END;
     $$ LANGUAGE plpgsql;
-    
-   
   `)
 };
 
