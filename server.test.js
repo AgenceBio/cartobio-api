@@ -762,8 +762,6 @@ describe('POST /api/v2/convert/anygeo/geojson', () => {
         expect(response.body.features).toHaveLength(2)
         expect(response.body.features.at(0)).toHaveProperty('properties', {
           id: expect.toBeAFeatureId(),
-          COMMUNE: '89118',
-          COMMUNE_LABEL: null,
           NOM: 'ilôt 22 - Coulanges-la-Vineuse / Jachère Côte de Groix Milieu',
           PACAGE: null,
           annotations: [],
@@ -783,8 +781,6 @@ describe('POST /api/v2/convert/anygeo/geojson', () => {
         })
         expect(response.body.features.at(1)).toHaveProperty('properties', {
           id: expect.toBeAFeatureId(),
-          COMMUNE: '89118',
-          COMMUNE_LABEL: 'Coulanges-la-Vineuse',
           NOM: 'Coulanges-la-vineuse Montfaucon (Moussu) / AOP Bourgogne Coulanges la vineuse Rouge',
           NUMERO_I: 19,
           NUMERO_P: 1,
