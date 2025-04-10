@@ -304,5 +304,28 @@
         ]
       }
     ]
-  }
+  },
+  {
+  "numeroBio": 172301,
+  "numeroClient": 195931,
+  "anneeReferenceControle": 2023,
+  "anneeAssolement": 2023,
+  "dateCertificationDebut": "2023-01-01",
+  "dateCertificationFin": "2025-03-31",
+  "dateAudit": "2023-03-30",
+  "numeroPacage": 32165694,
+  "parcelles": [
+    {
+      "id": 124300,
+      "dateEngagement": null,
+      "etatProduction": "C1",
+      "culture": [
+       {
+        "codeCPF": "",
+        "variete": ""
+       }
+      ]
+     }
+  ]
+ }
 ]
