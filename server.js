@@ -614,7 +614,7 @@ app.register(async (app) => {
     return reply.code(200).send(recordToApi(record))
   })
 
-  app.get('/api/v2/pdf/:numeroBio/:recordId', async (request, reply) => {
+  app.get('/api/v2/pdf/:numeroBio/:recordId', mergeSchemas(protectedWithToken()), async (request, reply) => {
     const pdf = await generatePDF(request.params.numeroBio, request.params.recordId)
     return reply.code(200).send(pdf)
   })
