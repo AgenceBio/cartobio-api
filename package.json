@@ -80,7 +80,8 @@
     "test:types": "tsc",
     "prewatch": "npm run build:geo-data && ./node_modules/.bin/db-migrate up",
     "watch": "node --watch server.js",
-    "clean-records": "node bin/clean-records.js"
+    "clean-records": "node bin/clean-records.js",
+    "clean-pdf": "node bin/delete-pdf.js"
   },
   "repository": {
     "type": "git",
