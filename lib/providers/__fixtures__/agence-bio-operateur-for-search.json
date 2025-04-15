@@ -171,6 +171,7 @@
             "nom": "Production"
           }
         ],
+        "etatCertification": "",
         "status": "BROUILLON"
       },
       {
@@ -257,6 +258,19 @@
           }
         ],
         "etatCertification": "NON ENGAGEE"
+      },
+      {
+        "organismeCertificateurId": 1,
+        "organisme": "OC fictif",
+        "date": "2023-01-01",
+        "url": "http://example.net/certificats/id/1-2-3-4",
+        "activites": [
+          {
+            "id": 1,
+            "nom": "Production"
+          }
+        ],
+        "etatCertification": null
       }
     ],
     "adressesOperateurs": [
