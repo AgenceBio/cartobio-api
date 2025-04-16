@@ -48,6 +48,7 @@ COPY ./lib ./lib
 COPY ./migrations ./migrations
 COPY ./test ./test
 COPY ./image-map ./image-map
+COPY ./pdf ./pdf
 COPY ./*.js ./
 COPY ./*.d.ts ./
 COPY ./.eslintrc.js ./.eslintrc.js
