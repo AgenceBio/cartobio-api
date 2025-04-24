@@ -2,6 +2,25 @@ FROM node:20-alpine3.19
 
 RUN apk add --update unzip gdal-dev cmake build-base python3
 
+ENV CHROME_BIN="/usr/bin/chromium-browser" \
+      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD="true"
+
+RUN apk add --no-cache \
+      chromium-swiftshader \
+      nss \
+      freetype \
+      harfbuzz \
+      ca-certificates \
+      ttf-freefont \
+      nodejs \
+      yarn \
+      mesa-dri-gallium \
+      mesa-egl \
+      mesa-gl \
+      libx11-dev \
+      libxext-dev
+
+
 # Create app directory
 WORKDIR /usr/src/app
 
@@ -28,6 +47,8 @@ COPY ./__mocks__ ./__mocks__
 COPY ./lib ./lib
 COPY ./migrations ./migrations
 COPY ./test ./test
+COPY ./image-map ./image-map
+COPY ./pdf ./pdf/
 COPY ./*.js ./
 COPY ./*.d.ts ./
 COPY ./.eslintrc.js ./.eslintrc.js
@@ -38,5 +59,7 @@ EXPOSE  8000
 ENV     NODE_ENV  production
 ENV     PORT      8000
 ENV     HOST      0.0.0.0
+
+ENV CHROMIUM_FLAGS="--disable-software-rasterizer --disable-dev-shm-usage"
 
 CMD [ "npm", "start" ]
