@@ -60,7 +60,7 @@ const JSONStream = require('jsonstream-next')
 const { createSigner } = require('fast-jwt')
 
 const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators, fetchCustomersByOc } = require('./lib/providers/agence-bio.js')
-const { addRecordFeature, addDividFeature, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, getDepartement, recordSorts, pinOperator, unpinOperator, consultOperator, getDashboardSummary, exportDataOcId, searchForAutocomplete, haveImportPAC, fetchDataImportPAC } = require('./lib/providers/cartobio.js')
+const { addRecordFeature, addDividFeature, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, getDepartement, recordSorts, pinOperator, unpinOperator, consultOperator, getDashboardSummary, exportDataOcId, searchForAutocomplete, haveImportPAC, fetchDataImportPAC, hideImport } = require('./lib/providers/cartobio.js')
 const { generatePDF } = require('./lib/providers/export-pdf.js')
 const { evvLookup, evvParcellaire, pacageLookup, iterateOperatorLastRecords } = require('./lib/providers/cartobio.js')
 const { parseAnyGeographicalArchive } = require('./lib/providers/gdal.js')
@@ -341,18 +341,18 @@ app.register(async (app) => {
    * @private
    * Checks if operator can import a pac record from 2025
    */
-  app.get('/api/v2/operator/:numeroBio/canImport/:fromImport', mergeSchemas(protectedWithToken()), async (request, reply) => {
-    const res = await haveImportPAC(request.params.numeroBio, request.params.fromImport)
-    return reply.code(200).send({ res })
+  app.get('/api/v2/operator/:numeroBio/importData', mergeSchemas(protectedWithToken()), async (request, reply) => {
+    const res = await haveImportPAC(request.params.numeroBio)
+    return reply.code(200).send({ data: res })
   })
 
   /**
    * @private
-   * Give record of import PAC 2025
+   * Hide import PAC 2025 notif
    */
-  app.get('/api/v2/operator/:numeroBio/importPacData', mergeSchemas(protectedWithToken()), async (request, reply) => {
-    const res = await fetchDataImportPAC(request.params.numeroBio)
-    return reply.code(200).send({ res })
+  app.patch('/api/v2/operator/:numeroBio/importPac', mergeSchemas(protectedWithToken()), async (request, reply) => {
+    await hideImport(request.params.numeroBio)
+    return reply.code(204).send()
   })
 
   /**
@@ -584,7 +584,7 @@ app.register(async (app) => {
       })
   })
 
-  app.post('/api/v2/certification/parcelles', mergeSchemas(protectedWithToken({ oc: true }), {
+  app.post('/api/v2/certification/parcelles', mergeSchemas({
     preParsing: async (request, reply, payload) => {
       const stream = payload.pipe(stripBom())
 
