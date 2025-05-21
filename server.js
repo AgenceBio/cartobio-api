@@ -604,7 +604,7 @@ app.register(async (app) => {
     // pass all records through recordToApi
     const apiRecords = async function * () {
       for await (const record of records) {
-        yield recordToApi(record)
+        yield (await recordToApi(record))
       }
     }
 
