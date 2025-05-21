@@ -49,7 +49,7 @@ afterAll(() => app.close())
 afterEach(() => jest.clearAllMocks())
 
 const apiRecordExpect = expectDeepCloseTo(
-  recordToApi(
+  await recordToApi(
     normalizeRecord({ parcelles, ...record })
   )
 )
