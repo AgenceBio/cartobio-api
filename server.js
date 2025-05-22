@@ -604,7 +604,7 @@ app.register(async (app) => {
     // pass all records through recordToApi
     const apiRecords = async function * () {
       for await (const record of records) {
-        yield (await recordToApi(record))
+        yield recordToApi(record)
       }
     }
 
@@ -618,7 +618,7 @@ app.register(async (app) => {
       anneeAudit: request.query.anneeAudit,
       statut: request.query.statut
     })
-    return reply.code(200).send(recordToApi(record))
+    return reply.code(200).send(await recordToApi(record))
   })
 
   app.get('/api/v2/pdf/:numeroBio/:recordId', mergeSchemas(protectedWithToken()), async (request, reply) => {
