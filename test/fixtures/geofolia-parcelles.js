@@ -20,7 +20,7 @@ module.exports = {
           {
             id: '6efe794c-c486-430d-9f5d-75154404b9a4',
             GF: 'H69',
-            surface: 2.04601791253
+            surface: 2.05
           }
         ]
       }
@@ -53,7 +53,7 @@ module.exports = {
             id: '60f5193f-1b87-4978-a755-6d4149aa3a3f',
             GF: 'ZCU',
             CPF: '01.19.10.6',
-            surface: 1.00,
+            surface: 1,
             variete: 'Trèfle et triticale hors code CPF'
           }
         ]
