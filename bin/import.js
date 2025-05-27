@@ -6,30 +6,16 @@ const dotenv = require('dotenv')
 
 const cliProgress = require('cli-progress')
 const getStream = require('get-stream')
-const { get } = require('got')
+const { post } = require('got')
 const gdal = require('gdal-async')
-const area = require('@turf/area')
 
 const pool = require('../lib/db')
-const { normalizeOperator } = require('../lib/outputs/operator.js')
+// const { surfaceForFeatureCollection } = require('../lib/outputs/api.js') TODO : Après passage des derniers devs sur main
 const { fromCodePacStrict } = require('@agencebio/rosetta-cultures')
 const { unzipGeographicalContent, detectSrs, wgs84 } = require('../lib/providers/gdal')
 const { getRandomFeatureId } = require('../lib/outputs/features')
 const { CertificationState, EtatProduction } = require('../lib/enums.js')
-
-// Constante
-const OC = {
-  'Ecocert France': 1,
-  'Bureau Veritas Certification France': 2,
-  'Certipaq Bio': 3,
-  Qualisud: 4,
-  Certisud: 5,
-  Certis: 6,
-  'Bureau Alpes contrôles': 7,
-  'Biotek Agriculture': 8,
-  'Control Union Inspections France': 10,
-  Ocacia: 11
-}
+const area = require('@turf/area')
 
 function parseCSV (text) {
   const [headerLine, ...lines] = text.trim().split('\n')
@@ -41,13 +27,17 @@ function parseCSV (text) {
 }
 
 async function * groupByPACAGE (features) {
-  const sorted = Array.from(features).sort((a, b) => a.fields.get('PACAGE').localeCompare(b.fields.get('PACAGE')))
+  const sorted = Array.from(features).sort((a, b) =>
+    a.fields.get('PACAGE').localeCompare(b.fields.get('PACAGE'))
+  )
   let current = null
   let group = []
 
   for (const feature of sorted) {
     const pacage = feature.fields.get('PACAGE')
-    if (!pacage) throw new Error(`Feature without PACAGE: ${JSON.stringify(feature.fields.toObject())}`)
+    if (!pacage) {
+      throw new Error(`Feature without PACAGE: ${JSON.stringify(feature.fields.toObject())}`)
+    }
 
     if (!current || pacage === current) {
       group.push(feature)
@@ -62,32 +52,32 @@ async function * groupByPACAGE (features) {
   if (group.length) yield group
 }
 
-async function getNumerobioBySiretID (ocId, siret, pacage) {
-  const response = await get(`${process.env.NOTIFICATIONS_AB_ENDPOINT}/api/oc/${ocId}/operateurs?siret=${siret}&pacage=${pacage}`, {
-    headers: {
-      Authorization: process.env.NOTIFICATIONS_AB_SERVICE_TOKEN,
-      origin: process.env.NOTIFICATIONS_AB_ORIGIN
+async function getValidOperator (tabCouplage) {
+  const response = await post(
+    `${process.env.NOTIFICATIONS_AB_ENDPOINT}/api/operateur/siret-pacage`,
+    {
+      headers: {
+        Authorization: process.env.NOTIFICATIONS_AB_SERVICE_TOKEN,
+        origin: process.env.NOTIFICATIONS_AB_ORIGIN
+      },
+      json: tabCouplage
     }
-  }).json()
-
-  response.operateurs = response.operateurs.map(normalizeOperator)
+  ).json()
   return response
 }
 
-async function findOperatorBySiret (siret, pacage) {
-  for (const [, ocId] of Object.entries(OC)) {
-    const data = await getNumerobioBySiretID(ocId, siret, pacage)
-    if (data.nbTotal === 1) {
-      return data.operateurs[0]
-    }
+function splitToNTabs (array, n) {
+  const result = []
+  for (let i = n; i > 0; i--) {
+    result.push(array.splice(0, Math.ceil(array.length / i)))
   }
-  return null
+  return result
 }
 
 /* main.js */
 
 if (process.argv.length < 4) {
-  console.error('Usage: node import-pac-declare.js <fichier-zip-asp> <correspondance.csv> [env]')
+  console.error('Usage: node import.js <fichier-zip-asp> <correspondance.csv> [env]')
   process.exit(1)
 }
 
@@ -103,27 +93,15 @@ if (process.argv.length < 4) {
   const client = await pool.connect()
   await client.query('BEGIN;')
 
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS import_pac (
-      id SERIAL PRIMARY KEY,
-      numerobio VARCHAR NOT NULL,
-      pacage VARCHAR NOT NULL,
-      siret VARCHAR NOT NULL,
-      nb_parcelles VARCHAR NOT NULL,
-      size VARCHAR NOT NULL,
-      record JSONB NOT NULL,
-      imported BOOLEAN NOT NULL DEFAULT FALSE,
-      UNIQUE(numerobio, pacage, siret)
-    );
-  `)
-
   const progress = new cliProgress.SingleBar({}, { ...cliProgress.Presets.rect, etaBuffer: 10000 })
   progress.start(correspondance.length, 0)
 
   let imported = 0
   let skipped = 0
-  const warnings = []
-
+  const warningsDoublon = []
+  const warningsCorrespondance = []
+  const warningsSiretVide = []
+  const warningsNoNumeroBio = []
   try {
     for await (const filepath of files) {
       const dataset = await gdal.openAsync(filepath)
@@ -131,89 +109,122 @@ if (process.argv.length < 4) {
       for await (const layer of dataset.layers) {
         const srs = await detectSrs(layer)
         const reproject = new gdal.CoordinateTransformation(srs, wgs84)
-
+        const tabCouplage = []
+        const tabGeom = []
         for await (const featureGroup of groupByPACAGE(layer.features)) {
           const pacage = featureGroup[0].fields.get('PACAGE')
           const siretMapping = correspondance.find(row => row.NUMEROPACAGE === pacage)
 
           if (!siretMapping) {
-            warnings.push(`Aucune correspondance pour le numéro de pacage : ${pacage}`)
+            warningsCorrespondance.push(pacage)
             skipped++
             continue
           }
 
-          const operator = await findOperatorBySiret(siretMapping.NUMEROSIRET, pacage)
-          if (!operator) {
-            warnings.push(`Aucun numéro Bio pour le SIRET : ${siretMapping.NUMEROSIRET} et le pacage : ${pacage}`)
+          if (siretMapping.NUMEROSIRET === '') {
+            warningsSiretVide.push(siretMapping.NUMEROPACAGE)
+            skipped++
             continue
           }
 
-          const featureCollection = {
-            type: 'FeatureCollection',
-            features: []
-          }
+          tabCouplage.push({
+            siret: siretMapping.NUMEROSIRET,
+            pacage: siretMapping.NUMEROPACAGE
+          })
+          tabGeom.push({
+            pacage: siretMapping.NUMEROPACAGE,
+            geom: featureGroup
+          })
+        }
+        const splitTab = splitToNTabs([...tabCouplage], 100)
 
-          for (const feature of featureGroup) {
-            const geometry = feature.getGeometry()
-            await geometry.transformAsync(reproject)
-
-            const fields = feature.fields.toObject()
-            const { BIO, CODE_CULT, PRECISION, NUM_ILOT, NUM_PARCEL } = fields
-            const id = feature.fields.get('IUP') || getRandomFeatureId()
-
-            featureCollection.features.push({
-              type: 'Feature',
-              id,
-              geometry: geometry.toObject(),
-              properties: {
-                id,
-                BIO,
-                cultures: [{
-                  id: randomUUID(),
-                  CPF: fromCodePacStrict(CODE_CULT, PRECISION)?.code_cpf,
-                  CODE_CULT
-                }],
-                conversion_niveau: BIO === 1 ? EtatProduction.BIO : EtatProduction.NB,
-                NUMERO_I: NUM_ILOT,
-                NUMERO_P: NUM_PARCEL,
-                PACAGE: pacage
-              }
-            })
-          }
-
-          const record = {
-            parcelles: featureCollection,
-            numerobio: operator.numeroBio,
-            oc_label: operator.organismeCertificateur.nom,
-            oc_id: operator.organismeCertificateur.id,
-            certification_state: CertificationState.OPERATOR_DRAFT,
-            version_name: 'Parcellaire déclaré PAC 2025',
-            metadata: {
-              source: 'telepac',
-              campagne: '2025',
-              pacage,
-              warnings: '',
-              provenance: 'asp-2025'
+        for (let i = 0; i < splitTab.length - 1; i++) {
+          const data = await getValidOperator(splitTab[i])
+          if (data.doublons.length > 0) {
+            for (const doublon of data.doublons) {
+              warningsDoublon.push({ siret: doublon.siret, pacage: doublon.pacage })
             }
+            skipped = skipped + data.doublons.length
           }
+          if (data.sansOperateur.length > 0) {
+            for (const so of data.sansOperateur) {
+              warningsNoNumeroBio.push({ siret: so.siret, pacage: so.pacage })
+            }
+            skipped = skipped + data.sansOperateur.length
+          }
+          for (const operator of data.operateurs) {
+            const pacageFeatures = tabGeom.find(e => e.pacage === operator.numeroPacage).geom
 
-          await client.query(`
+            const featureCollection = {
+              type: 'FeatureCollection',
+              features: []
+            }
+
+            for (const feature of pacageFeatures) {
+              const geometry = feature.getGeometry()
+              await geometry.transformAsync(reproject)
+
+              const fields = feature.fields.toObject()
+              const { BIO, CODE_CULT, PRECISION, NUM_ILOT, NUM_PARCEL } = fields
+              const id = feature.fields.get('IUP') || getRandomFeatureId()
+
+              featureCollection.features.push({
+                type: 'Feature',
+                id,
+                geometry: geometry.toObject(),
+                properties: {
+                  id,
+                  BIO,
+                  cultures: [
+                    {
+                      id: randomUUID(),
+                      CPF: fromCodePacStrict(CODE_CULT, PRECISION)?.code_cpf,
+                      CODE_CULT
+                    }
+                  ],
+                  conversion_niveau: BIO === 1 ? EtatProduction.BIO : EtatProduction.NB,
+                  NUMERO_I: NUM_ILOT,
+                  NUMERO_P: NUM_PARCEL,
+                  PACAGE: operator.numeroPacage
+                }
+              })
+            }
+
+            const record = {
+              parcelles: featureCollection,
+              numerobio: operator.numeroBio,
+              certification_state: CertificationState.OPERATOR_DRAFT,
+              version_name: 'Parcellaire déclaré PAC 2025',
+              metadata: {
+                source: 'telepac',
+                campagne: '2025',
+                pacage: operator.numeroPacage,
+                warnings: '',
+                provenance: 'asp-2025'
+              }
+            }
+
+            await client.query(
+              `
             INSERT INTO import_pac (numerobio, nb_parcelles, size, record, pacage, siret)
             VALUES ($1, $2, $3, $4, $5, $6)
             ON CONFLICT (numerobio, pacage, siret)
-            DO UPDATE SET record = $7
-          `, [
-            operator.numeroBio,
-            featureCollection.features.length,
-            area.default(featureCollection),
-            JSON.stringify(record),
-            pacage,
-            siretMapping.NUMEROSIRET,
-            JSON.stringify(record)
-          ])
+            DO UPDATE SET nb_parcelles = $2, size = $3, record = $4, updatedAt = CURRENT_TIMESTAMP
+          `,
+              [
+                operator.numeroBio,
+                featureCollection.features.length,
+                // surfaceForFeatureCollection(featureCollection) TODO : Après passage des derniers devs sur main
+                area.default(featureCollection),
+                JSON.stringify(record),
+                operator.numeroPacage,
+                operator.siret
+              ]
+            )
 
-          imported++
-          progress.increment()
+            imported++
+            progress.increment()
+          }
         }
       }
     }
@@ -231,9 +242,37 @@ if (process.argv.length < 4) {
     console.log('--- Résumé ---')
     console.log('Importés :', imported)
     console.log('Ignorés :', skipped)
-    if (warnings.length) {
-      console.warn('\n Warnings:')
-      for (const msg of warnings) console.warn(msg)
+    console.warn('\n Warnings:')
+    if (warningsDoublon.length > 0) {
+      console.log('\n Warnings =>  Couple Siret / Pacage avec plusieurs numéros Bio')
+      console.table(warningsDoublon)
     }
+    if (warningsNoNumeroBio.length > 0) {
+      console.log('\n Warnings => Couple Siret / Pacage sans numéros Bio ')
+      console.table(warningsNoNumeroBio)
+    }
+    if (warningsCorrespondance.length > 0) {
+      console.log('\n Warnings => Aucune correspondance pour les pacages : ')
+      for (const wc of warningsCorrespondance) console.log(wc)
+    }
+    if (warningsSiretVide.length > 0) {
+      console.log('\n Warnings =>Numero de siret à vide pour les pacages :')
+      for (const wsv of warningsSiretVide) console.log(wsv)
+    }
+    const json = {
+      success: imported,
+      skipped: skipped,
+      warningsCorrespondance,
+      warningsDoublon,
+      warningsNoNumeroBio,
+      warningsSiretVide
+    }
+    fs.writeFile('resultat.json', JSON.stringify(json), 'utf8', err => {
+      if (err) {
+        console.error(err)
+      } else {
+        console.log('Warnings disponible dans le fichier resultat.json')
+      }
+    })
   }
 })()
