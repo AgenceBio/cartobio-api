@@ -60,7 +60,7 @@ const JSONStream = require('jsonstream-next')
 const { createSigner } = require('fast-jwt')
 
 const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators, fetchCustomersByOc } = require('./lib/providers/agence-bio.js')
-const { addRecordFeature, addDividFeature, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, getDepartement, recordSorts, pinOperator, unpinOperator, consultOperator, getDashboardSummary, exportDataOcId, searchForAutocomplete, haveImportPAC, fetchDataImportPAC, hideImport } = require('./lib/providers/cartobio.js')
+const { addRecordFeature, addDividFeature, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, getDepartement, recordSorts, pinOperator, unpinOperator, consultOperator, getDashboardSummary, exportDataOcId, searchForAutocomplete, getImportPAC, fetchDataImportPAC, hideImport } = require('./lib/providers/cartobio.js')
 const { generatePDF } = require('./lib/providers/export-pdf.js')
 const { evvLookup, evvParcellaire, pacageLookup, iterateOperatorLastRecords } = require('./lib/providers/cartobio.js')
 const { parseAnyGeographicalArchive } = require('./lib/providers/gdal.js')
@@ -342,7 +342,7 @@ app.register(async (app) => {
    * Checks if operator can import a pac record from 2025
    */
   app.get('/api/v2/operator/:numeroBio/importData', mergeSchemas(protectedWithToken()), async (request, reply) => {
-    const res = await haveImportPAC(request.params.numeroBio)
+    const res = await getImportPAC(request.params.numeroBio)
     return reply.code(200).send({ data: res })
   })
 
@@ -584,7 +584,7 @@ app.register(async (app) => {
       })
   })
 
-  app.post('/api/v2/certification/parcelles', mergeSchemas({
+  app.post('/api/v2/certification/parcelles', mergeSchemas(protectedWithToken({ oc: true }), {
     preParsing: async (request, reply, payload) => {
       const stream = payload.pipe(stripBom())
 
