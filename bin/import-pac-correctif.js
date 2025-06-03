@@ -9,12 +9,11 @@ const getStream = require('get-stream')
 const gdal = require('gdal-async')
 
 const pool = require('../lib/db')
-// const { surfaceForFeatureCollection } = require('../lib/outputs/api.js') TODO : Après passage des derniers devs sur main
+const { surfaceForFeatureCollection } = require('../lib/outputs/api.js')
 const { fromCodePacStrict } = require('@agencebio/rosetta-cultures')
 const { unzipGeographicalContent, detectSrs, wgs84 } = require('../lib/providers/gdal')
 const { getRandomFeatureId } = require('../lib/outputs/features')
 const { CertificationState, EtatProduction } = require('../lib/enums.js')
-const area = require('@turf/area')
 
 function parseCSV (text) {
   const [headerLine, ...lines] = text.trim().split('\n')
@@ -111,7 +110,6 @@ if (process.argv.length < 3) {
             skipped++
             continue
           }
-
           tabCouplage.push({
             siret: siretMapping.NUMEROSIRET,
             pacage: siretMapping.NUMEROPACAGE,
@@ -119,60 +117,59 @@ if (process.argv.length < 3) {
             geom: featureGroup
           })
         }
+        if (tabCouplage.length > 0) {
+          for (let i = 0; i < tabCouplage.length; i++) {
+            const pacageFeatures = tabCouplage[i].geom
 
-        for (let i = 0; i < tabCouplage.length - 1; i++) {
-          const pacageFeatures = tabCouplage[i].geom
-
-          const featureCollection = {
-            type: 'FeatureCollection',
-            features: []
-          }
-
-          for (const feature of pacageFeatures) {
-            const geometry = feature.getGeometry()
-            await geometry.transformAsync(reproject)
-
-            const fields = feature.fields.toObject()
-            const { BIO, CODE_CULT, PRECISION, NUM_ILOT, NUM_PARCEL } = fields
-            const id = feature.fields.get('IUP') || getRandomFeatureId()
-
-            featureCollection.features.push({
-              type: 'Feature',
-              id,
-              geometry: geometry.toObject(),
-              properties: {
-                id,
-                BIO,
-                cultures: [
-                  {
-                    id: randomUUID(),
-                    CPF: fromCodePacStrict(CODE_CULT, PRECISION)?.code_cpf,
-                    CODE_CULT
-                  }
-                ],
-                conversion_niveau: BIO === 1 ? EtatProduction.BIO : EtatProduction.NB,
-                NUMERO_I: NUM_ILOT,
-                NUMERO_P: NUM_PARCEL,
-                PACAGE: tabCouplage[i].pacage
-              }
-            })
-          }
-
-          const record = {
-            parcelles: featureCollection,
-            numerobio: tabCouplage[i].numeroBio,
-            certification_state: CertificationState.OPERATOR_DRAFT,
-            version_name: 'Parcellaire déclaré PAC 2025',
-            metadata: {
-              source: 'telepac',
-              campagne: '2025',
-              pacage: tabCouplage[i].pacage,
-              warnings: '',
-              provenance: 'asp-2025'
+            const featureCollection = {
+              type: 'FeatureCollection',
+              features: []
             }
-          }
 
-          await client.query(
+            for (const feature of pacageFeatures) {
+              const geometry = feature.getGeometry()
+              await geometry.transformAsync(reproject)
+
+              const fields = feature.fields.toObject()
+              const { BIO, CODE_CULT, PRECISION, NUM_ILOT, NUM_PARCEL } = fields
+              const id = feature.fields.get('IUP') || getRandomFeatureId()
+
+              featureCollection.features.push({
+                type: 'Feature',
+                id,
+                geometry: geometry.toObject(),
+                properties: {
+                  id,
+                  BIO,
+                  cultures: [
+                    {
+                      id: randomUUID(),
+                      CPF: fromCodePacStrict(CODE_CULT, PRECISION)?.code_cpf,
+                      CODE_CULT
+                    }
+                  ],
+                  conversion_niveau: BIO === 1 ? EtatProduction.BIO : EtatProduction.NB,
+                  NUMERO_I: NUM_ILOT,
+                  NUMERO_P: NUM_PARCEL,
+                  PACAGE: tabCouplage[i].pacage
+                }
+              })
+            }
+
+            const record = {
+              parcelles: featureCollection,
+              numerobio: tabCouplage[i].numeroBio,
+              certification_state: CertificationState.OPERATOR_DRAFT,
+              version_name: 'Parcellaire déclaré PAC 2025',
+              metadata: {
+                source: 'telepac',
+                campagne: '2025',
+                pacage: tabCouplage[i].pacage,
+                warnings: '',
+                provenance: 'asp-2025'
+              }
+            }
+            await client.query(
               `
             INSERT INTO import_pac (numerobio, nb_parcelles, size, record, pacage, siret)
             VALUES ($1, $2, $3, $4, $5, $6)
@@ -182,16 +179,16 @@ if (process.argv.length < 3) {
               [
                 tabCouplage[i].numeroBio,
                 featureCollection.features.length,
-                // surfaceForFeatureCollection(featureCollection) TODO : Après passage des derniers devs sur main
-                area.default(featureCollection),
+                surfaceForFeatureCollection(featureCollection),
                 JSON.stringify(record),
                 tabCouplage[i].pacage,
                 tabCouplage[i].siret
               ]
-          )
+            )
 
-          imported++
-          progress.increment()
+            imported++
+            progress.increment()
+          }
         }
       }
     }
@@ -206,9 +203,6 @@ if (process.argv.length < 3) {
     await cleanup()
     progress.stop()
 
-    console.log('--- Résumé ---')
-    console.log('Importés :', imported)
-    console.log('Ignorés :', skipped)
     console.warn('\n Warnings:')
     if (warningsCorrespondance.length > 0) {
       console.log('\n Warnings => Aucune correspondance pour les pacages : ')
@@ -223,6 +217,11 @@ if (process.argv.length < 3) {
       console.log('\n Warnings =>Numero BIO à vide pour les pacages et les sirets :')
       for (const wsv of warningsNumeroBioVide) console.log(wsv)
     }
+
+    console.log('--- Résumé ---')
+    console.log('Importés :', imported)
+    console.log('Ignorés :', skipped)
+
     const json = {
       success: imported,
       skipped: skipped,
@@ -230,7 +229,7 @@ if (process.argv.length < 3) {
       warningsSiretVide,
       warningsNumeroBioVide
     }
-    fs.writeFile('resultat.json', JSON.stringify(json), 'utf8', err => {
+    fs.writeFile('resultat_correctif_csv.json', JSON.stringify(json), 'utf8', err => {
       if (err) {
         console.error(err)
       } else {

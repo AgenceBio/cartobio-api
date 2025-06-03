@@ -10,12 +10,11 @@ const { post } = require('got')
 const gdal = require('gdal-async')
 
 const pool = require('../lib/db')
-// const { surfaceForFeatureCollection } = require('../lib/outputs/api.js') TODO : Après passage des derniers devs sur main
+const { surfaceForFeatureCollection } = require('../lib/outputs/api.js')
 const { fromCodePacStrict } = require('@agencebio/rosetta-cultures')
 const { unzipGeographicalContent, detectSrs, wgs84 } = require('../lib/providers/gdal')
 const { getRandomFeatureId } = require('../lib/outputs/features')
 const { CertificationState, EtatProduction } = require('../lib/enums.js')
-const area = require('@turf/area')
 
 function parseCSV (text) {
   const [headerLine, ...lines] = text.trim().split('\n')
@@ -84,7 +83,7 @@ function splitToNTabs (array, n) {
 /* main.js */
 
 if (process.argv.length < 4) {
-  console.error('Usage: node import.js <fichier-zip-asp> <correspondance.csv> [env]')
+  console.error('Usage: node import-pac.js <fichier-zip-asp> <correspondance.csv> [env]')
   process.exit(1)
 }
 
@@ -146,7 +145,7 @@ if (process.argv.length < 4) {
         }
         const splitTab = splitToNTabs([...tabCouplage], 100)
 
-        for (let i = 0; i < splitTab.length - 1; i++) {
+        for (let i = 0; i < splitTab.length; i++) {
           const data = await getValidOperator(splitTab[i])
           if (data.doublons.length > 0) {
             for (const doublon of data.doublons) {
@@ -225,8 +224,7 @@ if (process.argv.length < 4) {
               [
                 operator.numeroBio,
                 featureCollection.features.length,
-                // surfaceForFeatureCollection(featureCollection) TODO : Après passage des derniers devs sur main
-                area.default(featureCollection),
+                surfaceForFeatureCollection(featureCollection),
                 JSON.stringify(record),
                 operator.numeroPacage,
                 operator.siret
@@ -250,9 +248,6 @@ if (process.argv.length < 4) {
     await cleanup()
     progress.stop()
 
-    console.log('--- Résumé ---')
-    console.log('Importés :', imported)
-    console.log('Ignorés :', skipped)
     console.warn('\n Warnings:')
     if (warningsDoublon.length > 0) {
       console.log('\n Warnings =>  Couple Siret / Pacage avec plusieurs numéros Bio')
@@ -270,6 +265,11 @@ if (process.argv.length < 4) {
       console.log('\n Warnings => Numero de siret à vide pour les pacages :')
       for (const wsv of warningsSiretVide) console.log(wsv)
     }
+
+    console.log('--- Résumé ---')
+    console.log('Importés :', imported)
+    console.log('Ignorés :', skipped)
+
     const json = {
       success: imported,
       skipped: skipped,
