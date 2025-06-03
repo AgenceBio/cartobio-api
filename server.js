@@ -618,7 +618,7 @@ app.register(async (app) => {
       anneeAudit: request.query.anneeAudit,
       statut: request.query.statut
     })
-    return reply.code(200).send(recordToApi(record))
+    return reply.code(200).send(await recordToApi(record))
   })
 
   app.get('/api/v2/pdf/:numeroBio/:recordId', mergeSchemas(protectedWithToken()), async (request, reply) => {
@@ -673,8 +673,8 @@ app.register(async (app) => {
     return reply.redirect(`${config.get('frontendUrl')}/login?mode=${mode}&returnto=${returnto}#token=${cartobioToken}`)
   })
 
-  app.get('/api/v2/exportParcellaire', mergeSchemas(protectedWithToken({ oc: true, cartobio: true })), async (request, reply) => {
-    const data = await exportDataOcId(request.user.organismeCertificateur.id)
+  app.post('/api/v2/exportParcellaire', mergeSchemas(protectedWithToken({ oc: true, cartobio: true })), async (request, reply) => {
+    const data = await exportDataOcId(request.user.organismeCertificateur.id, request.body.payload, request.user.id)
     if (data === null) {
       throw new Error("Une erreur s'est produite, impossible d'exporter les parcellaires")
     }
