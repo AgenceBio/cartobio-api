@@ -77,6 +77,7 @@ if (process.argv.length < 3) {
   let skipped = 0
   const warningsCorrespondance = []
   const warningsSiretVide = []
+  const warningsNumeroBioVide = []
   try {
     for await (const filepath of files) {
       const dataset = await gdal.openAsync(filepath)
@@ -102,7 +103,14 @@ if (process.argv.length < 3) {
             continue
           }
 
-          // TODO : Verifier numérioBIo
+          if (siretMapping.NUMEROBIO === '') {
+            warningsNumeroBioVide.push({
+              siret: siretMapping.NUMEROSIRET,
+              pacage: siretMapping.NUMEROPACAGE
+            })
+            skipped++
+            continue
+          }
 
           tabCouplage.push({
             siret: siretMapping.NUMEROSIRET,
@@ -210,11 +218,17 @@ if (process.argv.length < 3) {
       console.log('\n Warnings =>Numero de siret à vide pour les pacages :')
       for (const wsv of warningsSiretVide) console.log(wsv)
     }
+
+    if (warningsNumeroBioVide.length > 0) {
+      console.log('\n Warnings =>Numero BIO à vide pour les pacages et les sirets :')
+      for (const wsv of warningsNumeroBioVide) console.log(wsv)
+    }
     const json = {
       success: imported,
       skipped: skipped,
       warningsCorrespondance,
-      warningsSiretVide
+      warningsSiretVide,
+      warningsNumeroBioVide
     }
     fs.writeFile('resultat.json', JSON.stringify(json), 'utf8', err => {
       if (err) {
