@@ -7,7 +7,6 @@ const got = require('got')
 const fs = require('node:fs')
 const { join } = require('node:path')
 const db = require('./lib/db.js')
-const area = require('@turf/area').default
 
 const agencebioOperator = require('./lib/providers/__fixtures__/agence-bio-operateur.json')
 const [, record] = require('./lib/providers/__fixtures__/records.json')
@@ -17,7 +16,7 @@ const parcellesPatched = require('./lib/providers/__fixtures__/parcelles-patched
 const apiParcellaire = require('./lib/providers/__fixtures__/agence-bio-api-parcellaire.json')
 const { normalizeOperator } = require('./lib/outputs/operator.js')
 const { normalizeRecord } = require('./lib/outputs/record')
-const { parcelleToApi, recordToApi } = require('./lib/outputs/api.js')
+const { surfaceForFeatureCollection, recordToApi, parcelleToApi } = require('./lib/outputs/api.js')
 const { loadRecordFixture, expectDeepCloseTo } = require('./test/utils')
 
 const sign = createSigner({ key: config.get('jwtSecret') })
@@ -33,9 +32,15 @@ const OTHER_USER_DOC_AUTH_TOKEN = sign({ id: 2, prenom: 'Tania', nom: 'Ouest', t
 const OTHER_OC_AUTH_TOKEN = 'zzzz-zzzz-zzzz-zzzz'
 
 const mockSentry = jest.fn()
-
+let apiRecordExpect
 // start and stop server
-beforeAll(() => {
+beforeAll(async () => {
+  const returnRecordToApi = await recordToApi(
+    normalizeRecord({ parcelles, ...record })
+  )
+  apiRecordExpect = expectDeepCloseTo(returnRecordToApi)
+  apiRecordExpect.parcellaire.features.forEach(f => delete f.properties.dateAjout)
+
   app.addHook('onError', async (req, res, error) => {
     if (isHandledError(error)) {
       return
@@ -47,13 +52,6 @@ beforeAll(() => {
 })
 afterAll(() => app.close())
 afterEach(() => jest.clearAllMocks())
-
-const apiRecordExpect = expectDeepCloseTo(
-  recordToApi(
-    normalizeRecord({ parcelles, ...record })
-  )
-)
-apiRecordExpect.parcellaire.features.forEach(f => delete f.properties.dateAjout)
 
 describe('GET /', () => {
   test('responds with a 404', () => {
@@ -740,9 +738,10 @@ describe('POST /api/v2/convert/anygeo/geojson', () => {
       .attach('archive', `test/fixtures/anygeo/${filename}`)
       .type('json')
       .set('Authorization', USER_DOC_AUTH_HEADER)
-      .then((response) => {
+      .then(async (response) => {
         expect(response.status).toEqual(200)
-        expect(area(response.body)).toBeCloseTo(457013.20 + 391240.70, 1)
+        console.log(response.body)
+        expect(await surfaceForFeatureCollection(response.body)).toBeCloseTo(456681.77564219804 + 390972.0511883315, 1)
         expect(response.body.features).toHaveLength(2)
         expect(response.body.features.at(0)).toHaveProperty('properties', {
           id: expect.toBeAFeatureId()
@@ -750,15 +749,15 @@ describe('POST /api/v2/convert/anygeo/geojson', () => {
       })
   })
 
-  test('it responds to anygeo-test-cartobio.json with 2 features and their properties', () => {
+  test('it responds to anygeo-test-cartobio.json with 2 features and their properties', async () => {
     return request(app.server)
       .post('/api/v2/convert/anygeo/geojson')
       .attach('archive', 'test/fixtures/anygeo/anygeo-test-cartobio.json')
       .type('json')
       .set('Authorization', USER_DOC_AUTH_HEADER)
-      .then((response) => {
+      .then(async (response) => {
         expect(response.status).toEqual(200)
-        expect(area(response.body)).toBeCloseTo(457013.20 + 391240.70, 1)
+        expect(await surfaceForFeatureCollection(response.body)).toBeCloseTo(456681.77564219804 + 390972.0511883315, 1)
         expect(response.body.features).toHaveLength(2)
         expect(response.body.features.at(0)).toHaveProperty('properties', {
           id: expect.toBeAFeatureId(),
@@ -1153,8 +1152,22 @@ describe('GET /api/v2/import/evv/:numeroEvv+:numeroBio', () => {
 
 describe('GET /api/v2/certification/parcellaires', () => {
   const postMock = jest.mocked(got.post)
-
+  let expectedResult
   beforeEach(async () => {
+    expectedResult = await records.reverse().reduce(async (accPromise, record) => {
+      const acc = await accPromise
+
+      const normalizedRecord = normalizeRecord({ parcelles, ...record })
+      const apiRecord = await recordToApi(normalizedRecord)
+      const expectedRecord = expectDeepCloseTo(apiRecord)
+      expectedRecord.parcellaire.features.forEach(f => delete f.properties.dateAjout)
+      if (acc.find(r => r.numeroBio === expectedRecord.numeroBio)) {
+        return acc
+      } else {
+        acc.push(expectedRecord)
+        return acc
+      }
+    }, Promise.resolve([]))
     // 1. AUTHORIZATION check token
     postMock.mockReturnValueOnce({
       async json () {
@@ -1164,24 +1177,6 @@ describe('GET /api/v2/certification/parcellaires', () => {
     await loadRecordFixture()
   })
   afterEach(() => postMock.mockReset())
-
-  const expectedResult = records.reverse().reduce((acc, record) => {
-    record = expectDeepCloseTo(
-      recordToApi(
-        normalizeRecord({ parcelles, ...record })
-      )
-    )
-    record.parcellaire.features.forEach(f => delete f.properties.dateAjout)
-
-    // take only the last record for each numeroBio
-    if (acc.find(r => r.numeroBio === record.numeroBio)) {
-      return acc
-    } else {
-      acc.push(record)
-    }
-
-    return acc
-  }, [])
 
   test('it should return a list of parcellaire', async () => {
     const res = await request(app.server)
@@ -1377,7 +1372,7 @@ describe('POST /api/v2/certification/parcelles', () => {
     })
 
     expect(response.body.parcellaire.features.find(f => f.id === '45742')).toMatchObject(
-      parcelleToApi({
+      await parcelleToApi({
         id: '45742',
         geometry: {
           type: 'Polygon',
