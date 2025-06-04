@@ -1,11 +1,12 @@
 ---
 title: API d'envoi des parcellaires
 date: 2023-04-12
-updated_at: 2023-07-07
+updated_at: 2025-06-04
 contributors:
 - Laetita L (Ecocert)
 - Maud R (CartoBio)
 - Thomas P (CartoBio)
+- Hugo B (CartoBio)
 ---
 
 # Mise en place d'une API Parcellaire
@@ -85,6 +86,7 @@ En cas de statut `400`, un objet représente les objets acceptés et refusés. A
 | `nbObjectAcceptes` | integer | nombre d'objets validés                              |
 | `nbObjetRefuses`   | integer | nombre d'objets refusés pour cause d'erreur          |
 | `listeProblemes`   | array   | la liste des problèmes et leur index dans le fichier |
+| `listeWarning`  | array | la liste des warnings sur les numéros ainsi que le message comportant le warnings |
 
 ```json
 {
@@ -94,6 +96,11 @@ En cas de statut `400`, un objet représente les objets acceptés et refusés. A
   "listeProblemes": [
     "[#2] Numéro bio manquant",
     "[#3] Numéro CPF invalide pour la parcelle 2"
+  ],
+  "listeWarning": [{
+    "numeroBio": 12112,
+    "message": "Numéro bio inconnu du portail de notification"
+    }
   ]
 }
 ```
