@@ -15,21 +15,21 @@ exports.setup = function(options, seedLink) {
 };
 
 exports.up = async function(db) {
-//   await db.runSql(/* sql */ `
-//     UPDATE cartobio_parcelles_backup
-//     SET cultures = (
-//     SELECT jsonb_agg(
-//         CASE elem->>'CPF'
-//             WHEN '02.10.2003' THEN jsonb_set(elem, '{CPF}', '"02.10.3"')
-//             WHEN '01.12.2001' THEN jsonb_set(elem, '{CPF}', '"02.12.1"')
-//             ELSE elem
-//         END
-//     )
-//     FROM jsonb_array_elements(cultures) AS elem
-// )
-// WHERE cultures IS NOT NULL
-//   AND (cultures::text LIKE '%02.10.2003%' OR cultures::text LIKE '%01.12.2001%');
-//   `);
+  await db.runSql(/* sql */ `
+    UPDATE cartobio_parcelles
+    SET cultures = (
+    SELECT jsonb_agg(
+        CASE elem->>'CPF'
+            WHEN '02.10.2003' THEN jsonb_set(elem, '{CPF}', '"02.10.3"')
+            WHEN '01.12.2001' THEN jsonb_set(elem, '{CPF}', '"02.12.1"')
+            ELSE elem
+        END
+    )
+    FROM jsonb_array_elements(cultures) AS elem
+)
+WHERE cultures IS NOT NULL
+  AND (cultures::text LIKE '%02.10.2003%' OR cultures::text LIKE '%01.12.2001%');
+  `);
 };
 
 exports.down = function(db) {
