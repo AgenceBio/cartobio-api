@@ -1,10 +1,11 @@
 ---
 title: API de lecture des parcellaires
 date: 2023-12-05
-updated_at: 2023-12-05
+updated_at: 2025-06-06
 contributors:
 - Maud R (CartoBio)
 - Thomas P (CartoBio)
+- Hugo B (CartoBio)
 ---
 
 # Mise en place d'une API de lecture des parcellaires
@@ -145,6 +146,7 @@ Le parcellaire est représenté en utilisant le [format standardisé **GeoJSON**
 
 | Valeur | Description                                                                                                              |
 |--------|--------------------------------------------------------------------------------------------------------------------------|
+| `CONV` | Conventionnel  |
 | `C0`   | Conventionnel                                                                                                            |
 | `C1`   | Conversion 1<sup>ère</sup> année                                                                                         |
 | `C2`   | Conversion 2<sup>ème</sup> année                                                                                         |
