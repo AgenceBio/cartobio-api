@@ -1,11 +1,12 @@
 ---
 title: API d'envoi des parcellaires
 date: 2023-04-12
-updated_at: 2023-07-07
+updated_at: 2025-06-06
 contributors:
 - Laetita L (Ecocert)
 - Maud R (CartoBio)
 - Thomas P (CartoBio)
+- Hugo B (CartoBio)
 ---
 
 # Mise en place d'une API Parcellaire
@@ -85,6 +86,7 @@ En cas de statut `400`, un objet représente les objets acceptés et refusés. A
 | `nbObjectAcceptes` | integer | nombre d'objets validés                              |
 | `nbObjetRefuses`   | integer | nombre d'objets refusés pour cause d'erreur          |
 | `listeProblemes`   | array   | la liste des problèmes et leur index dans le fichier |
+| `listeWarning`  | array | la liste des warnings sur les numéros ainsi que le message comportant le warnings |
 
 ```json
 {
@@ -94,6 +96,11 @@ En cas de statut `400`, un objet représente les objets acceptés et refusés. A
   "listeProblemes": [
     "[#2] Numéro bio manquant",
     "[#3] Numéro CPF invalide pour la parcelle 2"
+  ],
+  "listeWarning": [{
+    "numeroBio": 12112,
+    "message": "Numéro bio inconnu du portail de notification"
+    }
   ]
 }
 ```
@@ -128,7 +135,7 @@ Si le JSON est invalide, le message d'erreur est simplement le suivant :
 | Chemin           | Type   | Obligatoire | Description                                                                                                                                                                                                                        |
 |------------------|--------|-------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `id`             | string | **oui**     | identifiant unique de parcelle (souvent appelé `PK`, `Primary Key` ou `Clé primaire`)                                                                                                                                              |
-| `etatProduction` | enum   | **oui**     | `AB`, `C1`, `C2`, `C3` ou `NB`                                                                                                                                                                                                     |
+| `etatProduction` | enum   | **oui**     | `CONV`,`AB`, `C1`, `C2`, `C3` ou `NB`                                                                                                                                                                                                     |
 | `dateEngagement` | string | non         | date d'engagement au format [ISO 8601] (`YYYY-MM-DD`), **obligatoire** pour les parcelles en conversion (voir si on peut avoir                                              la date d'import et la date de conversion différencier |
 | `numeroIlot`     | string | non         | numéro d'ilot PAC (si applicable)                                                                                                                                                                                                  |
 | `numeroParcelle` | string | non         | numéro de parcelle PAC (si applicable)                                                                                                                                                                                             |
