@@ -224,7 +224,7 @@ if (process.argv.length < 4) {
               [
                 operator.numeroBio,
                 featureCollection.features.length,
-                surfaceForFeatureCollection(featureCollection),
+                await surfaceForFeatureCollection(featureCollection),
                 JSON.stringify(record),
                 operator.numeroPacage,
                 operator.siret
