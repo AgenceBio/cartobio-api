@@ -179,7 +179,7 @@ if (process.argv.length < 3) {
               [
                 tabCouplage[i].numeroBio,
                 featureCollection.features.length,
-                surfaceForFeatureCollection(featureCollection),
+                await surfaceForFeatureCollection(featureCollection),
                 JSON.stringify(record),
                 tabCouplage[i].pacage,
                 tabCouplage[i].siret
