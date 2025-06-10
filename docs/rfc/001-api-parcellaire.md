@@ -249,7 +249,7 @@ avec les nouvelles valeurs. Pour supprimer une valeur existante pour un champ, i
 
 Le cas particulier des parcelles est traité de la manière suivante :
 * si une parcelle avec le même identifiant est déjà enregistrée pour un opérateur, elle est mise à jour avec les nouvelles valeurs
-* si aucune personne avec le même identifiant n'est pas déjà enregistrée pour un opérateur, elle est ajoutée
+* si aucune parcelle avec le même identifiant n'est pas déjà enregistrée pour un opérateur, elle est ajoutée
 * si une parcelle est déjà enregistrée pour un opérateur mais qu'aucune parcelle avec le même identifiant n'est présente dans les données envoyées, elle est supprimée
 
 ## Implémentation technique
