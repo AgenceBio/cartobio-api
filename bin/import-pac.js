@@ -164,7 +164,7 @@ if (process.argv.length < 4) {
             geom: featureGroup
           })
         }
-        const splitTab = splitToNTabs([...tabCouplage], 100)
+        const splitTab = splitToNTabs([...tabCouplage], 150)
 
         for (let i = 0; i < splitTab.length; i++) {
           const data = await getValidOperator(splitTab[i])
