@@ -21,16 +21,23 @@ exports.up = async function (db) {
   // Conversion 3ème année → C3
   // Non biologique → CONV
   await db.runSql(/* sql */ `
-  UPDATE cartobio_parcelles
-  SET conversion_niveau =
-    CASE conversion_niveau
-        WHEN 'Biologique' THEN 'AB'
-        WHEN 'Conversion 1ère année' THEN 'C1'
-        WHEN 'Conversion 2ème année' THEN 'C2'
-        WHEN 'Conversion 3ème année' THEN 'C3'
-        WHEN 'Non biologique' THEN 'CONV'
-        ELSE conversion_niveau
-    END;
+UPDATE cartobio_parcelles
+SET conversion_niveau =
+  CASE conversion_niveau
+    WHEN 'Biologique' THEN 'AB'
+    WHEN 'Conversion 1ère année' THEN 'C1'
+    WHEN 'Conversion 2ème année' THEN 'C2'
+    WHEN 'Conversion 3ème année' THEN 'C3'
+    WHEN 'Non biologique' THEN 'CONV'
+    ELSE conversion_niveau
+  END
+WHERE conversion_niveau IN (
+  'Biologique',
+  'Conversion 1ère année',
+  'Conversion 2ème année',
+  'Conversion 3ème année',
+  'Non biologique'
+);
   `);
 };
 
