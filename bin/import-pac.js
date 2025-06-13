@@ -12,23 +12,29 @@ const gdal = require('gdal-async')
 const pool = require('../lib/db')
 const { surfaceForFeatureCollection } = require('../lib/outputs/api.js')
 const { fromCodePacStrict } = require('@agencebio/rosetta-cultures')
-const { unzipGeographicalContent, detectSrs, wgs84 } = require('../lib/providers/gdal')
+const {
+  unzipGeographicalContent,
+  detectSrs,
+  wgs84
+} = require('../lib/providers/gdal')
 const { getRandomFeatureId } = require('../lib/outputs/features')
 const { CertificationState, EtatProduction } = require('../lib/enums.js')
 
 function parseCSV (text) {
   const [headerLine, ...lines] = text.trim().split('\n')
-  const headers = headerLine.split(';').map(h => h.trim())
-  return lines.map(line => {
-    const values = line.split(';').map(v => v.trim())
-    return Object.fromEntries(headers.map((h, i) => [h, values[i]]))
+  const headers = headerLine.split(';').map((h) => h.trim())
+  return lines.map((line) => {
+    const values = line.split(';').map((v) => v.trim())
+    return Object.fromEntries(headers.map((h, i) => [h.toUpperCase(), values[i]]))
   })
 }
 
 function toCSV (data, delimiter = ';', header = []) {
   if (data.length === 0) return ''
   const headers = [...Object.keys(data[0]), ...header]
-  const lines = data.map(obj => headers.map(h => obj[h] ?? '').join(delimiter))
+  const lines = data.map((obj) =>
+    headers.map((h) => obj[h] ?? '').join(delimiter)
+  )
   return [headers.join(delimiter), ...lines].join('\n')
 }
 
@@ -42,7 +48,9 @@ async function * groupByPACAGE (features) {
   for (const feature of sorted) {
     const pacage = feature.fields.get('PACAGE')
     if (!pacage) {
-      throw new Error(`Feature without PACAGE: ${JSON.stringify(feature.fields.toObject())}`)
+      throw new Error(
+        `Feature without PACAGE: ${JSON.stringify(feature.fields.toObject())}`
+      )
     }
 
     if (!current || pacage === current) {
@@ -83,7 +91,9 @@ function splitToNTabs (array, n) {
 /* main.js */
 
 if (process.argv.length < 4) {
-  console.error('Usage: node import-pac.js <fichier-zip-asp> <correspondance.csv> [env]')
+  console.error(
+    'Usage: node import-pac.js <fichier-zip-asp> <correspondance.csv> [env]'
+  )
   process.exit(1)
 }
 
@@ -100,7 +110,10 @@ if (process.argv.length < 4) {
   const client = await pool.connect()
   await client.query('BEGIN;')
 
-  const progress = new cliProgress.SingleBar({}, { ...cliProgress.Presets.rect, etaBuffer: 10000 })
+  const progress = new cliProgress.SingleBar(
+    {},
+    { ...cliProgress.Presets.rect, etaBuffer: 10000 }
+  )
   progress.start(correspondance.length, 0)
 
   let imported = 0
@@ -120,7 +133,9 @@ if (process.argv.length < 4) {
         const tabGeom = []
         for await (const featureGroup of groupByPACAGE(layer.features)) {
           const pacage = featureGroup[0].fields.get('PACAGE')
-          const siretMapping = correspondance.find(row => row.NUMEROPACAGE === pacage)
+          const siretMapping = correspondance.find(
+            (row) => row.PACAGE === pacage
+          )
 
           if (!siretMapping) {
             warningsCorrespondance.push(pacage)
@@ -128,18 +143,24 @@ if (process.argv.length < 4) {
             continue
           }
 
-          if (siretMapping.NUMEROSIRET === '') {
-            warningsSiretVide.push(siretMapping.NUMEROPACAGE)
+          if (siretMapping.SIRET === '') {
+            warningsSiretVide.push(siretMapping.PACAGE)
+            exportNoCorrespondance.push(
+              correspondance.find(
+                (e) =>
+                  e.PACAGE === siretMapping.PACAGE
+              )
+            )
             skipped++
             continue
           }
 
           tabCouplage.push({
-            siret: siretMapping.NUMEROSIRET,
-            pacage: siretMapping.NUMEROPACAGE
+            siret: siretMapping.SIRET,
+            pacage: siretMapping.PACAGE
           })
           tabGeom.push({
-            pacage: siretMapping.NUMEROPACAGE,
+            pacage: siretMapping.PACAGE,
             geom: featureGroup
           })
         }
@@ -149,7 +170,10 @@ if (process.argv.length < 4) {
           const data = await getValidOperator(splitTab[i])
           if (data.doublons.length > 0) {
             for (const doublon of data.doublons) {
-              warningsDoublon.push({ siret: doublon.siret, pacage: doublon.pacage })
+              warningsDoublon.push({
+                siret: doublon.siret,
+                pacage: doublon.pacage
+              })
             }
             skipped = skipped + data.doublons.length
           }
@@ -157,13 +181,18 @@ if (process.argv.length < 4) {
             for (const so of data.sansOperateur) {
               warningsNoNumeroBio.push({ siret: so.siret, pacage: so.pacage })
               exportNoCorrespondance.push(
-                correspondance.find(e => e.NUMEROPACAGE === so.pacage && e.NUMEROSIRET === so.siret)
+                correspondance.find(
+                  (e) =>
+                    e.PACAGE === so.pacage && e.SIRET === so.siret
+                )
               )
             }
             skipped = skipped + data.sansOperateur.length
           }
           for (const operator of data.operateurs) {
-            const pacageFeatures = tabGeom.find(e => e.pacage === operator.numeroPacage).geom
+            const pacageFeatures = tabGeom.find(
+              (e) => e.pacage === operator.numeroPacage
+            ).geom
 
             const featureCollection = {
               type: 'FeatureCollection',
@@ -175,7 +204,8 @@ if (process.argv.length < 4) {
               await geometry.transformAsync(reproject)
 
               const fields = feature.fields.toObject()
-              const { BIO, CODE_CULT, PRECISION, NUM_ILOT, NUM_PARCEL } = fields
+              const { BIO, CODE_CULT, PRECISION, NUM_ILOT, NUM_PARCEL } =
+                fields
               const id = feature.fields.get('IUP') || getRandomFeatureId()
 
               featureCollection.features.push({
@@ -192,7 +222,8 @@ if (process.argv.length < 4) {
                       CODE_CULT
                     }
                   ],
-                  conversion_niveau: BIO === 1 ? EtatProduction.BIO : EtatProduction.NB,
+                  conversion_niveau:
+                    BIO === 1 ? EtatProduction.BIO : EtatProduction.NB,
                   NUMERO_I: NUM_ILOT,
                   NUMERO_P: NUM_PARCEL,
                   PACAGE: operator.numeroPacage
@@ -250,7 +281,9 @@ if (process.argv.length < 4) {
 
     console.warn('\n Warnings:')
     if (warningsDoublon.length > 0) {
-      console.log('\n Warnings =>  Couple Siret / Pacage avec plusieurs numéros Bio')
+      console.log(
+        '\n Warnings =>  Couple Siret / Pacage avec plusieurs numéros Bio'
+      )
       console.table(warningsDoublon)
     }
     if (warningsNoNumeroBio.length > 0) {
@@ -278,7 +311,7 @@ if (process.argv.length < 4) {
       warningsNoNumeroBio,
       warningsSiretVide
     }
-    fs.writeFile('resultat.json', JSON.stringify(json), 'utf8', err => {
+    fs.writeFile('resultat.json', JSON.stringify(json), 'utf8', (err) => {
       if (err) {
         console.error(err)
       } else {
@@ -288,7 +321,9 @@ if (process.argv.length < 4) {
     if (exportNoCorrespondance.length > 0) {
       const outputCsv = toCSV(exportNoCorrespondance, ';', ['NUMEROBIO'])
       fs.writeFileSync('lignes_sans_numerobio.csv', outputCsv, 'utf8')
-      console.log('Correctifs à faire disponible dans le fichier lignes_sans_numerobio.csv')
+      console.log(
+        'Correctifs à faire disponible dans le fichier lignes_sans_numerobio.csv'
+      )
     }
   }
 })()
