@@ -11,15 +11,19 @@ const gdal = require('gdal-async')
 const pool = require('../lib/db')
 const { surfaceForFeatureCollection } = require('../lib/outputs/api.js')
 const { fromCodePacStrict } = require('@agencebio/rosetta-cultures')
-const { unzipGeographicalContent, detectSrs, wgs84 } = require('../lib/providers/gdal')
+const {
+  unzipGeographicalContent,
+  detectSrs,
+  wgs84
+} = require('../lib/providers/gdal')
 const { getRandomFeatureId } = require('../lib/outputs/features')
 const { CertificationState, EtatProduction } = require('../lib/enums.js')
 
 function parseCSV (text) {
   const [headerLine, ...lines] = text.trim().split('\n')
-  const headers = headerLine.split(';').map(h => h.trim())
-  return lines.map(line => {
-    const values = line.split(';').map(v => v.trim())
+  const headers = headerLine.split(';').map((h) => h.trim())
+  return lines.map((line) => {
+    const values = line.split(';').map((v) => v.trim())
     return Object.fromEntries(headers.map((h, i) => [h, values[i]]))
   })
 }
@@ -34,7 +38,9 @@ async function * groupByPACAGE (features) {
   for (const feature of sorted) {
     const pacage = feature.fields.get('PACAGE')
     if (!pacage) {
-      throw new Error(`Feature without PACAGE: ${JSON.stringify(feature.fields.toObject())}`)
+      throw new Error(
+        `Feature without PACAGE: ${JSON.stringify(feature.fields.toObject())}`
+      )
     }
 
     if (!current || pacage === current) {
@@ -53,7 +59,9 @@ async function * groupByPACAGE (features) {
 /* main.js */
 
 if (process.argv.length < 3) {
-  console.error('Usage: node import-pac-correctif.js <fichier-zip-asp> <correspondance-correctif.csv>')
+  console.error(
+    'Usage: node import-pac-correctif.js <fichier-zip-asp> <correspondance-correctif.csv>'
+  )
   process.exit(1)
 }
 
@@ -69,7 +77,10 @@ if (process.argv.length < 3) {
   const client = await pool.connect()
   await client.query('BEGIN;')
 
-  const progress = new cliProgress.SingleBar({}, { ...cliProgress.Presets.rect, etaBuffer: 10000 })
+  const progress = new cliProgress.SingleBar(
+    {},
+    { ...cliProgress.Presets.rect, etaBuffer: 10000 }
+  )
   progress.start(correspondance.length, 0)
 
   let imported = 0
@@ -88,7 +99,9 @@ if (process.argv.length < 3) {
 
         for await (const featureGroup of groupByPACAGE(layer.features)) {
           const pacage = featureGroup[0].fields.get('PACAGE')
-          const siretMapping = correspondance.find(row => row.NUMEROPACAGE === pacage)
+          const siretMapping = correspondance.find(
+            (row) => row.PACAGE === pacage
+          )
 
           if (!siretMapping) {
             warningsCorrespondance.push(pacage)
@@ -96,23 +109,23 @@ if (process.argv.length < 3) {
             continue
           }
 
-          if (siretMapping.NUMEROSIRET === '') {
-            warningsSiretVide.push(siretMapping.NUMEROPACAGE)
+          if (siretMapping.SIRET === '' && siretMapping.NUMEROBIO === '') {
+            warningsSiretVide.push(siretMapping.PACAGE)
             skipped++
             continue
           }
 
           if (siretMapping.NUMEROBIO === '') {
             warningsNumeroBioVide.push({
-              siret: siretMapping.NUMEROSIRET,
-              pacage: siretMapping.NUMEROPACAGE
+              siret: siretMapping.SIRET,
+              pacage: siretMapping.PACAGE
             })
             skipped++
             continue
           }
           tabCouplage.push({
-            siret: siretMapping.NUMEROSIRET,
-            pacage: siretMapping.NUMEROPACAGE,
+            siret: siretMapping.SIRET,
+            pacage: siretMapping.PACAGE,
             numeroBio: siretMapping.NUMEROBIO,
             geom: featureGroup
           })
@@ -131,7 +144,8 @@ if (process.argv.length < 3) {
               await geometry.transformAsync(reproject)
 
               const fields = feature.fields.toObject()
-              const { BIO, CODE_CULT, PRECISION, NUM_ILOT, NUM_PARCEL } = fields
+              const { BIO, CODE_CULT, PRECISION, NUM_ILOT, NUM_PARCEL } =
+                fields
               const id = feature.fields.get('IUP') || getRandomFeatureId()
 
               featureCollection.features.push({
@@ -148,7 +162,8 @@ if (process.argv.length < 3) {
                       CODE_CULT
                     }
                   ],
-                  conversion_niveau: BIO === 1 ? EtatProduction.BIO : EtatProduction.NB,
+                  conversion_niveau:
+                    BIO === 1 ? EtatProduction.BIO : EtatProduction.NB,
                   NUMERO_I: NUM_ILOT,
                   NUMERO_P: NUM_PARCEL,
                   PACAGE: tabCouplage[i].pacage
@@ -214,7 +229,9 @@ if (process.argv.length < 3) {
     }
 
     if (warningsNumeroBioVide.length > 0) {
-      console.log('\n Warnings =>Numero BIO à vide pour les pacages et les sirets :')
+      console.log(
+        '\n Warnings =>Numero BIO à vide pour les pacages et les sirets :'
+      )
       for (const wsv of warningsNumeroBioVide) console.log(wsv)
     }
 
@@ -229,12 +246,17 @@ if (process.argv.length < 3) {
       warningsSiretVide,
       warningsNumeroBioVide
     }
-    fs.writeFile('resultat_correctif_csv.json', JSON.stringify(json), 'utf8', err => {
-      if (err) {
-        console.error(err)
-      } else {
-        console.log('Warnings disponible dans le fichier resultat.json')
+    fs.writeFile(
+      'resultat_correctif_csv.json',
+      JSON.stringify(json),
+      'utf8',
+      (err) => {
+        if (err) {
+          console.error(err)
+        } else {
+          console.log('Warnings disponible dans le fichier resultat.json')
+        }
       }
-    })
+    )
   }
 })()
