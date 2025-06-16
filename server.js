@@ -350,7 +350,7 @@ app.register(async (app) => {
    * @private
    * Hide import PAC 2025 notif
    */
-  app.patch('/api/v2/operator/:numeroBio/importPac', mergeSchemas(protectedWithToken()), async (request, reply) => {
+  app.patch('/api/v2/operator/:numeroBio/hideNotif', mergeSchemas(protectedWithToken()), async (request, reply) => {
     await hideImport(request.params.numeroBio)
     return reply.code(204).send()
   })

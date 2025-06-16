@@ -28,14 +28,10 @@ function parseCSV (text) {
   })
 }
 
-async function * groupByPACAGE (features) {
-  const sorted = Array.from(features).sort((a, b) =>
-    a.fields.get('PACAGE').localeCompare(b.fields.get('PACAGE'))
-  )
-  let current = null
-  let group = []
+function groupByPACAGE (features) {
+  const groups = new Map()
 
-  for (const feature of sorted) {
+  for (const feature of features) {
     const pacage = feature.fields.get('PACAGE')
     if (!pacage) {
       throw new Error(
@@ -43,17 +39,14 @@ async function * groupByPACAGE (features) {
       )
     }
 
-    if (!current || pacage === current) {
-      group.push(feature)
-    } else {
-      yield group
-      group = [feature]
+    if (!groups.has(pacage)) {
+      groups.set(pacage, [])
     }
 
-    current = pacage
+    groups.get(pacage).push(feature)
   }
 
-  if (group.length) yield group
+  return Array.from(groups.values())
 }
 
 /* main.js */
@@ -68,7 +61,6 @@ if (process.argv.length < 3) {
 (async () => {
   const aspFile = process.argv[2]
   const csvFile = process.argv[3]
-  dotenv.config({ path: process.argv[4] })
 
   const zipBuffer = await getStream.buffer(fs.createReadStream(aspFile))
   const { files, cleanup } = await unzipGeographicalContent(zipBuffer)
@@ -96,8 +88,8 @@ if (process.argv.length < 3) {
         const srs = await detectSrs(layer)
         const reproject = new gdal.CoordinateTransformation(srs, wgs84)
         const tabCouplage = []
-
-        for await (const featureGroup of groupByPACAGE(layer.features)) {
+        const group = groupByPACAGE(layer.features)
+        for await (const featureGroup of group) {
           const pacage = featureGroup[0].fields.get('PACAGE')
           const siretMapping = correspondance.find(
             (row) => row.PACAGE === pacage
