@@ -62,17 +62,23 @@ function groupByPACAGE (features) {
 }
 
 async function getValidOperator (tabCouplage) {
-  const response = await post(
+  try {
+    const response = await post(
     `${process.env.NOTIFICATIONS_AB_ENDPOINT}/api/operateur/siret-pacage`,
     {
       headers: {
         Authorization: process.env.NOTIFICATIONS_AB_SERVICE_TOKEN,
         origin: process.env.NOTIFICATIONS_AB_ORIGIN
       },
-      json: tabCouplage
+      json: tabCouplage,
+      timeout: { request: 10000 },
+      retry: { limit: 3, methods: ['GET', 'POST'], errorCodes: ['EPIPE', 'ECONNRESET', 'ETIMEDOUT'] }
     }
-  ).json()
-  return response
+    ).json()
+    return response
+  } catch (e) {
+    console.error(e)
+  }
 }
 
 function splitToNTabs (array, n) {
@@ -126,8 +132,7 @@ if (process.argv.length < 4) {
         const reproject = new gdal.CoordinateTransformation(srs, wgs84)
         const tabCouplage = []
         const tabGeom = []
-        const group = await groupByPACAGE(layer.features)
-        console.log('here group')
+        const group = groupByPACAGE(layer.features)
         for await (const featureGroup of group) {
           const pacage = featureGroup[0].fields.toObject().PACAGE
           const siretMapping = correspondance.find(
@@ -145,8 +150,11 @@ if (process.argv.length < 4) {
           if (siretMapping.SIRET === '') {
             warningsSiretVide.push(siretMapping.PACAGE)
             skipped++
+            exportNoCorrespondance.push(
+              correspondance.find(
+                (e) => e.PACAGE === siretMapping.PACAGE && e.SIRET === siretMapping.SIRET
+              ))
             progress.increment()
-
             continue
           }
 
@@ -159,7 +167,7 @@ if (process.argv.length < 4) {
             geom: featureGroup
           })
         }
-        const splitTab = splitToNTabs([...tabCouplage], 150)
+        const splitTab = splitToNTabs([...tabCouplage], Math.round(tabCouplage.length / 30))
 
         for (let i = 0; i < splitTab.length; i++) {
           const data = await getValidOperator(splitTab[i])
