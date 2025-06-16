@@ -25,7 +25,9 @@ function parseCSV (text) {
   const headers = headerLine.split(';').map((h) => h.trim())
   return lines.map((line) => {
     const values = line.split(';').map((v) => v.trim())
-    return Object.fromEntries(headers.map((h, i) => [h.toUpperCase(), values[i]]))
+    return Object.fromEntries(
+      headers.map((h, i) => [h.toUpperCase(), values[i]])
+    )
   })
 }
 
@@ -39,13 +41,9 @@ function toCSV (data, delimiter = ';', header = []) {
 }
 
 async function * groupByPACAGE (features) {
-  const sorted = Array.from(features).sort((a, b) =>
-    a.fields.get('PACAGE').localeCompare(b.fields.get('PACAGE'))
-  )
-  let current = null
-  let group = []
+  const groups = new Map()
 
-  for (const feature of sorted) {
+  for (const feature of features) {
     const pacage = feature.fields.get('PACAGE')
     if (!pacage) {
       throw new Error(
@@ -53,17 +51,16 @@ async function * groupByPACAGE (features) {
       )
     }
 
-    if (!current || pacage === current) {
-      group.push(feature)
-    } else {
-      yield group
-      group = [feature]
+    if (!groups.has(pacage)) {
+      groups.set(pacage, [])
     }
 
-    current = pacage
+    groups.get(pacage).push(feature)
   }
 
-  if (group.length) yield group
+  for (const group of groups.values()) {
+    yield group
+  }
 }
 
 async function getValidOperator (tabCouplage) {
@@ -132,7 +129,7 @@ if (process.argv.length < 4) {
         const tabCouplage = []
         const tabGeom = []
         for await (const featureGroup of groupByPACAGE(layer.features)) {
-          const pacage = featureGroup[0].fields.get('PACAGE')
+          const pacage = featureGroup[0].fields.toObject().PACAGE
           const siretMapping = correspondance.find(
             (row) => row.PACAGE === pacage
           )
@@ -140,18 +137,16 @@ if (process.argv.length < 4) {
           if (!siretMapping) {
             warningsCorrespondance.push(pacage)
             skipped++
+            progress.increment()
+
             continue
           }
 
           if (siretMapping.SIRET === '') {
             warningsSiretVide.push(siretMapping.PACAGE)
-            exportNoCorrespondance.push(
-              correspondance.find(
-                (e) =>
-                  e.PACAGE === siretMapping.PACAGE
-              )
-            )
             skipped++
+            progress.increment()
+
             continue
           }
 
@@ -182,8 +177,7 @@ if (process.argv.length < 4) {
               warningsNoNumeroBio.push({ siret: so.siret, pacage: so.pacage })
               exportNoCorrespondance.push(
                 correspondance.find(
-                  (e) =>
-                    e.PACAGE === so.pacage && e.SIRET === so.siret
+                  (e) => e.PACAGE === so.pacage && e.SIRET === so.siret
                 )
               )
             }
@@ -244,7 +238,6 @@ if (process.argv.length < 4) {
                 provenance: 'asp-2025'
               }
             }
-
             await client.query(
               `
             INSERT INTO import_pac (numerobio, nb_parcelles, size, record, pacage, siret)
@@ -261,7 +254,6 @@ if (process.argv.length < 4) {
                 operator.siret
               ]
             )
-
             imported++
             progress.increment()
           }
