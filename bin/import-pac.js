@@ -40,7 +40,7 @@ function toCSV (data, delimiter = ';', header = []) {
   return [headers.join(delimiter), ...lines].join('\n')
 }
 
-async function * groupByPACAGE (features) {
+function groupByPACAGE (features) {
   const groups = new Map()
 
   for (const feature of features) {
@@ -58,9 +58,7 @@ async function * groupByPACAGE (features) {
     groups.get(pacage).push(feature)
   }
 
-  for (const group of groups.values()) {
-    yield group
-  }
+  return Array.from(groups.values())
 }
 
 async function getValidOperator (tabCouplage) {
@@ -128,7 +126,9 @@ if (process.argv.length < 4) {
         const reproject = new gdal.CoordinateTransformation(srs, wgs84)
         const tabCouplage = []
         const tabGeom = []
-        for await (const featureGroup of groupByPACAGE(layer.features)) {
+        const group = await groupByPACAGE(layer.features)
+        console.log('here group')
+        for await (const featureGroup of group) {
           const pacage = featureGroup[0].fields.toObject().PACAGE
           const siretMapping = correspondance.find(
             (row) => row.PACAGE === pacage
