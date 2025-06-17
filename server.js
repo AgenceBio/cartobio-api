@@ -60,7 +60,7 @@ const JSONStream = require('jsonstream-next')
 const { createSigner } = require('fast-jwt')
 
 const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators, fetchCustomersByOc } = require('./lib/providers/agence-bio.js')
-const { addRecordFeature, addDividFeature, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, getDepartement, recordSorts, pinOperator, unpinOperator, consultOperator, getDashboardSummary, exportDataOcId, searchForAutocomplete } = require('./lib/providers/cartobio.js')
+const { addRecordFeature, addDividFeature, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, getDepartement, recordSorts, pinOperator, unpinOperator, consultOperator, getDashboardSummary, exportDataOcId, searchForAutocomplete, getImportPAC, hideImport } = require('./lib/providers/cartobio.js')
 const { generatePDF } = require('./lib/providers/export-pdf.js')
 const { evvLookup, evvParcellaire, pacageLookup, iterateOperatorLastRecords } = require('./lib/providers/cartobio.js')
 const { parseAnyGeographicalArchive } = require('./lib/providers/gdal.js')
@@ -335,6 +335,24 @@ app.register(async (app) => {
     }
 
     return reply.code(200).send(records.filter((r) => r.oc_id === request.user.organismeCertificateur.id))
+  })
+
+  /**
+   * @private
+   * Checks if operator can import a pac record from 2025
+   */
+  app.get('/api/v2/operator/:numeroBio/importData', mergeSchemas(protectedWithToken()), async (request, reply) => {
+    const res = await getImportPAC(request.params.numeroBio)
+    return reply.code(200).send({ data: res })
+  })
+
+  /**
+   * @private
+   * Hide import PAC 2025 notif
+   */
+  app.patch('/api/v2/operator/:numeroBio/hideNotif', mergeSchemas(protectedWithToken()), async (request, reply) => {
+    await hideImport(request.params.numeroBio)
+    return reply.code(204).send()
   })
 
   /**
