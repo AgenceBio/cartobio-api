@@ -2,7 +2,6 @@
 
 const fs = require('node:fs')
 const { randomUUID } = require('node:crypto')
-const dotenv = require('dotenv')
 
 const cliProgress = require('cli-progress')
 const getStream = require('get-stream')
