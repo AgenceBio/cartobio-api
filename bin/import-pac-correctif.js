@@ -131,13 +131,14 @@ if (process.argv.length < 3) {
             }
 
             for (const feature of pacageFeatures) {
+              const names = feature.fields.getNames()
               const geometry = feature.getGeometry()
               await geometry.transformAsync(reproject)
 
               const fields = feature.fields.toObject()
               const { BIO, CODE_CULT, PRECISION, NUM_ILOT, NUM_PARCEL } =
                 fields
-              const id = feature.fields.get('IUP') || getRandomFeatureId()
+              const id = names.includes('id') ? feature.fields.get('id') : getRandomFeatureId()
 
               featureCollection.features.push({
                 type: 'Feature',
