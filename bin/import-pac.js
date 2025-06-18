@@ -208,7 +208,7 @@ if (process.argv.length < 4) {
               const fields = feature.fields.toObject()
               const { BIO, CODE_CULT, PRECISION, NUM_ILOT, NUM_PARCEL } =
                 fields
-              const id = feature.fields.get('IUP') || getRandomFeatureId()
+              const id = !isNaN(feature.fields.get('id')) ? feature.fields.get('id') : getRandomFeatureId()
 
               featureCollection.features.push({
                 type: 'Feature',
