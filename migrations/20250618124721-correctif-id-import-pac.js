@@ -20,8 +20,6 @@ exports.up = async function(db) {
     SET id = floor(random() * 281474976710655 + 1)::varchar
     FROM cartobio_operators co
     WHERE not(cp.id ~ '^[0-9\.]+$')
-    AND co.metadata ->> 'source' = 'telepac'
-    AND co.metadata ->> 'campagne' = '2025'
     AND cp.record_id  = co.record_id
   `)
 };
