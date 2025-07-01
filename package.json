@@ -81,7 +81,9 @@
     "prewatch": "npm run build:geo-data && ./node_modules/.bin/db-migrate up",
     "watch": "node --watch server.js",
     "clean-records": "node bin/clean-records.js",
-    "clean-pdf": "node bin/delete-pdf.js"
+    "clean-pdf": "node bin/delete-pdf.js",
+    "import-pac": "node bin/import-pac.js",
+    "import-pac-correctif": "node bin/import-pac-correctif.js"
   },
   "repository": {
     "type": "git",
