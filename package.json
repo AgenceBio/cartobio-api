@@ -83,7 +83,8 @@
     "clean-records": "node bin/clean-records.js",
     "clean-pdf": "node bin/delete-pdf.js",
     "import-pac": "node bin/import-pac.js",
-    "import-pac-correctif": "node bin/import-pac-correctif.js"
+    "import-pac-correctif": "node bin/import-pac-correctif.js",
+    "create-parcellaire-import-pac": "node bin/create-parcellaire-import-pac-for-oc.js"
   },
   "repository": {
     "type": "git",
