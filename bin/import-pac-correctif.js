@@ -158,6 +158,8 @@ if (process.argv.length < 3) {
                     BIO === 1 ? EtatProduction.BIO : EtatProduction.NB,
                   NUMERO_I: NUM_ILOT,
                   NUMERO_P: NUM_PARCEL,
+                  TYPE: CODE_CULT,
+                  CODE_VAR: PRECISION,
                   PACAGE: tabCouplage[i].pacage
                 }
               })

@@ -93,7 +93,7 @@ function splitToNTabs (array, n) {
 
 if (process.argv.length < 4) {
   console.error(
-    'Usage: node import-pac.js <fichier-zip-asp> <correspondance.csv> [env]'
+    'Usage: node import-pac.js <fichier-zip-asp> <correspondance.csv>'
   )
   process.exit(1)
 }
@@ -229,6 +229,8 @@ if (process.argv.length < 4) {
                     BIO === 1 ? EtatProduction.BIO : EtatProduction.NB,
                   NUMERO_I: NUM_ILOT,
                   NUMERO_P: NUM_PARCEL,
+                  TYPE: CODE_CULT,
+                  CODE_VAR: PRECISION,
                   PACAGE: operator.numeroPacage
                 }
               })
