@@ -81,7 +81,6 @@ exports.up = async function(db) {
   UPDATE cartobio_operators c
   SET mixite = m.mixite
   FROM mixiteresult m
-  JOIN allRI a ON c.record_id = a.record_id
   WHERE c.record_id = m.record_id;
   `
   )
