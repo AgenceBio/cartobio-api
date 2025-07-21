@@ -60,7 +60,7 @@ const JSONStream = require('jsonstream-next')
 const { createSigner } = require('fast-jwt')
 
 const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators, fetchCustomersByOc } = require('./lib/providers/agence-bio.js')
-const { addRecordFeature, addDividFeature, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, getDepartement, recordSorts, pinOperator, unpinOperator, consultOperator, getDashboardSummary, exportDataOcId, searchForAutocomplete, getImportPAC, hideImport } = require('./lib/providers/cartobio.js')
+const { addRecordFeature, addDividFeature, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, getDepartement, recordSorts, pinOperator, unpinOperator, consultOperator, getDashboardSummary, exportDataOcId, searchForAutocomplete, getImportPAC, hideImport, markFeatureControlled, markFeatureUncontrolled } = require('./lib/providers/cartobio.js')
 const { generatePDF } = require('./lib/providers/export-pdf.js')
 const { evvLookup, evvParcellaire, pacageLookup, iterateOperatorLastRecords } = require('./lib/providers/cartobio.js')
 const { parseAnyGeographicalArchive } = require('./lib/providers/gdal.js')
@@ -360,6 +360,26 @@ app.register(async (app) => {
    */
   app.get('/api/v2/audits/:recordId', mergeSchemas(protectedWithToken(), operatorFromRecordId), (request, reply) => {
     return reply.code(200).send(request.record)
+  })
+
+  /**
+   * @private
+   * Marque une parcelle comme controlée
+   */
+  app.post('/api/v2/audits/:recordId/:id/controlee', mergeSchemas(protectedWithToken()), async (request, reply) => {
+    await markFeatureControlled(request.params.recordId, request.params.id, request.user.id)
+
+    return reply.code(200).send({ controlee: true })
+  })
+
+  /**
+     * @private
+   * Marque une parcelle comme non controlée
+     */
+  app.post('/api/v2/audits/:recordId/:id/non-controlee', mergeSchemas(protectedWithToken()), async (request, reply) => {
+    await markFeatureUncontrolled(request.params.recordId, request.params.id, request.user.id)
+
+    return reply.code(200).send({ controlee: false })
   })
 
   /**
