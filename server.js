@@ -75,6 +75,8 @@ const { operatorsSchema, certificationBodySearchSchema } = require('./lib/routes
 const { createFeatureSchema, createRecordSchema, deleteSingleFeatureSchema, patchFeatureCollectionSchema, patchRecordSchema, updateFeaturePropertiesSchema } = require('./lib/routes/records.js')
 const { geofoliaImportSchema } = require('./lib/routes/index.js')
 
+const { verifyGeometry } = require('./lib/providers/geometry.js')
+
 const DURATION_ONE_MINUTE = 1000 * 60
 const DURATION_ONE_HOUR = DURATION_ONE_MINUTE * 60
 const DURATION_ONE_DAY = DURATION_ONE_HOUR * 24
@@ -698,6 +700,15 @@ app.register(async (app) => {
       throw new Error("Une erreur s'est produite, impossible d'exporter les parcellaires")
     }
     return reply.code(200).send(data)
+  })
+
+  app.post('/api/v2/geometry/:recordId/add', mergeSchemas(
+    protectedWithToken()
+  ), (request, reply) => {
+    const { payload: feature } = request.body
+    console.log()
+    return verifyGeometry(feature.geometry, request.params.recordId)
+      .then(record => reply.code(200).send((record)))
   })
 })
 
