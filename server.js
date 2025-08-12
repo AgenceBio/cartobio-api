@@ -60,7 +60,7 @@ const JSONStream = require('jsonstream-next')
 const { createSigner } = require('fast-jwt')
 
 const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators, fetchCustomersByOc } = require('./lib/providers/agence-bio.js')
-const { addRecordFeature, addDividFeature, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, getDepartement, recordSorts, pinOperator, unpinOperator, consultOperator, getDashboardSummary, exportDataOcId, searchForAutocomplete, getImportPAC, hideImport } = require('./lib/providers/cartobio.js')
+const { addRecordFeature, createFeaturesFromOther, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, getDepartement, recordSorts, pinOperator, unpinOperator, consultOperator, getDashboardSummary, exportDataOcId, searchForAutocomplete, getImportPAC, hideImport } = require('./lib/providers/cartobio.js')
 const { generatePDF } = require('./lib/providers/export-pdf.js')
 const { evvLookup, evvParcellaire, pacageLookup, iterateOperatorLastRecords } = require('./lib/providers/cartobio.js')
 const { parseAnyGeographicalArchive } = require('./lib/providers/gdal.js')
@@ -476,12 +476,11 @@ app.register(async (app) => {
       .then(record => reply.code(200).send(normalizeRecord(record)))
   })
 
-  app.post('/api/v2/audits/:recordId/parcelles/:featureId', mergeSchemas(protectedWithToken(), routeWithRecordId, operatorFromRecordId), (request, reply) => {
+  app.put('/api/v2/audits/:recordId/parcelles', mergeSchemas(protectedWithToken(), routeWithRecordId, operatorFromRecordId), (request, reply) => {
     const { user, record, operator } = request
-    const reason = request.body
-    const featureId = request.params
+    const { features, from } = request.body
 
-    return addDividFeature(user, record, operator, reason, featureId)
+    return createFeaturesFromOther(user, record, operator, features, from)
       .then(record => reply.code(200).send(normalizeRecord(record)))
   })
 

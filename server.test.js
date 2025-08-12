@@ -740,7 +740,6 @@ describe('POST /api/v2/convert/anygeo/geojson', () => {
       .set('Authorization', USER_DOC_AUTH_HEADER)
       .then(async (response) => {
         expect(response.status).toEqual(200)
-        console.log(response.body)
         expect(await surfaceForFeatureCollection(response.body)).toBeCloseTo(456681.77564219804 + 390972.0511883315, 1)
         expect(response.body.features).toHaveLength(2)
         expect(response.body.features.at(0)).toHaveProperty('properties', {
