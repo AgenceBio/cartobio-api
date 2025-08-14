@@ -64,6 +64,7 @@ type DBParcelle = {
     code_culture_pac?: string;
     code_precision_pac?: string;
     controlee?: boolean;
+    historique_cultures?: any;
 };
 
 export type OperatorFilter = {
