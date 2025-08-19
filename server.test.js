@@ -1153,7 +1153,8 @@ describe('GET /api/v2/certification/parcellaires', () => {
   const postMock = jest.mocked(got.post)
   let expectedResult
   beforeEach(async () => {
-    expectedResult = await records.reverse().reduce(async (accPromise, record) => {
+    const copyRecord = [...records]
+    expectedResult = await copyRecord.reverse().reduce(async (accPromise, record) => {
       const acc = await accPromise
 
       const normalizedRecord = normalizeRecord({ parcelles, ...record })
