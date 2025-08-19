@@ -75,7 +75,7 @@ const { operatorsSchema, certificationBodySearchSchema } = require('./lib/routes
 const { createFeatureSchema, createRecordSchema, deleteSingleFeatureSchema, patchFeatureCollectionSchema, patchRecordSchema, updateFeaturePropertiesSchema } = require('./lib/routes/records.js')
 const { geofoliaImportSchema } = require('./lib/routes/index.js')
 
-const { verifyGeometry } = require('./lib/providers/geometry.js')
+const { verifyGeometry, getRpg } = require('./lib/providers/geometry.js')
 
 const DURATION_ONE_MINUTE = 1000 * 60
 const DURATION_ONE_HOUR = DURATION_ONE_MINUTE * 60
@@ -705,10 +705,17 @@ app.register(async (app) => {
     protectedWithToken()
   ), (request, reply) => {
     const { payload: feature } = request.body
-    console.log()
     return verifyGeometry(feature.geometry, request.params.recordId)
       .then(record => reply.code(200).send((record)))
   })
+})
+
+app.post('/api/v2/geometry/rpg', mergeSchemas(
+  protectedWithToken()
+), (request, reply) => {
+  const { payload: extent } = request.body
+  return getRpg(extent)
+    .then(data => reply.code(200).send((data)))
 })
 
 if (require.main === module) {
