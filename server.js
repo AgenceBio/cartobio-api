@@ -705,7 +705,7 @@ app.register(async (app) => {
     protectedWithToken()
   ), (request, reply) => {
     const { payload: feature } = request.body
-    return verifyGeometry(feature.geometry, request.params.recordId)
+    return verifyGeometry(feature.geometry, request.params.recordId, feature.properties?.id ?? '')
       .then(record => reply.code(200).send((record)))
   })
 })
