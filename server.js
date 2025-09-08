@@ -735,7 +735,13 @@ app.post('/api/v2/geometry/rpg', mergeSchemas(
 ), (request, reply) => {
   const { payload: extent } = request.body
   return getRpg(extent)
-    .then(data => reply.code(200).send((data)))
+    .then(data => {
+      if (data) {
+        return reply.code(200).send((data))
+      }
+
+      return reply.code(404).send()
+    })
 })
 
 if (require.main === module) {
