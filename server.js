@@ -60,7 +60,7 @@ const JSONStream = require('jsonstream-next')
 const { createSigner } = require('fast-jwt')
 
 const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators, fetchCustomersByOc } = require('./lib/providers/agence-bio.js')
-const { addRecordFeature, createFeaturesFromOther, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, getDepartement, recordSorts, pinOperator, unpinOperator, consultOperator, getDashboardSummary, exportDataOcId, searchForAutocomplete, getImportPAC, hideImport, markFeatureControlled, markFeatureUncontrolled } = require('./lib/providers/cartobio.js')
+const { addRecordFeature, createFeaturesFromOther, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, getDepartement, recordSorts, pinOperator, unpinOperator, consultOperator, getDashboardSummary, exportDataOcId, searchForAutocomplete, getImportPAC, hideImport, markFeatureControlled, markFeatureUncontrolled, getFeaturesFromRecordId } = require('./lib/providers/cartobio.js')
 const { generatePDF } = require('./lib/providers/export-pdf.js')
 const { evvLookup, evvParcellaire, pacageLookup, iterateOperatorLastRecords } = require('./lib/providers/cartobio.js')
 const { parseAnyGeographicalArchive } = require('./lib/providers/gdal.js')
@@ -75,7 +75,7 @@ const { operatorsSchema, certificationBodySearchSchema } = require('./lib/routes
 const { createFeatureSchema, createRecordSchema, deleteSingleFeatureSchema, patchFeatureCollectionSchema, patchRecordSchema, updateFeaturePropertiesSchema } = require('./lib/routes/records.js')
 const { geofoliaImportSchema } = require('./lib/routes/index.js')
 
-const { verifyGeometry, getRpg } = require('./lib/providers/geometry.js')
+const { verifyGeometry, getRpg, getGeometryEquals } = require('./lib/providers/geometry.js')
 
 const DURATION_ONE_MINUTE = 1000 * 60
 const DURATION_ONE_HOUR = DURATION_ONE_MINUTE * 60
@@ -444,6 +444,17 @@ app.register(async (app) => {
   })
 
   /**
+   * Get features of specific record id
+   */
+  app.get('/api/v2/audits/:recordId/parcelles', mergeSchemas(
+    protectedWithToken(),
+    operatorFromRecordId
+  ), (request, reply) => {
+    const { record } = request
+    return reply.code(200).send(record.parcelles)
+  })
+
+  /**
    * Partial update a feature collection (ie: mass action from the collection screen)
    *
    * Matching features are updated, features not present in payload or database are ignored
@@ -735,6 +746,14 @@ app.post('/api/v2/geometry/rpg', mergeSchemas(
 ), (request, reply) => {
   const { payload: extent } = request.body
   return getRpg(extent)
+    .then(data => reply.code(200).send((data)))
+})
+
+app.post('/api/v2/geometry/geometryEquals', mergeSchemas(
+  protectedWithToken()
+), (request, reply) => {
+  const { payload } = request.body
+  return getGeometryEquals(payload)
     .then(data => reply.code(200).send((data)))
 })
 
