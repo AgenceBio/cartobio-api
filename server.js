@@ -652,9 +652,13 @@ app.register(async (app) => {
   app.get('/api/v2/pdf/:numeroBio/:recordId', mergeSchemas(protectedWithToken()), async (request, reply) => {
     const force = request.query.force_refresh === 'true' ?? false
 
-    const pdf = await generatePDF(request.params.numeroBio, request.params.recordId, force)
+    try {
+      const pdf = await generatePDF(request.params.numeroBio, request.params.recordId, force)
 
-    return reply.code(200).send(pdf)
+      return reply.code(200).send(pdf)
+    } catch (e) {
+      return reply.code(400).send({ message: e.message })
+    }
   })
 
   app.get('/api/v2/user/verify', mergeSchemas(protectedWithToken({ oc: true, cartobio: true }), sandboxSchema, internalSchema), (request, reply) => {
