@@ -3,6 +3,8 @@ const records = require('../lib/providers/__fixtures__/records.json')
 const parcelles = require('../lib/providers/__fixtures__/parcelles.json')
 
 module.exports.loadRecordFixture = async function (data = records, pinnedRecords = [], userId = 1) {
+  await db.query('TRUNCATE TABLE cartobio_parcelles')
+  await db.query('DELETE FROM cartobio_operators')
   for (let i = 0; i < data.length; i++) {
     const record = data[i]
     await db.query(
@@ -10,8 +12,8 @@ module.exports.loadRecordFixture = async function (data = records, pinnedRecords
         INSERT INTO cartobio_operators
         (record_id, version_name, numerobio, certification_state, certification_date_debut,
          certification_date_fin, audit_date, audit_notes, audit_demandes, audit_history, metadata, oc_id,
-         oc_label, updated_at, created_at, annee_reference_controle)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, $12, $13, now(), now(), COALESCE($14, DATE_PART('year', now())))
+         oc_label, created_at, updated_at, annee_reference_controle)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, $12, $13, now(), now() + ($15 ||' minutes')::INTERVAL, COALESCE($14, DATE_PART('year', now())))
       `,
       [
       /*  $1 */ record.record_id,
@@ -27,7 +29,8 @@ module.exports.loadRecordFixture = async function (data = records, pinnedRecords
         /* $11 */ record.metadata,
         /* $12 */ record.oc_id,
         /* $13 */ record.oc_label,
-        /* $14 */ record.annee_reference_controle
+        /* $14 */ record.annee_reference_controle,
+        /* $15 */ i
       ]
     )
   }
@@ -53,7 +56,7 @@ module.exports.loadRecordFixture = async function (data = records, pinnedRecords
           INSERT INTO cartobio_parcelles
           (record_id, id, geometry, commune, cultures, created, conversion_niveau, engagement_date, numero_ilot_pac, numero_parcelle_pac, commentaire)
           VALUES
-          ($1, $2, $3::geometry, $4, $5::jsonb, 'now', $6, $7, $8, $9, $10)
+          ($1, $2, $3::geometry, $4, $5::jsonb, now() + ($11 ||' minutes')::INTERVAL, $6, $7, $8, $9, $10)
           `,
         [
           record.record_id,
@@ -65,7 +68,8 @@ module.exports.loadRecordFixture = async function (data = records, pinnedRecords
           parcelle.engagement_date,
           parcelle.numero_ilot_pac,
           parcelle.numero_parcelle_pac,
-          parcelle.commentaire
+          parcelle.commentaire,
+          j
         ]
       )
     }

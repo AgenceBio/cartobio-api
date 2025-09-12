@@ -43,6 +43,38 @@
         "date_semis": "2022-03-24",
         "variete": "rouge bleue"
       }
+    ],
+    "historique_cultures": [
+      {
+        "cultures": [
+          {
+            "id": 1,
+            "CPF": "01.19.10.8",
+            "unit": "%",
+            "surface": 25,
+            "variete": "rouge bleue",
+            "date_semis": "2022-03-24",
+            "commentaire": "commentaire parcelle"
+          }
+        ],
+        "conversion_niveau": "AB",
+        "annee_controle": 2022
+      },
+      {
+        "cultures": [
+          {
+            "id": 1,
+            "CPF": "01.19.10.8",
+            "unit": "%",
+            "surface": 25,
+            "variete": "rouge bleue",
+            "date_semis": "2022-03-24",
+            "commentaire": "commentaire parcelle"
+          }
+        ],
+        "conversion_niveau": "AB",
+        "annee_controle": 2022
+      }
     ]
   },
   {
@@ -88,6 +120,46 @@
         "surface": "0.5",
         "date_semis": "",
         "variete": ""
+      }
+    ],
+    "historique_cultures": [
+      {
+        "cultures": [
+          {
+            "id": 1,
+            "CPF": "01.13.42",
+            "variete": "spéciale pour ail noir",
+            "date_semis": ""
+          },
+          {
+            "id": 2,
+            "CPF": "01.23.11",
+            "surface": "0.5",
+            "variete": "",
+            "date_semis": ""
+          }
+        ],
+        "conversion_niveau": null,
+        "annee_controle": 2022
+      },
+      {
+        "cultures": [
+          {
+            "id": 1,
+            "CPF": "01.13.42",
+            "variete": "spéciale pour ail noir",
+            "date_semis": ""
+          },
+          {
+            "id": 2,
+            "CPF": "01.23.11",
+            "surface": "0.5",
+            "variete": "",
+            "date_semis": ""
+          }
+        ],
+        "conversion_niveau": null,
+        "annee_controle": 2022
       }
     ]
   },
@@ -237,6 +309,32 @@
         "CPF": "01.19.10.8",
         "date_semis": "",
         "variete": ""
+      }
+    ],
+    "historique_cultures": [
+      {
+        "cultures": [
+          {
+            "id": 1,
+            "CPF": "01.19.10.8",
+            "variete": "",
+            "date_semis": ""
+          }
+        ],
+        "conversion_niveau": null,
+        "annee_controle": 2022
+      },
+      {
+        "cultures": [
+          {
+            "id": 1,
+            "CPF": "01.19.10.8",
+            "variete": "",
+            "date_semis": ""
+          }
+        ],
+        "conversion_niveau": null,
+        "annee_controle": 2022
       }
     ]
   }
