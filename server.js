@@ -733,8 +733,8 @@ app.register(async (app) => {
 app.post('/api/v2/geometry/rpg', mergeSchemas(
   protectedWithToken()
 ), (request, reply) => {
-  const { payload: extent } = request.body
-  return getRpg(extent)
+  const { extent, surface, codeCulture } = request.body
+  return getRpg(extent, surface, codeCulture)
     .then(data => {
       if (data) {
         return reply.code(200).send((data))
