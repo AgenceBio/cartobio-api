@@ -61,7 +61,7 @@ const { createSigner } = require('fast-jwt')
 
 const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators, fetchCustomersByOc } = require('./lib/providers/agence-bio.js')
 const { addRecordFeature, addDividFeature, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, getDepartement, recordSorts, pinOperator, unpinOperator, consultOperator, getDashboardSummary, exportDataOcId, searchForAutocomplete, getImportPAC, hideImport } = require('./lib/providers/cartobio.js')
-const { generatePDF } = require('./lib/providers/export-pdf.js')
+const { generatePDF, getAttestationProduction } = require('./lib/providers/export-pdf.js')
 const { evvLookup, evvParcellaire, pacageLookup, iterateOperatorLastRecords } = require('./lib/providers/cartobio.js')
 const { parseAnyGeographicalArchive } = require('./lib/providers/gdal.js')
 const { parseTelepacArchive } = require('./lib/providers/telepac.js')
@@ -363,6 +363,15 @@ app.register(async (app) => {
   })
 
   /**
+   * Retrieve a given Record
+   */
+  app.get('/api/v2/audits/:recordId/has-attestation-production', mergeSchemas(protectedWithToken(), operatorFromRecordId), async (request, reply) => {
+    const attestation = await getAttestationProduction(request.record.record_id)
+
+    return reply.code(200).send({ hasAttestationProduction: !!attestation })
+  })
+
+  /**
    * Create a new Record for a given Operator
    */
   app.post('/api/v2/operator/:numeroBio/records', mergeSchemas(
@@ -641,8 +650,15 @@ app.register(async (app) => {
   })
 
   app.get('/api/v2/pdf/:numeroBio/:recordId', mergeSchemas(protectedWithToken()), async (request, reply) => {
-    const pdf = await generatePDF(request.params.numeroBio, request.params.recordId)
-    return reply.code(200).send(pdf)
+    const force = request.query.force_refresh === 'true' ?? false
+
+    try {
+      const pdf = await generatePDF(request.params.numeroBio, request.params.recordId, force)
+
+      return reply.code(200).send(pdf)
+    } catch (e) {
+      return reply.code(400).send({ message: e.message })
+    }
   })
 
   app.get('/api/v2/user/verify', mergeSchemas(protectedWithToken({ oc: true, cartobio: true }), sandboxSchema, internalSchema), (request, reply) => {
