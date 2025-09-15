@@ -653,9 +653,18 @@ app.register(async (app) => {
     const force = request.query.force_refresh === 'true' ?? false
 
     try {
-      const pdf = await generatePDF(request.params.numeroBio, request.params.recordId, force)
+      const gen = generatePDF(request.params.numeroBio, request.params.recordId, force)
+      const numberParcelle = (await gen.next()).value
 
-      return reply.code(200).send(pdf)
+      console.log(numberParcelle)
+      if (numberParcelle > 80) {
+        reply.code(204).send()
+      }
+
+      const pdf = (await gen.next()).value
+      if (numberParcelle <= 80) {
+        return reply.code(200).send(pdf)
+      }
     } catch (e) {
       return reply.code(400).send({ message: e.message })
     }
