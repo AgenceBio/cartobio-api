@@ -119,6 +119,7 @@ jobs:
             --env-file=.env.cartobio-api-staging \
             --env SENTRY_RELEASE=${{ needs.build.outputs.version }}-dev-${{ github.sha }} \
             --name cartobio-api-staging \
+            --volume /root/pdf:/usr/src/app/pdf \
             ${{ needs.build.outputs.image }}
   deploy-test:
     needs: [build]
@@ -140,6 +141,7 @@ jobs:
             --env-file=.env.cartobio-api-test \
             --env SENTRY_RELEASE=${{ needs.build.outputs.version }}-test-${{ github.sha }} \
             --name cartobio-api-test \
+            --volume /root/pdf_test:/usr/src/app/pdf \
             ${{ needs.build.outputs.image }}
   deploy-production:
     needs: [build]
@@ -160,4 +162,5 @@ jobs:
             -p 127.0.0.1:8000:8000 \
             --env-file=.env.cartobio-api-production \
             --name cartobio-api-production \
+            --volume /root/pdf:/usr/src/app/pdf \
             ${{ needs.build.outputs.image }}
