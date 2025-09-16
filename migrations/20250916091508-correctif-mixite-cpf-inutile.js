@@ -90,8 +90,14 @@ FROM
 WHERE
     co.record_id = mixiteresult.record_id
     AND co.mixite IS NULL
-
-    AND co.certification_state = 'CERTIFIED'`);
+    AND co.certification_state = 'CERTIFIED'
+    AND EXISTS (
+      SELECT 1
+      FROM cartobio_parcelles cp2,
+           jsonb_array_elements(cp2.cultures) AS elem
+      WHERE cp2.record_id = co.record_id
+        AND elem->>'CPF' IN ('01.99.10.1', '01.99.10.2')
+  );`);
 };
 
 exports.down = function (db) {
