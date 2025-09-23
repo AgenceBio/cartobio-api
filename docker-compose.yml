@@ -5,16 +5,21 @@ services:
   api:
     build: ./
     volumes:
-    - ".env:/usr/src/app/.env"
+      - ".env:/usr/src/app/.env"
     environment:
       DATABASE_URL: postgresql://docker:docker@db:5432/gis
+      MAIL_HOST: maildev
+      MAIL_PORT: 1025
+      MAIL_USER: ""
+      MAIL_PASS: ""
     depends_on:
-    - db
+      - db
+      - maildev
     ports:
-    - 8000:8000
+      - 8000:8000
     networks:
-    - internal
-    - external
+      - internal
+      - external
 
   db:
     image: kartoza/postgis:15-3.4
@@ -24,13 +29,21 @@ services:
     healthcheck:
       test: "pg_isready"
     environment:
-      ALLOW_IP_RANGE: "0.0.0.0/0" # we need that to allow 'api' to connect
+      ALLOW_IP_RANGE: "0.0.0.0/0"
       POSTGRES_USER: docker
       POSTGRES_PASS: docker
     ports:
-    - 15432:5432
+      - 15432:5432
     networks:
-    - internal
+      - internal
+
+  maildev:
+    image: maildev/maildev
+    ports:
+      - 1080:1080
+      - 1025:1025
+    networks:
+      - internal
 
 networks:
   internal:
