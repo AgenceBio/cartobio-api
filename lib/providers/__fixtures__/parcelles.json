@@ -31,34 +31,35 @@
     ],
     "historique_cultures": [
       {
-        "annee_controle": 2022,
-        "conversion_niveau": "AB",
         "cultures": [
           {
-            "CPF": "01.19.10.8",
-            "commentaire": "commentaire parcelle",
-            "date_semis": "2022-03-24",
             "id": 1,
-            "surface": 25,
+            "CPF": "01.19.10.8",
             "unit": "%",
-            "variete": "rouge bleue"
+            "surface": 25,
+            "variete": "rouge bleue",
+            "date_semis": "2022-03-24",
+            "commentaire": "commentaire parcelle"
           }
-        ]
+        ],
+        "conversion_niveau": "AB",
+        "annee_controle": 2022
       },
       {
-        "annee_controle": 2022,
-        "conversion_niveau": "AB",
         "cultures": [
           {
-            "CPF": "01.19.10.8",
-            "commentaire": "commentaire parcelle",
-            "date_semis": "2022-03-24",
             "id": 1,
-            "surface": 25,
+            "CPF": "01.19.10.8",
             "unit": "%",
-            "variete": "rouge bleue"
+            "surface": 25,
+            "variete": "rouge bleue",
+            "date_semis": "2022-03-24",
+            "commentaire": "commentaire parcelle"
           }
-        ]
+        ],
+        "conversion_niveau": "AB",
+        "annee_controle": 2022
+
       }
     ]
   },
@@ -94,42 +95,42 @@
     ],
     "historique_cultures": [
       {
-        "annee_controle": 2022,
-        "conversion_niveau": null,
         "cultures": [
           {
-            "CPF": "01.13.42",
-            "date_semis": "",
             "id": 1,
-            "variete": "spéciale pour ail noir"
+            "CPF": "01.13.42",
+            "variete": "spéciale pour ail noir",
+            "date_semis": ""
           },
           {
-            "CPF": "01.23.11",
-            "date_semis": "",
             "id": 2,
+            "CPF": "01.23.11",
             "surface": "0.5",
-            "variete": ""
+            "variete": "",
+            "date_semis": ""
           }
-        ]
+        ],
+        "conversion_niveau": null,
+        "annee_controle": 2022
       },
       {
-        "annee_controle": 2022,
-        "conversion_niveau": null,
         "cultures": [
           {
-            "CPF": "01.13.42",
-            "date_semis": "",
             "id": 1,
-            "variete": "spéciale pour ail noir"
+            "CPF": "01.13.42",
+            "variete": "spéciale pour ail noir",
+            "date_semis": ""
           },
           {
-            "CPF": "01.23.11",
-            "date_semis": "",
             "id": 2,
+            "CPF": "01.23.11",
             "surface": "0.5",
-            "variete": ""
+            "variete": "",
+            "date_semis": ""
           }
-        ]
+        ],
+        "conversion_niveau": null,
+        "annee_controle": 2022
       }
     ]
   },
@@ -187,28 +188,28 @@
     ],
     "historique_cultures": [
       {
-        "annee_controle": 2022,
-        "conversion_niveau": null,
         "cultures": [
           {
-            "CPF": "01.19.10.8",
-            "date_semis": "",
             "id": 1,
-            "variete": ""
+            "CPF": "01.19.10.8",
+            "variete": "",
+            "date_semis": ""
           }
-        ]
+        ],
+        "conversion_niveau": null,
+        "annee_controle": 2022
       },
       {
-        "annee_controle": 2022,
-        "conversion_niveau": null,
         "cultures": [
           {
-            "CPF": "01.19.10.8",
-            "date_semis": "",
             "id": 1,
-            "variete": ""
+            "CPF": "01.19.10.8",
+            "variete": "",
+            "date_semis": ""
           }
-        ]
+        ],
+        "conversion_niveau": null,
+        "annee_controle": 2022
       }
     ]
   }
