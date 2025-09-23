@@ -75,7 +75,7 @@ const { operatorsSchema, certificationBodySearchSchema } = require('./lib/routes
 const { createFeatureSchema, createRecordSchema, deleteSingleFeatureSchema, patchFeatureCollectionSchema, patchRecordSchema, updateFeaturePropertiesSchema } = require('./lib/routes/records.js')
 const { geofoliaImportSchema } = require('./lib/routes/index.js')
 
-const { verifyGeometry, getRpg } = require('./lib/providers/geometry.js')
+const { verifyGeometry, getRpg, getGeometryEquals } = require('./lib/providers/geometry.js')
 
 const DURATION_ONE_MINUTE = 1000 * 60
 const DURATION_ONE_HOUR = DURATION_ONE_MINUTE * 60
@@ -444,6 +444,17 @@ app.register(async (app) => {
   })
 
   /**
+   * Get features of specific record id
+   */
+  app.get('/api/v2/audits/:recordId/parcelles', mergeSchemas(
+    protectedWithToken(),
+    operatorFromRecordId
+  ), (request, reply) => {
+    const { record } = request
+    return reply.code(200).send(record.parcelles)
+  })
+
+  /**
    * Partial update a feature collection (ie: mass action from the collection screen)
    *
    * Matching features are updated, features not present in payload or database are ignored
@@ -742,6 +753,14 @@ app.post('/api/v2/geometry/rpg', mergeSchemas(
 
       return reply.code(404).send()
     })
+})
+
+app.post('/api/v2/geometry/geometryEquals', mergeSchemas(
+  protectedWithToken()
+), (request, reply) => {
+  const { payload } = request.body
+  return getGeometryEquals(payload)
+    .then(data => reply.code(200).send((data)))
 })
 
 if (require.main === module) {
