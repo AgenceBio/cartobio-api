@@ -13,10 +13,10 @@ const [, record] = require('./lib/providers/__fixtures__/records.json')
 const parcelles = require('./lib/providers/__fixtures__/parcelles.json')
 const records = require('./lib/providers/__fixtures__/records.json')
 const parcellesPatched = require('./lib/providers/__fixtures__/parcelles-patched.json')
-const apiParcellaire = require('./lib/providers/__fixtures__/agence-bio-api-parcellaire.json')
 const { normalizeOperator } = require('./lib/outputs/operator.js')
 const { normalizeRecord } = require('./lib/outputs/record')
-const { surfaceForFeatureCollection, recordToApi, parcelleToApi } = require('./lib/outputs/api.js')
+const { surfaceForFeatureCollection, recordToApi } = require('./lib/outputs/api.js')
+const { collectPreparseResults, createImportJob, processFullJob } = require('./lib/providers/api-parcellaire.js')
 const { loadRecordFixture, expectDeepCloseTo } = require('./test/utils')
 
 const sign = createSigner({ key: config.get('jwtSecret') })
@@ -32,6 +32,8 @@ const OTHER_USER_DOC_AUTH_TOKEN = sign({ id: 2, prenom: 'Tania', nom: 'Ouest', t
 const OTHER_OC_AUTH_TOKEN = 'zzzz-zzzz-zzzz-zzzz'
 
 const mockSentry = jest.fn()
+jest.mock('./lib/providers/api-parcellaire.js')
+
 let apiRecordExpect
 // start and stop server
 beforeAll(async () => {
@@ -1234,257 +1236,90 @@ describe('GET /api/v2/certification/parcellaires', () => {
 describe('POST /api/v2/certification/parcelles', () => {
   const postMock = jest.mocked(got.post)
 
+  const fakePayload = [{ numeroBio: '123', numeroClient: '1', parcelles: [] }]
+
+  const collectPreparseResultsMocked = collectPreparseResults
+  const createImportJobMocked = createImportJob
+
   beforeEach(() => {
-    // 1. AUTHORIZATION check token
     postMock.mockReturnValueOnce({
       async json () {
         return fakeOc
       }
     })
   })
-  afterEach(() => postMock.mockReset())
+
+  afterEach(() => {
+    postMock.mockReset()
+  })
 
   test('it fails without auth', async () => {
+    postMock.mockReset()
+    postMock.mockRejectedValueOnce(new Error('Unauthorized'))
+
     const res = await request(app.server)
       .post('/api/v2/certification/parcelles')
-      .send(apiParcellaire)
+      .send(fakePayload)
 
-    expect(db.query).not.toHaveBeenCalled()
-    expect(db.connect).not.toHaveBeenCalled()
     expect(res.status).toBe(401)
-    expect(mockSentry).not.toHaveBeenCalled()
     expect(res.body).toMatchObject({
       error: 'Unauthorized',
       message: "Accès refusé : un jeton d'API est nécessaire pour accéder à ce contenu."
     })
   })
 
-  test('it responds with 400 when body is not valid JSON', async () => {
+  test('returns 200 when all records are valid', async () => {
+    collectPreparseResults.mockReturnValue([{ numeroBio: '123' }])
+    createImportJobMocked.mockResolvedValue(42)
+
     const res = await request(app.server)
       .post('/api/v2/certification/parcelles')
       .set('Authorization', fakeOcToken)
-      .send(apiParcellaire.toString() + ']')
+      .send(fakePayload)
 
-    expect(db.query).not.toHaveBeenCalled()
-    expect(db.connect).toHaveBeenCalled()
-    expect(db._clientQuery).toHaveBeenCalledWith('ROLLBACK;')
-    expect(db._clientRelease).toHaveBeenCalled()
-    expect(mockSentry).not.toHaveBeenCalled()
+    expect(res.status).toBe(200)
+
+    expect(processFullJob).toHaveBeenCalledWith(42, expect.anything(), expect.anything())
+  })
+
+  test('returns 207 when some records are invalid', async () => {
+    const fakePreparseResult = [
+      { numeroBio: '123' },
+      { numeroBio: '999', error: { message: 'Numéro bio inconnu du portail de notifications' } }
+    ]
+
+    collectPreparseResultsMocked.mockReturnValue(fakePreparseResult)
+    createImportJobMocked.mockResolvedValue(43)
+
+    const res = await request(app.server)
+      .post('/api/v2/certification/parcelles')
+      .set('Authorization', fakeOcToken)
+      .send(fakePayload)
+
+    expect(res.status).toBe(207)
+
+    expect(processFullJob).toHaveBeenCalledWith(43, expect.anything(), expect.anything())
+  })
+
+  test('returns 400 when all records are invalid', async () => {
+    const fakePreparseResult = [
+      { numeroBio: '123', error: { message: 'Numéro bio inconnu du portail de notification' } }
+    ]
+
+    collectPreparseResultsMocked.mockReturnValue(fakePreparseResult)
+    const res = await request(app.server)
+      .post('/api/v2/certification/parcelles')
+      .set('Authorization', fakeOcToken)
+      .send(fakePayload)
+
     expect(res.status).toBe(400)
-  })
-
-  test('it responds with 400 when records are invalid and rollback modifications', async () => {
-    const res = await request(app.server)
-      .post('/api/v2/certification/parcelles')
-      .set('Authorization', fakeOcToken)
-      .send(apiParcellaire)
-    /** TMP */
-    // expect(db.query).toHaveBeenCalled()
-    // expect(db.connect).toHaveBeenCalled()
-    // expect(db._clientRelease).toHaveBeenCalled()
-    expect(res.status).toBe(400)
-    expect(mockSentry).not.toHaveBeenCalled()
-    expect(res.body).toEqual({
-      nbObjetAcceptes: 2,
-      nbObjetRefuses: 7,
-      nbObjetTraites: 9,
-      listeProblemes: [
-        // in case of error, check `createOrUpdateOperatorRecord()` SQL arity
-        '[#1] Impossible de créer une parcelle sans donnée géographique.',
-        '[#2] champ dateAudit incorrect',
-        '[#3] champ geom incorrect : Expected \',\' or \']\' after array element in JSON at position 32635',
-        '[#6] Impossible de créer une parcelle sans donnée géographique.',
-        '[#7] Les dates de certification sont manquantes.',
-        '[#8] champ etatProduction incorrect',
-        '[#9] Champ date dengagement obligatoire lorsque que la parcelle est en conversion'
-      ],
-      listeWarning: []
+    expect(res.body).toMatchObject({
+      nbObjetRecu: 1,
+      nbObjetAcceptes: 0,
+      nbObjetRefuses: 1,
+      listeNumeroBioInvalides: [{ numeroBio: '123', message: 'Numéro bio inconnu du portail de notification' }]
     })
-  })
-
-  test('it responds with 202 when records are valid and save everything to database', async () => {
-    const validApiParcellaire = JSON.parse(JSON.stringify(apiParcellaire))
-    validApiParcellaire[0].parcelles.splice(1, 3)
-    validApiParcellaire.splice(3, 2)
-    validApiParcellaire.splice(1, 1)
-    validApiParcellaire[1].parcelles[0].geom = '[[[-61.04349055792852,14.723261389183236],[-61.043394367539705,14.72324278279335],[-61.04332156461696,14.72331866766676],[-61.043473960371315,14.723338733374248],[-61.04349055792852,14.723261389183236]]]'
-    validApiParcellaire[2].parcelles[0].geom = validApiParcellaire[1].parcelles[0].geom
-    validApiParcellaire[3].dateCertificationDebut = '2023-01-01'
-    validApiParcellaire[3].dateCertificationFin = '2024-01-01'
-    validApiParcellaire[4].parcelles[0].etatProduction = 'AB'
-    validApiParcellaire[5].parcelles[0].dateEngagement = '2024-01-01'
-    const res = await request(app.server)
-      .post('/api/v2/certification/parcelles')
-      .set('Authorization', fakeOcToken)
-      .send(validApiParcellaire)
-
-    /** TMP */
-    // expect(db.query).toHaveBeenCalled()
-    // expect(db.connect).toHaveBeenCalled()
-    // expect(db._clientQuery).toHaveBeenLastCalledWith('COMMIT;')
-    // expect(db._clientRelease).toHaveBeenCalled()
-    expect(res.status).toBe(202)
-    expect(res.body).toEqual({
-      nbObjetTraites: 6,
-      listeWarning: []
-    })
-  }, 10000)
-
-  test('it stores well all the data', async () => {
-    const validApiParcellaire = JSON.parse(JSON.stringify(apiParcellaire))
-    validApiParcellaire[0].parcelles.splice(1, 3)
-    const d = validApiParcellaire.at(0)
-    d.parcelles.at(0).geom = '[[[-61.04349055792852,14.723261389183236],[-61.043394367539705,14.72324278279335],[-61.04332156461696,14.72331866766676],[-61.043473960371315,14.723338733374248],[-61.04349055792852,14.723261389183236]]]'
-
-    let response = await request(app.server)
-      .post('/api/v2/certification/parcelles')
-      .set('Authorization', fakeOcToken)
-      .send([d])
-
-    expect(response.status).toBe(202)
-    expect(response.body).toEqual({
-      nbObjetTraites: 1,
-      listeWarning: []
-    })
-
-    postMock.mockReturnValueOnce({
-      async json () {
-        return fakeOc
-      }
-    })
-
-    got.get.mockReturnValueOnce({
-      async json () {
-        return agencebioOperator
-      }
-    })
-
-    response = await request(app.server)
-      .get('/api/v2/certification/parcellaire/99999')
-      .set('Authorization', fakeOcToken)
-
-    expect(response.body).toMatchObject({
-      numeroBio: d.numeroBio,
-      certification: {
-        statut: 'CERTIFIED',
-        dateAudit: d.dateAudit,
-        dateDebut: d.dateCertificationDebut,
-        dateFin: d.dateCertificationFin,
-        demandesAudit: '',
-        notesAudit: d.commentaire
-      }
-    })
-
-    expect(response.body.parcellaire.features.find(f => f.id === '45742')).toMatchObject(
-      await parcelleToApi({
-        id: '45742',
-        geometry: {
-          type: 'Polygon',
-          coordinates: JSON.parse('[[[-61.043490558,14.723261389],[-61.043394368,14.723242783],[-61.043321565,14.723318668],[-61.04347396,14.723338733],[-61.043490558,14.723261389]]]')
-        },
-        properties: {
-          id: '45742',
-          COMMUNE: '97212',
-          cultures: [
-            {
-              CPF: '01.92',
-              date_semis: '2023-10-10',
-              surface: 25,
-              unit: '%',
-              variete: ''
-            }
-          ],
-          conversion_niveau: 'AB',
-          engagement_date: '2023-04-27',
-          auditeur_notes: 'Parcelle 5 ILOT 12 PAC 2023 0C 1271',
-          annotations: [],
-          createdAt: expect.stringMatchingISODate(),
-          updatedAt: expect.stringMatchingISODate(),
-          NOM: null,
-          PACAGE: d.numeroPacage,
-          NUMERO_I: '12',
-          NUMERO_P: '5'
-        }
-      })
-    )
-  })
-
-  test('it maintains the value of optional fields', async () => {
-    await loadRecordFixture()
-
-    const payload = {
-      dateAudit: '2022-05-01',
-      numeroBio: '99999',
-      dateCertificationDebut: null,
-      dateCertificationFin: null,
-      commentaire: null,
-      parcelles: [
-        {
-          id: '1',
-          geom: null,
-          cultures: [{ codeCPF: '01.19.10.8' }],
-          commentaire: null,
-          dateEngagement: null,
-          etatProduction: null
-        }
-      ]
-    }
-
-    await request(app.server)
-      .post('/api/v2/certification/parcelles')
-      .set('Authorization', fakeOcToken)
-      .send([payload])
-
-    const { rows } = await db.query('SELECT * FROM cartobio_operators WHERE numerobio = $1 AND audit_date = $2', ['99999', '2022-05-01'])
-    expect(rows).toHaveLength(1)
-    expect(rows[0].certification_date_debut).toBe('2022-01-01')
-    expect(rows[0].certification_date_fin).toBe('2024-03-31')
-    expect(rows[0].audit_notes).toBe('notes 2022')
-
-    const { rows: parcelles } = await db.query('SELECT * FROM cartobio_parcelles WHERE record_id = $1', [rows[0].record_id])
-    expect(parcelles).toHaveLength(1)
-    expect(parcelles[0].cultures).toHaveLength(1)
-    expect(parcelles[0].cultures[0].CPF).toBe('01.19.10.8')
-    expect(parcelles[0].commune).toBe('26108')
-    expect(parcelles[0].conversion_niveau).toBe('AB')
-    expect(parcelles[0].engagement_date).toBe('2015-01-01')
-  })
-
-  test('it deletes fields value', async () => {
-    await loadRecordFixture()
-
-    const payload = {
-      dateAudit: '2022-05-01',
-      numeroBio: '99999',
-      commentaire: '',
-      parcelles: [
-        {
-          id: '1',
-          geom: null,
-          cultures: [{ codeCPF: '01.19.10.8' }],
-          commentaire: '',
-          dateEngagement: '',
-          etatProduction: ''
-        }
-      ]
-    }
-
-    await request(app.server)
-      .post('/api/v2/certification/parcelles')
-      .set('Authorization', fakeOcToken)
-      .send([payload])
-
-    const { rows } = await db.query('SELECT * FROM cartobio_operators WHERE numerobio = $1 AND audit_date = $2', ['99999', '2022-05-01'])
-    expect(rows).toHaveLength(1)
-    expect(rows[0].audit_notes).toBe('')
-
-    const { rows: parcelles } = await db.query('SELECT * FROM cartobio_parcelles WHERE record_id = $1', [rows[0].record_id])
-    expect(parcelles).toHaveLength(1)
-    expect(parcelles[0].cultures).toHaveLength(1)
-    expect(parcelles[0].cultures[0].CPF).toBe('01.19.10.8')
-    expect(parcelles[0].commune).toBe('26108')
-    expect(parcelles[0].conversion_niveau).toBe('')
-    expect(parcelles[0].engagement_date).toBeNull()
+    expect(processFullJob).not.toHaveBeenCalled()
   })
 })
 

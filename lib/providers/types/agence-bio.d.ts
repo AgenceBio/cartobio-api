@@ -6,6 +6,7 @@ export type OrganismeCertificateur = {
     id: number;
     nom: string;
     numeroControleEu?: string | undefined;
+    numeroClient?: string | undefined;
 };
 
 /**
