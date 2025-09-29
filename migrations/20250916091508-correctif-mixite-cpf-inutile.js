@@ -83,7 +83,7 @@ FROM
         WHERE NOT EXISTS (
                     SELECT 1
                     FROM jsonb_array_elements(cp.cultures) AS elem
-                    WHERE elem->>'CPF' IN ('01.99.10.1', '01.99.10.2')
+                    WHERE elem->>'CPF' IN ('01.99.10.1', '01.99.10.2'))
         GROUP BY
             co.record_id
     ) AS mixiteresult
