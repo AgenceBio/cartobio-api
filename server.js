@@ -54,8 +54,6 @@ const stripBom = require('strip-bom-stream')
 const LRUCache = require('mnemonist/lru-map-with-delete')
 const { randomUUID } = require('node:crypto')
 const { PassThrough } = require('stream')
-const stream = require('node:stream')
-const JSONStream = require('jsonstream-next')
 
 const { createSigner } = require('fast-jwt')
 
@@ -622,23 +620,43 @@ app.register(async (app) => {
 
   app.get('/api/v2/certification/parcellaires', mergeSchemas(protectedWithToken({ oc: true })), async (request, reply) => {
     reply.header('Content-Type', 'application/json')
-    const records = iterateOperatorLastRecords(
+
+    const { limit, start, anneeAudit, statut } = request.query
+    const finalLimit = limit ? Number(limit) : null
+    const finalStart = start ? Number(start) : 0
+
+    const records = await iterateOperatorLastRecords(
       request.organismeCertificateur.id,
       {
-        anneeAudit: request.query.anneeAudit,
-        statut: request.query.statut
+        anneeAudit,
+        statut,
+        limit: finalLimit,
+        start: finalStart
       }
     )
-    // pass all records through recordToApi
-    const apiRecords = async function * () {
-      for await (const record of records) {
-        yield recordToApi(record)
+
+    const apiRecords = await Promise.all(records.map(r => recordToApi(r)))
+    const links = {}
+    const baseUrl = request.url.split('?')[0]
+    const params = new URLSearchParams(request.query)
+
+    if (finalLimit !== null && finalLimit > 0) {
+      if ((finalStart || 0) > 0) {
+        params.set('start', (finalStart || 0) + finalLimit)
+        params.set('limit', finalLimit)
+        links.next = `${baseUrl}?${params.toString()}`
+        params.set('start', Math.max(0, (finalStart || 0) - finalLimit))
+        links.prev = `${baseUrl}?${params.toString()}`
+      } else {
+        links.prev = null
+        links.next = null
       }
+    } else if (finalStart !== null && finalLimit !== null) {
+      params.set('start', finalStart + records.length)
+      links.next = `${baseUrl}?${params.toString()}`
     }
 
-    const outputStream = JSONStream.stringify()
-    stream.Readable.from(apiRecords()).pipe(outputStream)
-    return reply.code(200).send(outputStream)
+    return reply.code(200).send({ data: apiRecords, _links: links })
   })
 
   app.get('/api/v2/certification/parcellaire/:numeroBio', mergeSchemas(protectedWithToken({ oc: true }), operatorFromNumeroBio), async (request, reply) => {
