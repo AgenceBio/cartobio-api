@@ -80,7 +80,7 @@ FROM
         FROM
             cartobio_operators co
             LEFT JOIN cartobio_parcelles cp ON cp.record_id = co.record_id
-        WHERE NOT EXISTS (
+        WHERE co.certification_state = 'CERTIFIED' AND EXISTS (
                     SELECT 1
                     FROM jsonb_array_elements(cp.cultures) AS elem
                     WHERE elem->>'CPF' IN ('01.99.10.1', '01.99.10.2'))
