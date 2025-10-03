@@ -89,7 +89,6 @@ FROM
     ) AS mixiteresult
 WHERE
     co.record_id = mixiteresult.record_id
-    AND co.mixite IS NULL
     AND co.certification_state = 'CERTIFIED'
     AND EXISTS (
       SELECT 1
