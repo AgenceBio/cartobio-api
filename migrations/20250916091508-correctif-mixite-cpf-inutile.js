@@ -16,87 +16,35 @@ exports.setup = function (options, seedLink) {
 
 exports.up = async function (db) {
   await db.runSql(/*sql*/ `
-UPDATE
-    cartobio_operators co
-SET
-    mixite = mixiteresult.mixite
-FROM
-    (
-        SELECT
-            co.record_id,
-            CASE
-                WHEN COUNT(
-                    CASE
-                        WHEN cp.conversion_niveau = 'AB' THEN 1
-                        ELSE NULL
-                    END
-                ) = COUNT(cp.record_id) THEN 'AB'
-                WHEN (
-                    COALESCE(
-                        COUNT(
-                            CASE
-                                WHEN cp.conversion_niveau = 'C1' THEN 1
-                                ELSE NULL
-                            END
-                        ),
-                        0
-                    ) + COALESCE(
-                        COUNT(
-                            CASE
-                                WHEN cp.conversion_niveau = 'C2' THEN 1
-                                ELSE NULL
-                            END
-                        ),
-                        0
-                    ) + COALESCE(
-                        COUNT(
-                            CASE
-                                WHEN cp.conversion_niveau = 'C3' THEN 1
-                                ELSE NULL
-                            END
-                        ),
-                        0
-                    ) + COALESCE(
-                        COUNT(
-                            CASE
-                                WHEN cp.conversion_niveau = 'AB' THEN 1
-                                ELSE NULL
-                            END
-                        ),
-                        0
-                    )
-                ) = COUNT(cp.record_id) THEN 'ABCONV'
-                WHEN COALESCE(
-                    COUNT(
-                        CASE
-                            WHEN cp.conversion_niveau = 'CONV' THEN 1
-                            ELSE NULL
-                        END
-                    ),
-                    0
-                ) >= 1 THEN 'MIXTE'
-                ELSE NULL
-            END AS mixite
-        FROM
-            cartobio_operators co
-            LEFT JOIN cartobio_parcelles cp ON cp.record_id = co.record_id
-        WHERE co.certification_state = 'CERTIFIED' AND EXISTS (
-                    SELECT 1
-                    FROM jsonb_array_elements(cp.cultures) AS elem
-                    WHERE elem->>'CPF' IN ('01.99.10.1', '01.99.10.2'))
-        GROUP BY
-            co.record_id
-    ) AS mixiteresult
-WHERE
-    co.record_id = mixiteresult.record_id
-    AND co.certification_state = 'CERTIFIED'
-    AND EXISTS (
-      SELECT 1
-      FROM cartobio_parcelles cp2,
-           jsonb_array_elements(cp2.cultures) AS elem
-      WHERE cp2.record_id = co.record_id
-        AND elem->>'CPF' IN ('01.99.10.1', '01.99.10.2')
-  );`);
+WITH parcels AS (
+  SELECT
+    cp.record_id AS operator_record_id,
+    cp.conversion_niveau
+  FROM cartobio_parcelles cp
+  WHERE not EXISTS (
+    SELECT 1
+    FROM jsonb_array_elements(cp.cultures) AS elem
+    WHERE elem->>'CPF' IN ('01.99.10.1','01.99.10.2')
+  )
+),
+mixiteresult AS (
+  SELECT
+    operator_record_id AS record_id,
+    CASE
+      WHEN COUNT(*) FILTER (WHERE conversion_niveau = 'AB') = COUNT(*) THEN 'AB'
+      WHEN COUNT(*) FILTER (WHERE conversion_niveau IN ('C1','C2','C3','AB')) = COUNT(*) THEN 'ABCONV'
+      WHEN COUNT(*) FILTER (WHERE conversion_niveau = 'CONV') >= 1 THEN 'MIXTE'
+      ELSE NULL
+    END AS mixite
+  FROM parcels
+  GROUP BY operator_record_id
+)
+UPDATE cartobio_operators co
+SET mixite = m.mixite
+FROM mixiteresult m
+WHERE co.record_id = m.record_id
+  AND co.certification_state = 'CERTIFIED';
+`);
 };
 
 exports.down = function (db) {
