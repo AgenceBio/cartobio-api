@@ -43,7 +43,12 @@ UPDATE cartobio_operators co
 SET mixite = m.mixite
 FROM mixiteresult m
 WHERE co.record_id = m.record_id
-  AND co.certification_state = 'CERTIFIED';
+  AND co.certification_state = 'CERTIFIED'
+  AND EXISTS (
+    SELECT 1
+    FROM jsonb_array_elements(cp.cultures) AS elem
+    WHERE elem->>'CPF' IN ('01.99.10.1','01.99.10.2')
+  );
 `);
 };
 
