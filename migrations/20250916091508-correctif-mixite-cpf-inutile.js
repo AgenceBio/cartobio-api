@@ -21,7 +21,7 @@ WITH parcels AS (
     cp.record_id AS operator_record_id,
     cp.conversion_niveau
   FROM cartobio_parcelles cp
-  WHERE not EXISTS (
+  WHERE NOT EXISTS (
     SELECT 1
     FROM jsonb_array_elements(cp.cultures) AS elem
     WHERE elem->>'CPF' IN ('01.99.10.1','01.99.10.2')
@@ -46,8 +46,10 @@ WHERE co.record_id = m.record_id
   AND co.certification_state = 'CERTIFIED'
   AND EXISTS (
     SELECT 1
-    FROM jsonb_array_elements(cp.cultures) AS elem
-    WHERE elem->>'CPF' IN ('01.99.10.1','01.99.10.2')
+    FROM cartobio_parcelles cp
+    CROSS JOIN jsonb_array_elements(cp.cultures) AS elem
+    WHERE cp.record_id = co.record_id
+      AND elem->>'CPF' IN ('01.99.10.1','01.99.10.2')
   );
 `);
 };
