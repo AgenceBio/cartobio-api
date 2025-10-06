@@ -148,7 +148,7 @@ Le parcellaire est représenté en utilisant le [format standardisé **GeoJSON**
 
 | Valeur                  | Description                         |
 | ----------------------- | ----------------------------------- |
-| `OPERATOR_DRAFT`        | Brouillon                           |
+| `OPERATOR_DRAFT`        | Parcellaire importé                 |
 | `AUDITED`               | Audité                              |
 | `PENDING_CERTIFICATION` | Audité, transmis pour certification |
 | `CERTIFIED`             | Certifié                            |
