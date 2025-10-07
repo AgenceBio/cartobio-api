@@ -45,6 +45,8 @@ Il est possible de spécifier des filtres pour obtenir les données d'une versio
 | `limit`      | `number` | Nombre de résultat à retourner                                                                         | ❌          | ✅   |
 | `start`      | `number` | Index du premier résultat à retourner (offset de pagination)                                           | ❌          | ✅   |
 
+Les paramètres optionnels limit et start permettent de définir une pagination des résultats.
+
 ```bash
 curl -H 'Accept: application/json' \
   -H 'Content-Type: application/json' \
@@ -149,8 +151,8 @@ Le parcellaire est représenté en utilisant le [format standardisé **GeoJSON**
 | Valeur                  | Description                         |
 | ----------------------- | ----------------------------------- |
 | `OPERATOR_DRAFT`        | Parcellaire importé                 |
-| `AUDITED`               | Audité                              |
-| `PENDING_CERTIFICATION` | Audité, transmis pour certification |
+| `AUDITED`               | Contrôle terminé                              |
+| `PENDING_CERTIFICATION` | En attente de certification |
 | `CERTIFIED`             | Certifié                            |
 
 #### Valeurs possibles : niveaux de conversion
