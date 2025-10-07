@@ -22,6 +22,8 @@ export type CartoBioFeatureProperties = {
     CODE_VAR?: string;
     CODE_CULTURE?: string;
     CODE_PRECISION?: string;
+    controlee?: boolean;
+    historique?: any;
     /**
      * @deprecated
      */
