@@ -620,7 +620,6 @@ app.register(async (app) => {
 
   app.get('/api/v2/certification/parcellaires', mergeSchemas(protectedWithToken({ oc: true })), async (request, reply) => {
     reply.header('Content-Type', 'application/json')
-
     const { limit, start, anneeAudit, statut } = request.query
     const finalLimit = limit ? Number(limit) : null
     const finalStart = start ? Number(start) : 0
@@ -660,6 +659,16 @@ app.register(async (app) => {
       } else {
         links.next = null
       }
+    } else {
+      if (finalStart > 0) {
+        const prevParams = new URLSearchParams(request.query)
+        prevParams.delete('start')
+        links.prev = `${baseUrl}?${prevParams.toString()}`
+      } else {
+        links.prev = null
+      }
+
+      links.next = null
     }
 
     return reply.code(200).send({ data: apiRecords, _links: links })
