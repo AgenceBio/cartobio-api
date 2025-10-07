@@ -637,23 +637,29 @@ app.register(async (app) => {
 
     const apiRecords = await Promise.all(records.map(r => recordToApi(r)))
     const links = {}
-    const baseUrl = request.url.split('?')[0]
-    const params = new URLSearchParams(request.query)
+
+    const protocol = request.protocol
+    const host = request.hostname
+    const baseUrl = `${protocol}://${host}${request.url.split('?')[0]}`
 
     if (finalLimit !== null && finalLimit > 0) {
-      if ((finalStart || 0) > 0) {
-        params.set('start', (finalStart || 0) + finalLimit)
-        params.set('limit', finalLimit)
-        links.next = `${baseUrl}?${params.toString()}`
-        params.set('start', Math.max(0, (finalStart || 0) - finalLimit))
-        links.prev = `${baseUrl}?${params.toString()}`
+      if (finalStart > 0) {
+        const prevParams = new URLSearchParams(request.query)
+        prevParams.set('start', Math.max(0, finalStart - finalLimit))
+        prevParams.set('limit', finalLimit)
+        links.prev = `${baseUrl}?${prevParams.toString()}`
       } else {
         links.prev = null
+      }
+
+      if (records.length === finalLimit) {
+        const nextParams = new URLSearchParams(request.query)
+        nextParams.set('start', finalStart + finalLimit)
+        nextParams.set('limit', finalLimit)
+        links.next = `${baseUrl}?${nextParams.toString()}`
+      } else {
         links.next = null
       }
-    } else if (finalStart !== null && finalLimit !== null) {
-      params.set('start', finalStart + records.length)
-      links.next = `${baseUrl}?${params.toString()}`
     }
 
     return reply.code(200).send({ data: apiRecords, _links: links })
