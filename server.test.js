@@ -1184,8 +1184,8 @@ describe('GET /api/v2/certification/parcellaires', () => {
       .set('Authorization', fakeOcToken)
 
     expect(res.status).toBe(200)
-    expect(res.body).toHaveLength(expectedResult.length)
-    expect(res.body).toMatchObject(expectedResult)
+    expect(res.body.data).toHaveLength(expectedResult.length)
+    expect(res.body.data).toMatchObject(expectedResult)
   })
 
   test('we can filter on status', async () => {
@@ -1194,7 +1194,7 @@ describe('GET /api/v2/certification/parcellaires', () => {
       .set('Authorization', fakeOcToken)
 
     expect(res.status).toBe(200)
-    expect(res.body).toHaveLength(2)
+    expect(res.body.data).toHaveLength(2)
   })
 
   test('we can filter on year', async () => {
@@ -1203,7 +1203,7 @@ describe('GET /api/v2/certification/parcellaires', () => {
       .set('Authorization', fakeOcToken)
 
     expect(res.status).toBe(200)
-    expect(res.body).toHaveLength(1)
+    expect(res.body.data).toHaveLength(1)
   })
 
   test('it should only return this oc\'s parcellaire', async () => {
@@ -1215,7 +1215,7 @@ describe('GET /api/v2/certification/parcellaires', () => {
       .set('Authorization', OTHER_OC_AUTH_TOKEN)
 
     expect(res.status).toBe(200)
-    expect(res.body).toHaveLength(expectedResult.length - 1)
+    expect(res.body.data).toHaveLength(expectedResult.length - 1)
   })
 
   test('it should return a 401 without auth', async () => {
