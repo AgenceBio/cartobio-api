@@ -54,8 +54,6 @@ const stripBom = require('strip-bom-stream')
 const LRUCache = require('mnemonist/lru-map-with-delete')
 const { randomUUID } = require('node:crypto')
 const { PassThrough } = require('stream')
-const stream = require('node:stream')
-const JSONStream = require('jsonstream-next')
 
 const { createSigner } = require('fast-jwt')
 
@@ -622,23 +620,58 @@ app.register(async (app) => {
 
   app.get('/api/v2/certification/parcellaires', mergeSchemas(protectedWithToken({ oc: true })), async (request, reply) => {
     reply.header('Content-Type', 'application/json')
-    const records = iterateOperatorLastRecords(
+    const { limit, start, anneeAudit, statut } = request.query
+    const finalLimit = limit ? Number(limit) : null
+    const finalStart = start ? Number(start) : 0
+
+    const records = await iterateOperatorLastRecords(
       request.organismeCertificateur.id,
       {
-        anneeAudit: request.query.anneeAudit,
-        statut: request.query.statut
+        anneeAudit,
+        statut,
+        limit: finalLimit,
+        start: finalStart
       }
     )
-    // pass all records through recordToApi
-    const apiRecords = async function * () {
-      for await (const record of records) {
-        yield recordToApi(record)
+
+    const apiRecords = await Promise.all(records.map(r => recordToApi(r)))
+    const links = {}
+
+    const protocol = request.protocol
+    const host = request.hostname
+    const baseUrl = `${protocol}://${host}${request.url.split('?')[0]}`
+
+    if (finalLimit !== null && finalLimit > 0) {
+      if (finalStart > 0) {
+        const prevParams = new URLSearchParams(request.query)
+        prevParams.set('start', Math.max(0, finalStart - finalLimit))
+        prevParams.set('limit', finalLimit)
+        links.prev = `${baseUrl}?${prevParams.toString()}`
+      } else {
+        links.prev = null
       }
+
+      if (records.length === finalLimit) {
+        const nextParams = new URLSearchParams(request.query)
+        nextParams.set('start', finalStart + finalLimit)
+        nextParams.set('limit', finalLimit)
+        links.next = `${baseUrl}?${nextParams.toString()}`
+      } else {
+        links.next = null
+      }
+    } else {
+      if (finalStart > 0) {
+        const prevParams = new URLSearchParams(request.query)
+        prevParams.delete('start')
+        links.prev = `${baseUrl}?${prevParams.toString()}`
+      } else {
+        links.prev = null
+      }
+
+      links.next = null
     }
 
-    const outputStream = JSONStream.stringify()
-    stream.Readable.from(apiRecords()).pipe(outputStream)
-    return reply.code(200).send(outputStream)
+    return reply.code(200).send({ data: apiRecords, _links: links })
   })
 
   app.get('/api/v2/certification/parcellaire/:numeroBio', mergeSchemas(protectedWithToken({ oc: true }), operatorFromNumeroBio), async (request, reply) => {
