@@ -637,7 +637,7 @@ app.register(async (app) => {
     const apiRecords = await Promise.all(records.map(r => recordToApi(r)))
     const links = {}
 
-    const protocol = request.protocol
+    const protocol = request.headers['x-forwarded-proto'] || request.protocol
     const host = request.hostname
     const baseUrl = `${protocol}://${host}${request.url.split('?')[0]}`
 
