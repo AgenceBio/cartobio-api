@@ -70,7 +70,7 @@ if (process.argv.length < 4) {
       FROM import_pac ip
       WHERE ip.numerobio = ANY($1) AND ip.imported = false
     `,
-  [validCodesBio]
+    [validCodesBio]
   )
   const numerobioACreer = parcellairesACreer.map(r => r.numerobio)
   const parcellairesDejaImportes = validCodesBio.filter(nb => !numerobioACreer.includes(nb))
@@ -90,10 +90,10 @@ if (process.argv.length < 4) {
           FROM cartobio_operators co
           WHERE co.certification_state IN ('CERTIFIED', 'AUDITED', 'PENDING_CERTIFICATION')
             AND numerobio = $1
-          ORDER BY certification_state = 'CERTIFIED' DESC, certification_date_debut DESC
+          ORDER BY certification_state = 'CERTIFIED' DESC, audit_date DESC
           LIMIT 1
         `,
-  [parcelle.numerobio]
+        [parcelle.numerobio]
       )
 
       const previousParcellaire = rows.length > 0 ? rows[0] : null
