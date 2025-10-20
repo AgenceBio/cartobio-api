@@ -70,7 +70,7 @@ if (process.argv.length < 4) {
       FROM import_pac ip
       WHERE ip.numerobio = ANY($1) AND ip.imported = false
     `,
-    [validCodesBio]
+  [validCodesBio]
   )
   const numerobioACreer = parcellairesACreer.map(r => r.numerobio)
   const parcellairesDejaImportes = validCodesBio.filter(nb => !numerobioACreer.includes(nb))
@@ -93,7 +93,7 @@ if (process.argv.length < 4) {
           ORDER BY certification_state = 'CERTIFIED' DESC, audit_date DESC
           LIMIT 1
         `,
-        [parcelle.numerobio]
+  [parcelle.numerobio]
       )
 
       const previousParcellaire = rows.length > 0 ? rows[0] : null
