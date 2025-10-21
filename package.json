@@ -84,7 +84,9 @@
     "clean-pdf": "node bin/delete-pdf.js",
     "import-pac": "node bin/import-pac.js",
     "import-pac-correctif": "node bin/import-pac-correctif.js",
-    "create-parcellaire-import-pac": "node bin/create-parcellaire-import-pac-for-oc.js"
+    "create-parcellaire-import-pac": "node bin/create-parcellaire-import-pac-for-oc.js",
+    "create-parcellaire-import-xlsx": "node bin/create-parcellaire-import-xlsx.js"
+
   },
   "repository": {
     "type": "git",
@@ -103,6 +105,7 @@
   "dependencies": {
     "cli-progress": "^3.12.0",
     "pdf-lib": "^1.17.1",
-    "puppeteer": "^24.3.0"
+    "puppeteer": "^24.3.0",
+    "xlsx": "^0.18.5"
   }
 }
