@@ -47,6 +47,7 @@ export type OutputApiCertification = {
     dateFin: string;
     demandesAudit: string;
     notesAudit: string;
+	anneeReferenceControle : number;
 };
 
 export type OutputApiCulture = {

@@ -620,7 +620,7 @@ app.register(async (app) => {
 
   app.get('/api/v2/certification/parcellaires', mergeSchemas(protectedWithToken({ oc: true })), async (request, reply) => {
     reply.header('Content-Type', 'application/json')
-    const { limit, start, anneeAudit, statut } = request.query
+    const { limit, start, anneeAudit, statut, anneeReferenceControle } = request.query
     const finalLimit = limit ? Number(limit) : null
     const finalStart = start ? Number(start) : 0
 
@@ -629,6 +629,7 @@ app.register(async (app) => {
       {
         anneeAudit,
         statut,
+        anneeReferenceControle,
         limit: finalLimit,
         start: finalStart
       }
