@@ -91,17 +91,19 @@ La réponse est un objet JSON contenant deux clés principales :
 
 ##### Structure de `data`
 
-| Clé                           | Type                                     | Description                                                                                          |
-| ----------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `numeroBio`                   | `string`                                 | Numéro bio de l'opérateur                                                                            |
-| `certification`               | `object`                                 | -                                                                                                    |
-| `certification.statut`        | `string`                                 | Statut du parcellaire ([cf. statuts de certification](#valeurs-possibles--statuts-de-certification)) |
-| `certification.dateAudit`     | `string`                                 | Date de l'audit s'il a eu lieu (au format [ISO 8601])                                                |
-| `certification.dateDebut`     | `string`                                 | Date de début de validité de certification du parcellaire (au format [ISO 8601])                     |
-| `certification.dateFin`       | `string`                                 | Date de fin de validité de certification du parcellaire (au format [ISO 8601])                       |
-| `certification.demandesAudit` | `string`                                 | Mémo à l'intention de l'exploitant                                                                   |
-| `certification.notesAudit`    | `string`                                 | Notes final de l'audit                                                                               |
-| `parcellaire`                 | [`FeatureCollection`][FeatureCollection] | Le parcellaire géographique (voir [ci-après](#format-du-parcellaire))                                |
+| Clé                                    | Type                                     | Description                                                                                          |
+| -------------------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `numeroBio`                            | `string`                                 | Numéro bio de l'opérateur                                                                            |
+| `version_name`                         | `string`                                 | Nom de la version                                                                                    |
+| `certification`                        | `object`                                 | -                                                                                                    |
+| `certification.statut`                 | `string`                                 | Statut du parcellaire ([cf. statuts de certification](#valeurs-possibles--statuts-de-certification)) |
+| `certification.dateAudit`              | `string`                                 | Date de l'audit s'il a eu lieu (au format [ISO 8601])                                                |
+| `certification.dateDebut`              | `string`                                 | Date de début de validité de certification du parcellaire (au format [ISO 8601])                     |
+| `certification.dateFin`                | `string`                                 | Date de fin de validité de certification du parcellaire (au format [ISO 8601])                       |
+| `certification.demandesAudit`          | `string`                                 | Mémo à l'intention de l'exploitant                                                                   |
+| `certification.notesAudit`             | `string`                                 | Notes final de l'audit                                                                               |
+| `certification.anneeReferenceControle` | `number`                                 | Annee de la reference controle                                                                       |
+| `parcellaire`                          | [`FeatureCollection`][FeatureCollection] | Le parcellaire géographique (voir [ci-après](#format-du-parcellaire))                                |
 
 #### Format du parcellaire
 
@@ -148,12 +150,12 @@ Le parcellaire est représenté en utilisant le [format standardisé **GeoJSON**
 
 #### Valeurs possibles : statuts de certification
 
-| Valeur                  | Description                         |
-| ----------------------- | ----------------------------------- |
-| `OPERATOR_DRAFT`        | Parcellaire importé                 |
-| `AUDITED`               | Contrôle terminé                              |
+| Valeur                  | Description                 |
+| ----------------------- | --------------------------- |
+| `OPERATOR_DRAFT`        | Parcellaire importé         |
+| `AUDITED`               | Contrôle terminé            |
 | `PENDING_CERTIFICATION` | En attente de certification |
-| `CERTIFIED`             | Certifié                            |
+| `CERTIFIED`             | Certifié                    |
 
 #### Valeurs possibles : niveaux de conversion
 
