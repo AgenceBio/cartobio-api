@@ -1,6 +1,6 @@
 {
   "name": "@agencebio/cartobio-api",
-  "version": "2.32.1",
+  "version": "2.32.2",
   "description": "api for cartobio",
   "main": "app.js",
   "private": true,
@@ -86,7 +86,6 @@
     "import-pac-correctif": "node bin/import-pac-correctif.js",
     "create-parcellaire-import-pac": "node bin/create-parcellaire-import-pac-for-oc.js",
     "create-parcellaire-import-xlsx": "node bin/create-parcellaire-import-xlsx.js"
-
   },
   "repository": {
     "type": "git",
