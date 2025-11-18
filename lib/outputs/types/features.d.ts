@@ -23,7 +23,7 @@ export type CartoBioFeatureProperties = {
     CODE_CULTURE?: string;
     CODE_PRECISION?: string;
     controlee?: boolean;
-    historique?: any;
+    historique?: CartoBioHistoriqueCulture[];
     /**
      * @deprecated
      */
@@ -66,6 +66,13 @@ export type CartoBioCulture = {
     unit?: "%" | "ha" | undefined;
     date_semis?: string | undefined;
 };
+
+export type CartoBioHistoriqueCulture = {
+    cultures: CartoBioCulture[];
+    annee_controle: number;
+    conversion_niveau: string;
+};
+
 export type CartoBioFeature = Feature<Polygon, CartoBioFeatureProperties>;
 export type CartoBioFeatureCollection = FeatureCollection<
     Polygon,
