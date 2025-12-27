@@ -613,8 +613,7 @@ app.register(async (app) => {
     }
 
     return reply.code(202).send({
-      nbObjetTraites: count,
-      listeWarning: warnings && warnings.length > 0 ? warnings.map(([index, message]) => `[#${index}] ${message}`) : []
+      nbObjetTraites: count
     })
   })
 
