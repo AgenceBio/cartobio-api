@@ -36,6 +36,7 @@ export type InputApiCulture = {
 
 export type OutputApiRecord = {
     numeroBio: string;
+    version_name: string;
     certification: OutputApiCertification;
     parcellaire: OutputApiFeatureCollection;
 };
@@ -47,6 +48,7 @@ export type OutputApiCertification = {
     dateFin: string;
     demandesAudit: string;
     notesAudit: string;
+	anneeReferenceControle : number;
 };
 
 export type OutputApiCulture = {

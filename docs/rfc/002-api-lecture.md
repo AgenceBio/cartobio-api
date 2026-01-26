@@ -1,7 +1,7 @@
 ---
 title: API de lecture des parcellaires
 date: 2023-12-05
-updated_at: 2025-06-06
+updated_at: 2025-10-02
 contributors:
 - Maud R (CartoBio)
 - Thomas P (CartoBio)
@@ -15,7 +15,6 @@ La mise en place de cette API constitue un mécanisme pour récupérer les donn�
 ## Proposition
 
 ### Accès via API HTTP
-
 
 ```bash
 curl -H 'Accept: application/json' \
@@ -39,10 +38,14 @@ le chemin `/api/oc/check-token`.
 Par défaut, l'API renvoie les données de la version la plus récemment modifiée du parcellaire.
 Il est possible de spécifier des filtres pour obtenir les données d'une version spécifique.
 
-| Paramètre      | Type     | Description                                                                                            |
-|----------------|----------|--------------------------------------------------------------------------------------------------------|
-| `anneeAudit`   | `string` | Année de l'audit                                                                     |
-| `statut`       | `string` | Statut de certification ([cf. statuts de certification](#valeurs-possibles--statuts-de-certification)) |
+| Paramètre    | Type     | Description                                                                                            | Numero bio | ALL |
+| ------------ | -------- | ------------------------------------------------------------------------------------------------------ | ---------- | --- |
+| `anneeAudit` | `string` | Année de l'audit                                                                                       | ✅          | ✅   |
+| `statut`     | `string` | Statut de certification ([cf. statuts de certification](#valeurs-possibles--statuts-de-certification)) | ✅          | ✅   |
+| `limit`      | `number` | Nombre de résultat à retourner                                                                         | ❌          | ✅   |
+| `start`      | `number` | Index du premier résultat à retourner (offset de pagination)                                           | ❌          | ✅   |
+
+Les paramètres optionnels limit et start permettent de définir une pagination des résultats.
 
 ```bash
 curl -H 'Accept: application/json' \
@@ -67,7 +70,7 @@ curl -H 'Accept: application/json' \
 #### Codes HTTP
 
 | Code HTTP | Message HTTP            | Signification                                                                                                             |
-|-----------|-------------------------|---------------------------------------------------------------------------------------------------------------------------|
+| --------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `200`     | `OK`                    | Tout s'est bien passé.                                                                                                    |
 | `401`     | `Unauthorized`          | Le jeton d'`Authorization` est manquant.                                                                                  |
 | `403`     | `Forbidden`             | Ce jeton d'`Authorization` n'est pas attribué, ou a expiré.                                                               |
@@ -79,21 +82,33 @@ En cas de statut `200`, un objet JSON représentant l'opérateur, son parcellair
 
 #### Propriétés de la réponse
 
-| Clé                           | Type                                     | Description                                                                                          |
-|-------------------------------|------------------------------------------|------------------------------------------------------------------------------------------------------|
-| `numeroBio`                   | `string`                                 | Numéro bio de l'opérateur                                                                            |
-| `certification`               | `object`                                 | -                                                                                                    |
-| `certification.statut`        | `string`                                 | Statut du parcellaire ([cf. statuts de certification](#valeurs-possibles--statuts-de-certification)) |
-| `certification.dateAudit`     | `string`                                 | Date de l'audit s'il a eu lieu (au format [ISO 8601])                                                |
-| `certification.dateDebut`     | `string`                                 | Date de début de validité de certification du parcellaire (au format [ISO 8601])                     |
-| `certification.dateFin`       | `string`                                 | Date de fin de validité de certification du parcellaire (au format [ISO 8601])                       |
-| `certification.demandesAudit` | `string`                                 | Mémo à l'intention de l'exploitant                                                                   |
-| `certification.notesAudit`    | `string`                                 | Notes final de l'audit                                                                               |
-| `parcellaire`                 | [`FeatureCollection`][FeatureCollection] | Le parcellaire géographique (voir [ci-après](#format-du-parcellaire))                                |
+La réponse est un objet JSON contenant deux clés principales :
+
+- **`data`** : un objet qui contient les champs décrits ci-dessous  
+- **`_links`** : un objet optionnel qui contient les URLs de pagination  
+  - `prev` : URL de la page précédente si disponible  
+  - `next` : URL de la page suivante si disponible  
+
+##### Structure de `data`
+
+| Clé                                    | Type                                     | Description                                                                                          |
+| -------------------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `numeroBio`                            | `string`                                 | Numéro bio de l'opérateur                                                                            |
+| `version_name`                         | `string`                                 | Nom de la version                                                                                    |
+| `certification`                        | `object`                                 | -                                                                                                    |
+| `certification.statut`                 | `string`                                 | Statut du parcellaire ([cf. statuts de certification](#valeurs-possibles--statuts-de-certification)) |
+| `certification.dateAudit`              | `string`                                 | Date de l'audit s'il a eu lieu (au format [ISO 8601])                                                |
+| `certification.dateDebut`              | `string`                                 | Date de début de validité de certification du parcellaire (au format [ISO 8601])                     |
+| `certification.dateFin`                | `string`                                 | Date de fin de validité de certification du parcellaire (au format [ISO 8601])                       |
+| `certification.demandesAudit`          | `string`                                 | Mémo à l'intention de l'exploitant                                                                   |
+| `certification.notesAudit`             | `string`                                 | Notes final de l'audit                                                                               |
+| `certification.anneeReferenceControle` | `number`                                 | Annee de la reference controle                                                                       |
+| `parcellaire`                          | [`FeatureCollection`][FeatureCollection] | Le parcellaire géographique (voir [ci-après](#format-du-parcellaire))                                |
 
 #### Format du parcellaire
 
 Le parcellaire est représenté en utilisant le [format standardisé **GeoJSON**][GeoJSON], par un objet de type [`FeatureCollection`][FeatureCollection].
+
 - chaque parcelle est un objet de type [`Feature`][Feature]
 - la clé standard `geometry` est forcément de type [`Polygon`][Polygon]
 - la clé standard `properties` est utilisée sur chaque `Feature` pour enregistrer les données de chaque parcelles
@@ -101,7 +116,7 @@ Le parcellaire est représenté en utilisant le [format standardisé **GeoJSON**
 ##### Propriétés obligatoires
 
 | Clé                | Type     | Description                                                                                                             |
-|--------------------|----------|-------------------------------------------------------------------------------------------------------------------------|
+| ------------------ | -------- | ----------------------------------------------------------------------------------------------------------------------- |
 | `id`               | `string` | Le numéro bio de l'opérateur                                                                                            |
 | `commune`          | `string` | Code INSEE de la commune                                                                                                |
 | `cultures`         | `array`  | Liste des cultures en place ([cf. Cultures](#cultures))                                                                 |
@@ -113,20 +128,20 @@ Le parcellaire est représenté en utilisant le [format standardisé **GeoJSON**
 
 ##### Propriétés facultatives
 
-| Clé                    | Type     | Description                                                                                       |
-|------------------------|----------|---------------------------------------------------------------------------------------------------|
-| `dateAjout`            | `string` | Date d'ajout sur CartoBio (au format [ISO 8601])                                                  |
-| `dateMiseAJour`        | `string` | Date de modification sur CartoBio (au format [ISO 8601])                                          |
-| `nom`                  | `string` | Nom de la parcelle                                                                                |
-| `numeroPacage`         | `string` | Numéro PACAGE                                                                                     |
-| `numeroIlotPAC`        | `string` | Numéro de l'ilôt PAC                                                                              |
-| `numeroParcellePAC`    | `string` | Numéro de la parcelle PAC                                                                         |
-| `referenceCadastrale`  | `string` | Référence cadastrale complète (code INSEE de la commune + préfixe + section + numéro de parcelle) |
+| Clé                   | Type     | Description                                                                                       |
+| --------------------- | -------- | ------------------------------------------------------------------------------------------------- |
+| `dateAjout`           | `string` | Date d'ajout sur CartoBio (au format [ISO 8601])                                                  |
+| `dateMiseAJour`       | `string` | Date de modification sur CartoBio (au format [ISO 8601])                                          |
+| `nom`                 | `string` | Nom de la parcelle                                                                                |
+| `numeroPacage`        | `string` | Numéro PACAGE                                                                                     |
+| `numeroIlotPAC`       | `string` | Numéro de l'ilôt PAC                                                                              |
+| `numeroParcellePAC`   | `string` | Numéro de la parcelle PAC                                                                         |
+| `referenceCadastrale` | `string` | Référence cadastrale complète (code INSEE de la commune + préfixe + section + numéro de parcelle) |
 
 ##### Cultures
 
 | Clé         | Type     | Description                                                                               |
-|-------------|----------|-------------------------------------------------------------------------------------------|
+| ----------- | -------- | ----------------------------------------------------------------------------------------- |
 | `cpf`       | `string` | Code CPF de la culture[^cpf]                                                              |
 | `surface`   | `float`  | (facultatif) Surface de la culture. Utile en cas de multi-cultures sur une même parcelle. |
 | `unite`     | `enum`   | (facultatif) Unité exprimée de la surface. Par défaut, en _hectare_.                      |
@@ -135,18 +150,18 @@ Le parcellaire est représenté en utilisant le [format standardisé **GeoJSON**
 
 #### Valeurs possibles : statuts de certification
 
-| Valeur                  | Description                         |
-|-------------------------|-------------------------------------|
-| `OPERATOR_DRAFT`        | Brouillon                           |
-| `AUDITED`               | Audité                              |
-| `PENDING_CERTIFICATION` | Audité, transmis pour certification |
-| `CERTIFIED`             | Certifié                            |
+| Valeur                  | Description                 |
+| ----------------------- | --------------------------- |
+| `OPERATOR_DRAFT`        | Parcellaire importé         |
+| `AUDITED`               | Contrôle terminé            |
+| `PENDING_CERTIFICATION` | En attente de certification |
+| `CERTIFIED`             | Certifié                    |
 
 #### Valeurs possibles : niveaux de conversion
 
 | Valeur | Description                                                                                                              |
-|--------|--------------------------------------------------------------------------------------------------------------------------|
-| `CONV` | Conventionnel  |
+| ------ | ------------------------------------------------------------------------------------------------------------------------ |
+| `CONV` | Conventionnel                                                                                                            |
 | `C0`   | Conventionnel                                                                                                            |
 | `C1`   | Conversion 1<sup>ère</sup> année                                                                                         |
 | `C2`   | Conversion 2<sup>ème</sup> année                                                                                         |
@@ -157,19 +172,19 @@ Le parcellaire est représenté en utilisant le [format standardisé **GeoJSON**
 #### Valeurs possibles : unités
 
 | Valeur | Description          |
-|--------|----------------------|
+| ------ | -------------------- |
 | `ha`   | Hectare (par défaut) |
 | `%`    | Pourcentage          |
 
 #### Valeurs possibles : annotations
 
-| Clés                   | Valeurs possibles      | Description                     |
-|------------------------|------------------------|---------------------------------|
-| `reduction-conversion` | `accepted`, `rejected` | Réduction de conversion         |
-| `downgraded`           | `accepted`, `rejected` | Déclassement                    |
-| `risky`                | `true`                 | À risque                        |
-| `sampled`              | `true`                 | Prélèvement effectué            |
-| `surveyed`             | `true`                 | Visitée                         |
+| Clés                   | Valeurs possibles      | Description             |
+| ---------------------- | ---------------------- | ----------------------- |
+| `reduction-conversion` | `accepted`, `rejected` | Réduction de conversion |
+| `downgraded`           | `accepted`, `rejected` | Déclassement            |
+| `risky`                | `true`                 | À risque                |
+| `sampled`              | `true`                 | Prélèvement effectué    |
+| `surveyed`             | `true`                 | Visitée                 |
 
 #### Exemple
 
