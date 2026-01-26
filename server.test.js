@@ -339,7 +339,6 @@ describe('GET /api/v2/audits/:recordId', () => {
     expectedRecord.parcelles.features.forEach(
       f => delete f.properties.createdAt
     )
-
     expect(response.status).toEqual(200)
     expect(response.body).toMatchObject(expectDeepCloseTo(expectedRecord))
   })

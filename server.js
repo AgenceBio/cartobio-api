@@ -58,7 +58,7 @@ const { PassThrough } = require('stream')
 const { createSigner } = require('fast-jwt')
 
 const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators, fetchCustomersByOc } = require('./lib/providers/agence-bio.js')
-const { addRecordFeature, addDividFeature, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, getDepartement, recordSorts, pinOperator, unpinOperator, consultOperator, getDashboardSummary, exportDataOcId, searchForAutocomplete, getImportPAC, hideImport } = require('./lib/providers/cartobio.js')
+const { addRecordFeature, createFeaturesFromOther, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, getDepartement, recordSorts, pinOperator, unpinOperator, consultOperator, getDashboardSummary, exportDataOcId, searchForAutocomplete, getImportPAC, hideImport, markFeatureControlled, markFeatureUncontrolled } = require('./lib/providers/cartobio.js')
 const { generatePDF, getAttestationProduction } = require('./lib/providers/export-pdf.js')
 const { evvLookup, evvParcellaire, pacageLookup, iterateOperatorLastRecords } = require('./lib/providers/cartobio.js')
 const { parseAnyGeographicalArchive } = require('./lib/providers/gdal.js')
@@ -72,6 +72,8 @@ const { operatorFromNumeroBio, operatorFromRecordId, protectedWithToken, routeWi
 const { operatorsSchema, certificationBodySearchSchema } = require('./lib/routes/index.js')
 const { createFeatureSchema, createRecordSchema, deleteSingleFeatureSchema, patchFeatureCollectionSchema, patchRecordSchema, updateFeaturePropertiesSchema } = require('./lib/routes/records.js')
 const { geofoliaImportSchema } = require('./lib/routes/index.js')
+
+const { verifyGeometry, getRpg, getGeometryEquals } = require('./lib/providers/geometry.js')
 
 const DURATION_ONE_MINUTE = 1000 * 60
 const DURATION_ONE_HOUR = DURATION_ONE_MINUTE * 60
@@ -370,6 +372,26 @@ app.register(async (app) => {
   })
 
   /**
+   * @private
+   * Marque une parcelle comme controlée
+   */
+  app.post('/api/v2/audits/:recordId/:id/controlee', mergeSchemas(protectedWithToken()), async (request, reply) => {
+    await markFeatureControlled(request.params.recordId, request.params.id, request.user.id)
+
+    return reply.code(200).send({ controlee: true })
+  })
+
+  /**
+     * @private
+   * Marque une parcelle comme non controlée
+     */
+  app.post('/api/v2/audits/:recordId/:id/non-controlee', mergeSchemas(protectedWithToken()), async (request, reply) => {
+    await markFeatureUncontrolled(request.params.recordId, request.params.id, request.user.id)
+
+    return reply.code(200).send({ controlee: false })
+  })
+
+  /**
    * Create a new Record for a given Operator
    */
   app.post('/api/v2/operator/:numeroBio/records', mergeSchemas(
@@ -429,6 +451,17 @@ app.register(async (app) => {
   })
 
   /**
+   * Get features of specific record id
+   */
+  app.get('/api/v2/audits/:recordId/parcelles', mergeSchemas(
+    protectedWithToken(),
+    operatorFromRecordId
+  ), (request, reply) => {
+    const { record } = request
+    return reply.code(200).send(record.parcelles)
+  })
+
+  /**
    * Partial update a feature collection (ie: mass action from the collection screen)
    *
    * Matching features are updated, features not present in payload or database are ignored
@@ -481,12 +514,11 @@ app.register(async (app) => {
       .then(record => reply.code(200).send(normalizeRecord(record)))
   })
 
-  app.post('/api/v2/audits/:recordId/parcelles/:featureId', mergeSchemas(protectedWithToken(), routeWithRecordId, operatorFromRecordId), (request, reply) => {
+  app.put('/api/v2/audits/:recordId/parcelles', mergeSchemas(protectedWithToken(), routeWithRecordId, operatorFromRecordId), (request, reply) => {
     const { user, record, operator } = request
-    const reason = request.body
-    const featureId = request.params
+    const { features, from } = request.body
 
-    return addDividFeature(user, record, operator, reason, featureId)
+    return createFeaturesFromOther(user, record, operator, features, from)
       .then(record => reply.code(200).send(normalizeRecord(record)))
   })
 
@@ -757,6 +789,36 @@ app.register(async (app) => {
     }
     return reply.code(200).send(data)
   })
+
+  app.post('/api/v2/geometry/:recordId/add', mergeSchemas(
+    protectedWithToken()
+  ), (request, reply) => {
+    const { payload: feature } = request.body
+    return verifyGeometry(feature.geometry, request.params.recordId, feature.properties?.id ?? '')
+      .then(record => reply.code(200).send((record)))
+  })
+})
+
+app.post('/api/v2/geometry/rpg', mergeSchemas(
+  protectedWithToken()
+), (request, reply) => {
+  const { extent, surface, codeCulture } = request.body
+  return getRpg(extent, surface, codeCulture)
+    .then(data => {
+      if (data) {
+        return reply.code(200).send((data))
+      }
+
+      return reply.code(404).send()
+    })
+})
+
+app.post('/api/v2/geometry/geometryEquals', mergeSchemas(
+  protectedWithToken()
+), (request, reply) => {
+  const { payload } = request.body
+  return getGeometryEquals(payload)
+    .then(data => reply.code(200).send((data)))
 })
 
 if (require.main === module) {

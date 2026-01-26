@@ -1,5 +1,8 @@
 import { CertificationState, EtatProduction } from "../../enums";
-import { CartoBioCulture } from "../../outputs/types/features";
+import {
+    CartoBioCulture,
+    CartoBioHistoriqueCulture,
+} from "../../outputs/types/features";
 import { HistoryEntry } from "../../outputs/types/history";
 import { AgenceBioUserGroup, OrganismeCertificateur } from "./agence-bio";
 import { Polygon } from "geojson";
@@ -63,6 +66,8 @@ type DBParcelle = {
     etranger: boolean;
     code_culture_pac?: string;
     code_precision_pac?: string;
+    controlee?: boolean;
+    historique_cultures?: CartoBioHistoriqueCulture[];
 };
 
 export type OperatorFilter = {
