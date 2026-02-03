@@ -31,6 +31,21 @@
             "id": "5910f110-96cb-4557-957c-fb77cae8695f"
           }
         ]
+      },
+      {
+        "annee_controle": 2022,
+        "conversion_niveau": "AB",
+        "cultures": [
+          {
+            "id": 1,
+            "commentaire": "commentaire parcelle",
+            "CPF": "01.19.10.8",
+            "surface": 25,
+            "unit": "%",
+            "date_semis": "2022-03-24",
+            "variete": "rouge bleue"
+          }
+        ]
       }
     ]
   },
@@ -60,6 +75,25 @@
           {
             "CPF": "01.21.12",
             "id": "5910f110-96cb-4557-957c-fb77cae8695f"
+          }
+        ]
+      },
+      {
+         "annee_controle": 2022,
+        "conversion_niveau": null,
+        "cultures": [
+          {
+            "id": 1,
+            "CPF": "01.13.42",
+            "variete": "spéciale pour ail noir",
+            "date_semis": ""
+          },
+          {
+            "id": 2,
+            "CPF": "01.23.11",
+            "surface": "0.5",
+            "date_semis": "",
+            "variete": ""
           }
         ]
       }
@@ -122,6 +156,18 @@
             "variete": ""
           }
         ]
+      },
+      {
+        "cultures": [
+          {
+            "id": 1,
+            "CPF": "01.19.10.8",
+            "variete": "",
+            "date_semis": ""
+          }
+        ],
+        "conversion_niveau": null,
+        "annee_controle": 2022
       }
     ]
   }
