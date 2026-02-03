@@ -1,6 +1,6 @@
 {
   "name": "@agencebio/cartobio-api",
-  "version": "2.32.2",
+  "version": "3.0.0",
   "description": "api for cartobio",
   "main": "app.js",
   "private": true,
@@ -48,7 +48,7 @@
     "eslint-plugin-promise": "^4.3.1",
     "fast-jwt": "^5.0.6",
     "fast-xml-parser": "^4.4.1",
-    "fastify": "^4.27.0",
+    "fastify": "^5.7.3",
     "file-type": "^16.5.4",
     "form-data": "^4.0.4",
     "gdal-async": "^3.12.1",
