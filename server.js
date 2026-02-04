@@ -40,7 +40,10 @@ if (reportErrors) {
 const app = require('fastify')({
   logger: config.get('env') !== 'test',
   ajv: {
-    plugins: [require('ajv-formats')]
+    plugins: [require('ajv-formats')],
+    customOptions: {
+      strict: false
+    }
   }
 })
 
