@@ -151,8 +151,6 @@ const {
   verifyGeometry,
   getRpg,
   getGeometryEquals,
-  computeFullBorder,
-  computePartialBorder,
   calculateParcelBorder
 } = require('./lib/providers/geometry.js')
 
