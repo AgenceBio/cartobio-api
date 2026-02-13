@@ -23,12 +23,12 @@ const sign = createSigner({ key: config.get('jwtSecret') })
 
 const fakeOcToken = 'aaaa-bbbb-cccc-dddd'
 const fakeOc = { id: 999, nom: 'CartobiOC', numeroControleEu: 'FR-BIO-999' }
-const fakeUser = { id: 1, prenom: 'Tonio', nom: 'Est', test: true, organismeCertificateur: fakeOc }
+const fakeUser = { id: 1, prenom: 'Tonio', nom: 'Est', test: true, organismeCertificateur: fakeOc, mainGroup: { id: 2 } }
 const USER_DOC_AUTH_TOKEN = sign(fakeUser)
 const USER_DOC_AUTH_HEADER = `Bearer ${USER_DOC_AUTH_TOKEN}`
 
 const otherFakeOc = { id: 1111, nom: 'Certificator', numeroControleEu: 'FR-BIO-1111' }
-const OTHER_USER_DOC_AUTH_TOKEN = sign({ id: 2, prenom: 'Tania', nom: 'Ouest', test: true, organismeCertificateur: otherFakeOc })
+const OTHER_USER_DOC_AUTH_TOKEN = sign({ id: 2, prenom: 'Tania', nom: 'Ouest', test: true, mainGroup: { id: 2 }, organismeCertificateur: otherFakeOc })
 const OTHER_OC_AUTH_TOKEN = 'zzzz-zzzz-zzzz-zzzz'
 
 const mockSentry = jest.fn()
