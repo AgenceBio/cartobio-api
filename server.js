@@ -30,7 +30,10 @@ if (reportErrors) {
 
   if (config.get('environment') === 'production') {
     sentryOptions.release = config.get('version')
-  } else if (config.get('environment') === 'staging' || config.get('environment') === 'test') {
+  } else if (
+    config.get('environment') === 'staging' ||
+    config.get('environment') === 'test'
+  ) {
     sentryOptions.release = process.env.SENTRY_RELEASE
   }
 
@@ -60,23 +63,99 @@ const { PassThrough } = require('stream')
 
 const { createSigner } = require('fast-jwt')
 
-const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators, fetchCustomersByOc } = require('./lib/providers/agence-bio.js')
-const { addRecordFeature, createFeaturesFromOther, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, getDepartement, recordSorts, pinOperator, unpinOperator, consultOperator, getDashboardSummary, exportDataOcId, searchForAutocomplete, getImportPAC, hideImport, markFeatureControlled, markFeatureUncontrolled } = require('./lib/providers/cartobio.js')
-const { generatePDF, getAttestationProduction } = require('./lib/providers/export-pdf.js')
-const { evvLookup, evvParcellaire, pacageLookup, iterateOperatorLastRecords } = require('./lib/providers/cartobio.js')
+const {
+  fetchOperatorByNumeroBio,
+  getUserProfileById,
+  getUserProfileFromSSOToken,
+  verifyNotificationAuthorization,
+  fetchUserOperators,
+  fetchCustomersByOc
+} = require('./lib/providers/agence-bio.js')
+const {
+  addRecordFeature,
+  createFeaturesFromOther,
+  patchFeatureCollection,
+  updateAuditRecordState,
+  updateFeature,
+  createOrUpdateOperatorRecord,
+  parcellaireStreamToDb,
+  deleteSingleFeature,
+  getRecords,
+  deleteRecord,
+  getOperatorLastRecord,
+  searchControlBodyRecords,
+  getDepartement,
+  recordSorts,
+  pinOperator,
+  unpinOperator,
+  consultOperator,
+  getDashboardSummary,
+  exportDataOcId,
+  searchForAutocomplete,
+  getImportPAC,
+  hideImport,
+  markFeatureControlled,
+  markFeatureUncontrolled
+} = require('./lib/providers/cartobio.js')
+const {
+  generatePDF,
+  getAttestationProduction
+} = require('./lib/providers/export-pdf.js')
+const {
+  evvLookup,
+  evvParcellaire,
+  pacageLookup,
+  iterateOperatorLastRecords
+} = require('./lib/providers/cartobio.js')
 const { parseAnyGeographicalArchive } = require('./lib/providers/gdal.js')
 const { parseTelepacArchive } = require('./lib/providers/telepac.js')
-const { parseGeofoliaArchive, geofoliaLookup, geofoliaParcellaire } = require('./lib/providers/geofolia.js')
+const {
+  parseGeofoliaArchive,
+  geofoliaLookup,
+  geofoliaParcellaire
+} = require('./lib/providers/geofolia.js')
 const { InvalidRequestApiError, NotFoundApiError } = require('./lib/errors.js')
 
-const { mergeSchemas, swaggerConfig, CartoBioDecoratorsPlugin, dashboardSummarySchema, autocompleteSchema } = require('./lib/routes/index.js')
-const { sandboxSchema, internalSchema, hiddenSchema } = require('./lib/routes/index.js')
-const { operatorFromNumeroBio, operatorFromRecordId, protectedWithToken, routeWithRecordId, routeWithPacage, checkCertificationStatus } = require('./lib/routes/index.js')
-const { operatorsSchema, certificationBodySearchSchema } = require('./lib/routes/index.js')
-const { createFeatureSchema, createRecordSchema, deleteSingleFeatureSchema, patchFeatureCollectionSchema, patchRecordSchema, updateFeaturePropertiesSchema } = require('./lib/routes/records.js')
+const {
+  mergeSchemas,
+  swaggerConfig,
+  CartoBioDecoratorsPlugin,
+  dashboardSummarySchema,
+  autocompleteSchema
+} = require('./lib/routes/index.js')
+const {
+  sandboxSchema,
+  internalSchema,
+  hiddenSchema
+} = require('./lib/routes/index.js')
+const {
+  operatorFromNumeroBio,
+  operatorFromRecordId,
+  protectedWithToken,
+  routeWithRecordId,
+  routeWithPacage,
+  checkCertificationStatus
+} = require('./lib/routes/index.js')
+const {
+  operatorsSchema,
+  certificationBodySearchSchema
+} = require('./lib/routes/index.js')
+const {
+  createFeatureSchema,
+  createRecordSchema,
+  deleteSingleFeatureSchema,
+  patchFeatureCollectionSchema,
+  patchRecordSchema,
+  updateFeaturePropertiesSchema
+} = require('./lib/routes/records.js')
 const { geofoliaImportSchema } = require('./lib/routes/index.js')
 
-const { verifyGeometry, getRpg, getGeometryEquals } = require('./lib/providers/geometry.js')
+const {
+  verifyGeometry,
+  getRpg,
+  getGeometryEquals,
+  calculateParcelBorder
+} = require('./lib/providers/geometry.js')
 
 const DURATION_ONE_MINUTE = 1000 * 60
 const DURATION_ONE_HOUR = DURATION_ONE_MINUTE * 60
@@ -87,8 +166,15 @@ const { UnauthorizedApiError, errorHandler } = require('./lib/errors.js')
 const { normalizeRecord } = require('./lib/outputs/record')
 const { recordToApi } = require('./lib/outputs/api')
 const { isHandledError } = require('./lib/errors')
-const { getPinnedOperators, getConsultedOperators, addRecordData } = require('./lib/outputs/operator.js')
-const sign = createSigner({ key: config.get('jwtSecret'), expiresIn: DURATION_ONE_DAY * 30 })
+const {
+  getPinnedOperators,
+  getConsultedOperators,
+  addRecordData
+} = require('./lib/outputs/operator.js')
+const sign = createSigner({
+  key: config.get('jwtSecret'),
+  expiresIn: DURATION_ONE_DAY * 30
+})
 
 app.setErrorHandler(errorHandler)
 if (reportErrors) {
@@ -98,7 +184,15 @@ if (reportErrors) {
 // Configure server
 app.register(fastifyCors, {
   origin: true,
-  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Accept-Encoding', 'Authorization', 'If-Unmodified-Since']
+  allowedHeaders: [
+    'Origin',
+    'X-Requested-With',
+    'Content-Type',
+    'Accept',
+    'Accept-Encoding',
+    'Authorization',
+    'If-Unmodified-Since'
+  ]
 })
 
 // Accept incoming files and forms (GeoJSON, ZIP files, etc.)
@@ -184,302 +278,473 @@ app.register(async (app) => {
     return reply.send({ version: config.get('version') })
   })
 
-  app.get('/api/v2/test', mergeSchemas(sandboxSchema, protectedWithToken({ oc: true, cartobio: true })), (_, reply) => {
-    return reply.send({ message: 'OK' })
-  })
+  app.get(
+    '/api/v2/test',
+    mergeSchemas(
+      sandboxSchema,
+      protectedWithToken({ oc: true, cartobio: true })
+    ),
+    (_, reply) => {
+      return reply.send({ message: 'OK' })
+    }
+  )
 
   /**
    * @private
    */
-  app.post('/api/v2/certification/search', mergeSchemas(certificationBodySearchSchema, protectedWithToken()), async (request, reply) => {
-    const { input, page, limit, filter } = request.body
-    const { id: ocId } = request.user.organismeCertificateur
+  app.post(
+    '/api/v2/certification/search',
+    mergeSchemas(certificationBodySearchSchema, protectedWithToken()),
+    async (request, reply) => {
+      const { input, page, limit, filter } = request.body
+      const { id: ocId } = request.user.organismeCertificateur
 
-    return reply.code(200).send(searchControlBodyRecords({ ocId, userId: request.user.id, input, page, limit, filter }))
-  })
+      return reply.code(200).send(
+        searchControlBodyRecords({
+          ocId,
+          userId: request.user.id,
+          input,
+          page,
+          limit,
+          filter
+        })
+      )
+    }
+  )
 
   /**
    * @private
    */
-  app.get('/api/v2/certification/autocomplete', mergeSchemas(autocompleteSchema, protectedWithToken()), async (request, reply) => {
-    const { search } = request.query
-    const { id: userId, organismeCertificateur } = request.user
+  app.get(
+    '/api/v2/certification/autocomplete',
+    mergeSchemas(autocompleteSchema, protectedWithToken()),
+    async (request, reply) => {
+      const { search } = request.query
+      const { id: userId, organismeCertificateur } = request.user
 
-    return reply.code(200).send(searchForAutocomplete(organismeCertificateur?.id, userId, search))
-  })
+      return reply
+        .code(200)
+        .send(
+          searchForAutocomplete(organismeCertificateur?.id, userId, search)
+        )
+    }
+  )
 
   /**
    * @private
    * Retrieve operators for a given user
    */
-  app.get('/api/v2/operators', mergeSchemas(protectedWithToken({ cartobio: true }), operatorsSchema), async (request, reply) => {
-    const { id: userId } = request.user
-    const { search, limit, offset } = request.query
+  app.get(
+    '/api/v2/operators',
+    mergeSchemas(protectedWithToken({ cartobio: true }), operatorsSchema),
+    async (request, reply) => {
+      const { id: userId } = request.user
+      const { search, limit, offset } = request.query
 
-    return Promise.all(
-      [
+      return Promise.all([
         fetchUserOperators(userId),
         getPinnedOperators(request.user.id)
-      ]
-    ).then(([res, pinnedOperators]) => {
-      const paginatedOperators = res.operators
-        .filter((e) => {
-          if (!search) {
-            return true
-          }
+      ]).then(([res, pinnedOperators]) => {
+        const paginatedOperators = res.operators
+          .filter((e) => {
+            if (!search) {
+              return true
+            }
 
-          const userInput = search.toLowerCase().trim()
+            const userInput = search.toLowerCase().trim()
 
-          return e.denominationCourante.toLowerCase().includes(userInput) ||
-            e.numeroBio.toString().includes(userInput) ||
-            e.nom.toLowerCase().includes(userInput) ||
-            e.siret.toLowerCase().includes(userInput)
+            return (
+              e.denominationCourante.toLowerCase().includes(userInput) ||
+              e.numeroBio.toString().includes(userInput) ||
+              e.nom.toLowerCase().includes(userInput) ||
+              e.siret.toLowerCase().includes(userInput)
+            )
+          })
+          .toSorted(recordSorts('fn', 'notifications', 'desc'))
+          .slice(offset, offset + limit)
+          .map((o) => ({
+            ...o,
+            epingle: pinnedOperators.includes(+o.numeroBio)
+          }))
+
+        return reply.code(200).send({
+          nbTotal: res.operators.length,
+          operators: paginatedOperators
         })
-        .toSorted(recordSorts('fn', 'notifications', 'desc'))
-        .slice(offset, offset + limit)
-        .map((o) => ({ ...o, epingle: pinnedOperators.includes(+o.numeroBio) }))
-
-      return reply.code(200).send({ nbTotal: res.operators.length, operators: paginatedOperators })
-    })
-  })
+      })
+    }
+  )
 
   /**
    * @private
    * Retrieve operators for a given user for their dashboard
    */
-  app.get('/api/v2/operators/dashboard', mergeSchemas(protectedWithToken({ oc: true, cartobio: true })), async (request, reply) => {
-    const { id: userId } = request.user
-    const { id: ocId } = request.user.organismeCertificateur
+  app.get(
+    '/api/v2/operators/dashboard',
+    mergeSchemas(protectedWithToken({ oc: true, cartobio: true })),
+    async (request, reply) => {
+      const { id: userId } = request.user
+      const { id: ocId } = request.user.organismeCertificateur
 
-    return Promise.all([getPinnedOperators(userId), getConsultedOperators(userId)])
-      .then(async ([pinnedNumerobios, consultedNumerobio]) => {
-        const uniqueNumerobios = [...new Set([...pinnedNumerobios, ...consultedNumerobio])]
-        const operators = (
-          await fetchCustomersByOc(ocId))
-          .filter(
-            (operator) =>
-              uniqueNumerobios.includes(operator.numeroBio) &&
-              operator.notifications.certification_state !== 'ARRETEE' &&
-              operator.notifications.organismeCertificateurId === ocId &&
-              ['ENGAGEE', 'ENGAGEE FUTUR'].includes(operator.notifications.etatCertification)
-          )
+      return Promise.all([
+        getPinnedOperators(userId),
+        getConsultedOperators(userId)
+      ]).then(async ([pinnedNumerobios, consultedNumerobio]) => {
+        const uniqueNumerobios = [
+          ...new Set([...pinnedNumerobios, ...consultedNumerobio])
+        ]
+        const operators = (await fetchCustomersByOc(ocId)).filter(
+          (operator) =>
+            uniqueNumerobios.includes(operator.numeroBio) &&
+            operator.notifications.certification_state !== 'ARRETEE' &&
+            operator.notifications.organismeCertificateurId === ocId &&
+            ['ENGAGEE', 'ENGAGEE FUTUR'].includes(
+              operator.notifications.etatCertification
+            )
+        )
         return Promise.all(operators.map((o) => addRecordData(o))).then(
-          (operatorsWithData) => reply.code(200).send({
-            pinnedOperators: pinnedNumerobios.filter((numeroBio) => (operatorsWithData.find((o) => o.numeroBio === numeroBio))).map((numeroBio) => ({ ...operatorsWithData.find((o) => o.numeroBio === numeroBio), epingle: true })),
-            consultedOperators: consultedNumerobio.filter((numeroBio) => (operatorsWithData.find((o) => o.numeroBio === numeroBio))).map((numeroBio) => ({ ...operatorsWithData.find((o) => o.numeroBio === numeroBio), epingle: pinnedNumerobios.includes(numeroBio) }))
-          })
+          (operatorsWithData) =>
+            reply.code(200).send({
+              pinnedOperators: pinnedNumerobios
+                .filter((numeroBio) =>
+                  operatorsWithData.find((o) => o.numeroBio === numeroBio)
+                )
+                .map((numeroBio) => ({
+                  ...operatorsWithData.find((o) => o.numeroBio === numeroBio),
+                  epingle: true
+                })),
+              consultedOperators: consultedNumerobio
+                .filter((numeroBio) =>
+                  operatorsWithData.find((o) => o.numeroBio === numeroBio)
+                )
+                .map((numeroBio) => ({
+                  ...operatorsWithData.find((o) => o.numeroBio === numeroBio),
+                  epingle: pinnedNumerobios.includes(numeroBio)
+                }))
+            })
         )
       })
-  })
+    }
+  )
 
   /**
    * @private
    * Retrieve operators for a given user for their dashboard
    */
-  app.post('/api/v2/operators/dashboard-summary', mergeSchemas(dashboardSummarySchema, protectedWithToken({ oc: true, cartobio: true })), async (request, reply) => {
-    const { departements, anneeReferenceControle } = request.body
-    const { id: ocId } = request.user.organismeCertificateur
+  app.post(
+    '/api/v2/operators/dashboard-summary',
+    mergeSchemas(
+      dashboardSummarySchema,
+      protectedWithToken({ oc: true, cartobio: true })
+    ),
+    async (request, reply) => {
+      const { departements, anneeReferenceControle } = request.body
+      const { id: ocId } = request.user.organismeCertificateur
 
-    return reply.code(200).send(getDashboardSummary(ocId, departements, anneeReferenceControle))
-  })
+      return reply
+        .code(200)
+        .send(getDashboardSummary(ocId, departements, anneeReferenceControle))
+    }
+  )
 
   /**
    * @private
    * Retrieve an operator
    */
-  app.get('/api/v2/operator/:numeroBio', mergeSchemas(protectedWithToken(), operatorFromNumeroBio), async (request, reply) => {
-    const pinnedOperators = await getPinnedOperators(request.user.id)
+  app.get(
+    '/api/v2/operator/:numeroBio',
+    mergeSchemas(protectedWithToken(), operatorFromNumeroBio),
+    async (request, reply) => {
+      const pinnedOperators = await getPinnedOperators(request.user.id)
 
-    request.operator.epingle = pinnedOperators.includes(+request.operator.numeroBio)
+      request.operator.epingle = pinnedOperators.includes(
+        +request.operator.numeroBio
+      )
 
-    return reply.code(200).send(request.operator)
-  })
+      return reply.code(200).send(request.operator)
+    }
+  )
 
   /**
    * @private
    * Pin an operator
    */
-  app.post('/api/v2/operator/:numeroBio/pin', mergeSchemas(protectedWithToken()), async (request, reply) => {
-    await pinOperator(request.params.numeroBio, request.user.id)
+  app.post(
+    '/api/v2/operator/:numeroBio/pin',
+    mergeSchemas(protectedWithToken()),
+    async (request, reply) => {
+      await pinOperator(request.params.numeroBio, request.user.id)
 
-    return reply.code(200).send({ epingle: true })
-  })
+      return reply.code(200).send({ epingle: true })
+    }
+  )
 
   /**
    * @private
    * Unpin an operator
    */
-  app.post('/api/v2/operator/:numeroBio/unpin', mergeSchemas(protectedWithToken()), async (request, reply) => {
-    await unpinOperator(request.params.numeroBio, request.user.id)
+  app.post(
+    '/api/v2/operator/:numeroBio/unpin',
+    mergeSchemas(protectedWithToken()),
+    async (request, reply) => {
+      await unpinOperator(request.params.numeroBio, request.user.id)
 
-    return reply.code(200).send({ epingle: false })
-  })
+      return reply.code(200).send({ epingle: false })
+    }
+  )
 
   /**
    * @private
    * Mark an operator as consulted
    */
-  app.post('/api/v2/operator/:numeroBio/consulte', mergeSchemas(protectedWithToken()), async (request, reply) => {
-    await consultOperator(request.params.numeroBio, request.user.id)
+  app.post(
+    '/api/v2/operator/:numeroBio/consulte',
+    mergeSchemas(protectedWithToken()),
+    async (request, reply) => {
+      await consultOperator(request.params.numeroBio, request.user.id)
 
-    return reply.code(204).send()
-  })
+      return reply.code(204).send()
+    }
+  )
 
   /**
   /**
    * @private
    * Retrieve an operator records
    */
-  app.get('/api/v2/operator/:numeroBio/records', mergeSchemas(protectedWithToken(), operatorFromNumeroBio), async (request, reply) => {
-    const records = await getRecords(request.params.numeroBio)
+  app.get(
+    '/api/v2/operator/:numeroBio/records',
+    mergeSchemas(protectedWithToken(), operatorFromNumeroBio),
+    async (request, reply) => {
+      const records = await getRecords(request.params.numeroBio)
 
-    if (!request.user.organismeCertificateur || request.user.organismeCertificateur.id === request.operator.organismeCertificateur.id) {
-      return reply.code(200).send(records)
+      if (
+        !request.user.organismeCertificateur ||
+        request.user.organismeCertificateur.id ===
+          request.operator.organismeCertificateur.id
+      ) {
+        return reply.code(200).send(records)
+      }
+
+      return reply
+        .code(200)
+        .send(
+          records.filter(
+            (r) => r.oc_id === request.user.organismeCertificateur.id
+          )
+        )
     }
-
-    return reply.code(200).send(records.filter((r) => r.oc_id === request.user.organismeCertificateur.id))
-  })
+  )
 
   /**
    * @private
    * Checks if operator can import a pac record from 2025
    */
-  app.get('/api/v2/operator/:numeroBio/importData', mergeSchemas(protectedWithToken()), async (request, reply) => {
-    const res = await getImportPAC(request.params.numeroBio)
-    return reply.code(200).send({ data: res })
-  })
+  app.get(
+    '/api/v2/operator/:numeroBio/importData',
+    mergeSchemas(protectedWithToken()),
+    async (request, reply) => {
+      const res = await getImportPAC(request.params.numeroBio)
+      return reply.code(200).send({ data: res })
+    }
+  )
 
   /**
    * @private
    * Hide import PAC 2025 notif
    */
-  app.patch('/api/v2/operator/:numeroBio/hideNotif', mergeSchemas(protectedWithToken()), async (request, reply) => {
-    await hideImport(request.params.numeroBio)
-    return reply.code(204).send()
-  })
+  app.patch(
+    '/api/v2/operator/:numeroBio/hideNotif',
+    mergeSchemas(protectedWithToken()),
+    async (request, reply) => {
+      await hideImport(request.params.numeroBio)
+      return reply.code(204).send()
+    }
+  )
 
   /**
    * Retrieve a given Record
    */
-  app.get('/api/v2/audits/:recordId', mergeSchemas(protectedWithToken(), operatorFromRecordId), (request, reply) => {
-    return reply.code(200).send(request.record)
-  })
+  app.get(
+    '/api/v2/audits/:recordId',
+    mergeSchemas(protectedWithToken(), operatorFromRecordId),
+    (request, reply) => {
+      return reply.code(200).send(request.record)
+    }
+  )
 
   /**
    * Retrieve a given Record
    */
-  app.get('/api/v2/audits/:recordId/has-attestation-production', mergeSchemas(protectedWithToken(), operatorFromRecordId), async (request, reply) => {
-    const attestation = await getAttestationProduction(request.record.record_id)
+  app.get(
+    '/api/v2/audits/:recordId/has-attestation-production',
+    mergeSchemas(protectedWithToken(), operatorFromRecordId),
+    async (request, reply) => {
+      const attestation = await getAttestationProduction(
+        request.record.record_id
+      )
 
-    return reply.code(200).send({ hasAttestationProduction: !!attestation })
-  })
+      return reply.code(200).send({ hasAttestationProduction: !!attestation })
+    }
+  )
 
   /**
    * @private
    * Marque une parcelle comme controlée
    */
-  app.post('/api/v2/audits/:recordId/:id/controlee', mergeSchemas(protectedWithToken()), async (request, reply) => {
-    await markFeatureControlled(request.params.recordId, request.params.id, request.user.id)
+  app.post(
+    '/api/v2/audits/:recordId/:id/controlee',
+    mergeSchemas(protectedWithToken()),
+    async (request, reply) => {
+      await markFeatureControlled(
+        request.params.recordId,
+        request.params.id,
+        request.user.id
+      )
 
-    return reply.code(200).send({ controlee: true })
-  })
+      return reply.code(200).send({ controlee: true })
+    }
+  )
 
   /**
-     * @private
+   * @private
    * Marque une parcelle comme non controlée
-     */
-  app.post('/api/v2/audits/:recordId/:id/non-controlee', mergeSchemas(protectedWithToken()), async (request, reply) => {
-    await markFeatureUncontrolled(request.params.recordId, request.params.id, request.user.id)
+   */
+  app.post(
+    '/api/v2/audits/:recordId/:id/non-controlee',
+    mergeSchemas(protectedWithToken()),
+    async (request, reply) => {
+      await markFeatureUncontrolled(
+        request.params.recordId,
+        request.params.id,
+        request.user.id
+      )
 
-    return reply.code(200).send({ controlee: false })
-  })
+      return reply.code(200).send({ controlee: false })
+    }
+  )
 
   /**
    * Create a new Record for a given Operator
    */
-  app.post('/api/v2/operator/:numeroBio/records', mergeSchemas(
-    createRecordSchema,
-    operatorFromNumeroBio,
-    checkCertificationStatus,
-    protectedWithToken()
-  ), async (request, reply) => {
-    const { numeroBio } = request.params
-    const { id: ocId, nom: ocLabel } = request.operator.organismeCertificateur
-    const record = await createOrUpdateOperatorRecord(
-      { numerobio: numeroBio, oc_id: ocId, oc_label: ocLabel, ...request.body },
-      { user: request.user, copyParcellesData: request.body.importPrevious, previousRecordId: request.body.recordId }
-    )
-    return reply.code(200).send(normalizeRecord(record))
-  })
+  app.post(
+    '/api/v2/operator/:numeroBio/records',
+    mergeSchemas(
+      createRecordSchema,
+      operatorFromNumeroBio,
+      checkCertificationStatus,
+      protectedWithToken()
+    ),
+    async (request, reply) => {
+      const { numeroBio } = request.params
+      const { id: ocId, nom: ocLabel } =
+        request.operator.organismeCertificateur
+      const record = await createOrUpdateOperatorRecord(
+        {
+          numerobio: numeroBio,
+          oc_id: ocId,
+          oc_label: ocLabel,
+          ...request.body
+        },
+        {
+          user: request.user,
+          copyParcellesData: request.body.importPrevious,
+          previousRecordId: request.body.recordId
+        }
+      )
+      return reply.code(200).send(normalizeRecord(record))
+    }
+  )
 
   /**
    * Delete a given Record
    */
-  app.delete('/api/v2/audits/:recordId', mergeSchemas(protectedWithToken(), routeWithRecordId), async (request, reply) => {
-    const { user, record } = request
-    await deleteRecord({ user, record })
-    return reply.code(204).send()
-  })
+  app.delete(
+    '/api/v2/audits/:recordId',
+    mergeSchemas(protectedWithToken(), routeWithRecordId),
+    async (request, reply) => {
+      const { user, record } = request
+      await deleteRecord({ user, record })
+      return reply.code(204).send()
+    }
+  )
 
   /**
    * Partial update Record's metadata (top-level properties except features)
    * It also keep track of new HistoryEvent along the way, depending who and when you update feature properties
    */
-  app.patch('/api/v2/audits/:recordId', mergeSchemas(
-    protectedWithToken(),
-    patchRecordSchema,
-    operatorFromRecordId,
-    routeWithRecordId
-  ), (request, reply) => {
-    const { body: patch, user, record, operator } = request
+  app.patch(
+    '/api/v2/audits/:recordId',
+    mergeSchemas(
+      protectedWithToken(),
+      patchRecordSchema,
+      operatorFromRecordId,
+      routeWithRecordId
+    ),
+    (request, reply) => {
+      const { body: patch, user, record, operator } = request
 
-    return updateAuditRecordState({ user, record, operator }, patch)
-      .then(record => reply.code(200).send(normalizeRecord(record)))
-  })
+      return updateAuditRecordState({ user, record, operator }, patch).then(
+        (record) => reply.code(200).send(normalizeRecord(record))
+      )
+    }
+  )
 
   /**
    * Add new feature entries to an existing collection
    */
-  app.post('/api/v2/audits/:recordId/parcelles', mergeSchemas(
-    protectedWithToken(),
-    createFeatureSchema,
-    routeWithRecordId,
-    operatorFromRecordId
-  ), (request, reply) => {
-    const { feature } = request.body
-    const { user, record, operator } = request
+  app.post(
+    '/api/v2/audits/:recordId/parcelles',
+    mergeSchemas(
+      protectedWithToken(),
+      createFeatureSchema,
+      routeWithRecordId,
+      operatorFromRecordId
+    ),
+    (request, reply) => {
+      const { feature } = request.body
+      const { user, record, operator } = request
 
-    return addRecordFeature({ user, record, operator }, feature)
-      .then(record => reply.code(200).send(normalizeRecord(record)))
-  })
+      return addRecordFeature({ user, record, operator }, feature).then(
+        (record) => reply.code(200).send(normalizeRecord(record))
+      )
+    }
+  )
 
   /**
    * Get features of specific record id
    */
-  app.get('/api/v2/audits/:recordId/parcelles', mergeSchemas(
-    protectedWithToken(),
-    operatorFromRecordId
-  ), (request, reply) => {
-    const { record } = request
-    return reply.code(200).send(record.parcelles)
-  })
+  app.get(
+    '/api/v2/audits/:recordId/parcelles',
+    mergeSchemas(protectedWithToken(), operatorFromRecordId),
+    (request, reply) => {
+      const { record } = request
+      return reply.code(200).send(record.parcelles)
+    }
+  )
 
   /**
    * Partial update a feature collection (ie: mass action from the collection screen)
    *
    * Matching features are updated, features not present in payload or database are ignored
    */
-  app.patch('/api/v2/audits/:recordId/parcelles', mergeSchemas(
-    protectedWithToken(),
-    patchFeatureCollectionSchema,
-    routeWithRecordId,
-    operatorFromRecordId
-  ), (request, reply) => {
-    const { body: featureCollection, user, record, operator } = request
+  app.patch(
+    '/api/v2/audits/:recordId/parcelles',
+    mergeSchemas(
+      protectedWithToken(),
+      patchFeatureCollectionSchema,
+      routeWithRecordId,
+      operatorFromRecordId
+    ),
+    (request, reply) => {
+      const { body: featureCollection, user, record, operator } = request
 
-    return patchFeatureCollection({ user, record, operator }, featureCollection.features)
-      .then(record => reply.code(200).send(normalizeRecord(record)))
-  })
+      return patchFeatureCollection(
+        { user, record, operator },
+        featureCollection.features
+      ).then((record) => reply.code(200).send(normalizeRecord(record)))
+    }
+  )
 
   /**
    * Partial update a single feature (ie: feature form from an editing modal)
@@ -487,358 +752,547 @@ app.register(async (app) => {
    * Absent properties are kept as is, new properties are added, existing properties are updated
    * ('culture' field is not a special case, it's just a regular property that can be replaced)
    */
-  app.patch('/api/v2/audits/:recordId/parcelles/:featureId', mergeSchemas(
-    protectedWithToken(),
-    updateFeaturePropertiesSchema,
-    routeWithRecordId,
-    operatorFromRecordId
-  ), (request, reply) => {
-    const { body: feature, user, record, operator } = request
-    const { featureId } = request.params
+  app.patch(
+    '/api/v2/audits/:recordId/parcelles/:featureId',
+    mergeSchemas(
+      protectedWithToken(),
+      updateFeaturePropertiesSchema,
+      routeWithRecordId,
+      operatorFromRecordId
+    ),
+    (request, reply) => {
+      const { body: feature, user, record, operator } = request
+      const { featureId } = request.params
 
-    return updateFeature({ featureId, user, record, operator }, feature)
-      .then(record => reply.code(200).send(normalizeRecord(record)))
-  })
+      return updateFeature({ featureId, user, record, operator }, feature).then(
+        (record) => reply.code(200).send(normalizeRecord(record))
+      )
+    }
+  )
 
   /**
    * Delete a single feature
    */
-  app.delete('/api/v2/audits/:recordId/parcelles/:featureId', mergeSchemas(
-    protectedWithToken(),
-    deleteSingleFeatureSchema,
-    routeWithRecordId,
-    operatorFromRecordId
-  ), (request, reply) => {
-    const { user, record, operator } = request
-    const { reason } = request.body
-    const { featureId } = request.params
+  app.delete(
+    '/api/v2/audits/:recordId/parcelles/:featureId',
+    mergeSchemas(
+      protectedWithToken(),
+      deleteSingleFeatureSchema,
+      routeWithRecordId,
+      operatorFromRecordId
+    ),
+    (request, reply) => {
+      const { user, record, operator } = request
+      const { reason } = request.body
+      const { featureId } = request.params
 
-    return deleteSingleFeature({ featureId, user, record, operator }, { reason })
-      .then(record => reply.code(200).send(normalizeRecord(record)))
-  })
+      return deleteSingleFeature(
+        { featureId, user, record, operator },
+        { reason }
+      ).then((record) => reply.code(200).send(normalizeRecord(record)))
+    }
+  )
 
-  app.put('/api/v2/audits/:recordId/parcelles', mergeSchemas(protectedWithToken(), routeWithRecordId, operatorFromRecordId), (request, reply) => {
-    const { user, record, operator } = request
-    const { features, from } = request.body
+  app.put(
+    '/api/v2/audits/:recordId/parcelles',
+    mergeSchemas(protectedWithToken(), routeWithRecordId, operatorFromRecordId),
+    (request, reply) => {
+      const { user, record, operator } = request
+      const { features, from } = request.body
 
-    return createFeaturesFromOther(user, record, operator, features, from)
-      .then(record => reply.code(200).send(normalizeRecord(record)))
-  })
+      return createFeaturesFromOther(
+        user,
+        record,
+        operator,
+        features,
+        from
+      ).then((record) => reply.code(200).send(normalizeRecord(record)))
+    }
+  )
 
   /**
    * Turn a Telepac XML or Telepac zipped Shapefile into a workeable FeatureCollection
    * It's essentially used during an import process to preview its content
    * @private
    */
-  app.post('/api/v2/convert/telepac/geojson', mergeSchemas(protectedWithToken({ oc: true, cartobio: true })), async (request, reply) => {
-    return parseTelepacArchive(request.file())
-      .then(geojson => reply.send(geojson))
-  })
+  app.post(
+    '/api/v2/convert/telepac/geojson',
+    mergeSchemas(protectedWithToken({ oc: true, cartobio: true })),
+    async (request, reply) => {
+      return parseTelepacArchive(request.file()).then((geojson) =>
+        reply.send(geojson)
+      )
+    }
+  )
 
   /**
    * Turn a Geofolia file into a workeable FeatureCollection
    * It's essentially used during an import process to preview its content
    * @private
    */
-  app.post('/api/v2/convert/geofolia/geojson', mergeSchemas(protectedWithToken()), async (request, reply) => {
-    const data = await request.file()
+  app.post(
+    '/api/v2/convert/geofolia/geojson',
+    mergeSchemas(protectedWithToken()),
+    async (request, reply) => {
+      const data = await request.file()
 
-    return parseGeofoliaArchive(await data.toBuffer())
-      .then(geojson => reply.send(geojson))
-  })
+      return parseGeofoliaArchive(await data.toBuffer()).then((geojson) =>
+        reply.send(geojson)
+      )
+    }
+  )
 
   /**
    * Turn a geographical file workeable FeatureCollection
    * It's essentially used during an import process to preview its content
    * @private
    */
-  app.post('/api/v2/convert/anygeo/geojson', mergeSchemas(protectedWithToken()), async (request, reply) => {
-    return parseAnyGeographicalArchive(request.file())
-      .then(geojson => reply.send(geojson))
-  })
+  app.post(
+    '/api/v2/convert/anygeo/geojson',
+    mergeSchemas(protectedWithToken()),
+    async (request, reply) => {
+      return parseAnyGeographicalArchive(request.file()).then((geojson) =>
+        reply.send(geojson)
+      )
+    }
+  )
 
   /**
    * Retrieves all features associated to a PACAGE as a workeable FeatureCollection
    */
-  app.get('/api/v2/import/pacage/:numeroPacage', mergeSchemas(protectedWithToken({ cartobio: true, oc: true }), routeWithPacage), async (request, reply) => {
-    const { numeroPacage } = request.params
+  app.get(
+    '/api/v2/import/pacage/:numeroPacage',
+    mergeSchemas(
+      protectedWithToken({ cartobio: true, oc: true }),
+      routeWithPacage
+    ),
+    async (request, reply) => {
+      const { numeroPacage } = request.params
 
-    return pacageLookup({ numeroPacage })
-      .then(featureCollection => reply.send(featureCollection))
-  })
+      return pacageLookup({ numeroPacage }).then((featureCollection) =>
+        reply.send(featureCollection)
+      )
+    }
+  )
 
   /**
    * Checks if an operator has Geofolink features
    * It triggers a data order, which has the benefit to break the waiting time in two
    */
-  app.head('/api/v2/import/geofolia/:numeroBio', mergeSchemas(protectedWithToken({ cartobio: true, oc: true }), operatorFromNumeroBio, geofoliaImportSchema), async (request, reply) => {
-    const { siret } = request.operator
-    const { year } = request.query
+  app.head(
+    '/api/v2/import/geofolia/:numeroBio',
+    mergeSchemas(
+      protectedWithToken({ cartobio: true, oc: true }),
+      operatorFromNumeroBio,
+      geofoliaImportSchema
+    ),
+    async (request, reply) => {
+      const { siret } = request.operator
+      const { year } = request.query
 
-    const isWellKnown = await geofoliaLookup(siret, year)
+      const isWellKnown = await geofoliaLookup(siret, year)
 
-    return reply.code(isWellKnown === true ? 204 : 404).send()
-  })
+      return reply.code(isWellKnown === true ? 204 : 404).send()
+    }
+  )
 
   /**
    * Retrieves all features associated to a given SIRET linked to a numeroBio
    */
-  app.get('/api/v2/import/geofolia/:numeroBio', mergeSchemas(protectedWithToken({ cartobio: true, oc: true }), operatorFromNumeroBio), async (request, reply) => {
-    const { siret } = request.operator
+  app.get(
+    '/api/v2/import/geofolia/:numeroBio',
+    mergeSchemas(
+      protectedWithToken({ cartobio: true, oc: true }),
+      operatorFromNumeroBio
+    ),
+    async (request, reply) => {
+      const { siret } = request.operator
 
-    const featureCollection = await geofoliaParcellaire(siret)
+      const featureCollection = await geofoliaParcellaire(siret)
 
-    if (!featureCollection) {
-      return reply.code(202).send()
+      if (!featureCollection) {
+        return reply.code(202).send()
+      }
+
+      return reply.send(featureCollection)
     }
-
-    return reply.send(featureCollection)
-  })
+  )
 
   /**
    * Retrieves all features associated to an EVV associated to a numeroBio
    * You still have to add geometries to the collection.
    * Features contains a 'cadastre' property with references to fetch
    */
-  app.get('/api/v2/import/evv/:numeroEvv(\\d+)+:numeroBio(\\d+)', mergeSchemas(protectedWithToken({ cartobio: true, oc: true }), operatorFromNumeroBio), async (request, reply) => {
-    const { numeroEvv } = request.params
-    const { siret: expectedSiret } = request.operator
+  app.get(
+    '/api/v2/import/evv/:numeroEvv(\\d+)+:numeroBio(\\d+)',
+    mergeSchemas(
+      protectedWithToken({ cartobio: true, oc: true }),
+      operatorFromNumeroBio
+    ),
+    async (request, reply) => {
+      const { numeroEvv } = request.params
+      const { siret: expectedSiret } = request.operator
 
-    if (!expectedSiret) {
-      throw new InvalidRequestApiError('Le numéro SIRET de l\'opérateur n\'est pas renseigné sur le portail de Notification de l\'Agence Bio. Il est indispensable pour sécuriser la collecte du parcellaire viticole auprès des Douanes.')
+      if (!expectedSiret) {
+        throw new InvalidRequestApiError(
+          "Le numéro SIRET de l'opérateur n'est pas renseigné sur le portail de Notification de l'Agence Bio. Il est indispensable pour sécuriser la collecte du parcellaire viticole auprès des Douanes."
+        )
+      }
+
+      return evvLookup({ numeroEvv })
+        .then(({ siret }) => {
+          if (!siret) {
+            throw new NotFoundApiError('Ce numéro EVV est introuvable')
+          } else if (siret !== expectedSiret) {
+            throw new UnauthorizedApiError(
+              "les numéros SIRET du nCVI et de l'opérateur Agence Bio ne correspondent pas."
+            )
+          }
+        })
+        .then(() => evvParcellaire({ numeroEvv }))
+        .then((featureCollection) => {
+          if (featureCollection.features.length === 0) {
+            throw new NotFoundApiError(
+              'Ce numéro EVV ne retourne pas de parcelles.'
+            )
+          }
+
+          return reply.send(featureCollection)
+        })
     }
+  )
 
-    return evvLookup({ numeroEvv })
-      .then(({ siret }) => {
-        if (!siret) {
-          throw new NotFoundApiError('Ce numéro EVV est introuvable')
-        } else if (siret !== expectedSiret) {
-          throw new UnauthorizedApiError('les numéros SIRET du nCVI et de l\'opérateur Agence Bio ne correspondent pas.')
-        }
-      })
-      .then(() => evvParcellaire({ numeroEvv }))
-      .then(featureCollection => {
-        if (featureCollection.features.length === 0) {
-          throw new NotFoundApiError('Ce numéro EVV ne retourne pas de parcelles.')
-        }
+  app.post(
+    '/api/v2/certification/parcelles',
+    mergeSchemas(protectedWithToken({ oc: true }), {
+      preParsing: async (request, reply, payload) => {
+        const stream = payload.pipe(stripBom())
 
-        return reply.send(featureCollection)
-      })
-  })
+        request.APIResult = await parcellaireStreamToDb(
+          stream,
+          request.organismeCertificateur
+        )
+        request.headers['content-length'] = '2'
+        return new PassThrough().end('{}')
+      }
+    }),
+    (request, reply) => {
+      const { count, errors, warnings } = request.APIResult
 
-  app.post('/api/v2/certification/parcelles', mergeSchemas(protectedWithToken({ oc: true }), {
-    preParsing: async (request, reply, payload) => {
-      const stream = payload.pipe(stripBom())
+      if (errors.length > 0) {
+        return reply.code(400).send({
+          nbObjetTraites: count,
+          nbObjetAcceptes: count - errors.length,
+          nbObjetRefuses: errors.length,
+          listeProblemes: errors.map(
+            ([index, message]) => `[#${index}] ${message}`
+          ),
+          listeWarning:
+            warnings && warnings.length > 0
+              ? warnings.map(([index, message]) => `[#${index}] ${message}`)
+              : []
+        })
+      }
 
-      request.APIResult = await parcellaireStreamToDb(stream, request.organismeCertificateur)
-      request.headers['content-length'] = '2'
-      return new PassThrough().end('{}')
-    }
-  }), (request, reply) => {
-    const { count, errors, warnings } = request.APIResult
-
-    if (errors.length > 0) {
-      return reply.code(400).send({
+      return reply.code(202).send({
         nbObjetTraites: count,
-        nbObjetAcceptes: count - errors.length,
-        nbObjetRefuses: errors.length,
-        listeProblemes: errors.map(([index, message]) => `[#${index}] ${message}`),
-        listeWarning: warnings && warnings.length > 0 ? warnings.map(([index, message]) => `[#${index}] ${message}`) : []
+        listeWarning:
+          warnings && warnings.length > 0
+            ? warnings.map(([index, message]) => `[#${index}] ${message}`)
+            : []
       })
     }
+  )
 
-    return reply.code(202).send({
-      nbObjetTraites: count,
-      listeWarning: warnings && warnings.length > 0 ? warnings.map(([index, message]) => `[#${index}] ${message}`) : []
-    })
-  })
+  app.get(
+    '/api/v2/certification/parcellaires',
+    mergeSchemas(protectedWithToken({ oc: true })),
+    async (request, reply) => {
+      reply.header('Content-Type', 'application/json')
+      const { limit, start, anneeAudit, statut, anneeReferenceControle } =
+        request.query
+      const finalLimit = limit ? Number(limit) : null
+      const finalStart = start ? Number(start) : 0
 
-  app.get('/api/v2/certification/parcellaires', mergeSchemas(protectedWithToken({ oc: true })), async (request, reply) => {
-    reply.header('Content-Type', 'application/json')
-    const { limit, start, anneeAudit, statut, anneeReferenceControle } = request.query
-    const finalLimit = limit ? Number(limit) : null
-    const finalStart = start ? Number(start) : 0
+      const records = await iterateOperatorLastRecords(
+        request.organismeCertificateur.id,
+        {
+          anneeAudit,
+          statut,
+          anneeReferenceControle,
+          limit: finalLimit,
+          start: finalStart
+        }
+      )
 
-    const records = await iterateOperatorLastRecords(
-      request.organismeCertificateur.id,
-      {
-        anneeAudit,
-        statut,
-        anneeReferenceControle,
-        limit: finalLimit,
-        start: finalStart
-      }
-    )
+      const apiRecords = await Promise.all(records.map((r) => recordToApi(r)))
+      const links = {}
 
-    const apiRecords = await Promise.all(records.map(r => recordToApi(r)))
-    const links = {}
+      const host = request.hostname
+      const baseUrl = `https://${host}${request.url.split('?')[0]}`
 
-    const host = request.hostname
-    const baseUrl = `https://${host}${request.url.split('?')[0]}`
+      if (finalLimit !== null && finalLimit > 0) {
+        if (finalStart > 0) {
+          const prevParams = new URLSearchParams(request.query)
+          prevParams.set('start', Math.max(0, finalStart - finalLimit))
+          prevParams.set('limit', finalLimit)
+          links.prev = `${baseUrl}?${prevParams.toString()}`
+        } else {
+          links.prev = null
+        }
 
-    if (finalLimit !== null && finalLimit > 0) {
-      if (finalStart > 0) {
-        const prevParams = new URLSearchParams(request.query)
-        prevParams.set('start', Math.max(0, finalStart - finalLimit))
-        prevParams.set('limit', finalLimit)
-        links.prev = `${baseUrl}?${prevParams.toString()}`
+        if (records.length === finalLimit) {
+          const nextParams = new URLSearchParams(request.query)
+          nextParams.set('start', finalStart + finalLimit)
+          nextParams.set('limit', finalLimit)
+          links.next = `${baseUrl}?${nextParams.toString()}`
+        } else {
+          links.next = null
+        }
       } else {
-        links.prev = null
-      }
+        if (finalStart > 0) {
+          const prevParams = new URLSearchParams(request.query)
+          prevParams.delete('start')
+          links.prev = `${baseUrl}?${prevParams.toString()}`
+        } else {
+          links.prev = null
+        }
 
-      if (records.length === finalLimit) {
-        const nextParams = new URLSearchParams(request.query)
-        nextParams.set('start', finalStart + finalLimit)
-        nextParams.set('limit', finalLimit)
-        links.next = `${baseUrl}?${nextParams.toString()}`
-      } else {
         links.next = null
       }
-    } else {
-      if (finalStart > 0) {
-        const prevParams = new URLSearchParams(request.query)
-        prevParams.delete('start')
-        links.prev = `${baseUrl}?${prevParams.toString()}`
-      } else {
-        links.prev = null
-      }
 
-      links.next = null
+      return reply.code(200).send({ data: apiRecords, _links: links })
     }
+  )
 
-    return reply.code(200).send({ data: apiRecords, _links: links })
-  })
-
-  app.get('/api/v2/certification/parcellaire/:numeroBio', mergeSchemas(protectedWithToken({ oc: true }), operatorFromNumeroBio), async (request, reply) => {
-    const record = await getOperatorLastRecord(request.params.numeroBio, {
-      anneeAudit: request.query.anneeAudit,
-      statut: request.query.statut
-    })
-    return reply.code(200).send(await recordToApi(record))
-  })
-
-  app.get('/api/v2/pdf/:numeroBio/:recordId', mergeSchemas(protectedWithToken()), async (request, reply) => {
-    const force = request.query.force_refresh === 'true' ?? false
-
-    try {
-      const gen = generatePDF(request.params.numeroBio, request.params.recordId, force)
-      const numberParcelle = (await gen.next()).value
-
-      console.log(numberParcelle)
-      if (numberParcelle > 80) {
-        reply.code(204).send()
-      }
-
-      const pdf = (await gen.next()).value
-      if (numberParcelle <= 80) {
-        return reply.code(200).send(pdf)
-      }
-    } catch (e) {
-      return reply.code(400).send({ message: e.message })
+  app.get(
+    '/api/v2/certification/parcellaire/:numeroBio',
+    mergeSchemas(protectedWithToken({ oc: true }), operatorFromNumeroBio),
+    async (request, reply) => {
+      const record = await getOperatorLastRecord(request.params.numeroBio, {
+        anneeAudit: request.query.anneeAudit,
+        statut: request.query.statut
+      })
+      return reply.code(200).send(await recordToApi(record))
     }
-  })
+  )
 
-  app.get('/api/v2/user/verify', mergeSchemas(protectedWithToken({ oc: true, cartobio: true }), sandboxSchema, internalSchema), (request, reply) => {
-    const { user, organismeCertificateur } = request
+  app.get(
+    '/api/v2/pdf/:numeroBio/:recordId',
+    mergeSchemas(protectedWithToken()),
+    async (request, reply) => {
+      const force = request.query.force_refresh === 'true' ?? false
 
-    return reply.send(user ?? organismeCertificateur)
-  })
+      try {
+        const gen = generatePDF(
+          request.params.numeroBio,
+          request.params.recordId,
+          force
+        )
+        const numberParcelle = (await gen.next()).value
+
+        console.log(numberParcelle)
+        if (numberParcelle > 80) {
+          reply.code(204).send()
+        }
+
+        const pdf = (await gen.next()).value
+        if (numberParcelle <= 80) {
+          return reply.code(200).send(pdf)
+        }
+      } catch (e) {
+        return reply.code(400).send({ message: e.message })
+      }
+    }
+  )
+
+  app.get(
+    '/api/v2/user/verify',
+    mergeSchemas(
+      protectedWithToken({ oc: true, cartobio: true }),
+      sandboxSchema,
+      internalSchema
+    ),
+    (request, reply) => {
+      const { user, organismeCertificateur } = request
+
+      return reply.send(user ?? organismeCertificateur)
+    }
+  )
 
   /**
    * Exchange a notification.agencebio.org token for a CartoBio token
    */
-  app.get('/api/v2/user/exchangeToken', internalSchema, async (request, reply) => {
-    const { error, decodedToken, token } = verifyNotificationAuthorization(request.headers.authorization)
+  app.get(
+    '/api/v2/user/exchangeToken',
+    internalSchema,
+    async (request, reply) => {
+      const { error, decodedToken, token } = verifyNotificationAuthorization(
+        request.headers.authorization
+      )
 
-    if (error) {
-      return new UnauthorizedApiError('impossible de vérifier ce jeton', { cause: error })
+      if (error) {
+        return new UnauthorizedApiError('impossible de vérifier ce jeton', {
+          cause: error
+        })
+      }
+
+      const [operator, userProfile] = await Promise.all([
+        fetchOperatorByNumeroBio(decodedToken.numeroBio, token),
+        getUserProfileById(decodedToken.userId, token)
+      ])
+
+      const sign = createSigner({
+        key: config.get('jwtSecret'),
+        expiresIn: DURATION_ONE_HOUR * 2
+      })
+
+      return reply.send({
+        operator,
+        // @todo use Notification pubkey and time based token to passthrough the requests to both Agence Bio and CartoBio APIs
+        token: sign(userProfile)
+      })
     }
+  )
 
-    const [operator, userProfile] = await Promise.all([
-      fetchOperatorByNumeroBio(decodedToken.numeroBio, token),
-      getUserProfileById(decodedToken.userId, token)
-    ])
-
-    const sign = createSigner({ key: config.get('jwtSecret'), expiresIn: DURATION_ONE_HOUR * 2 })
-
-    return reply.send({
-      operator,
-      // @todo use Notification pubkey and time based token to passthrough the requests to both Agence Bio and CartoBio APIs
-      token: sign(userProfile)
-    })
-  })
-
-  app.get('/api/v2/departements', mergeSchemas(protectedWithToken()), async (request, reply) => {
-    const departements = await getDepartement()
-    return reply.code(200).send(departements)
-  })
+  app.get(
+    '/api/v2/departements',
+    mergeSchemas(protectedWithToken()),
+    async (request, reply) => {
+      const departements = await getDepartement()
+      return reply.code(200).send(departements)
+    }
+  )
 
   // usefull only in dev mode
-  app.get('/auth-provider/agencebio/login', hiddenSchema, (request, reply) => reply.redirect('/api/auth-provider/agencebio/login'))
-  app.get('/api/auth-provider/agencebio/callback', mergeSchemas(sandboxSchema, hiddenSchema), async (request, reply) => {
-    // forwards to the UI the user-selected tab
-    const { mode = '', returnto = '' } = stateCache.get(request.query.state)
-    const { token } = await app.agenceBioOAuth2.getAccessTokenFromAuthorizationCodeFlow(request)
-    const userProfile = await getUserProfileFromSSOToken(token.access_token)
-    const cartobioToken = sign(userProfile)
+  app.get('/auth-provider/agencebio/login', hiddenSchema, (request, reply) =>
+    reply.redirect('/api/auth-provider/agencebio/login')
+  )
+  app.get(
+    '/api/auth-provider/agencebio/callback',
+    mergeSchemas(sandboxSchema, hiddenSchema),
+    async (request, reply) => {
+      // forwards to the UI the user-selected tab
+      const { mode = '', returnto = '' } = stateCache.get(request.query.state)
+      const { token } =
+        await app.agenceBioOAuth2.getAccessTokenFromAuthorizationCodeFlow(
+          request
+        )
+      const userProfile = await getUserProfileFromSSOToken(token.access_token)
+      const cartobioToken = sign(userProfile)
 
-    return reply.redirect(`${config.get('frontendUrl')}/login?mode=${mode}&returnto=${returnto}#token=${cartobioToken}`)
-  })
-
-  app.post('/api/v2/exportParcellaire', mergeSchemas(protectedWithToken({ oc: true, cartobio: true })), async (request, reply) => {
-    const data = await exportDataOcId(request.user.organismeCertificateur.id, request.body.payload, request.user.id)
-    if (data === null) {
-      throw new Error("Une erreur s'est produite, impossible d'exporter les parcellaires")
+      return reply.redirect(
+        `${config.get(
+          'frontendUrl'
+        )}/login?mode=${mode}&returnto=${returnto}#token=${cartobioToken}`
+      )
     }
-    return reply.code(200).send(data)
-  })
+  )
 
-  app.post('/api/v2/geometry/:recordId/add', mergeSchemas(
-    protectedWithToken()
-  ), (request, reply) => {
-    const { payload: feature } = request.body
-    return verifyGeometry(feature.geometry, request.params.recordId, feature.properties?.id ?? '')
-      .then(record => reply.code(200).send((record)))
-  })
+  app.post(
+    '/api/v2/exportParcellaire',
+    mergeSchemas(protectedWithToken({ oc: true, cartobio: true })),
+    async (request, reply) => {
+      const data = await exportDataOcId(
+        request.user.organismeCertificateur.id,
+        request.body.payload,
+        request.user.id
+      )
+      if (data === null) {
+        throw new Error(
+          "Une erreur s'est produite, impossible d'exporter les parcellaires"
+        )
+      }
+      return reply.code(200).send(data)
+    }
+  )
+
+  app.post(
+    '/api/v2/geometry/:recordId/add',
+    mergeSchemas(protectedWithToken()),
+    (request, reply) => {
+      const { payload: feature } = request.body
+      return verifyGeometry(
+        feature.geometry,
+        request.params.recordId,
+        feature.properties?.id ?? ''
+      ).then((record) => reply.code(200).send(record))
+    }
+  )
 })
 
-app.post('/api/v2/geometry/rpg', mergeSchemas(
-  protectedWithToken()
-), (request, reply) => {
-  const { extent, surface, codeCulture } = request.body
-  return getRpg(extent, surface, codeCulture)
-    .then(data => {
+app.post(
+  '/api/v2/geometry/rpg',
+  mergeSchemas(protectedWithToken()),
+  (request, reply) => {
+    const { extent, surface, codeCulture } = request.body
+    return getRpg(extent, surface, codeCulture).then((data) => {
       if (data) {
-        return reply.code(200).send((data))
+        return reply.code(200).send(data)
       }
 
       return reply.code(404).send()
     })
-})
+  }
+)
 
-app.post('/api/v2/geometry/geometryEquals', mergeSchemas(
-  protectedWithToken()
-), (request, reply) => {
-  const { payload } = request.body
-  return getGeometryEquals(payload)
-    .then(data => reply.code(200).send((data)))
-})
+app.post(
+  '/api/v3/geometry/border-cut',
+  mergeSchemas(protectedWithToken()),
+  async (request, reply) => {
+    const {
+      geometry,
+      distance,
+      allBorder,
+      isInverted,
+      startBorderPoint,
+      endBorderPoint
+    } = request.body
+    const result = calculateParcelBorder(
+      JSON.stringify(geometry),
+      distance,
+      allBorder,
+      isInverted,
+      startBorderPoint,
+      endBorderPoint
+    )
+    if (!result) {
+      return reply.code(400).send()
+    }
+
+    return result
+  }
+)
+
+app.post(
+  '/api/v2/geometry/geometryEquals',
+  mergeSchemas(protectedWithToken()),
+  (request, reply) => {
+    const { payload } = request.body
+    return getGeometryEquals(payload).then((data) =>
+      reply.code(200).send(data)
+    )
+  }
+)
 
 if (require.main === module) {
-  db.query('SHOW server_version;').then(async ({ rows }) => {
-    const { server_version: pgVersion } = rows[0]
-    console.log(`Postgres connection established, v${pgVersion}`)
+  db.query('SHOW server_version;').then(
+    async ({ rows }) => {
+      const { server_version: pgVersion } = rows[0]
+      console.log(`Postgres connection established, v${pgVersion}`)
 
-    await app.ready()
-    await app.swagger()
+      await app.ready()
+      await app.swagger()
 
-    const address = await app.listen({
-      host: config.get('host'),
-      port: config.get('port')
-    })
+      const address = await app.listen({
+        host: config.get('host'),
+        port: config.get('port')
+      })
 
-    console.log(`Running env:${config.get('env')} on ${address}`)
-  }, () => console.error('Failed to connect to database'))
+      console.log(`Running env:${config.get('env')} on ${address}`)
+    },
+    () => console.error('Failed to connect to database')
+  )
 }
 
 module.exports = app
