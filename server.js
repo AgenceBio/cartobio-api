@@ -841,4 +841,31 @@ if (require.main === module) {
   }, () => console.error('Failed to connect to database'))
 }
 
+app.get('/api/external/exploitations/:numeroBio', (req, res) => {
+  const { numeroBio } = req.params
+
+  if (!numeroBio || isNaN(Number(numeroBio)) || Number(numeroBio) <= 0) {
+    return res.status(400).send('numeroBio invalide')
+  }
+
+  const state = randomUUID()
+  stateCache.set(state, {
+    returnto: `/exploitations/${numeroBio}`
+  })
+
+  const ssoHost = config.get('notifications.sso.host')
+  const clientId = config.get('notifications.sso.clientId')
+  const callbackUri = config.get('notifications.sso.callbackUri')
+
+  const authUrl = new URL(`${ssoHost}/oauth2/auth`)
+  authUrl.searchParams.set('response_type', 'code')
+  authUrl.searchParams.set('client_id', clientId)
+  authUrl.searchParams.set('redirect_uri', callbackUri)
+  authUrl.searchParams.set('scope', 'openid')
+  authUrl.searchParams.set('state', state)
+  authUrl.searchParams.set('login_hint', 'skip_consent')
+
+  return res.redirect(authUrl.toString())
+})
+
 module.exports = app
