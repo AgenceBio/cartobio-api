@@ -841,7 +841,7 @@ if (require.main === module) {
   }, () => console.error('Failed to connect to database'))
 }
 
-app.get('/api/external/exploitations/:numeroBio', (req, res) => {
+app.get('/api/v3/external/exploitations/:numeroBio', (req, res) => {
   const { numeroBio } = req.params
 
   if (!numeroBio || isNaN(Number(numeroBio)) || Number(numeroBio) <= 0) {
