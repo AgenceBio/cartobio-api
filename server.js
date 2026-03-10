@@ -63,50 +63,10 @@ const { PassThrough } = require('stream')
 
 const { createSigner } = require('fast-jwt')
 
-const {
-  fetchOperatorByNumeroBio,
-  getUserProfileById,
-  getUserProfileFromSSOToken,
-  verifyNotificationAuthorization,
-  fetchUserOperators,
-  fetchCustomersByOc
-} = require('./lib/providers/agence-bio.js')
-const {
-  addRecordFeature,
-  createFeaturesFromOther,
-  patchFeatureCollection,
-  updateAuditRecordState,
-  updateFeature,
-  createOrUpdateOperatorRecord,
-  parcellaireStreamToDb,
-  deleteSingleFeature,
-  getRecords,
-  deleteRecord,
-  getOperatorLastRecord,
-  searchControlBodyRecords,
-  getDepartement,
-  recordSorts,
-  pinOperator,
-  unpinOperator,
-  consultOperator,
-  getDashboardSummary,
-  exportDataOcId,
-  searchForAutocomplete,
-  getImportPAC,
-  hideImport,
-  markFeatureControlled,
-  markFeatureUncontrolled
-} = require('./lib/providers/cartobio.js')
-const {
-  generatePDF,
-  getAttestationProduction
-} = require('./lib/providers/export-pdf.js')
-const {
-  evvLookup,
-  evvParcellaire,
-  pacageLookup,
-  iterateOperatorLastRecords
-} = require('./lib/providers/cartobio.js')
+const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators, fetchCustomersByOc } = require('./lib/providers/agence-bio.js')
+const { addRecordFeature, createFeaturesFromOther, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, getDepartement, recordSorts, pinOperator, unpinOperator, consultOperator, getDashboardSummary, exportDataOcId, searchForAutocomplete, getImportPAC, hideImport, markFeatureControlled, markFeatureUncontrolled, searchControlBodyRecordsAdmin } = require('./lib/providers/cartobio.js')
+const { generatePDF, getAttestationProduction } = require('./lib/providers/export-pdf.js')
+const { evvLookup, evvParcellaire, pacageLookup, iterateOperatorLastRecords } = require('./lib/providers/cartobio.js')
 const { parseAnyGeographicalArchive } = require('./lib/providers/gdal.js')
 const { parseTelepacArchive } = require('./lib/providers/telepac.js')
 const {
@@ -315,20 +275,20 @@ app.register(async (app) => {
   /**
    * @private
    */
-  app.get(
-    '/api/v2/certification/autocomplete',
-    mergeSchemas(autocompleteSchema, protectedWithToken()),
-    async (request, reply) => {
-      const { search } = request.query
-      const { id: userId, organismeCertificateur } = request.user
+  app.post('/api/v2/certification/adminsearch', mergeSchemas(certificationBodySearchSchema, protectedWithToken()), async (request, reply) => {
+    const { input, page, limit, filter } = request.body
+    return reply.code(200).send(searchControlBodyRecordsAdmin({ input, page, limit, filter }))
+  })
 
-      return reply
-        .code(200)
-        .send(
-          searchForAutocomplete(organismeCertificateur?.id, userId, search)
-        )
-    }
-  )
+  /**
+   * @private
+   */
+  app.get('/api/v2/certification/autocomplete', mergeSchemas(autocompleteSchema, protectedWithToken()), async (request, reply) => {
+    const { search } = request.query
+    const { id: userId, organismeCertificateur } = request.user
+
+    return reply.code(200).send(searchForAutocomplete(organismeCertificateur?.id, userId, search))
+  })
 
   /**
    * @private
