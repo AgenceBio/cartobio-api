@@ -88,6 +88,7 @@ const { normalizeRecord } = require('./lib/outputs/record')
 const { recordToApi } = require('./lib/outputs/api')
 const { isHandledError } = require('./lib/errors')
 const { getPinnedOperators, getConsultedOperators, addRecordData } = require('./lib/outputs/operator.js')
+const { AttestationsProductionsType } = require('./lib/enums.js')
 const sign = createSigner({ key: config.get('jwtSecret'), expiresIn: DURATION_ONE_DAY * 30 })
 
 app.setErrorHandler(errorHandler)
@@ -369,7 +370,9 @@ app.register(async (app) => {
    * Retrieve a given Record
    */
   app.get('/api/v2/audits/:recordId/has-attestation-production', mergeSchemas(protectedWithToken(), operatorFromRecordId), async (request, reply) => {
-    const attestation = await getAttestationProduction(request.record.record_id)
+    const pac = request.query.pac === 'true' ?? false
+
+    const attestation = await getAttestationProduction(request.record.record_id, pac ? AttestationsProductionsType.PACCOMPLET : AttestationsProductionsType.COMPLET)
 
     return reply.code(200).send({ hasAttestationProduction: !!attestation })
   })
@@ -719,20 +722,28 @@ app.register(async (app) => {
 
   app.get('/api/v2/pdf/:numeroBio/:recordId', mergeSchemas(protectedWithToken()), async (request, reply) => {
     const force = request.query.force_refresh === 'true' ?? false
+    const pac = request.query.pac === 'true' ?? false
+    const zip = request.query.zip === 'true' ?? false
 
     try {
-      const gen = generatePDF(request.params.numeroBio, request.params.recordId, force)
+      const gen = generatePDF(request.params.numeroBio, request.params.recordId, force, pac, zip)
       const numberParcelle = (await gen.next()).value
 
-      console.log(numberParcelle)
       if (numberParcelle > 80) {
-        reply.code(204).send()
+        return reply.code(204).send()
       }
 
       const pdf = (await gen.next()).value
-      if (numberParcelle <= 80) {
+
+      if (zip) {
+        reply.headers({
+          'Content-Type': 'application/zip'
+        })
         return reply.code(200).send(pdf)
       }
+
+      reply.header('Content-Type', 'application/zip')
+      return reply.code(200).send(pdf)
     } catch (e) {
       return reply.code(400).send({ message: e.message })
     }
