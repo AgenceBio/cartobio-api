@@ -1,7 +1,7 @@
 ---
 title: API d'envoi des parcellaires
 date: 2023-04-12
-updated_at: 2025-09-25
+updated_at: 2026-03-17
 contributors:
 - Laetita L (Ecocert)
 - Maud R (CartoBio)
@@ -39,14 +39,14 @@ curl --data-binary '@/chemin/vers/parcellaire.json' \
   https://cartobio.agencebio.org/api/v2/certification/parcelles
 ```
 
-### MAJ Septembre 2025
+### MAJ Mars 2026
 
 Afin de répondre à la problématique des traitements longs et coûteux en ressources, nous avons mis en place une architecture adaptée autour de deux mécanismes complémentaires :  
 
 1. **Polling pattern pour le suivi des traitements asynchrones**
    - Lorsqu’un utilisateur envoie une requête, celle-ci n’est plus traitée immédiatement en mode synchrone.  
    - À la place, un **job asynchrone** est créé et un identifiant unique est renvoyé au client.  
-   - L'utilisateur peut ensuite interroger régulièrement l’endpoint `/api/v2/import/jobs/{id}` pour récupérer l’état du traitement (`pending`, `error`, `done`, `create`) et accéder aux résultats dès qu’ils sont disponibles.
+   - L'utilisateur peut ensuite interroger régulièrement l’endpoint `/api/v3/import/jobs/{id}` pour récupérer l’état du traitement (`pending`, `error`, `done`, `create`) et accéder aux résultats dès qu’ils sont disponibles.
    - Ce mécanisme évite les **timeouts**, améliore la **robustesse du système** et permet de mieux **gérer la charge serveur**.  
 
 2. **Envoi hebdomadaire d’un récapitulatif par e-mail**  
@@ -193,6 +193,8 @@ Si le JSON est invalide, le message d'erreur est simplement le suivant :
 | `geom`           | string | non         | coordonnées géographiques. Obligatoire si la parcelle est nouvelle. Équivalent du champ `geometry.coordinates` d'une [_feature_ GeoJSON]                                                                                           |
 | `commentaire`    | string | non         | notes d'audit spécifiques à la parcelle                                                                                                                                                                                            |
 | `cultures`       | array  | **oui**     | liste d'éléments de type [Culture](#culture)                                                                                                                                                                                       |
+| `commune`        | number | non         | Code commune de la parcelles                                                                                                                                                                                                       |
+| `name`           | string | non         | Nom de la parcelle                                                                                                                                                                                                                 |
 
 #### Culture
 

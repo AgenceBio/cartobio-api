@@ -57,7 +57,7 @@ const stripBom = require('strip-bom-stream')
 const LRUCache = require('mnemonist/lru-map-with-delete')
 const { randomUUID } = require('node:crypto')
 const { PassThrough } = require('stream')
-
+const JSONStream = require('jsonstream-next')
 const { createSigner } = require('fast-jwt')
 
 const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators, fetchCustomersByOc } = require('./lib/providers/agence-bio.js')
@@ -689,10 +689,15 @@ app.register(async (app) => {
       })
     }
 
-    processFullJob(jobId, request.organismeCertificateur, result)
+    if (jobId) {
+      processFullJob(jobId, request.organismeCertificateur, result)
+        .catch(err => console.error('processFullJob error:', err))
+    }
+
+    return reply
   })
 
-  app.get('/api/v2/import/jobs/:id', mergeSchemas(protectedWithToken({ cartobio: true, oc: true }), operatorFromNumeroBio), async (request, reply) => {
+  app.get('/api/v3/import/jobs/:id', mergeSchemas(protectedWithToken({ oc: true })), async (request, reply) => {
     const { id } = request.params
     const result = await getCurrentStatusJobs(id)
 
@@ -772,7 +777,6 @@ app.register(async (app) => {
       const gen = generatePDF(request.params.numeroBio, request.params.recordId, force)
       const numberParcelle = (await gen.next()).value
 
-      console.log(numberParcelle)
       if (numberParcelle > 80) {
         reply.code(204).send()
       }
