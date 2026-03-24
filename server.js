@@ -58,7 +58,7 @@ const LRUCache = require('mnemonist/lru-map-with-delete')
 const { randomUUID } = require('node:crypto')
 const { PassThrough } = require('stream')
 
-const { createSigner } = require('fast-jwt')
+const { createSigner, createDecoder } = require('fast-jwt')
 
 const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators, fetchCustomersByOc } = require('./lib/providers/agence-bio.js')
 const { addRecordFeature, createFeaturesFromOther, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, getDepartement, recordSorts, pinOperator, unpinOperator, consultOperator, getDashboardSummary, exportDataOcId, searchForAutocomplete, getImportPAC, hideImport, markFeatureControlled, markFeatureUncontrolled } = require('./lib/providers/cartobio.js')
@@ -780,11 +780,25 @@ app.register(async (app) => {
     const { mode = '', returnto = '' } = stateCache.get(request.query.state)
     const { token } = await app.agenceBioOAuth2.getAccessTokenFromAuthorizationCodeFlow(request)
     const userProfile = await getUserProfileFromSSOToken(token.access_token)
-    const cartobioToken = sign(userProfile)
+
+    const cartobioToken = sign({ ...userProfile, id_token: token.id_token })
 
     return reply.redirect(`${config.get('frontendUrl')}/login?mode=${mode}&returnto=${returnto}#token=${cartobioToken}`)
   })
 
+  app.post('/api/auth/logout', async (request, reply) => {
+    const decode = createDecoder()
+    const cartobioToken = request.headers.authorization?.split(' ')[1]
+    const { id_token } = decode(cartobioToken)
+    const ssoHost = config.get('notifications.sso.host')
+    const logoutUrl = new URL('/oauth2/sessions/logout', ssoHost)
+    if (id_token) {
+      logoutUrl.searchParams.set('id_token_hint', id_token)
+    }
+
+
+    return reply.redirect(logoutUrl.toString())
+  })
   app.post('/api/v2/exportParcellaire', mergeSchemas(protectedWithToken({ oc: true, cartobio: true })), async (request, reply) => {
     const data = await exportDataOcId(request.user.organismeCertificateur.id, request.body.payload, request.user.id)
     if (data === null) {
