@@ -936,13 +936,12 @@ app.register(async (app) => {
   app.post('/api/auth/logout', async (request, reply) => {
     const decode = createDecoder()
     const cartobioToken = request.headers.authorization?.split(' ')[1]
-    const { id_token } = decode(cartobioToken)
+    const { id_token: idToken } = decode(cartobioToken)
     const ssoHost = config.get('notifications.sso.host')
     const logoutUrl = new URL('/oauth2/sessions/logout', ssoHost)
-    if (id_token) {
-      logoutUrl.searchParams.set('id_token_hint', id_token)
+    if (idToken) {
+      logoutUrl.searchParams.set('id_token_hint', idToken)
     }
-
 
     return reply.redirect(logoutUrl.toString())
   })
