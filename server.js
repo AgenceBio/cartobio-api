@@ -61,7 +61,7 @@ const LRUCache = require('mnemonist/lru-map-with-delete')
 const { randomUUID } = require('node:crypto')
 const { PassThrough } = require('stream')
 
-const { createSigner } = require('fast-jwt')
+const { createSigner, createDecoder } = require('fast-jwt')
 
 const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators, fetchCustomersByOc } = require('./lib/providers/agence-bio.js')
 const { addRecordFeature, createFeaturesFromOther, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, getDepartement, recordSorts, pinOperator, unpinOperator, consultOperator, getDashboardSummary, exportDataOcId, searchForAutocomplete, getImportPAC, hideImport, markFeatureControlled, markFeatureUncontrolled, searchControlBodyRecordsAdmin } = require('./lib/providers/cartobio.js')
@@ -1125,29 +1125,30 @@ app.register(async (app) => {
   )
 
   // usefull only in dev mode
-  app.get('/auth-provider/agencebio/login', hiddenSchema, (request, reply) =>
-    reply.redirect('/api/auth-provider/agencebio/login')
-  )
-  app.get(
-    '/api/auth-provider/agencebio/callback',
-    mergeSchemas(sandboxSchema, hiddenSchema),
-    async (request, reply) => {
-      // forwards to the UI the user-selected tab
-      const { mode = '', returnto = '' } = stateCache.get(request.query.state)
-      const { token } =
-        await app.agenceBioOAuth2.getAccessTokenFromAuthorizationCodeFlow(
-          request
-        )
-      const userProfile = await getUserProfileFromSSOToken(token.access_token)
-      const cartobioToken = sign(userProfile)
+  app.get('/auth-provider/agencebio/login', hiddenSchema, (request, reply) => reply.redirect('/api/auth-provider/agencebio/login'))
+  app.get('/api/auth-provider/agencebio/callback', mergeSchemas(sandboxSchema, hiddenSchema), async (request, reply) => {
+    // forwards to the UI the user-selected tab
+    const { mode = '', returnto = '' } = stateCache.get(request.query.state)
+    const { token } = await app.agenceBioOAuth2.getAccessTokenFromAuthorizationCodeFlow(request)
+    const userProfile = await getUserProfileFromSSOToken(token.access_token)
 
-      return reply.redirect(
-        `${config.get(
-          'frontendUrl'
-        )}/login?mode=${mode}&returnto=${returnto}#token=${cartobioToken}`
-      )
+    const cartobioToken = sign({ ...userProfile, id_token: token.id_token })
+
+    return reply.redirect(`${config.get('frontendUrl')}/login?mode=${mode}&returnto=${returnto}#token=${cartobioToken}`)
+  })
+
+  app.post('/api/auth/logout', async (request, reply) => {
+    const decode = createDecoder()
+    const cartobioToken = request.headers.authorization?.split(' ')[1]
+    const { id_token: idToken } = decode(cartobioToken)
+    const ssoHost = config.get('notifications.sso.host')
+    const logoutUrl = new URL('/oauth2/sessions/logout', ssoHost)
+    if (idToken) {
+      logoutUrl.searchParams.set('id_token_hint', idToken)
     }
-  )
+
+    return reply.redirect(logoutUrl.toString())
+  })
 
   app.post(
     '/api/v2/exportParcellaire',
