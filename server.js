@@ -1149,13 +1149,6 @@ app.register(async (app) => {
 
     return reply.redirect(logoutUrl.toString())
   })
-  
-  app.post('/api/v2/exportParcellaire', mergeSchemas(protectedWithToken({ oc: true, cartobio: true })), async (request, reply) => {
-    const data = await exportDataOcId(request.user.organismeCertificateur.id, request.body.payload, request.user.id)
-    if (data === null) {
-      throw new Error("Une erreur s'est produite, impossible d'exporter les parcellaires")
-    }
-  )
 
   app.post(
     '/api/v2/exportParcellaire',
