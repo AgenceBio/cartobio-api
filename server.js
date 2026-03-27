@@ -649,7 +649,12 @@ app.register(async (app) => {
     }
   }), async (request, reply) => {
     const validRecords = request.APIResult.filter(r => !r.error).map(r => r.numeroBio)
-    const invalidRecords = request.APIResult.filter(r => r.error).map(r => ({ numeroBio: r.numeroBio, message: r.error.message }))
+    const invalidRecords = request.APIResult
+      .filter(r => r.error)
+      .map(r => ({
+        ...(r.numeroBio ? { numeroBio: r.numeroBio } : {}),
+        message: r.error.message
+      }))
     const stream = request.originalPayload.pipe(stripBom())
     const jsonStream = stream.pipe(JSONStream.parse([true]))
 
@@ -678,14 +683,14 @@ app.register(async (app) => {
         nbObjetAcceptes: validRecords.length,
         nbObjetRefuses: invalidRecords.length,
         listeNumeroBioValides: validRecords,
-        listeNumeroBioInvalides: invalidRecords
+        listeProblemes: invalidRecords
       })
     } else {
       return reply.code(400).send({
         nbObjetRecu: invalidRecords.length,
         nbObjetAcceptes: 0,
         nbObjetRefuses: invalidRecords.length,
-        listeNumeroBioInvalides: invalidRecords
+        listeProblemes: invalidRecords
       })
     }
 
