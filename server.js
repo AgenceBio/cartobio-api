@@ -1137,7 +1137,7 @@ app.register(async (app) => {
     return reply.redirect(`${config.get('frontendUrl')}/login?mode=${mode}&returnto=${returnto}#token=${cartobioToken}`)
   })
 
-  app.post('/api/auth/logout', async (request, reply) => {
+  app.post('/api/auth-provider/logout', async (request, reply) => {
     const decode = createDecoder()
     const cartobioToken = request.headers.authorization?.split(' ')[1]
     const { id_token: idToken } = decode(cartobioToken)
