@@ -1145,9 +1145,10 @@ app.register(async (app) => {
     const logoutUrl = new URL('/oauth2/sessions/logout', ssoHost)
     if (idToken) {
       logoutUrl.searchParams.set('id_token_hint', idToken)
+      logoutUrl.searchParams.set('post_logout_redirect_uri', config.get('frontendUrl'))
     }
 
-    return reply.redirect(logoutUrl.toString())
+    return reply.code(200).send({ logoutUrl: logoutUrl.toString() })
   })
 
   app.post(
