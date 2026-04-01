@@ -66,7 +66,11 @@ const {
   collectPreparseResults,
   createImportJob,
   processFullJob,
-  getCurrentStatusJobs
+  getCurrentStatusJobs,
+  getImportList,
+  getImportById,
+  getImportLogs,
+  getImportPayload
 } = require('./lib/providers/api-parcellaire.js')
 const { generatePDF, getAttestationProduction } = require('./lib/providers/export-pdf.js')
 const { evvLookup, evvParcellaire, pacageLookup, iterateOperatorLastRecords } = require('./lib/providers/cartobio.js')
@@ -666,7 +670,7 @@ app.register(async (app) => {
     let jobId = null
 
     if (invalidRecords.length === 0) {
-      jobId = await createImportJob(result)
+      jobId = await createImportJob(result, request.organismeCertificateur.id)
 
       reply.code(200).send({
         jobId: jobId,
@@ -676,7 +680,7 @@ app.register(async (app) => {
         listeNumeroBioValides: validRecords
       })
     } else if (validRecords.length > 0) {
-      jobId = await createImportJob(result)
+      jobId = await createImportJob(result, request.organismeCertificateur.id)
       reply.code(207).send({
         jobId: jobId,
         nbObjetRecu: validRecords.length + invalidRecords.length,
@@ -709,6 +713,59 @@ app.register(async (app) => {
     if (result.status === 'error') {
       return reply.code(400).send(result)
     } else { return reply.code(200).send(result) }
+  })
+
+  app.get('/api/v3/import/parcellaire-imports', mergeSchemas(protectedWithToken({ oc: true })), async (request, reply) => {
+    const {
+      status,
+      from,
+      to,
+      withPayload = 'false',
+      logs = 'none',
+      page = 1,
+      limit = 20
+    } = request.query
+
+    const organismeCertificateur = request.organismeCertificateur.id
+    const result = await getImportList(
+      { status, organismeCertificateur, from, to, withPayload, logs, page, limit }
+    )
+
+    return reply.send(result)
+  })
+
+  app.get('/api/v3/import/parcellaire-imports/:id', mergeSchemas(protectedWithToken({ oc: true })), async (request, reply) => {
+    const { id } = request.params
+    const { withPayload = 'false', logs = 'none' } = request.query
+
+    const result = await getImportById({ id, withPayload, logs })
+
+    if (!result) {
+      return reply.status(404).send({ message: 'Import introuvable' })
+    }
+
+    return reply.send(result)
+  })
+
+  app.get('/api/v3/import/parcellaire-imports/:id/logs', mergeSchemas(protectedWithToken({ oc: true })), async (request, reply) => {
+    const { id } = request.params
+    const { type = 'all' } = request.query
+
+    const result = await getImportLogs({ id, type })
+
+    return reply.send(result)
+  })
+
+  app.get('/api/v3/import/parcellaire-imports/:id/payload', mergeSchemas(protectedWithToken({ oc: true })), async (request, reply) => {
+    const { id } = request.params
+
+    const result = await getImportPayload({ id })
+
+    if (!result) {
+      return reply.status(404).send({ message: 'Payload introuvable' })
+    }
+
+    return reply.send(result)
   })
 
   app.get('/api/v2/certification/parcellaires', mergeSchemas(protectedWithToken({ oc: true })), async (request, reply) => {
