@@ -1316,7 +1316,7 @@ describe('POST /api/v2/certification/parcelles', () => {
       nbObjetRecu: 1,
       nbObjetAcceptes: 0,
       nbObjetRefuses: 1,
-      listeNumeroBioInvalides: [{ numeroBio: '123', message: 'Numéro bio inconnu du portail de notification' }]
+      listeProblemes: [{ numeroBio: '123', message: 'Numéro bio inconnu du portail de notification' }]
     })
     expect(processFullJob).not.toHaveBeenCalled()
   })
