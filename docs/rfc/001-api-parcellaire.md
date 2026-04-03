@@ -49,11 +49,6 @@ Afin de répondre à la problématique des traitements longs et coûteux en ress
    - L'utilisateur peut ensuite interroger régulièrement l’endpoint `/api/v3/import/jobs/{id}` pour récupérer l’état du traitement (`pending`, `error`, `done`, `create`) et accéder aux résultats dès qu’ils sont disponibles.
    - Ce mécanisme évite les **timeouts**, améliore la **robustesse du système** et permet de mieux **gérer la charge serveur**.  
 
-2. **Envoi hebdomadaire d’un récapitulatif par e-mail**  
-   - En complément du polling manuel, nous avons automatisé l’envoi d’un **mail hebdomadaire** regroupant les informations clés :  
-     - Récapitulatif des imports de la semaine
-     - Récapitulatif des erreurs éventuelles.
-
 ### Authentification
 
 L'entête `Authorization` contient le jeton de service fourni par
@@ -163,6 +158,103 @@ Si le JSON est invalide, le message d'erreur est simplement le suivant :
   "error": "Le JSON est invalide"
 }
 ```
+
+### Suivi des jobs d'import (polling)
+
+#### `GET /api/v3/import/jobs/:id`
+
+Retourne l'état courant d'un job d'import.
+
+##### Codes HTTP jobs import
+
+| Code HTTP | Signification                              |
+| --------- | ------------------------------------------ |
+| `200`     | Job trouvé, statut retourné.               |
+| `400`     | Aucun job ne correspond à cet identifiant. |
+
+##### Statuts possibles
+
+| Statut    | Description                                    |
+| --------- | ---------------------------------------------- |
+| `CREATE`  | Job créé, pas encore démarré.                  |
+| `PENDING` | Job en cours de traitement.                    |
+| `DONE`    | Traitement terminé avec succès.                |
+| `ERROR`   | Une erreur est survenue pendant le traitement. |
+
+##### Réponse `PENDING` ou `CREATE`
+
+```json
+{
+  "status": "PENDING",
+  "created": "2026-03-17T10:00:00.000Z"
+}
+```
+
+##### Réponse `DONE`
+
+```json
+{
+  "status": "DONE",
+  "result": { ... },
+  "ended": "2026-03-17T10:01:30.000Z"
+}
+```
+
+##### Réponse `ERROR`
+
+```json
+{
+  "status": "ERROR",
+  "error": { ... },
+  "ended": "2026-03-17T10:01:05.000Z"
+}
+```
+
+---
+
+### Consultation des imports
+
+#### `GET /api/v3/import/parcellaire-imports`
+
+Liste paginée des imports de l'OC authentifié.
+
+##### Paramètres query
+
+| Paramètre | Type   | Description                                                         |
+| --------- | ------ | ------------------------------------------------------------------- |
+| `status`  | string | Filtre par statut (ex. `DONE,ERROR`). Valeurs séparées par virgule. |
+| `from`    | string | Date de début (ISO 8601).                                           |
+| `to`      | string | Date de fin (ISO 8601).                                             |
+| `payload` | bool   | Inclure le payload brut (`true`/`false`, défaut `false`).           |
+| `page`    | number | Numéro de page (défaut `1`).                                        |
+| `limit`   | number | Taille de page (défaut `20`).                                       |
+
+##### Réponse
+
+```json
+{
+  "data": [ ... ],
+  "meta": {
+    "total": 42,
+    "page": 1,
+    "limit": 20
+  }
+}
+```
+
+---
+
+#### `GET /api/v3/import/parcellaire-imports/:id`
+
+Détail d'un import.
+
+##### Paramètres query
+
+| Paramètre | Type | Description                                               |
+| --------- | ---- | --------------------------------------------------------- |
+| `payload` | bool | Inclure le payload brut (`true`/`false`, défaut `false`). |
+
+Retourne `404` si l'import n'existe pas.
 
 ### Structure de fichier
 
@@ -307,7 +399,7 @@ Le cas particulier des parcelles est traité de la manière suivante :
 
 ## Implémentation technique
 
-[`parseAPIParcellaireStream()` dans `lib/providers/agence-bio.js`](../../lib/providers/agence-bio.js).
+[`parseAPIParcellaireStream()` et `parcellaireStreamToDb()` dans `lib/providers/api-parcellaire.js`](../../lib/providers/api-parcellaire.js).
 
 [GeoJSON]: https://geojson.org/
 [ISO 8601]: https://www.iso.org/iso-8601-date-and-time-format.html
