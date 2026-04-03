@@ -24,8 +24,9 @@ exports.up = async function(db) {
     created_at TIMESTAMP DEFAULT now(),
     started_at TIMESTAMP NULL,
     ended_at TIMESTAMP NULL,
-    objets_acceptes JSONB NULL,
-    objets_refuses JSONB NULL,
+    nb_objets_recu INT NULL,
+    nb_objets_acceptes INT NULL,
+    nb_objets_refuses INT NULL,
     result_job JSONB NULL
     );
 
