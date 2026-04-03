@@ -1,6 +1,6 @@
 {
   "name": "@agencebio/cartobio-api",
-  "version": "3.1.1",
+  "version": "3.2.0",
   "description": "api for cartobio",
   "main": "app.js",
   "private": true,
