@@ -1313,7 +1313,7 @@ describe('POST /api/v2/certification/parcelles', () => {
 
     expect(res.status).toBe(400)
     expect(res.body).toMatchObject({
-      nbObjetRecu: 1,
+      nbObjetRecus: 1,
       nbObjetAcceptes: 0,
       nbObjetRefuses: 1,
       listeProblemes: [{ numeroBio: '123', message: 'Numéro bio inconnu du portail de notification' }]

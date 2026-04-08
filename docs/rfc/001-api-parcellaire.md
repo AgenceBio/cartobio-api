@@ -46,7 +46,7 @@ Afin de répondre à la problématique des traitements longs et coûteux en ress
 1. **Polling pattern pour le suivi des traitements asynchrones**
    - Lorsqu’un utilisateur envoie une requête, celle-ci n’est plus traitée immédiatement en mode synchrone.  
    - À la place, un **job asynchrone** est créé et un identifiant unique est renvoyé au client.  
-   - L'utilisateur peut ensuite interroger régulièrement l’endpoint `/api/v3/import/jobs/{id}` pour récupérer l’état du traitement (`pending`, `error`, `done`, `create`) et accéder aux résultats dès qu’ils sont disponibles.
+   - L'utilisateur peut ensuite interroger régulièrement l’endpoint `/api/v3/import/jobs/{id}` pour récupérer l’état du traitement (`pending`, `error`, `done`, `created`) et accéder aux résultats dès qu’ils sont disponibles.
    - Ce mécanisme évite les **timeouts**, améliore la **robustesse du système** et permet de mieux **gérer la charge serveur**.  
 
 ### Authentification
@@ -65,7 +65,7 @@ le chemin `/api/oc/check-token`.
 
 | Code HTTP | Message HTTP            | Signification                                                                                                             |
 | --------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `200`     | `Accepted`              | Les données d'entrée sont validéss et le processus d'import va se lancer.                                                 |
+| `202`     | `Accepted`              | Les données d'entrée sont validéss et le processus d'import va se lancer.                                                 |
 | `207`     | `Multi-Status`          | Les données d'entrée sont partiellement validées et le processus d'import va se lancer sur les données valides.           |
 | `400`     | `Bad Request`           | Le fichier JSON est invalide ou certaines données sont incorrectes et donc le traitement ne se lancera pas.               |
 | `401`     | `Unauthorized`          | Le jeton d'`Authorization` est manquant.                                                                                  |
@@ -80,7 +80,7 @@ En cas de statut `202`, un objet représente le nombre d'objets traités.
 | Chemin                  | Type    | Description                                  |
 | ----------------------- | ------- | -------------------------------------------- |
 | `jobId`                 | integer | id du job d'import                           |
-| `nbObjetRecu`           | integer | nombre d'objets reçus                        |
+| `nbObjetRecus`          | integer | nombre d'objets reçus                        |
 | `nbObjetAcceptes`       | integer | nombre d'objets acceptes                     |
 | `nbObjetRefuses`        | integer | nombre d'objets refuses                      |
 | `listeNumeroBioValides` | array   | liste des numéros bios qui vont etre traités |
@@ -97,7 +97,7 @@ En cas de statut `202`, un objet représente le nombre d'objets traités.
 }
 ```
 
-En cas de statut `207`, un objet représente les objets acceptés et refusés. Aucune donnée n'est enregistrée.
+En cas de statut `207`, un objet représente les objets acceptés et refusés. Seulement les donnéees valides seront traités.
 
 | Chemin                    | Type    | Description                                         |
 | ------------------------- | ------- | --------------------------------------------------- |
@@ -170,13 +170,13 @@ Retourne l'état courant d'un job d'import.
 | Code HTTP | Signification                              |
 | --------- | ------------------------------------------ |
 | `200`     | Job trouvé, statut retourné.               |
-| `400`     | Aucun job ne correspond à cet identifiant. |
+| `404`     | Aucun job ne correspond à cet identifiant. |
 
 ##### Statuts possibles
 
 | Statut    | Description                                    |
 | --------- | ---------------------------------------------- |
-| `CREATE`  | Job créé, pas encore démarré.                  |
+| `CREATED` | Job créé, pas encore démarré.                  |
 | `PENDING` | Job en cours de traitement.                    |
 | `DONE`    | Traitement terminé avec succès.                |
 | `ERROR`   | Une erreur est survenue pendant le traitement. |

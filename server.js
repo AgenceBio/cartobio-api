@@ -674,7 +674,7 @@ app.register(async (app) => {
 
       reply.code(200).send({
         jobId: jobId,
-        nbObjetRecu: validRecords.length,
+        nbObjetRecus: validRecords.length,
         nbObjetAcceptes: validRecords.length,
         nbObjetRefuses: 0,
         listeNumeroBioValides: validRecords
@@ -683,7 +683,7 @@ app.register(async (app) => {
       jobId = await createImportJob(result, request.organismeCertificateur.id)
       reply.code(207).send({
         jobId: jobId,
-        nbObjetRecu: validRecords.length + invalidRecords.length,
+        nbObjetRecus: validRecords.length + invalidRecords.length,
         nbObjetAcceptes: validRecords.length,
         nbObjetRefuses: invalidRecords.length,
         listeNumeroBioValides: validRecords,
@@ -691,17 +691,15 @@ app.register(async (app) => {
       })
     } else {
       return reply.code(400).send({
-        nbObjetRecu: invalidRecords.length,
+        nbObjetRecus: invalidRecords.length,
         nbObjetAcceptes: 0,
         nbObjetRefuses: invalidRecords.length,
         listeProblemes: invalidRecords
       })
     }
 
-    if (jobId) {
-      processFullJob(jobId, request.organismeCertificateur, result)
-        .catch(err => console.error('processFullJob error:', err))
-    }
+    processFullJob(jobId, request.organismeCertificateur, result)
+      .catch(err => console.error('processFullJob error:', err))
 
     return reply
   })
@@ -711,8 +709,8 @@ app.register(async (app) => {
     const result = await getCurrentStatusJobs(id)
 
     if (result.status === 'error') {
-      return reply.code(400).send(result)
-    } else { return reply.code(200).send(result) }
+      return reply.code(404).send(result)
+    } return reply.code(200).send(result)
   })
 
   app.get('/api/v3/import/parcellaire-imports', mergeSchemas(protectedWithToken({ oc: true })), async (request, reply) => {
