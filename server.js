@@ -61,7 +61,7 @@ const JSONStream = require('jsonstream-next')
 const { createSigner } = require('fast-jwt')
 
 const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators, fetchCustomersByOc } = require('./lib/providers/agence-bio.js')
-const { addRecordFeature, createFeaturesFromOther, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, getDepartement, recordSorts, pinOperator, unpinOperator, consultOperator, getDashboardSummary, exportDataOcId, searchForAutocomplete, getImportPAC, hideImport, markFeatureControlled, markFeatureUncontrolled } = require('./lib/providers/cartobio.js')
+const { addRecordFeature, createFeaturesFromOther, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, getDepartement, recordSorts, pinOperator, unpinOperator, consultOperator, getDashboardSummary, exportDataOcId, searchForAutocomplete, getImportPAC, hideImport, markFeatureControlled, markFeatureUncontrolled, searchControlBodyRecordsAdmin } = require('./lib/providers/cartobio.js')
 const {
   collectPreparseResults,
   createImportJob,
