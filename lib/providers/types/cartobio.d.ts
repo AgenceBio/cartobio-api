@@ -68,6 +68,7 @@ type DBParcelle = {
     code_precision_pac?: string;
     controlee?: boolean;
     historique_cultures?: CartoBioHistoriqueCulture[];
+    statut_import_geom?: string;
 };
 
 export type OperatorFilter = {
