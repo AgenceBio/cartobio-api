@@ -57,11 +57,21 @@ const stripBom = require('strip-bom-stream')
 const LRUCache = require('mnemonist/lru-map-with-delete')
 const { randomUUID } = require('node:crypto')
 const { PassThrough } = require('stream')
-
+const JSONStream = require('jsonstream-next')
 const { createSigner } = require('fast-jwt')
 
 const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators, fetchCustomersByOc } = require('./lib/providers/agence-bio.js')
-const { addRecordFeature, createFeaturesFromOther, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, parcellaireStreamToDb, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, getDepartement, recordSorts, pinOperator, unpinOperator, consultOperator, getDashboardSummary, exportDataOcId, searchForAutocomplete, getImportPAC, hideImport, markFeatureControlled, markFeatureUncontrolled, searchControlBodyRecordsAdmin } = require('./lib/providers/cartobio.js')
+const { addRecordFeature, createFeaturesFromOther, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, getDepartement, recordSorts, pinOperator, unpinOperator, consultOperator, getDashboardSummary, exportDataOcId, searchForAutocomplete, getImportPAC, hideImport, markFeatureControlled, markFeatureUncontrolled } = require('./lib/providers/cartobio.js')
+const {
+  collectPreparseResults,
+  createImportJob,
+  processFullJob,
+  getCurrentStatusJobs,
+  getImportList,
+  getImportById,
+  getImportLogs,
+  getImportPayload
+} = require('./lib/providers/api-parcellaire.js')
 const { generatePDF, getAttestationProduction } = require('./lib/providers/export-pdf.js')
 const { evvLookup, evvParcellaire, pacageLookup, iterateOperatorLastRecords } = require('./lib/providers/cartobio.js')
 const { parseAnyGeographicalArchive } = require('./lib/providers/gdal.js')
@@ -636,29 +646,132 @@ app.register(async (app) => {
 
   app.post('/api/v2/certification/parcelles', mergeSchemas(protectedWithToken({ oc: true }), {
     preParsing: async (request, reply, payload) => {
-      const stream = payload.pipe(stripBom())
+      const stream1 = new PassThrough()
+      const stream2 = new PassThrough()
 
-      request.APIResult = await parcellaireStreamToDb(stream, request.organismeCertificateur)
+      payload.pipe(stream1)
+      payload.pipe(stream2)
+
+      const processedStream = stream1.pipe(stripBom())
+      request.APIResult = await collectPreparseResults(processedStream)
+
+      request.originalPayload = stream2
       request.headers['content-length'] = '2'
       return new PassThrough().end('{}')
     }
-  }), (request, reply) => {
-    const { count, errors, warnings } = request.APIResult
+  }), async (request, reply) => {
+    const validRecords = request.APIResult.filter(r => !r.error).map(r => r.numeroBio)
+    const invalidRecords = request.APIResult
+      .filter(r => r.error)
+      .map(r => ({
+        ...(r.numeroBio ? { numeroBio: r.numeroBio } : {}),
+        message: r.error.message
+      }))
+    const stream = request.originalPayload.pipe(stripBom())
+    const jsonStream = stream.pipe(JSONStream.parse([true]))
 
-    if (errors.length > 0) {
+    const result = []
+    for await (const record of jsonStream) {
+      result.push(record)
+    }
+
+    let jobId = null
+
+    if (invalidRecords.length === 0) {
+      jobId = await createImportJob(result, request.organismeCertificateur.id)
+
+      reply.code(200).send({
+        jobId: jobId,
+        nbObjetRecus: validRecords.length,
+        nbObjetAcceptes: validRecords.length,
+        nbObjetRefuses: 0,
+        listeNumeroBioValides: validRecords
+      })
+    } else if (validRecords.length > 0) {
+      jobId = await createImportJob(result, request.organismeCertificateur.id)
+      reply.code(207).send({
+        jobId: jobId,
+        nbObjetRecus: validRecords.length + invalidRecords.length,
+        nbObjetAcceptes: validRecords.length,
+        nbObjetRefuses: invalidRecords.length,
+        listeNumeroBioValides: validRecords,
+        listeProblemes: invalidRecords
+      })
+    } else {
       return reply.code(400).send({
-        nbObjetTraites: count,
-        nbObjetAcceptes: count - errors.length,
-        nbObjetRefuses: errors.length,
-        listeProblemes: errors.map(([index, message]) => `[#${index}] ${message}`),
-        listeWarning: warnings && warnings.length > 0 ? warnings.map(([index, message]) => `[#${index}] ${message}`) : []
+        nbObjetRecus: invalidRecords.length,
+        nbObjetAcceptes: 0,
+        nbObjetRefuses: invalidRecords.length,
+        listeProblemes: invalidRecords
       })
     }
 
-    return reply.code(202).send({
-      nbObjetTraites: count,
-      listeWarning: warnings && warnings.length > 0 ? warnings.map(([index, message]) => `[#${index}] ${message}`) : []
-    })
+    processFullJob(jobId, request.organismeCertificateur, result)
+      .catch(err => console.error('processFullJob error:', err))
+
+    return reply
+  })
+
+  app.get('/api/v3/import/jobs/:id', mergeSchemas(protectedWithToken({ oc: true })), async (request, reply) => {
+    const { id } = request.params
+    const result = await getCurrentStatusJobs(id)
+
+    if (result.status === 'error') {
+      return reply.code(404).send(result)
+    } return reply.code(200).send(result)
+  })
+
+  app.get('/api/v3/import/parcellaire-imports', mergeSchemas(protectedWithToken({ oc: true })), async (request, reply) => {
+    const {
+      status,
+      from,
+      to,
+      withPayload = 'false',
+      logs = 'none',
+      page = 1,
+      limit = 20
+    } = request.query
+
+    const organismeCertificateur = request.organismeCertificateur.id
+    const result = await getImportList(
+      { status, organismeCertificateur, from, to, withPayload, logs, page, limit }
+    )
+
+    return reply.send(result)
+  })
+
+  app.get('/api/v3/import/parcellaire-imports/:id', mergeSchemas(protectedWithToken({ oc: true })), async (request, reply) => {
+    const { id } = request.params
+    const { withPayload = 'false', logs = 'none' } = request.query
+
+    const result = await getImportById({ id, withPayload, logs })
+
+    if (!result) {
+      return reply.status(404).send({ message: 'Import introuvable' })
+    }
+
+    return reply.send(result)
+  })
+
+  app.get('/api/v3/import/parcellaire-imports/:id/logs', mergeSchemas(protectedWithToken({ oc: true })), async (request, reply) => {
+    const { id } = request.params
+    const { type = 'all' } = request.query
+
+    const result = await getImportLogs({ id, type })
+
+    return reply.send(result)
+  })
+
+  app.get('/api/v3/import/parcellaire-imports/:id/payload', mergeSchemas(protectedWithToken({ oc: true })), async (request, reply) => {
+    const { id } = request.params
+
+    const result = await getImportPayload({ id })
+
+    if (!result) {
+      return reply.status(404).send({ message: 'Payload introuvable' })
+    }
+
+    return reply.send(result)
   })
 
   app.get('/api/v2/certification/parcellaires', mergeSchemas(protectedWithToken({ oc: true })), async (request, reply) => {
@@ -732,7 +845,6 @@ app.register(async (app) => {
       const gen = generatePDF(request.params.numeroBio, request.params.recordId, force)
       const numberParcelle = (await gen.next()).value
 
-      console.log(numberParcelle)
       if (numberParcelle > 80) {
         reply.code(204).send()
       }
