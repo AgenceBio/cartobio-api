@@ -57,14 +57,8 @@ const stripBom = require('strip-bom-stream')
 const LRUCache = require('mnemonist/lru-map-with-delete')
 const { randomUUID } = require('node:crypto')
 const { PassThrough } = require('stream')
-<<<<<<< feat/redirection-login-portail
-
-const { createSigner, createDecoder } = require('fast-jwt')
-=======
 const JSONStream = require('jsonstream-next')
-const { createSigner } = require('fast-jwt')
->>>>>>> test
-
+const { createSigner,createDecoder } = require('fast-jwt')
 const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators, fetchCustomersByOc } = require('./lib/providers/agence-bio.js')
 const { addRecordFeature, createFeaturesFromOther, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, getDepartement, recordSorts, pinOperator, unpinOperator, consultOperator, getDashboardSummary, exportDataOcId, searchForAutocomplete, getImportPAC, hideImport, markFeatureControlled, markFeatureUncontrolled } = require('./lib/providers/cartobio.js')
 const {
