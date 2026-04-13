@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    <img src="cid:logo" alt="Logo" style="max-width: 600px" />
+    <b>Bilan hebdomadaire des envois API </b>
+    <p>Du {{date_debut}} au {{date_fin}}</p>
+    <ul>
+      <li>Nombre d’objets envoyés : {{nb_envoye}}</li>
+      <li>Nombre d’objets traités : {{nb_traite}}</li>
+      <li><b>Nombre d’objets rejetés : {{nb_error}}</b></li>
+    </ul>
+    <p>
+      Pour consulter les retours des jobs en erreur,
+      <a target="_blank" href="{{url}}"> la route</a>
+       est à votre disposition. Vous pouvez également modifier les paramètres
+      d’état des jobs que vous souhaitez consulter, ainsi que la période
+      d’envoi.
+    </p>
+    <br />
+    <p>Bien cordialement,</p>
+  </body>
+</html>
