@@ -1,7 +1,7 @@
 ---
 title: API d'envoi des parcellaires
 date: 2023-04-12
-updated_at: 2026-03-17
+updated_at: 2026-04-10
 contributors:
 - Laetita L (Ecocert)
 - Maud R (CartoBio)
@@ -65,7 +65,7 @@ le chemin `/api/oc/check-token`.
 
 | Code HTTP | Message HTTP            | Signification                                                                                                             |
 | --------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `202`     | `Accepted`              | Les données d'entrée sont validéss et le processus d'import va se lancer.                                                 |
+| `202`     | `Accepted`              | Les données d'entrée sont validées et le processus d'import va se lancer.                                                 |
 | `207`     | `Multi-Status`          | Les données d'entrée sont partiellement validées et le processus d'import va se lancer sur les données valides.           |
 | `400`     | `Bad Request`           | Le fichier JSON est invalide ou certaines données sont incorrectes et donc le traitement ne se lancera pas.               |
 | `401`     | `Unauthorized`          | Le jeton d'`Authorization` est manquant.                                                                                  |
@@ -81,14 +81,14 @@ En cas de statut `202`, un objet représente le nombre d'objets traités.
 | ----------------------- | ------- | -------------------------------------------- |
 | `jobId`                 | integer | id du job d'import                           |
 | `nbObjetRecus`          | integer | nombre d'objets reçus                        |
-| `nbObjetAcceptes`       | integer | nombre d'objets acceptes                     |
-| `nbObjetRefuses`        | integer | nombre d'objets refuses                      |
-| `listeNumeroBioValides` | array   | liste des numéros bios qui vont etre traités |
+| `nbObjetAcceptes`       | integer | nombre d'objets acceptés                     |
+| `nbObjetRefuses`        | integer | nombre d'objets refusés                      |
+| `listeNumeroBioValides` | array   | liste des numéros bios qui vont être traités |
 
 ```json
 {
   "jobId": 26,
-  "nbObjetRecu": 1,
+  "nbObjetRecus": 1,
   "nbObjetAcceptes": 1,
   "nbObjetRefuses": 0,
   "listeNumeroBioValides": [
@@ -97,31 +97,31 @@ En cas de statut `202`, un objet représente le nombre d'objets traités.
 }
 ```
 
-En cas de statut `207`, un objet représente les objets acceptés et refusés. Seulement les donnéees valides seront traités.
+En cas de statut `207`, un objet représente les objets acceptés et refusés. Seulement les donnéees valides seront traitées.
 
-| Chemin                    | Type    | Description                                         |
-| ------------------------- | ------- | --------------------------------------------------- |
-| `jobId`                   | integer | id du job d'import                                  |
-| `nbObjetRecu`             | integer | nombre d'objets reçus                               |
-| `nbObjetAcceptes`         | integer | nombre d'objets acceptes                            |
-| `nbObjetRefuses`          | integer | nombre d'objets refuses                             |
-| `listeNumeroBioValides`   | array   | liste des numéros bios qui vont etre traités        |
-| `listeNumeroBioInvalides` | array   | liste des numéros bios qui ne vont pas etre traités |
+| Chemin                  | Type    | Description                                         |
+| ----------------------- | ------- | --------------------------------------------------- |
+| `jobId`                 | integer | id du job d'import                                  |
+| `nbObjetRecus`          | integer | nombre d'objets reçus                               |
+| `nbObjetAcceptes`       | integer | nombre d'objets acceptes                            |
+| `nbObjetRefuses`        | integer | nombre d'objets refuses                             |
+| `listeNumeroBioValides` | array   | liste des numéros bios qui vont etre traités        |
+| `listeProblemes`        | array   | liste des numéros bios qui ne vont pas etre traités |
 
 ```json
 {
   "jobId": 26,
-  "nbObjetRecu": 3,
+  "nbObjetRecus": 3,
   "nbObjetAcceptes": 2,
   "nbObjetRefuses": 1,
   "listeNumeroBioValides": [
     "181932",
     "181933"
   ],
-  "listeNumeroBioInvalides": [
+  "listeProblemes": [
     {
       "numeroBio": "181934",
-      "message": "Numéro client différent -> numéro attendu : 209597"
+      "message": "Le couple numéro bio - numéro client ne correspond pas aux données du portail de notification"
     }
   ]
 }
@@ -129,23 +129,23 @@ En cas de statut `207`, un objet représente les objets acceptés et refusés. S
 
 En cas de statut `400`, un objet représente les objets acceptés et refusés. Aucune donnée n'est enregistrée.
 
-| Chemin                    | Type    | Description                                         |
-| ------------------------- | ------- | --------------------------------------------------- |
-| `nbObjetRecu`             | integer | nombre d'objets reçus                               |
-| `nbObjetAcceptes`         | integer | nombre d'objets acceptes                            |
-| `nbObjetRefuses`          | integer | nombre d'objets refuses                             |
-| `listeNumeroBioValides`   | array   | liste des numéros bios qui vont etre traités        |
-| `listeNumeroBioInvalides` | array   | liste des numéros bios qui ne vont pas etre traités |
+| Chemin                  | Type    | Description                                         |
+| ----------------------- | ------- | --------------------------------------------------- |
+| `nbObjetRecus`          | integer | nombre d'objets reçus                               |
+| `nbObjetAcceptes`       | integer | nombre d'objets acceptes                            |
+| `nbObjetRefuses`        | integer | nombre d'objets refuses                             |
+| `listeNumeroBioValides` | array   | liste des numéros bios qui vont etre traités        |
+| `listeProblemes`        | array   | liste des numéros bios qui ne vont pas etre traités |
 
 ```json
 {
-  "nbObjetRecu": 1,
+  "nbObjetRecus": 1,
   "nbObjetAcceptes": 0,
   "nbObjetRefuses": 1,
-  "listeNumeroBioInvalides": [
+  "listeProblemes": [
     {
       "numeroBio": "181934",
-      "message": "Numéro client différent -> numéro attendu : 209597"
+      "message": "Le couple numéro bio - numéro client ne correspond pas aux données du portail de notification"
     }
   ]
 }
@@ -158,6 +158,30 @@ Si le JSON est invalide, le message d'erreur est simplement le suivant :
   "error": "Le JSON est invalide"
 }
 ```
+
+#### Différents cas d'erreur
+
+##### Première vérification
+
+| Cas de refus                               | Chemin         | Message d’erreur                                                                                                                          |
+| ------------------------------------------ | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Numéro bio manquant                        | listeProblemes | "message" : "[Index] Numéro bio manquant"                                                                                                 |
+| Numéro bio inconnu                         | listeProblemes | "message" : "[Index] Numéro bio inconnu du portail de notification"                                                                       |
+| Numéro client manquant                     | listeProblemes | "numeroBio" : "Numéro bio"<br>"message" : "Numéro client manquant"                                                                        |
+| Numéro client ne correspond pas au portail | listeProblemes | "numeroBio" : "Numéro bio"<br>"message" : "Le couple numéro bio - numéro client ne correspond pas aux données du portail de notification" |
+| Json mal formaté                           | error          | "error" : "Le JSON est invalide"                                                                                                          |
+
+##### Deuxième vérification
+
+| Cas                                           | Type    | Message                                                                           |
+| --------------------------------------------- | ------- | --------------------------------------------------------------------------------- |
+| Géométrie corrigée                            | Warning | "geometriesCorrigees" : "liste des id des parcelles corrigées"                    |
+| Géométrie invalide acceptée mais non corrigée | Warning | "geometriesInvalidesAcceptees" : "liste des id des parcelles invalides acceptées" |
+| Géométrie invalide non corrigeable            | erreur  | "geometriesRejetees" : "id des parcelles rejetées"                                |
+| Géométrie absente                             | erreur  | "Parcelle [id] n’a pas de géométrie"                                              |
+| Géométrie mal formatée                        | erreur  | "champ géom incorrect" + message d’erreur plus précis                             |
+| codeCPF inconnu                               | erreur  | "culture inconnue" : "liste des codes inconnus"                                   |
+| codeCPF absent                                | erreur  | "culture absente"                                                                 |
 
 ### Suivi des jobs d'import (polling)
 
@@ -195,8 +219,22 @@ Retourne l'état courant d'un job d'import.
 ```json
 {
   "status": "DONE",
-  "result": { ... },
-  "ended": "2026-03-17T10:01:30.000Z"
+  "nbObjetsRecus": 1,
+  "nbObjetsAcceptes": 1,
+  "nbObjetsRefuses": 0,
+  "result": {
+    "count": 1,
+    "errors": [],
+    "warning": [],
+    "numeroBioError": [],
+    "numeroBioValid": [
+      {
+        "numeroBio": "181932",
+        "nbParcelles": 2
+      }
+    ]
+  },
+  "ended": "2026-04-13T05:00:53.272Z"
 }
 ```
 
@@ -205,10 +243,12 @@ Retourne l'état courant d'un job d'import.
 ```json
 {
   "status": "ERROR",
-  "error": { ... },
+  "error": { "name": "Error", "message": "Le fichier JSON est invalide." },
   "ended": "2026-03-17T10:01:05.000Z"
 }
 ```
+
+
 
 ---
 
@@ -226,16 +266,41 @@ Liste paginée des imports de l'OC authentifié.
 | `from`    | string | Date de début (ISO 8601).                                           |
 | `to`      | string | Date de fin (ISO 8601).                                             |
 | `payload` | bool   | Inclure le payload brut (`true`/`false`, défaut `false`).           |
-| `page`    | number | Numéro de page (défaut `1`).                                        |
+| `page`    | number | Numéro de page (défaut `1`)é.                                       |
 | `limit`   | number | Taille de page (défaut `20`).                                       |
 
 ##### Réponse
 
 ```json
 {
-  "data": [ ... ],
+ "data": [
+    {
+      "jobId": 4,
+      "status": "DONE",
+      "createdAt": "2026-04-13T04:57:53.587Z",
+      "endedAt": "2026-04-13T04:57:53.824Z",
+      "nbObjetsRecus": 1,
+      "nbObjetsAcceptes": 0,
+      "nbObjetsRefuses": 1,
+      "result": {
+        "count": 1,
+        "errors": [
+          [
+            "181932",
+            "cultures inconnues: 01.13.49.967565"
+          ]
+        ],
+        "warning": [],
+        "numeroBioError": [
+          "181932"
+        ],
+        "numeroBioValid": []
+      },
+      "payload": null
+    },
+  ],
   "meta": {
-    "total": 42,
+    "total": 1,
     "page": 1,
     "limit": 20
   }
@@ -255,6 +320,34 @@ Détail d'un import.
 | `payload` | bool | Inclure le payload brut (`true`/`false`, défaut `false`). |
 
 Retourne `404` si l'import n'existe pas.
+
+##### Réponse
+
+```json
+{
+  "status": "DONE",
+  "createdAt": "2026-04-13T04:57:53.587Z",
+  "endedAt": "2026-04-13T04:57:53.824Z",
+  "nbObjetsRecus": 1,
+  "nbObjetsAcceptes": 0,
+  "nbObjetsRefuses": 1,
+  "result": {
+    "count": 1,
+    "errors": [
+      [
+        "181932",
+        "cultures inconnues: 01.13.49.967565"
+      ]
+    ],
+    "warning": [],
+    "numeroBioError": [
+      "181932"
+    ],
+    "numeroBioValid": []
+  },
+  "payload": null
+}
+```
 
 ### Structure de fichier
 
@@ -286,7 +379,7 @@ Retourne `404` si l'import n'existe pas.
 | `commentaire`    | string | non         | notes d'audit spécifiques à la parcelle                                                                                                                                                                                            |
 | `cultures`       | array  | **oui**     | liste d'éléments de type [Culture](#culture)                                                                                                                                                                                       |
 | `commune`        | number | non         | Code commune de la parcelles                                                                                                                                                                                                       |
-| `name`           | string | non         | Nom de la parcelle                                                                                                                                                                                                                 |
+| `nom`            | string | non         | Nom de la parcelle                                                                                                                                                                                                                 |
 
 #### Culture
 
@@ -330,7 +423,8 @@ Exemple de fichier JSON relatif à un audit de 2 parcelles. Elles comportent res
            "quantite": 0.25,
            "unite": "ha"
          }
-       ]
+       ],
+       "nom": "test",
     },
     {
        "id": "45743",
