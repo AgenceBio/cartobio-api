@@ -266,7 +266,7 @@ Liste paginée des imports de l'OC authentifié.
 | `from`    | string | Date de début (ISO 8601).                                           |
 | `to`      | string | Date de fin (ISO 8601).                                             |
 | `payload` | bool   | Inclure le payload brut (`true`/`false`, défaut `false`).           |
-| `page`    | number | Numéro de page (défaut `1`)é.                                       |
+| `page`    | number | Numéro de page (défaut `1`).                                       |
 | `limit`   | number | Taille de page (défaut `20`).                                       |
 
 ##### Réponse
