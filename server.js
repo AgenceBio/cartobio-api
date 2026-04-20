@@ -729,6 +729,45 @@ app.register(async (app) => {
       { status, organismeCertificateur, from, to, withPayload, logs, page, limit }
     )
 
+    const links = {}
+    const host = request.hostname
+    const baseUrl = `https://${host}${request.url.split('?')[0]}`
+
+    const finalPage = parseInt(page)
+    const finalLimit = parseInt(limit)
+
+    if (finalLimit > 0) {
+      if (finalPage > 1) {
+        const prevParams = new URLSearchParams(request.query)
+        prevParams.set('page', finalPage - 1)
+        prevParams.set('limit', finalLimit)
+        links.prev = `${baseUrl}?${prevParams.toString()}`
+      } else {
+        links.prev = null
+      }
+
+      if ((finalPage * finalLimit) < result.meta.total) {
+        const nextParams = new URLSearchParams(request.query)
+        nextParams.set('page', finalPage + 1)
+        nextParams.set('limit', finalLimit)
+        links.next = `${baseUrl}?${nextParams.toString()}`
+      } else {
+        links.next = null
+      }
+    } else {
+      if (finalPage > 1) {
+        const prevParams = new URLSearchParams(request.query)
+        prevParams.delete('page')
+        links.prev = `${baseUrl}?${prevParams.toString()}`
+      } else {
+        links.prev = null
+      }
+
+      links.next = null
+    }
+
+    result._links = links
+
     return reply.send(result)
   })
 
