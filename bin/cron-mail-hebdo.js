@@ -17,7 +17,7 @@ async function sendMail () {
   }
 
   try {
-    for (const oc in ocList) {
+    for (const oc of ocList) {
       await sendRapportHebdo(oc.id, oc.email)
       console.log(`Rapport envoyé à ${oc.email}`)
     }
