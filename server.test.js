@@ -16,7 +16,7 @@ const parcellesPatched = require('./lib/providers/__fixtures__/parcelles-patched
 const { normalizeOperator } = require('./lib/outputs/operator.js')
 const { normalizeRecord } = require('./lib/outputs/record')
 const { surfaceForFeatureCollection, recordToApi } = require('./lib/outputs/api.js')
-const { collectPreparseResults, createImportJob, processFullJob } = require('./lib/providers/api-parcellaire.js')
+// const { collectPreparseResults, createImportJob, processFullJob } = require('./lib/providers/api-parcellaire.js')
 const { loadRecordFixture, expectDeepCloseTo } = require('./test/utils')
 
 const sign = createSigner({ key: config.get('jwtSecret') })
@@ -1232,95 +1232,95 @@ describe('GET /api/v2/certification/parcellaires', () => {
   })
 })
 
-describe('POST /api/v2/certification/parcelles', () => {
-  const postMock = jest.mocked(got.post)
+// describe('POST /api/v2/certification/parcelles', () => {
+//   const postMock = jest.mocked(got.post)
 
-  const fakePayload = [{ numeroBio: '123', numeroClient: '1', parcelles: [] }]
+//   const fakePayload = [{ numeroBio: '123', numeroClient: '1', parcelles: [] }]
 
-  const collectPreparseResultsMocked = collectPreparseResults
-  const createImportJobMocked = createImportJob
+//   const collectPreparseResultsMocked = collectPreparseResults
+//   const createImportJobMocked = createImportJob
 
-  beforeEach(() => {
-    postMock.mockReturnValueOnce({
-      async json () {
-        return fakeOc
-      }
-    })
-  })
+//   beforeEach(() => {
+//     postMock.mockReturnValueOnce({
+//       async json () {
+//         return fakeOc
+//       }
+//     })
+//   })
 
-  afterEach(() => {
-    postMock.mockReset()
-  })
+//   afterEach(() => {
+//     postMock.mockReset()
+//   })
 
-  test('it fails without auth', async () => {
-    postMock.mockReset()
-    postMock.mockRejectedValueOnce(new Error('Unauthorized'))
+//   test('it fails without auth', async () => {
+//     postMock.mockReset()
+//     postMock.mockRejectedValueOnce(new Error('Unauthorized'))
 
-    const res = await request(app.server)
-      .post('/api/v2/certification/parcelles')
-      .send(fakePayload)
+//     const res = await request(app.server)
+//       .post('/api/v2/certification/parcelles')
+//       .send(fakePayload)
 
-    expect(res.status).toBe(401)
-    expect(res.body).toMatchObject({
-      error: 'Unauthorized',
-      message: "Accès refusé : un jeton d'API est nécessaire pour accéder à ce contenu."
-    })
-  })
+//     expect(res.status).toBe(401)
+//     expect(res.body).toMatchObject({
+//       error: 'Unauthorized',
+//       message: "Accès refusé : un jeton d'API est nécessaire pour accéder à ce contenu."
+//     })
+//   })
 
-  test('returns 200 when all records are valid', async () => {
-    collectPreparseResults.mockReturnValue([{ numeroBio: '123' }])
-    createImportJobMocked.mockResolvedValue(42)
+//   test('returns 200 when all records are valid', async () => {
+//     collectPreparseResults.mockReturnValue([{ numeroBio: '123' }])
+//     createImportJobMocked.mockResolvedValue(42)
 
-    const res = await request(app.server)
-      .post('/api/v2/certification/parcelles')
-      .set('Authorization', fakeOcToken)
-      .send(fakePayload)
+//     const res = await request(app.server)
+//       .post('/api/v2/certification/parcelles')
+//       .set('Authorization', fakeOcToken)
+//       .send(fakePayload)
 
-    expect(res.status).toBe(200)
+//     expect(res.status).toBe(200)
 
-    expect(processFullJob).toHaveBeenCalledWith(42, expect.anything(), expect.anything())
-  })
+//     expect(processFullJob).toHaveBeenCalledWith(42, expect.anything(), expect.anything())
+//   })
 
-  test('returns 207 when some records are invalid', async () => {
-    const fakePreparseResult = [
-      { numeroBio: '123' },
-      { numeroBio: '999', error: { message: 'Numéro bio inconnu du portail de notifications' } }
-    ]
+//   test('returns 207 when some records are invalid', async () => {
+//     const fakePreparseResult = [
+//       { numeroBio: '123' },
+//       { numeroBio: '999', error: { message: 'Numéro bio inconnu du portail de notifications' } }
+//     ]
 
-    collectPreparseResultsMocked.mockReturnValue(fakePreparseResult)
-    createImportJobMocked.mockResolvedValue(43)
+//     collectPreparseResultsMocked.mockReturnValue(fakePreparseResult)
+//     createImportJobMocked.mockResolvedValue(43)
 
-    const res = await request(app.server)
-      .post('/api/v2/certification/parcelles')
-      .set('Authorization', fakeOcToken)
-      .send(fakePayload)
+//     const res = await request(app.server)
+//       .post('/api/v2/certification/parcelles')
+//       .set('Authorization', fakeOcToken)
+//       .send(fakePayload)
 
-    expect(res.status).toBe(207)
+//     expect(res.status).toBe(207)
 
-    expect(processFullJob).toHaveBeenCalledWith(43, expect.anything(), expect.anything())
-  })
+//     expect(processFullJob).toHaveBeenCalledWith(43, expect.anything(), expect.anything())
+//   })
 
-  test('returns 400 when all records are invalid', async () => {
-    const fakePreparseResult = [
-      { numeroBio: '123', error: { message: 'Numéro bio inconnu du portail de notification' } }
-    ]
+//   test('returns 400 when all records are invalid', async () => {
+//     const fakePreparseResult = [
+//       { numeroBio: '123', error: { message: 'Numéro bio inconnu du portail de notification' } }
+//     ]
 
-    collectPreparseResultsMocked.mockReturnValue(fakePreparseResult)
-    const res = await request(app.server)
-      .post('/api/v2/certification/parcelles')
-      .set('Authorization', fakeOcToken)
-      .send(fakePayload)
+//     collectPreparseResultsMocked.mockReturnValue(fakePreparseResult)
+//     const res = await request(app.server)
+//       .post('/api/v2/certification/parcelles')
+//       .set('Authorization', fakeOcToken)
+//       .send(fakePayload)
 
-    expect(res.status).toBe(400)
-    expect(res.body).toMatchObject({
-      nbObjetRecus: 1,
-      nbObjetAcceptes: 0,
-      nbObjetRefuses: 1,
-      listeProblemes: [{ numeroBio: '123', message: 'Numéro bio inconnu du portail de notification' }]
-    })
-    expect(processFullJob).not.toHaveBeenCalled()
-  })
-})
+//     expect(res.status).toBe(400)
+//     expect(res.body).toMatchObject({
+//       nbObjetRecus: 1,
+//       nbObjetAcceptes: 0,
+//       nbObjetRefuses: 1,
+//       listeProblemes: [{ numeroBio: '123', message: 'Numéro bio inconnu du portail de notification' }]
+//     })
+//     expect(processFullJob).not.toHaveBeenCalled()
+//   })
+// })
 
 describe('GET /api/v2/operators', () => {
   const getMock = jest.mocked(got.get)

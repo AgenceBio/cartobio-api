@@ -53,25 +53,25 @@ const fastifyCors = require('@fastify/cors')
 const fastifyMultipart = require('@fastify/multipart')
 const fastifyFormBody = require('@fastify/formbody')
 const fastifyOauth = require('@fastify/oauth2')
-const stripBom = require('strip-bom-stream')
 const LRUCache = require('mnemonist/lru-map-with-delete')
 const { randomUUID } = require('node:crypto')
 const { PassThrough } = require('stream')
-const JSONStream = require('jsonstream-next')
 const { createSigner } = require('fast-jwt')
 
 const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators, fetchCustomersByOc } = require('./lib/providers/agence-bio.js')
 const { addRecordFeature, createFeaturesFromOther, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, getDepartement, recordSorts, pinOperator, unpinOperator, consultOperator, getDashboardSummary, exportDataOcId, searchForAutocomplete, getImportPAC, hideImport, markFeatureControlled, markFeatureUncontrolled } = require('./lib/providers/cartobio.js')
 const {
-  collectPreparseResults,
+  collectFullValidationResults,
   createImportJob,
   processFullJob,
   getCurrentStatusJobs,
   getImportList,
   getImportById,
   getImportLogs,
-  getImportPayload
+  getImportPayload,
+  addErrorJob
 } = require('./lib/providers/api-parcellaire.js')
+// const JSONStream = require('jsonstream-next')
 const { generatePDF, getAttestationProduction } = require('./lib/providers/export-pdf.js')
 const { evvLookup, evvParcellaire, pacageLookup, iterateOperatorLastRecords } = require('./lib/providers/cartobio.js')
 const { parseAnyGeographicalArchive } = require('./lib/providers/gdal.js')
@@ -638,51 +638,40 @@ app.register(async (app) => {
 
   app.post('/api/v2/certification/parcelles', mergeSchemas(protectedWithToken({ oc: true }), {
     preParsing: async (request, reply, payload) => {
-      const stream1 = new PassThrough()
-      const stream2 = new PassThrough()
+      const stream = new PassThrough()
 
-      payload.pipe(stream1)
-      payload.pipe(stream2)
+      payload.pipe(stream)
 
-      const processedStream = stream1.pipe(stripBom())
-      request.APIResult = await collectPreparseResults(processedStream)
-
-      request.originalPayload = stream2
+      request.originalPayload = stream
       request.headers['content-length'] = '2'
       return new PassThrough().end('{}')
     }
   }), async (request, reply) => {
-    const validRecords = request.APIResult.filter(r => !r.error).map(r => r.numeroBio)
-    const invalidRecords = request.APIResult
-      .filter(r => r.error)
-      .map(r => ({
-        ...(r.numeroBio ? { numeroBio: r.numeroBio } : {}),
-        message: r.error.message
-      }))
-    const stream = request.originalPayload.pipe(stripBom())
-    const jsonStream = stream.pipe(JSONStream.parse([true]))
+    const stream = request.originalPayload
+    const jobId = await createImportJob(request.organismeCertificateur.id)
 
-    const result = []
-    for await (const record of jsonStream) {
-      result.push(record)
-    }
+    const { errors, validItems } = await collectFullValidationResults(stream, {
+      organismeCertificateur: request.organismeCertificateur
+    }, jobId)
 
-    let jobId = null
+    const validRecords = validItems.map(v => v.numeroBio)
+    const invalidRecords = errors.map(({ numeroBio, error, errorType }) => ({
+      ...(numeroBio ? { numeroBio } : {}),
+      code: errorType,
+      message: error.message
+    }))
 
     if (invalidRecords.length === 0) {
-      jobId = await createImportJob(result, request.organismeCertificateur.id)
-
       reply.code(200).send({
-        jobId: jobId,
+        jobId,
         nbObjetRecus: validRecords.length,
         nbObjetAcceptes: validRecords.length,
         nbObjetRefuses: 0,
         listeNumeroBioValides: validRecords
       })
     } else if (validRecords.length > 0) {
-      jobId = await createImportJob(result, request.organismeCertificateur.id)
       reply.code(207).send({
-        jobId: jobId,
+        jobId,
         nbObjetRecus: validRecords.length + invalidRecords.length,
         nbObjetAcceptes: validRecords.length,
         nbObjetRefuses: invalidRecords.length,
@@ -690,6 +679,9 @@ app.register(async (app) => {
         listeProblemes: invalidRecords
       })
     } else {
+      for (const error of errors) {
+        await addErrorJob(jobId, error)
+      }
       return reply.code(400).send({
         nbObjetRecus: invalidRecords.length,
         nbObjetAcceptes: 0,
@@ -698,7 +690,7 @@ app.register(async (app) => {
       })
     }
 
-    processFullJob(jobId, request.organismeCertificateur, result)
+    processFullJob(jobId, validItems, errors)
       .catch(err => console.error('processFullJob error:', err))
 
     return reply
