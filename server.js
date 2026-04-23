@@ -691,7 +691,7 @@ app.register(async (app) => {
       for (const error of errors) {
         await addErrorJob(jobId, error)
       }
-      await updateJobError(validRecords, invalidRecords, invalidRecords.length, errors, [], jobId)
+      await updateJobError(validRecords, invalidRecords, invalidRecords.length, [], jobId)
       return reply.code(400).send({
         jobId,
         nbObjetRecus: invalidRecords.length,
