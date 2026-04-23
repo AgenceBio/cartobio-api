@@ -1,7 +1,7 @@
 ---
 title: API d'envoi des parcellaires
 date: 2023-04-12
-updated_at: 2026-04-10
+updated_at: 2026-04-23
 contributors:
 - Laetita L (Ecocert)
 - Maud R (CartoBio)
@@ -44,9 +44,9 @@ curl --data-binary '@/chemin/vers/parcellaire.json' \
 Afin de répondre à la problématique des traitements longs et coûteux en ressources, nous avons mis en place une architecture adaptée autour de deux mécanismes complémentaires :  
 
 1. **Polling pattern pour le suivi des traitements asynchrones**
-   - Lorsqu’un utilisateur envoie une requête, celle-ci n’est plus traitée immédiatement en mode synchrone.  
+   - Lorsqu'un utilisateur envoie une requête, celle-ci n'est plus traitée immédiatement en mode synchrone.  
    - À la place, un **job asynchrone** est créé et un identifiant unique est renvoyé au client.  
-   - L'utilisateur peut ensuite interroger régulièrement l’endpoint `/api/v3/import/jobs/{id}` pour récupérer l’état du traitement (`pending`, `error`, `done`, `created`) et accéder aux résultats dès qu’ils sont disponibles.
+   - L'utilisateur peut ensuite interroger régulièrement l'endpoint `/api/v3/import/jobs/{id}` pour récupérer l'état du traitement (`pending`, `error`, `done`, `created`) et accéder aux résultats dès qu'ils sont disponibles.
    - Ce mécanisme évite les **timeouts**, améliore la **robustesse du système** et permet de mieux **gérer la charge serveur**.  
 
 ### Authentification
@@ -97,7 +97,7 @@ En cas de statut `202`, un objet représente le nombre d'objets traités.
 }
 ```
 
-En cas de statut `207`, un objet représente les objets acceptés et refusés. Seulement les donnéees valides seront traitées.
+En cas de statut `207`, un objet représente les objets acceptés et refusés. Seulement les données valides seront traitées.
 
 | Chemin                  | Type    | Description                                         |
 | ----------------------- | ------- | --------------------------------------------------- |
@@ -106,7 +106,15 @@ En cas de statut `207`, un objet représente les objets acceptés et refusés. S
 | `nbObjetAcceptes`       | integer | nombre d'objets acceptes                            |
 | `nbObjetRefuses`        | integer | nombre d'objets refuses                             |
 | `listeNumeroBioValides` | array   | liste des numéros bios qui vont etre traités        |
-| `listeProblemes`        | array   | liste des numéros bios qui ne vont pas etre traités |
+| `listeProblemes`        | array   | liste des entrées qui ne vont pas etre traitées     |
+
+Chaque entrée de `listeProblemes` :
+
+| Chemin      | Type   | Description                                                                         |
+| ----------- | ------ | ----------------------------------------------------------------------------------- |
+| `numeroBio` | string | numéro bio concerné (absent si le numéro bio lui-même est manquant)                 |
+| `code`      | string | code d'erreur (voir tableau des cas d'erreur)                                       |
+| `message`   | string | message d'erreur détaillé                                                           |
 
 ```json
 {
@@ -121,21 +129,23 @@ En cas de statut `207`, un objet représente les objets acceptés et refusés. S
   "listeProblemes": [
     {
       "numeroBio": "181934",
-      "message": "Le couple numéro bio - numéro client ne correspond pas aux données du portail de notification"
+      "code": "OC_MISMATCH",
+      "message": "Numéro client différent"
     }
   ]
 }
 ```
 
-En cas de statut `400`, un objet représente les objets acceptés et refusés. Aucune donnée n'est enregistrée.
+En cas de statut `400`, un objet représente les objets refusés. Aucune donnée n'est enregistrée.
 
 | Chemin                  | Type    | Description                                         |
 | ----------------------- | ------- | --------------------------------------------------- |
 | `nbObjetRecus`          | integer | nombre d'objets reçus                               |
 | `nbObjetAcceptes`       | integer | nombre d'objets acceptes                            |
 | `nbObjetRefuses`        | integer | nombre d'objets refuses                             |
-| `listeNumeroBioValides` | array   | liste des numéros bios qui vont etre traités        |
-| `listeProblemes`        | array   | liste des numéros bios qui ne vont pas etre traités |
+| `listeProblemes`        | array   | liste des entrées qui ne vont pas etre traitées     |
+
+Chaque entrée de `listeProblemes` : identique au tableau ci-dessus.
 
 ```json
 {
@@ -145,7 +155,8 @@ En cas de statut `400`, un objet représente les objets acceptés et refusés. A
   "listeProblemes": [
     {
       "numeroBio": "181934",
-      "message": "Le couple numéro bio - numéro client ne correspond pas aux données du portail de notification"
+      "code": "OC_MISMATCH",
+      "message": "Numéro client différent"
     }
   ]
 }
@@ -161,27 +172,38 @@ Si le JSON est invalide, le message d'erreur est simplement le suivant :
 
 #### Différents cas d'erreur
 
-##### Première vérification
+##### Validation de l'opérateur
 
-| Cas de refus                               | Chemin         | Message d’erreur                                                                                                                          |
-| ------------------------------------------ | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| Numéro bio manquant                        | listeProblemes | "message" : "[Index] Numéro bio manquant"                                                                                                 |
-| Numéro bio inconnu                         | listeProblemes | "message" : "[Index] Numéro bio inconnu du portail de notification"                                                                       |
-| Numéro client manquant                     | listeProblemes | "numeroBio" : "Numéro bio"<br>"message" : "Numéro client manquant"                                                                        |
-| Numéro client ne correspond pas au portail | listeProblemes | "numeroBio" : "Numéro bio"<br>"message" : "Le couple numéro bio - numéro client ne correspond pas aux données du portail de notification" |
-| Json mal formaté                           | error          | "error" : "Le JSON est invalide"                                                                                                          |
+| Cas de refus                           | Code                 | Message d'erreur                                                                 |
+| -------------------------------------- | -------------------- | -------------------------------------------------------------------------------- |
+| Numéro bio inconnu                     | `UNKNOWN_NUMERO_BIO` | `Numéro bio inconnu du portail de notification`                                  |
+| Numéro bio sans activité de production | `NOT_PRODUCTION`     | `Numéro bio sans notification liée à une activité de production`                 |
+| Aucun organisme certificateur          | `NO_OC`              | `Aucun organisme certificateur pour ce numéro bio.`                              |
+| Numéro client ne correspond pas        | `OC_MISMATCH`        | `Numéro client différent`                                                        |
+| Json mal formaté                       | —                    | `Le fichier JSON est invalide.`                                                  |
 
-##### Deuxième vérification
+##### Validation des dates du parcellaire
 
-| Cas                                           | Type    | Message                                                                           |
-| --------------------------------------------- | ------- | --------------------------------------------------------------------------------- |
-| Géométrie corrigée                            | Warning | "geometriesCorrigees" : "liste des id des parcelles corrigées"                    |
-| Géométrie invalide acceptée mais non corrigée | Warning | "geometriesInvalidesAcceptees" : "liste des id des parcelles invalides acceptées" |
-| Géométrie invalide non corrigeable            | erreur  | "geometriesRejetees" : "id des parcelles rejetées"                                |
-| Géométrie absente                             | erreur  | "Parcelle [id] n’a pas de géométrie"                                              |
-| Géométrie mal formatée                        | erreur  | "champ géom incorrect" + message d’erreur plus précis                             |
-| codeCPF inconnu                               | erreur  | "culture inconnue" : "liste des codes inconnus"                                   |
-| codeCPF absent                                | erreur  | "culture absente"                                                                 |
+| Cas de refus                      | Code                               | Message d'erreur                         |
+| --------------------------------- | ---------------------------------- | ---------------------------------------- |
+| `dateCertificationDebut` invalide | `INVALID_DATE_CERTIFICATION_DEBUT` | `champ dateCertificationDebut incorrect` |
+| `dateCertificationFin` invalide   | `INVALID_DATE_CERTIFICATION_FIN`   | `champ dateCertificationFin incorrect`   |
+| `dateAudit` invalide              | `INVALID_DATE_AUDIT`               | `champ dateAudit incorrect`              |
+
+##### Validation des parcelles
+
+| Cas                                           | Code                            | Type    | Message                                                                                    |
+| --------------------------------------------- | ------------------------------- | ------- | ------------------------------------------------------------------------------------------ |
+| `etatProduction` invalide                     | `INVALID_ETAT_PRODUCTION`       | erreur  | `champ etatProduction incorrect`                                                           |
+| `dateEngagement` absente pour une conversion  | `MISSING_DATE_ENGAGEMENT`       | erreur  | `Champ date dengagement obligatoire lorsque que la parcelle est en conversion`             |
+| `dateEngagement` invalide                     | `INVALID_DATE_ENGAGEMENT`       | erreur  | `champ dateEngagement incorrect`                                                           |
+| Cultures absentes                             | `MISSING_CULTURES`              | erreur  | `cultures absentes`                                                                        |
+| `codeCPF` inconnu                             | `INVALID_CPF`                   | erreur  | `cultures inconnues: <liste des codes>`                                                    |
+| Géométrie mal formatée                        | `INVALID_GEOM`                  | erreur  | `champ geom incorrect : <détail>`                                                          |
+| Géométrie absente                             | `MISSING_GEOM`                  | warning | `Parcelle <id> n'a pas de géométrie`                                                       |
+| Géométrie hors zone autorisée                 | `GEOM_OUT_OF_BOUNDS`            | warning | `Parcelle <id> en dehors des régions autorisées`                                           |
+| Géométrie corrigée                            | `GEOM_CORRECTED`                | warning | `Ces parcelles ont été corrigées : <liste des id>`                                         |
+| Géométrie invalide acceptée mais non corrigée | `GEOM_INVALID_NOT_CORRECTED`    | warning | `Ces parcelles n'ont pas été corrigées mais sont invalides : <liste des id>`               |
 
 ### Suivi des jobs d'import (polling)
 
@@ -205,7 +227,7 @@ Retourne l'état courant d'un job d'import.
 | `DONE`    | Traitement terminé avec succès.                |
 | `ERROR`   | Une erreur est survenue pendant le traitement. |
 
-##### Réponse `PENDING` ou `CREATE`
+##### Réponse `PENDING` ou `CREATED`
 
 ```json
 {
@@ -248,8 +270,6 @@ Retourne l'état courant d'un job d'import.
 }
 ```
 
-
-
 ---
 
 ### Consultation des imports
@@ -266,14 +286,14 @@ Liste paginée des imports de l'OC authentifié.
 | `from`    | string | Date de début (ISO 8601).                                           |
 | `to`      | string | Date de fin (ISO 8601).                                             |
 | `payload` | bool   | Inclure le payload brut (`true`/`false`, défaut `false`).           |
-| `page`    | number | Numéro de page (défaut `1`).                                       |
+| `page`    | number | Numéro de page (défaut `1`).                                        |
 | `limit`   | number | Taille de page (défaut `20`).                                       |
 
 ##### Réponse
 
 ```json
 {
- "data": [
+  "data": [
     {
       "jobId": 4,
       "status": "DONE",
@@ -297,12 +317,16 @@ Liste paginée des imports de l'OC authentifié.
         "numeroBioValid": []
       },
       "payload": null
-    },
+    }
   ],
   "meta": {
     "total": 1,
     "page": 1,
     "limit": 20
+  },
+  "_links": {
+    "prev": null,
+    "next": null
   }
 }
 ```
@@ -372,7 +396,7 @@ Retourne `404` si l'import n'existe pas.
 | ---------------- | ------ | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `id`             | string | **oui**     | identifiant unique de parcelle (souvent appelé `PK`, `Primary Key` ou `Clé primaire`)                                                                                                                                              |
 | `etatProduction` | enum   | **oui**     | `CONV`,`AB`, `C1`, `C2`, `C3` ou `NB`                                                                                                                                                                                              |
-| `dateEngagement` | string | non         | date d'engagement au format [ISO 8601] (`YYYY-MM-DD`), **obligatoire** pour les parcelles en conversion (voir si on peut avoir                                              la date d'import et la date de conversion différencier |
+| `dateEngagement` | string | non         | date d'engagement au format [ISO 8601] (`YYYY-MM-DD`), **obligatoire** pour les parcelles en conversion (voir si on peut avoir la date d'import et la date de conversion différencier                                              |
 | `numeroIlot`     | string | non         | numéro d'ilot PAC (si applicable)                                                                                                                                                                                                  |
 | `numeroParcelle` | string | non         | numéro de parcelle PAC (si applicable)                                                                                                                                                                                             |
 | `geom`           | string | non         | coordonnées géographiques. Obligatoire si la parcelle est nouvelle. Équivalent du champ `geometry.coordinates` d'une [_feature_ GeoJSON]                                                                                           |
@@ -424,7 +448,7 @@ Exemple de fichier JSON relatif à un audit de 2 parcelles. Elles comportent res
            "unite": "ha"
          }
        ],
-       "nom": "test",
+       "nom": "test"
     },
     {
        "id": "45743",
