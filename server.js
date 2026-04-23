@@ -69,7 +69,8 @@ const {
   getImportById,
   getImportLogs,
   getImportPayload,
-  addErrorJob
+  addErrorJob,
+  updateJobError
 } = require('./lib/providers/api-parcellaire.js')
 // const JSONStream = require('jsonstream-next')
 const { generatePDF, getAttestationProduction } = require('./lib/providers/export-pdf.js')
@@ -682,7 +683,9 @@ app.register(async (app) => {
       for (const error of errors) {
         await addErrorJob(jobId, error)
       }
+      await updateJobError(validRecords, invalidRecords, invalidRecords.length, errors, [], jobId)
       return reply.code(400).send({
+        jobId,
         nbObjetRecus: invalidRecords.length,
         nbObjetAcceptes: 0,
         nbObjetRefuses: invalidRecords.length,
