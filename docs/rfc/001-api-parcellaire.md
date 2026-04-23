@@ -323,6 +323,10 @@ Liste paginée des imports de l'OC authentifié.
     "total": 1,
     "page": 1,
     "limit": 20
+  },
+  "_links": {
+    "prev": null,
+    "next": null
   }
 }
 ```
