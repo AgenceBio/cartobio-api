@@ -316,35 +316,35 @@ app.register(async (app) => {
         fetchUserOperators(userId),
         getPinnedOperators(request.user.id)
       ]
-    ).then(([res, pinnedOperators]) => {
-      const filteredOperators = res.operators
-        .filter((e) => {
-          if (!search) return true
+      ).then(([res, pinnedOperators]) => {
+        const filteredOperators = res.operators
+          .filter((e) => {
+            if (!search) return true
 
-          const userInput = search.toLowerCase().trim()
+            const userInput = search.toLowerCase().trim()
 
-          return e.denominationCourante.toLowerCase().includes(userInput) ||
+            return e.denominationCourante.toLowerCase().includes(userInput) ||
           e.numeroBio.toString().includes(userInput) ||
           e.nom.toLowerCase().includes(userInput) ||
           e.siret.toLowerCase().includes(userInput)
+          })
+
+        const sortedOperators = filteredOperators
+          .toSorted(recordSorts('fn', 'notifications', 'desc'))
+
+        const paginatedOperators = sortedOperators
+          .slice(offset, offset + limit)
+          .map((o) => ({
+            ...o,
+            epingle: pinnedOperators.includes(+o.numeroBio)
+          }))
+
+        return reply.code(200).send({
+          nbTotal: filteredOperators.length,
+          operators: paginatedOperators
         })
-
-      const sortedOperators = filteredOperators
-        .toSorted(recordSorts('fn', 'notifications', 'desc'))
-
-      const paginatedOperators = sortedOperators
-        .slice(offset, offset + limit)
-        .map((o) => ({
-          ...o,
-          epingle: pinnedOperators.includes(+o.numeroBio)
-        }))
-
-      return reply.code(200).send({
-        nbTotal: filteredOperators.length,
-        operators: paginatedOperators
       })
     })
-  })
 
   /**
    * @private
@@ -1281,12 +1281,6 @@ app.register(async (app) => {
 
     return reply.code(200).send({ logoutUrl: logoutUrl.toString() })
   })
-  app.post('/api/v2/exportParcellaire', mergeSchemas(protectedWithToken({ oc: true, cartobio: true })), async (request, reply) => {
-    const data = await exportDataOcId(request.user.organismeCertificateur.id, request.body.payload, request.user.id)
-    if (data === null) {
-      throw new Error("Une erreur s'est produite, impossible d'exporter les parcellaires")
-    }
-  )
 
   app.post(
     '/api/v2/exportParcellaire',
