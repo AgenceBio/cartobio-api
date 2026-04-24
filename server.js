@@ -56,25 +56,26 @@ const fastifyCors = require('@fastify/cors')
 const fastifyMultipart = require('@fastify/multipart')
 const fastifyFormBody = require('@fastify/formbody')
 const fastifyOauth = require('@fastify/oauth2')
-const stripBom = require('strip-bom-stream')
 const LRUCache = require('mnemonist/lru-map-with-delete')
 const { randomUUID } = require('node:crypto')
 const { PassThrough } = require('stream')
-const JSONStream = require('jsonstream-next')
-const { createSigner } = require('fast-jwt')
-
+// const JSONStream = require('jsonstream-next')
+const { createSigner, createDecoder } = require('fast-jwt')
 const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators, fetchCustomersByOc } = require('./lib/providers/agence-bio.js')
-const { addRecordFeature, createFeaturesFromOther, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, getDepartement, recordSorts, pinOperator, unpinOperator, consultOperator, getDashboardSummary, exportDataOcId, searchForAutocomplete, getImportPAC, hideImport, markFeatureControlled, markFeatureUncontrolled } = require('./lib/providers/cartobio.js')
+const { addRecordFeature, createFeaturesFromOther, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, getDepartement, recordSorts, pinOperator, unpinOperator, consultOperator, getDashboardSummary, exportDataOcId, searchForAutocomplete, getImportPAC, hideImport, markFeatureControlled, markFeatureUncontrolled, searchControlBodyRecordsAdmin } = require('./lib/providers/cartobio.js')
 const {
-  collectPreparseResults,
+  collectFullValidationResults,
   createImportJob,
   processFullJob,
   getCurrentStatusJobs,
   getImportList,
   getImportById,
   getImportLogs,
-  getImportPayload
+  getImportPayload,
+  addErrorJob,
+  updateJobError
 } = require('./lib/providers/api-parcellaire.js')
+// const JSONStream = require('jsonstream-next')
 const { generatePDF, getAttestationProduction } = require('./lib/providers/export-pdf.js')
 const { evvLookup, evvParcellaire, pacageLookup, iterateOperatorLastRecords } = require('./lib/providers/cartobio.js')
 const { parseAnyGeographicalArchive } = require('./lib/providers/gdal.js')
@@ -285,20 +286,20 @@ app.register(async (app) => {
   /**
    * @private
    */
-  app.get(
-    '/api/v2/certification/autocomplete',
-    mergeSchemas(autocompleteSchema, protectedWithToken()),
-    async (request, reply) => {
-      const { search } = request.query
-      const { id: userId, organismeCertificateur } = request.user
+  app.post('/api/v2/certification/adminsearch', mergeSchemas(certificationBodySearchSchema, protectedWithToken()), async (request, reply) => {
+    const { input, page, limit, filter } = request.body
+    return reply.code(200).send(searchControlBodyRecordsAdmin({ input, page, limit, filter }))
+  })
 
-      return reply
-        .code(200)
-        .send(
-          searchForAutocomplete(organismeCertificateur?.id, userId, search)
-        )
-    }
-  )
+  /**
+   * @private
+   */
+  app.get('/api/v2/certification/autocomplete', mergeSchemas(autocompleteSchema, protectedWithToken()), async (request, reply) => {
+    const { search } = request.query
+    const { id: userId, organismeCertificateur } = request.user
+
+    return reply.code(200).send(searchForAutocomplete(organismeCertificateur?.id, userId, search))
+  })
 
   /**
    * @private
@@ -314,36 +315,36 @@ app.register(async (app) => {
       return Promise.all([
         fetchUserOperators(userId),
         getPinnedOperators(request.user.id)
-      ]).then(([res, pinnedOperators]) => {
-        const paginatedOperators = res.operators
-          .filter((e) => {
-            if (!search) {
-              return true
-            }
+      ]
+    ).then(([res, pinnedOperators]) => {
+      const filteredOperators = res.operators
+        .filter((e) => {
+          if (!search) return true
 
-            const userInput = search.toLowerCase().trim()
+          const userInput = search.toLowerCase().trim()
 
-            return (
-              e.denominationCourante.toLowerCase().includes(userInput) ||
-              e.numeroBio.toString().includes(userInput) ||
-              e.nom.toLowerCase().includes(userInput) ||
-              e.siret.toLowerCase().includes(userInput)
-            )
-          })
-          .toSorted(recordSorts('fn', 'notifications', 'desc'))
-          .slice(offset, offset + limit)
-          .map((o) => ({
-            ...o,
-            epingle: pinnedOperators.includes(+o.numeroBio)
-          }))
-
-        return reply.code(200).send({
-          nbTotal: res.operators.length,
-          operators: paginatedOperators
+          return e.denominationCourante.toLowerCase().includes(userInput) ||
+          e.numeroBio.toString().includes(userInput) ||
+          e.nom.toLowerCase().includes(userInput) ||
+          e.siret.toLowerCase().includes(userInput)
         })
+
+      const sortedOperators = filteredOperators
+        .toSorted(recordSorts('fn', 'notifications', 'desc'))
+
+      const paginatedOperators = sortedOperators
+        .slice(offset, offset + limit)
+        .map((o) => ({
+          ...o,
+          epingle: pinnedOperators.includes(+o.numeroBio)
+        }))
+
+      return reply.code(200).send({
+        nbTotal: filteredOperators.length,
+        operators: paginatedOperators
       })
-    }
-  )
+    })
+  })
 
   /**
    * @private
@@ -934,51 +935,40 @@ app.register(async (app) => {
 
   app.post('/api/v2/certification/parcelles', mergeSchemas(protectedWithToken({ oc: true }), {
     preParsing: async (request, reply, payload) => {
-      const stream1 = new PassThrough()
-      const stream2 = new PassThrough()
+      const stream = new PassThrough()
 
-      payload.pipe(stream1)
-      payload.pipe(stream2)
+      payload.pipe(stream)
 
-      const processedStream = stream1.pipe(stripBom())
-      request.APIResult = await collectPreparseResults(processedStream)
-
-      request.originalPayload = stream2
+      request.originalPayload = stream
       request.headers['content-length'] = '2'
       return new PassThrough().end('{}')
     }
   }), async (request, reply) => {
-    const validRecords = request.APIResult.filter(r => !r.error).map(r => r.numeroBio)
-    const invalidRecords = request.APIResult
-      .filter(r => r.error)
-      .map(r => ({
-        ...(r.numeroBio ? { numeroBio: r.numeroBio } : {}),
-        message: r.error.message
-      }))
-    const stream = request.originalPayload.pipe(stripBom())
-    const jsonStream = stream.pipe(JSONStream.parse([true]))
+    const stream = request.originalPayload
+    const jobId = await createImportJob(request.organismeCertificateur.id)
 
-    const result = []
-    for await (const record of jsonStream) {
-      result.push(record)
-    }
+    const { errors, validItems } = await collectFullValidationResults(stream, {
+      organismeCertificateur: request.organismeCertificateur
+    }, jobId)
 
-    let jobId = null
+    const validRecords = validItems.map(v => v.numeroBio)
+    const invalidRecords = errors.map(({ numeroBio, error, errorType }) => ({
+      ...(numeroBio ? { numeroBio } : {}),
+      code: errorType,
+      message: error.message
+    }))
 
     if (invalidRecords.length === 0) {
-      jobId = await createImportJob(result, request.organismeCertificateur.id)
-
       reply.code(200).send({
-        jobId: jobId,
+        jobId,
         nbObjetRecus: validRecords.length,
         nbObjetAcceptes: validRecords.length,
         nbObjetRefuses: 0,
         listeNumeroBioValides: validRecords
       })
     } else if (validRecords.length > 0) {
-      jobId = await createImportJob(result, request.organismeCertificateur.id)
       reply.code(207).send({
-        jobId: jobId,
+        jobId,
         nbObjetRecus: validRecords.length + invalidRecords.length,
         nbObjetAcceptes: validRecords.length,
         nbObjetRefuses: invalidRecords.length,
@@ -986,7 +976,12 @@ app.register(async (app) => {
         listeProblemes: invalidRecords
       })
     } else {
+      for (const error of errors) {
+        await addErrorJob(jobId, error)
+      }
+      await updateJobError(validRecords, invalidRecords, invalidRecords.length, [], jobId)
       return reply.code(400).send({
+        jobId,
         nbObjetRecus: invalidRecords.length,
         nbObjetAcceptes: 0,
         nbObjetRefuses: invalidRecords.length,
@@ -994,7 +989,7 @@ app.register(async (app) => {
       })
     }
 
-    processFullJob(jobId, request.organismeCertificateur, result)
+    processFullJob(jobId, validItems, errors)
       .catch(err => console.error('processFullJob error:', err))
 
     return reply
@@ -1024,6 +1019,45 @@ app.register(async (app) => {
     const result = await getImportList(
       { status, organismeCertificateur, from, to, withPayload, logs, page, limit }
     )
+
+    const links = {}
+    const host = request.hostname
+    const baseUrl = `https://${host}${request.url.split('?')[0]}`
+
+    const finalPage = parseInt(page)
+    const finalLimit = parseInt(limit)
+
+    if (finalLimit > 0) {
+      if (finalPage > 1) {
+        const prevParams = new URLSearchParams(request.query)
+        prevParams.set('page', finalPage - 1)
+        prevParams.set('limit', finalLimit)
+        links.prev = `${baseUrl}?${prevParams.toString()}`
+      } else {
+        links.prev = null
+      }
+
+      if ((finalPage * finalLimit) < result.meta.total) {
+        const nextParams = new URLSearchParams(request.query)
+        nextParams.set('page', finalPage + 1)
+        nextParams.set('limit', finalLimit)
+        links.next = `${baseUrl}?${nextParams.toString()}`
+      } else {
+        links.next = null
+      }
+    } else {
+      if (finalPage > 1) {
+        const prevParams = new URLSearchParams(request.query)
+        prevParams.delete('page')
+        links.prev = `${baseUrl}?${prevParams.toString()}`
+      } else {
+        links.prev = null
+      }
+
+      links.next = null
+    }
+
+    result._links = links
 
     return reply.send(result)
   })
@@ -1222,27 +1256,35 @@ app.register(async (app) => {
   )
 
   // usefull only in dev mode
-  app.get('/auth-provider/agencebio/login', hiddenSchema, (request, reply) =>
-    reply.redirect('/api/auth-provider/agencebio/login')
-  )
-  app.get(
-    '/api/auth-provider/agencebio/callback',
-    mergeSchemas(sandboxSchema, hiddenSchema),
-    async (request, reply) => {
-      // forwards to the UI the user-selected tab
-      const { mode = '', returnto = '' } = stateCache.get(request.query.state)
-      const { token } =
-        await app.agenceBioOAuth2.getAccessTokenFromAuthorizationCodeFlow(
-          request
-        )
-      const userProfile = await getUserProfileFromSSOToken(token.access_token)
-      const cartobioToken = sign(userProfile)
+  app.get('/auth-provider/agencebio/login', hiddenSchema, (request, reply) => reply.redirect('/api/auth-provider/agencebio/login'))
+  app.get('/api/auth-provider/agencebio/callback', mergeSchemas(sandboxSchema, hiddenSchema), async (request, reply) => {
+    // forwards to the UI the user-selected tab
+    const { mode = '', returnto = '' } = stateCache.get(request.query.state)
+    const { token } = await app.agenceBioOAuth2.getAccessTokenFromAuthorizationCodeFlow(request)
+    const userProfile = await getUserProfileFromSSOToken(token.access_token)
 
-      return reply.redirect(
-        `${config.get(
-          'frontendUrl'
-        )}/login?mode=${mode}&returnto=${returnto}#token=${cartobioToken}`
-      )
+    const cartobioToken = sign({ ...userProfile, id_token: token.id_token })
+
+    return reply.redirect(`${config.get('frontendUrl')}/login?mode=${mode}&returnto=${returnto}#token=${cartobioToken}`)
+  })
+
+  app.post('/api/auth-provider/logout', async (request, reply) => {
+    const decode = createDecoder()
+    const cartobioToken = request.headers.authorization?.split(' ')[1]
+    const { id_token: idToken } = decode(cartobioToken)
+    const ssoHost = config.get('notifications.sso.host')
+    const logoutUrl = new URL('/oauth2/sessions/logout', ssoHost)
+    if (idToken) {
+      logoutUrl.searchParams.set('id_token_hint', idToken)
+      logoutUrl.searchParams.set('post_logout_redirect_uri', config.get('frontendUrl'))
+    }
+
+    return reply.code(200).send({ logoutUrl: logoutUrl.toString() })
+  })
+  app.post('/api/v2/exportParcellaire', mergeSchemas(protectedWithToken({ oc: true, cartobio: true })), async (request, reply) => {
+    const data = await exportDataOcId(request.user.organismeCertificateur.id, request.body.payload, request.user.id)
+    if (data === null) {
+      throw new Error("Une erreur s'est produite, impossible d'exporter les parcellaires")
     }
   )
 
@@ -1351,5 +1393,32 @@ if (require.main === module) {
     () => console.error('Failed to connect to database')
   )
 }
+
+app.get('/api/v3/external/exploitations/:numeroBio', (req, res) => {
+  const { numeroBio } = req.params
+
+  if (!numeroBio || isNaN(Number(numeroBio)) || Number(numeroBio) <= 0) {
+    return res.status(400).send('numeroBio invalide')
+  }
+
+  const state = randomUUID()
+  stateCache.set(state, {
+    returnto: `/exploitations/${numeroBio}`
+  })
+
+  const ssoHost = config.get('notifications.sso.host')
+  const clientId = config.get('notifications.sso.clientId')
+  const callbackUri = config.get('notifications.sso.callbackUri')
+
+  const authUrl = new URL(`${ssoHost}/oauth2/auth`)
+  authUrl.searchParams.set('response_type', 'code')
+  authUrl.searchParams.set('client_id', clientId)
+  authUrl.searchParams.set('redirect_uri', callbackUri)
+  authUrl.searchParams.set('scope', 'openid')
+  authUrl.searchParams.set('state', state)
+  authUrl.searchParams.set('login_hint', 'skip_consent')
+
+  return res.redirect(authUrl.toString())
+})
 
 module.exports = app

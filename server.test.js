@@ -14,9 +14,10 @@ const parcelles = require('./lib/providers/__fixtures__/parcelles.json')
 const records = require('./lib/providers/__fixtures__/records.json')
 const parcellesPatched = require('./lib/providers/__fixtures__/parcelles-patched.json')
 const { normalizeOperator } = require('./lib/outputs/operator.js')
+
 const { normalizeRecord } = require('./lib/outputs/record')
 const { surfaceForFeatureCollection, recordToApi } = require('./lib/outputs/api.js')
-const { collectPreparseResults, createImportJob, processFullJob } = require('./lib/providers/api-parcellaire.js')
+const { collectFullValidationResults, createImportJob, processFullJob } = require('./lib/providers/api-parcellaire.js')
 const { loadRecordFixture, expectDeepCloseTo } = require('./test/utils')
 
 const sign = createSigner({ key: config.get('jwtSecret') })
@@ -1237,7 +1238,7 @@ describe('POST /api/v2/certification/parcelles', () => {
 
   const fakePayload = [{ numeroBio: '123', numeroClient: '1', parcelles: [] }]
 
-  const collectPreparseResultsMocked = collectPreparseResults
+  const collectFullValidationResultsMocked = collectFullValidationResults
   const createImportJobMocked = createImportJob
 
   beforeEach(() => {
@@ -1268,7 +1269,11 @@ describe('POST /api/v2/certification/parcelles', () => {
   })
 
   test('returns 200 when all records are valid', async () => {
-    collectPreparseResults.mockReturnValue([{ numeroBio: '123' }])
+    collectFullValidationResultsMocked.mockResolvedValue({
+      errors: [],
+      validItems: [{ numeroBio: '123', record: {} }]
+    })
+
     createImportJobMocked.mockResolvedValue(42)
 
     const res = await request(app.server)
@@ -1277,17 +1282,33 @@ describe('POST /api/v2/certification/parcelles', () => {
       .send(fakePayload)
 
     expect(res.status).toBe(200)
+    expect(res.body).toMatchObject({
+      jobId: 42,
+      nbObjetRecus: 1,
+      nbObjetAcceptes: 1,
+      nbObjetRefuses: 0,
+      listeNumeroBioValides: ['123']
+    })
 
-    expect(processFullJob).toHaveBeenCalledWith(42, expect.anything(), expect.anything())
+    expect(processFullJob).toHaveBeenCalledWith(
+      42,
+      expect.any(Array),
+      expect.any(Array)
+    )
   })
 
   test('returns 207 when some records are invalid', async () => {
-    const fakePreparseResult = [
-      { numeroBio: '123' },
-      { numeroBio: '999', error: { message: 'Numéro bio inconnu du portail de notifications' } }
-    ]
+    collectFullValidationResultsMocked.mockResolvedValue({
+      validItems: [{ numeroBio: '123', record: {} }],
+      errors: [
+        {
+          numeroBio: '999',
+          error: new Error('Numéro bio inconnu du portail de notification'),
+          errorType: 'UNKNOWN_NUMERO_BIO'
+        }
+      ]
+    })
 
-    collectPreparseResultsMocked.mockReturnValue(fakePreparseResult)
     createImportJobMocked.mockResolvedValue(43)
 
     const res = await request(app.server)
@@ -1296,16 +1317,41 @@ describe('POST /api/v2/certification/parcelles', () => {
       .send(fakePayload)
 
     expect(res.status).toBe(207)
+    expect(res.body).toMatchObject({
+      jobId: 43,
+      nbObjetAcceptes: 1,
+      nbObjetRefuses: 1,
+      listeNumeroBioValides: ['123'],
+      listeProblemes: [
+        {
+          numeroBio: '999',
+          code: 'UNKNOWN_NUMERO_BIO',
+          message: 'Numéro bio inconnu du portail de notification'
+        }
+      ]
+    })
 
-    expect(processFullJob).toHaveBeenCalledWith(43, expect.anything(), expect.anything())
+    expect(processFullJob).toHaveBeenCalledWith(
+      43,
+      expect.any(Array),
+      expect.any(Array)
+    )
   })
 
   test('returns 400 when all records are invalid', async () => {
-    const fakePreparseResult = [
-      { numeroBio: '123', error: { message: 'Numéro bio inconnu du portail de notification' } }
-    ]
+    collectFullValidationResultsMocked.mockResolvedValue({
+      validItems: [],
+      errors: [
+        {
+          numeroBio: '123',
+          error: new Error('Numéro bio inconnu du portail de notification'),
+          errorType: 'UNKNOWN_NUMERO_BIO'
+        }
+      ]
+    })
 
-    collectPreparseResultsMocked.mockReturnValue(fakePreparseResult)
+    createImportJobMocked.mockResolvedValue(44)
+
     const res = await request(app.server)
       .post('/api/v2/certification/parcelles')
       .set('Authorization', fakeOcToken)
@@ -1316,8 +1362,15 @@ describe('POST /api/v2/certification/parcelles', () => {
       nbObjetRecus: 1,
       nbObjetAcceptes: 0,
       nbObjetRefuses: 1,
-      listeProblemes: [{ numeroBio: '123', message: 'Numéro bio inconnu du portail de notification' }]
+      listeProblemes: [
+        {
+          numeroBio: '123',
+          code: 'UNKNOWN_NUMERO_BIO',
+          message: 'Numéro bio inconnu du portail de notification'
+        }
+      ]
     })
+
     expect(processFullJob).not.toHaveBeenCalled()
   })
 })
