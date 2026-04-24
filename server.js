@@ -56,7 +56,7 @@ const fastifyOauth = require('@fastify/oauth2')
 const LRUCache = require('mnemonist/lru-map-with-delete')
 const { randomUUID } = require('node:crypto')
 const { PassThrough } = require('stream')
-const { createSigner } = require('fast-jwt')
+const { createSigner, createDecoder } = require('fast-jwt')
 
 const { fetchOperatorByNumeroBio, getUserProfileById, getUserProfileFromSSOToken, verifyNotificationAuthorization, fetchUserOperators, fetchCustomersByOc } = require('./lib/providers/agence-bio.js')
 const { addRecordFeature, createFeaturesFromOther, patchFeatureCollection, updateAuditRecordState, updateFeature, createOrUpdateOperatorRecord, deleteSingleFeature, getRecords, deleteRecord, getOperatorLastRecord, searchControlBodyRecords, getDepartement, recordSorts, pinOperator, unpinOperator, consultOperator, getDashboardSummary, exportDataOcId, searchForAutocomplete, getImportPAC, hideImport, markFeatureControlled, markFeatureUncontrolled } = require('./lib/providers/cartobio.js')
@@ -926,11 +926,25 @@ app.register(async (app) => {
     const { mode = '', returnto = '' } = stateCache.get(request.query.state)
     const { token } = await app.agenceBioOAuth2.getAccessTokenFromAuthorizationCodeFlow(request)
     const userProfile = await getUserProfileFromSSOToken(token.access_token)
-    const cartobioToken = sign(userProfile)
+
+    const cartobioToken = sign({ ...userProfile, id_token: token.id_token })
 
     return reply.redirect(`${config.get('frontendUrl')}/login?mode=${mode}&returnto=${returnto}#token=${cartobioToken}`)
   })
 
+  app.post('/api/auth-provider/logout', async (request, reply) => {
+    const decode = createDecoder()
+    const cartobioToken = request.headers.authorization?.split(' ')[1]
+    const { id_token: idToken } = decode(cartobioToken)
+    const ssoHost = config.get('notifications.sso.host')
+    const logoutUrl = new URL('/oauth2/sessions/logout', ssoHost)
+    if (idToken) {
+      logoutUrl.searchParams.set('id_token_hint', idToken)
+      logoutUrl.searchParams.set('post_logout_redirect_uri', config.get('frontendUrl'))
+    }
+
+    return reply.code(200).send({ logoutUrl: logoutUrl.toString() })
+  })
   app.post('/api/v2/exportParcellaire', mergeSchemas(protectedWithToken({ oc: true, cartobio: true })), async (request, reply) => {
     const data = await exportDataOcId(request.user.organismeCertificateur.id, request.body.payload, request.user.id)
     if (data === null) {
@@ -986,5 +1000,32 @@ if (require.main === module) {
     console.log(`Running env:${config.get('env')} on ${address}`)
   }, () => console.error('Failed to connect to database'))
 }
+
+app.get('/api/v3/external/exploitations/:numeroBio', (req, res) => {
+  const { numeroBio } = req.params
+
+  if (!numeroBio || isNaN(Number(numeroBio)) || Number(numeroBio) <= 0) {
+    return res.status(400).send('numeroBio invalide')
+  }
+
+  const state = randomUUID()
+  stateCache.set(state, {
+    returnto: `/exploitations/${numeroBio}`
+  })
+
+  const ssoHost = config.get('notifications.sso.host')
+  const clientId = config.get('notifications.sso.clientId')
+  const callbackUri = config.get('notifications.sso.callbackUri')
+
+  const authUrl = new URL(`${ssoHost}/oauth2/auth`)
+  authUrl.searchParams.set('response_type', 'code')
+  authUrl.searchParams.set('client_id', clientId)
+  authUrl.searchParams.set('redirect_uri', callbackUri)
+  authUrl.searchParams.set('scope', 'openid')
+  authUrl.searchParams.set('state', state)
+  authUrl.searchParams.set('login_hint', 'skip_consent')
+
+  return res.redirect(authUrl.toString())
+})
 
 module.exports = app
