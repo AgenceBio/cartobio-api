@@ -52,6 +52,8 @@ const fastifySwaggerUi = require('@fastify/swagger-ui')
 const fastifyCors = require('@fastify/cors')
 const fastifyMultipart = require('@fastify/multipart')
 const fastifyFormBody = require('@fastify/formbody')
+const stripBom = require('strip-bom-stream')
+
 const fastifyOauth = require('@fastify/oauth2')
 const LRUCache = require('mnemonist/lru-map-with-delete')
 const { randomUUID } = require('node:crypto')
@@ -639,64 +641,69 @@ app.register(async (app) => {
 
   app.post('/api/v2/certification/parcelles', mergeSchemas(protectedWithToken({ oc: true }), {
     preParsing: async (request, reply, payload) => {
-      const stream = new PassThrough()
-
-      payload.pipe(stream)
+      const stream = payload.pipe(stripBom())
 
       request.originalPayload = stream
       request.headers['content-length'] = '2'
       return new PassThrough().end('{}')
     }
   }), async (request, reply) => {
-    const stream = request.originalPayload
-    const jobId = await createImportJob(request.organismeCertificateur.id)
+    try {
+      const stream = request.originalPayload
+      const jobId = await createImportJob(request.organismeCertificateur.id)
 
-    const { errors, validItems } = await collectFullValidationResults(stream, {
-      organismeCertificateur: request.organismeCertificateur
-    }, jobId)
+      const { errors, validItems } = await collectFullValidationResults(stream, {
+        organismeCertificateur: request.organismeCertificateur
+      }, jobId)
 
-    const validRecords = validItems.map(v => v.numeroBio)
-    const invalidRecords = errors.map(({ numeroBio, error, errorType }) => ({
-      ...(numeroBio ? { numeroBio } : {}),
-      code: errorType,
-      message: error.message
-    }))
+      const validRecords = validItems.map(v => v.numeroBio)
+      const invalidRecords = errors.map(({ numeroBio, error, errorType }) => ({
+        ...(numeroBio ? { numeroBio } : {}),
+        code: errorType,
+        message: error.message
+      }))
 
-    if (invalidRecords.length === 0) {
-      reply.code(200).send({
-        jobId,
-        nbObjetRecus: validRecords.length,
-        nbObjetAcceptes: validRecords.length,
-        nbObjetRefuses: 0,
-        listeNumeroBioValides: validRecords
-      })
-    } else if (validRecords.length > 0) {
-      reply.code(207).send({
-        jobId,
-        nbObjetRecus: validRecords.length + invalidRecords.length,
-        nbObjetAcceptes: validRecords.length,
-        nbObjetRefuses: invalidRecords.length,
-        listeNumeroBioValides: validRecords,
-        listeProblemes: invalidRecords
-      })
-    } else {
-      for (const error of errors) {
-        await addErrorJob(jobId, error)
+      if (invalidRecords.length === 0) {
+        reply.code(200).send({
+          jobId,
+          nbObjetRecus: validRecords.length,
+          nbObjetAcceptes: validRecords.length,
+          nbObjetRefuses: 0,
+          listeNumeroBioValides: validRecords
+        })
+      } else if (validRecords.length > 0) {
+        reply.code(207).send({
+          jobId,
+          nbObjetRecus: validRecords.length + invalidRecords.length,
+          nbObjetAcceptes: validRecords.length,
+          nbObjetRefuses: invalidRecords.length,
+          listeNumeroBioValides: validRecords,
+          listeProblemes: invalidRecords
+        })
+      } else {
+        for (const error of errors) {
+          await addErrorJob(jobId, error)
+        }
+        await updateJobError(validRecords, invalidRecords, invalidRecords.length, [], jobId)
+        return reply.code(400).send({
+          jobId,
+          nbObjetRecus: invalidRecords.length,
+          nbObjetAcceptes: 0,
+          nbObjetRefuses: invalidRecords.length,
+          listeProblemes: invalidRecords
+        })
       }
-      await updateJobError(validRecords, invalidRecords, invalidRecords.length, [], jobId)
-      return reply.code(400).send({
-        jobId,
-        nbObjetRecus: invalidRecords.length,
-        nbObjetAcceptes: 0,
-        nbObjetRefuses: invalidRecords.length,
-        listeProblemes: invalidRecords
-      })
+
+      processFullJob(jobId, validItems, errors)
+        .catch(err => console.error('processFullJob error:', err))
+
+      return reply
+    } catch (error) {
+      if (error instanceof InvalidRequestApiError) {
+        throw error
+      }
+      throw new InvalidRequestApiError(error.message)
     }
-
-    processFullJob(jobId, validItems, errors)
-      .catch(err => console.error('processFullJob error:', err))
-
-    return reply
   })
 
   app.get('/api/v3/import/jobs/:id', mergeSchemas(protectedWithToken({ oc: true })), async (request, reply) => {
@@ -968,6 +975,27 @@ app.post('/api/v2/geometry/geometryEquals', mergeSchemas(
   const { payload } = request.body
   return getGeometryEquals(payload)
     .then(data => reply.code(200).send((data)))
+})
+
+app.get('/api/v3/health', async (request, reply) => {
+  try {
+    // TODO : SELECT IN BDD
+    // await pool.query('SELECT 1')
+
+    return reply.status(200).send({
+      status: 'ok',
+      db: 'ok',
+      uptime: process.uptime(),
+      timestamp: Date.now()
+    })
+  } catch (err) {
+    return reply.status(503).send({
+      status: 'ok',
+      db: 'unreachable',
+      uptime: process.uptime(),
+      timestamp: Date.now()
+    })
+  }
 })
 
 if (require.main === module) {

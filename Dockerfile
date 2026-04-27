@@ -18,7 +18,8 @@ RUN apk add --no-cache \
       mesa-egl \
       mesa-gl \
       libx11-dev \
-      libxext-dev
+      libxext-dev \
+      curl
 
 
 # Create app directory
@@ -61,5 +62,8 @@ ENV     PORT      8000
 ENV     HOST      0.0.0.0
 
 ENV CHROMIUM_FLAGS="--disable-software-rasterizer --disable-dev-shm-usage"
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:8000/api/v3/health || exit 1
 
 CMD [ "npm", "start" ]
