@@ -242,24 +242,32 @@ app.register(async (app) => {
         getPinnedOperators(request.user.id)
       ]
     ).then(([res, pinnedOperators]) => {
-      const paginatedOperators = res.operators
+      const filteredOperators = res.operators
         .filter((e) => {
-          if (!search) {
-            return true
-          }
+          if (!search) return true
 
           const userInput = search.toLowerCase().trim()
 
           return e.denominationCourante.toLowerCase().includes(userInput) ||
-            e.numeroBio.toString().includes(userInput) ||
-            e.nom.toLowerCase().includes(userInput) ||
-            e.siret.toLowerCase().includes(userInput)
+          e.numeroBio.toString().includes(userInput) ||
+          e.nom.toLowerCase().includes(userInput) ||
+          e.siret.toLowerCase().includes(userInput)
         })
-        .toSorted(recordSorts('fn', 'notifications', 'desc'))
-        .slice(offset, offset + limit)
-        .map((o) => ({ ...o, epingle: pinnedOperators.includes(+o.numeroBio) }))
 
-      return reply.code(200).send({ nbTotal: res.operators.length, operators: paginatedOperators })
+      const sortedOperators = filteredOperators
+        .toSorted(recordSorts('fn', 'notifications', 'desc'))
+
+      const paginatedOperators = sortedOperators
+        .slice(offset, offset + limit)
+        .map((o) => ({
+          ...o,
+          epingle: pinnedOperators.includes(+o.numeroBio)
+        }))
+
+      return reply.code(200).send({
+        nbTotal: filteredOperators.length,
+        operators: paginatedOperators
+      })
     })
   })
 
