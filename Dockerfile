@@ -1,4 +1,4 @@
-FROM node:20-alpine3.19
+FROM node:24-alpine3.22
 
 RUN apk add --update unzip gdal-dev cmake build-base python3
 
@@ -18,8 +18,8 @@ RUN apk add --no-cache \
       mesa-egl \
       mesa-gl \
       libx11-dev \
-      libxext-dev
-
+      libxext-dev \
+      curl
 
 # Create app directory
 WORKDIR /usr/src/app
