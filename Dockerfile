@@ -18,8 +18,7 @@ RUN apk add --no-cache \
       mesa-egl \
       mesa-gl \
       libx11-dev \
-      libxext-dev \
-      curl
+      libxext-dev
 
 
 # Create app directory
