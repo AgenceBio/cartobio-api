@@ -18,6 +18,8 @@ export type InputApiParcelle = {
     dateEngagement: string;
     etatProduction: EtatProduction;
     numeroIlot?: string | undefined;
+    commune?: string | undefined;
+    nom?: string | undefined;
     numeroParcelle?: string | undefined;
     commentaire?: string | undefined;
     codeCulture?: string | undefined;

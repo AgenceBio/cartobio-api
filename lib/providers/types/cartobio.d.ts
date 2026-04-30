@@ -69,6 +69,7 @@ type DBParcelle = {
     controlee?: boolean;
     historique_cultures?: CartoBioHistoriqueCulture[];
     attente_pac?:boolean;
+    statut_import_geom?: string;
 };
 
 export type OperatorFilter = {
