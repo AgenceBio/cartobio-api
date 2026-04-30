@@ -70,7 +70,7 @@ module.exports = {
         geometry: {
           type: 'Polygon',
           coordinates: [
-            expect.arrayContaining([[6.065424536564729, 47.68858541466545]])
+            expect.arrayContaining([[6.065424536564729, 47.688585414665454]])
           ]
         },
         properties: {
