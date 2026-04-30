@@ -299,12 +299,12 @@ app.register(async (app) => {
     const { search } = request.query
     const { id: userId, organismeCertificateur } = request.user
 
-      return reply
-        .code(200)
-        .send(
-          searchForAutocomplete(organismeCertificateur?.id, userId, search)
-        )
-    }
+    return reply
+      .code(200)
+      .send(
+        searchForAutocomplete(organismeCertificateur?.id, userId, search)
+      )
+  }
   )
 
   /**
@@ -322,35 +322,35 @@ app.register(async (app) => {
         fetchUserOperators(userId),
         getPinnedOperators(request.user.id)
       ]
-    ).then(([res, pinnedOperators]) => {
-      const filteredOperators = res.operators
-        .filter((e) => {
-          if (!search) return true
+      ).then(([res, pinnedOperators]) => {
+        const filteredOperators = res.operators
+          .filter((e) => {
+            if (!search) return true
 
             const userInput = search.toLowerCase().trim()
 
-          return e.denominationCourante.toLowerCase().includes(userInput) ||
+            return e.denominationCourante.toLowerCase().includes(userInput) ||
           e.numeroBio.toString().includes(userInput) ||
           e.nom.toLowerCase().includes(userInput) ||
           e.siret.toLowerCase().includes(userInput)
+          })
+
+        const sortedOperators = filteredOperators
+          .toSorted(recordSorts('fn', 'notifications', 'desc'))
+
+        const paginatedOperators = sortedOperators
+          .slice(offset, offset + limit)
+          .map((o) => ({
+            ...o,
+            epingle: pinnedOperators.includes(+o.numeroBio)
+          }))
+
+        return reply.code(200).send({
+          nbTotal: filteredOperators.length,
+          operators: paginatedOperators
         })
-
-      const sortedOperators = filteredOperators
-        .toSorted(recordSorts('fn', 'notifications', 'desc'))
-
-      const paginatedOperators = sortedOperators
-        .slice(offset, offset + limit)
-        .map((o) => ({
-          ...o,
-          epingle: pinnedOperators.includes(+o.numeroBio)
-        }))
-
-      return reply.code(200).send({
-        nbTotal: filteredOperators.length,
-        operators: paginatedOperators
       })
     })
-  })
 
   /**
    * @private
@@ -1189,9 +1189,9 @@ app.register(async (app) => {
         )
         const numberParcelle = (await gen.next()).value
 
-      if (numberParcelle > 80) {
-        reply.code(204).send()
-      }
+        if (numberParcelle > 80) {
+          reply.code(204).send()
+        }
 
         const pdf = (await gen.next()).value
         if (numberParcelle <= 80) {
