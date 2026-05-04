@@ -18,12 +18,14 @@ export type CartoBioFeatureProperties = {
     NUMERO_P?: string;
     cadastre?: string[];
     etranger?: boolean;
+    statut_import_geom?: string;
     TYPE?: string;
     CODE_VAR?: string;
     CODE_CULTURE?: string;
     CODE_PRECISION?: string;
     controlee?: boolean;
     historique?: CartoBioHistoriqueCulture[];
+    attente_pac?: boolean;
     /**
      * @deprecated
      */

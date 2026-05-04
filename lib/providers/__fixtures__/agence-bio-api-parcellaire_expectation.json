@@ -9,7 +9,7 @@
       "features": [
         {
           "type": "Feature",
-          "id": 45742,
+          "id": "45742",
           "geometry": {
             "type": "Polygon",
             "coordinates": [
@@ -38,7 +38,7 @@
             ]
           },
           "properties": {
-            "id": 45742,
+            "id": "45742",
             "cultures": [
               {
                 "CPF": "01.92",
@@ -57,20 +57,20 @@
         },
         {
           "type": "Feature",
-          "id": 1234,
+          "id": "1234",
           "geometry": null
         },
         {
           "type": "Feature",
-          "id": 1235,
+          "id": "1235",
           "geometry": null
         },
         {
           "type": "Feature",
-          "id": 45758,
+          "id": "45758",
           "geometry": null,
           "properties": {
-            "id": 45758,
+            "id": "45758",
             "cultures": [
               {
                 "CPF": "01.21.12",
@@ -88,7 +88,7 @@
         },
         {
           "type": "Feature",
-          "id": 45736,
+          "id": "45736",
           "geometry": {
             "type": "Polygon",
             "coordinates": [
@@ -117,7 +117,7 @@
             ]
           },
           "properties": {
-            "id": 45736,
+            "id": "45736",
             "cultures": [
               {
                 "CPF": "01.21.12",
@@ -135,7 +135,7 @@
         },
         {
           "type": "Feature",
-          "id": 45737,
+          "id": "45737",
           "geometry": {
             "type": "Polygon",
             "coordinates": [
@@ -164,7 +164,7 @@
             ]
           },
           "properties": {
-            "id": 45737,
+            "id": "45737",
             "cultures": [
               {
                 "CPF": "01.21.12",

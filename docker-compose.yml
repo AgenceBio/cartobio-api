@@ -4,6 +4,11 @@ volumes:
 services:
   api:
     build: ./
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v3/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     volumes:
     - ".env:/usr/src/app/.env"
     environment:
