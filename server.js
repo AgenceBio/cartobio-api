@@ -1199,7 +1199,7 @@ app.register(async (app) => {
     } catch (e) {
       return reply.code(400).send({ message: e.message })
     }
-    }
+  }
   )
 
   app.get(
