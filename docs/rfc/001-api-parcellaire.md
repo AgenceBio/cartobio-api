@@ -1,7 +1,7 @@
 ---
 title: API d'envoi des parcellaires
 date: 2023-04-12
-updated_at: 2026-04-23
+updated_at: 2026-05-07
 contributors:
 - Laetita L (Ecocert)
 - Maud R (CartoBio)
@@ -15,21 +15,9 @@ Les Organismes de Certification (OC) transmettent des informations de Production
 
 La mise en place de cette API constitue une première étape pour échanger automatiquement des informations entre système d'information, d'abord dans le sens "OC vers CartoBio".
 
-## Proposition
+## Envoi via API
 
-### Prototypage : envoi par fichier
-
-Pour prototyper un import à grande échelle, nous convenons :
-
-- de la production d'un fichier d'export, au format JSON, compressé en ZIP
-- transmis de manière sécurisée
-- importé manuellement par l'équipe CartoBio
-
-Cette période permettra d'ajuster le format de fichier sous forme de dialogues entre Organisme de Certification et CartoBio.
-
-### Envoi via API
-
-Dans un second temps, lorsque le format d'import sera stabilisé, les parcellaires seront télétransmis à un rythme hebdomadaire voire journalier, sauf dérogation auprès de l'INAO.
+Les parcellaires seront télétransmis à un rythme hebdomadaire voire journalier, sauf dérogation auprès de l'INAO.
 
 ```bash
 curl --data-binary '@/chemin/vers/parcellaire.json' \
@@ -39,7 +27,7 @@ curl --data-binary '@/chemin/vers/parcellaire.json' \
   https://cartobio.agencebio.org/api/v2/certification/parcelles
 ```
 
-### MAJ Mars 2026
+### MAJ Mai 2026
 
 Afin de répondre à la problématique des traitements longs et coûteux en ressources, nous avons mis en place une architecture adaptée autour de deux mécanismes complémentaires :  
 
