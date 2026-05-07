@@ -99,22 +99,24 @@ En cas de statut `202`, un objet représente le nombre d'objets traités.
 
 En cas de statut `207`, un objet représente les objets acceptés et refusés. Seulement les données valides seront traitées.
 
-| Chemin                  | Type    | Description                                         |
-| ----------------------- | ------- | --------------------------------------------------- |
-| `jobId`                 | integer | id du job d'import                                  |
-| `nbObjetRecus`          | integer | nombre d'objets reçus                               |
-| `nbObjetAcceptes`       | integer | nombre d'objets acceptes                            |
-| `nbObjetRefuses`        | integer | nombre d'objets refuses                             |
-| `listeNumeroBioValides` | array   | liste des numéros bios qui vont etre traités        |
-| `listeProblemes`        | array   | liste des entrées qui ne vont pas etre traitées     |
+| Chemin                  | Type    | Description                                     |
+| ----------------------- | ------- | ----------------------------------------------- |
+| `jobId`                 | integer | id du job d'import                              |
+| `nbObjetRecus`          | integer | nombre d'objets reçus                           |
+| `nbObjetAcceptes`       | integer | nombre d'objets acceptes                        |
+| `nbObjetRefuses`        | integer | nombre d'objets refuses                         |
+| `listeNumeroBioValides` | array   | liste des numéros bios qui vont etre traités    |
+| `listeProblemes`        | array   | liste des entrées qui ne vont pas etre traitées |
 
 Chaque entrée de `listeProblemes` :
 
-| Chemin      | Type   | Description                                                                         |
-| ----------- | ------ | ----------------------------------------------------------------------------------- |
-| `numeroBio` | string | numéro bio concerné (absent si le numéro bio lui-même est manquant)                 |
-| `code`      | string | code d'erreur (voir tableau des cas d'erreur)                                       |
-| `message`   | string | message d'erreur détaillé                                                           |
+| Chemin      | Type   | Description                                                         |
+| ----------- | ------ | ------------------------------------------------------------------- |
+| `numeroBio` | string | numéro bio concerné (absent si le numéro bio lui-même est manquant) |
+| `code`      | string | code d'erreur (voir tableau des cas d'erreur)                       |
+| `message`   | string | message d'erreur détaillé                                           |
+
+> `listeProblemes` est peuplé lors de la **validation initiale**, avant la création du job. Il ne contient que des anomalies de type `erreur` empêchant le traitement d'un opérateur. Les `warning` n'apparaissent pas ici — ils sont disponibles uniquement dans le résultat du job (`GET /api/v3/import/jobs/:id`).
 
 ```json
 {
@@ -138,12 +140,12 @@ Chaque entrée de `listeProblemes` :
 
 En cas de statut `400`, un objet représente les objets refusés. Aucune donnée n'est enregistrée.
 
-| Chemin                  | Type    | Description                                         |
-| ----------------------- | ------- | --------------------------------------------------- |
-| `nbObjetRecus`          | integer | nombre d'objets reçus                               |
-| `nbObjetAcceptes`       | integer | nombre d'objets acceptes                            |
-| `nbObjetRefuses`        | integer | nombre d'objets refuses                             |
-| `listeProblemes`        | array   | liste des entrées qui ne vont pas etre traitées     |
+| Chemin            | Type    | Description                                     |
+| ----------------- | ------- | ----------------------------------------------- |
+| `nbObjetRecus`    | integer | nombre d'objets reçus                           |
+| `nbObjetAcceptes` | integer | nombre d'objets acceptes                        |
+| `nbObjetRefuses`  | integer | nombre d'objets refuses                         |
+| `listeProblemes`  | array   | liste des entrées qui ne vont pas etre traitées |
 
 Chaque entrée de `listeProblemes` : identique au tableau ci-dessus.
 
@@ -174,13 +176,13 @@ Si le JSON est invalide, le message d'erreur est simplement le suivant :
 
 ##### Validation de l'opérateur
 
-| Cas de refus                           | Code                 | Message d'erreur                                                                 |
-| -------------------------------------- | -------------------- | -------------------------------------------------------------------------------- |
-| Numéro bio inconnu                     | `UNKNOWN_NUMERO_BIO` | `Numéro bio inconnu du portail de notification`                                  |
-| Numéro bio sans activité de production | `NOT_PRODUCTION`     | `Numéro bio sans notification liée à une activité de production`                 |
-| Aucun organisme certificateur          | `NO_OC`              | `Aucun organisme certificateur pour ce numéro bio.`                              |
-| Numéro client ne correspond pas        | `OC_MISMATCH`        | `Numéro client différent`                                                        |
-| Json mal formaté                       | —                    | `Le fichier JSON est invalide.`                                                  |
+| Cas de refus                           | Code                 | Message d'erreur                                                 |
+| -------------------------------------- | -------------------- | ---------------------------------------------------------------- |
+| Numéro bio inconnu                     | `UNKNOWN_NUMERO_BIO` | `Numéro bio inconnu du portail de notification`                  |
+| Numéro bio sans activité de production | `NOT_PRODUCTION`     | `Numéro bio sans notification liée à une activité de production` |
+| Aucun organisme certificateur          | `NO_OC`              | `Aucun organisme certificateur pour ce numéro bio.`              |
+| Numéro client ne correspond pas        | `OC_MISMATCH`        | `Numéro client différent`                                        |
+| Json mal formaté                       | —                    | `Le fichier JSON est invalide.`                                  |
 
 ##### Validation des dates du parcellaire
 
@@ -192,18 +194,21 @@ Si le JSON est invalide, le message d'erreur est simplement le suivant :
 
 ##### Validation des parcelles
 
-| Cas                                           | Code                            | Type    | Message                                                                                    |
-| --------------------------------------------- | ------------------------------- | ------- | ------------------------------------------------------------------------------------------ |
-| `etatProduction` invalide                     | `INVALID_ETAT_PRODUCTION`       | erreur  | `champ etatProduction incorrect`                                                           |
-| `dateEngagement` absente pour une conversion  | `MISSING_DATE_ENGAGEMENT`       | erreur  | `Champ date dengagement obligatoire lorsque que la parcelle est en conversion`             |
-| `dateEngagement` invalide                     | `INVALID_DATE_ENGAGEMENT`       | erreur  | `champ dateEngagement incorrect`                                                           |
-| Cultures absentes                             | `MISSING_CULTURES`              | erreur  | `cultures absentes`                                                                        |
-| `codeCPF` inconnu                             | `INVALID_CPF`                   | erreur  | `cultures inconnues: <liste des codes>`                                                    |
-| Géométrie mal formatée                        | `INVALID_GEOM`                  | erreur  | `champ geom incorrect : <détail>`                                                          |
-| Géométrie absente                             | `MISSING_GEOM`                  | warning | `Parcelle <id> n'a pas de géométrie`                                                       |
-| Géométrie hors zone autorisée                 | `GEOM_OUT_OF_BOUNDS`            | warning | `Parcelle <id> en dehors des régions autorisées`                                           |
-| Géométrie corrigée                            | `GEOM_CORRECTED`                | warning | `Ces parcelles ont été corrigées : <liste des id>`                                         |
-| Géométrie invalide acceptée mais non corrigée | `GEOM_INVALID_NOT_CORRECTED`    | warning | `Ces parcelles n'ont pas été corrigées mais sont invalides : <liste des id>`               |
+> Les cas de type **`erreur`** provoquent le rejet de la parcelle concernée. Ils alimentent le tableau `errors` dans le résultat du job.  
+> Les cas de type **`warning`** n'empêchent pas l'import mais signalent une correction automatique ou une donnée manquante non bloquante. Ils alimentent le tableau `warning` dans le résultat du job.
+
+| Cas                                           | Code                         | Type    | Message                                                                        |
+| --------------------------------------------- | ---------------------------- | ------- | ------------------------------------------------------------------------------ |
+| `etatProduction` invalide                     | `INVALID_ETAT_PRODUCTION`    | erreur  | `champ etatProduction incorrect`                                               |
+| `dateEngagement` absente pour une conversion  | `MISSING_DATE_ENGAGEMENT`    | erreur  | `Champ date dengagement obligatoire lorsque que la parcelle est en conversion` |
+| `dateEngagement` invalide                     | `INVALID_DATE_ENGAGEMENT`    | erreur  | `champ dateEngagement incorrect`                                               |
+| Cultures absentes                             | `MISSING_CULTURES`           | erreur  | `cultures absentes`                                                            |
+| `codeCPF` inconnu                             | `INVALID_CPF`                | erreur  | `cultures inconnues: <liste des codes>`                                        |
+| Géométrie mal formatée                        | `INVALID_GEOM`               | erreur  | `champ geom incorrect : <détail>`                                              |
+| Géométrie absente                             | `MISSING_GEOM`               | warning | `Parcelle <id> n'a pas de géométrie`                                           |
+| Géométrie hors zone autorisée                 | `GEOM_OUT_OF_BOUNDS`         | warning | `Parcelle <id> en dehors des régions autorisées`                               |
+| Géométrie corrigée                            | `GEOM_CORRECTED`             | warning | `Ces parcelles ont été corrigées : <liste des id>`                             |
+| Géométrie invalide acceptée mais non corrigée | `GEOM_INVALID_NOT_CORRECTED` | warning | `Ces parcelles n'ont pas été corrigées mais sont invalides : <liste des id>`   |
 
 ### Suivi des jobs d'import (polling)
 
@@ -238,22 +243,51 @@ Retourne l'état courant d'un job d'import.
 
 ##### Réponse `DONE`
 
+Le champ `result` contient le détail du traitement.
+
+**`errors`** : tableau d'objets à 3 éléments `[numeroBio, message, code]`. Chaque entrée correspond à une anomalie bloquante — la parcelle concernée n'est **pas** importée.
+
+| Chemin      | Type   | Description                                |
+| ----------- | ------ | ------------------------------------------ |
+| `numeroBio` | string | numéro bio concerné                        |
+| `message`   | string | message d'erreur détaillé                  |
+| `code`      | string | code d'erreur (voir tableau de validation) |
+
+**`warnings`** : tableau de tableau à 2 éléments `[numeroBio, warnings[]]`. Chaque entrée correspond à une anomalie non-bloquante — la parcelle concernée est importée.
+
+Chaque objet dans le tableau `warnings` :
+
+| Chemin      | Type   | Description                                       |
+| ----------- | ------ | ------------------------------------------------- |
+| `numeroBio` | string | numéro bio concerné                               |
+| `code`      | string | code d'avertissement (voir tableau de validation) |
+| `message`   | string | message détaillé                                  |
+
+> Un même `numeroBio` peut apparaître à la fois dans `numeroBioValid` et avoir des entrées dans `warning` — ses parcelles ont été importées malgré les avertissements.
+
 ```json
 {
   "status": "DONE",
-  "nbObjetsRecus": 1,
-  "nbObjetsAcceptes": 1,
-  "nbObjetsRefuses": 0,
+  "nbObjetsRecus": 3,
+  "nbObjetsAcceptes": 2,
+  "nbObjetsRefuses": 1,
   "result": {
-    "count": 1,
-    "errors": [],
-    "warning": [],
-    "numeroBioError": [],
+    "count": 3,
+    "errors": [
+      {"numeroBio": "181934", "message": "cultures inconnues: 01.13.49.967565", "code" : "INVALID_CPF"},
+    ],
+    "warning": [
+      ["181932", [
+        { "numeroBio": "181932", "code": "MISSING_GEOM", "message": "Parcelle 45742 n'a pas de géométrie" }
+      ]],
+      ["181933", [
+        { "numeroBio": "181933", "code": "GEOM_CORRECTED", "message": "Ces parcelles ont été corrigées : 45800, 45801" }
+      ]]
+    ],
+    "numeroBioError": ["181934"],
     "numeroBioValid": [
-      {
-        "numeroBio": "181932",
-        "nbParcelles": 2
-      }
+      { "numeroBio": "181932", "nbParcelles": 3 },
+      { "numeroBio": "181933", "nbParcelles": 1 }
     ]
   },
   "ended": "2026-04-13T05:00:53.272Z"
@@ -305,15 +339,10 @@ Liste paginée des imports de l'OC authentifié.
       "result": {
         "count": 1,
         "errors": [
-          [
-            "181932",
-            "cultures inconnues: 01.13.49.967565"
-          ]
+           {"numeroBio":"181932", "message":"cultures inconnues: 01.13.49.967565", "code":"INVALID_CPF"}
         ],
         "warning": [],
-        "numeroBioError": [
-          "181932"
-        ],
+        "numeroBioError": ["181932"],
         "numeroBioValid": []
       },
       "payload": null
@@ -349,6 +378,7 @@ Retourne `404` si l'import n'existe pas.
 
 ```json
 {
+  "jobId": 4,
   "status": "DONE",
   "createdAt": "2026-04-13T04:57:53.587Z",
   "endedAt": "2026-04-13T04:57:53.824Z",
@@ -358,15 +388,10 @@ Retourne `404` si l'import n'existe pas.
   "result": {
     "count": 1,
     "errors": [
-      [
-        "181932",
-        "cultures inconnues: 01.13.49.967565"
-      ]
+           {"numeroBio":"181932", "message":"cultures inconnues: 01.13.49.967565", "code":"INVALID_CPF"}
     ],
     "warning": [],
-    "numeroBioError": [
-      "181932"
-    ],
+    "numeroBioError": ["181932"],
     "numeroBioValid": []
   },
   "payload": null
@@ -392,18 +417,18 @@ Retourne `404` si l'import n'existe pas.
 
 #### Parcelle
 
-| Chemin           | Type   | Obligatoire | Description                                                                                                                                                                                                                        |
-| ---------------- | ------ | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`             | string | **oui**     | identifiant unique de parcelle (souvent appelé `PK`, `Primary Key` ou `Clé primaire`)                                                                                                                                              |
-| `etatProduction` | enum   | **oui**     | `CONV`,`AB`, `C1`, `C2`, `C3` ou `NB`                                                                                                                                                                                              |
-| `dateEngagement` | string | non         | date d'engagement au format [ISO 8601] (`YYYY-MM-DD`), **obligatoire** pour les parcelles en conversion (voir si on peut avoir la date d'import et la date de conversion différencier                                              |
-| `numeroIlot`     | string | non         | numéro d'ilot PAC (si applicable)                                                                                                                                                                                                  |
-| `numeroParcelle` | string | non         | numéro de parcelle PAC (si applicable)                                                                                                                                                                                             |
-| `geom`           | string | non         | coordonnées géographiques. Obligatoire si la parcelle est nouvelle. Équivalent du champ `geometry.coordinates` d'une [_feature_ GeoJSON]                                                                                           |
-| `commentaire`    | string | non         | notes d'audit spécifiques à la parcelle                                                                                                                                                                                            |
-| `cultures`       | array  | **oui**     | liste d'éléments de type [Culture](#culture)                                                                                                                                                                                       |
-| `commune`        | number | non         | Code commune de la parcelles                                                                                                                                                                                                       |
-| `nom`            | string | non         | Nom de la parcelle                                                                                                                                                                                                                 |
+| Chemin           | Type   | Obligatoire | Description                                                                                                                                                                           |
+| ---------------- | ------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`             | string | **oui**     | identifiant unique de parcelle (souvent appelé `PK`, `Primary Key` ou `Clé primaire`)                                                                                                 |
+| `etatProduction` | enum   | **oui**     | `CONV`,`AB`, `C1`, `C2`, `C3` ou `NB`                                                                                                                                                 |
+| `dateEngagement` | string | non         | date d'engagement au format [ISO 8601] (`YYYY-MM-DD`), **obligatoire** pour les parcelles en conversion (voir si on peut avoir la date d'import et la date de conversion différencier |
+| `numeroIlot`     | string | non         | numéro d'ilot PAC (si applicable)                                                                                                                                                     |
+| `numeroParcelle` | string | non         | numéro de parcelle PAC (si applicable)                                                                                                                                                |
+| `geom`           | string | non         | coordonnées géographiques. Obligatoire si la parcelle est nouvelle. Équivalent du champ `geometry.coordinates` d'une [_feature_ GeoJSON]                                              |
+| `commentaire`    | string | non         | notes d'audit spécifiques à la parcelle                                                                                                                                               |
+| `cultures`       | array  | **oui**     | liste d'éléments de type [Culture](#culture)                                                                                                                                          |
+| `commune`        | number | non         | Code commune de la parcelles                                                                                                                                                          |
+| `nom`            | string | non         | Nom de la parcelle                                                                                                                                                                    |
 
 #### Culture
 
