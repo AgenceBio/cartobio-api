@@ -339,7 +339,11 @@ Liste paginée des imports de l'OC authentifié.
       "result": {
         "count": 1,
         "errors": [
-           {"numeroBio":"181932", "message":"cultures inconnues: 01.13.49.967565", "code":"INVALID_CPF"}
+          {
+            "numeroBio":"181932",
+            "message":"cultures inconnues: 01.13.49.967565",
+            "code":"INVALID_CPF"
+          }
         ],
         "warning": [],
         "numeroBioError": ["181932"],
@@ -388,7 +392,11 @@ Retourne `404` si l'import n'existe pas.
   "result": {
     "count": 1,
     "errors": [
-           {"numeroBio":"181932", "message":"cultures inconnues: 01.13.49.967565", "code":"INVALID_CPF"}
+      {
+        "numeroBio":"181932",
+        "message":"cultures inconnues: 01.13.49.967565", 
+        "code":"INVALID_CPF"
+      }
     ],
     "warning": [],
     "numeroBioError": ["181932"],
