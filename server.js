@@ -681,7 +681,7 @@ app.register(async (app) => {
       }))
 
       if (invalidRecords.length === 0) {
-        reply.code(200).send({
+        reply.code(202).send({
           jobId,
           nbObjetRecus: validRecords.length,
           nbObjetAcceptes: validRecords.length,

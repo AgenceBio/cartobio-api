@@ -1281,7 +1281,7 @@ describe('POST /api/v2/certification/parcelles', () => {
       .set('Authorization', fakeOcToken)
       .send(fakePayload)
 
-    expect(res.status).toBe(200)
+    expect(res.status).toBe(202)
     expect(res.body).toMatchObject({
       jobId: 42,
       nbObjetRecus: 1,
