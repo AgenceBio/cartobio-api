@@ -9,12 +9,15 @@ Cette API est réalisée en node avec [Fastify](https://fastify.dev/) et [swagge
 
 Les erreurs sont centralisées avec [Sentry](https://github.com/getsentry/sentry).
 
+- [Doc API parcellaire](docs/rfc/001-api-parcellaire.md)
+- [Doc API lecture](docs/rfc/002-api-lecture.md)
+
 ## Développement
 
 ### Outils nécessaires
 
--   `docker` avec `compose 2`
--   `node` 20
+- `docker` avec `compose 2`
+- `node` 20
 
 On pourra utiliser `nvm` pour faciliter la gestion de différentes versions de node (cf. [`.nvmrc`](.nvmrc)) :
 
@@ -57,9 +60,9 @@ npm run watch
 
 Ouvrir :
 
--   http://localhost:8000/api/version
--   http://localhost:8000/api/v2/test
--   http://localhost:8000/api/documentation/static/index.html
+- http://localhost:8000/api/version
+- http://localhost:8000/api/v2/test
+- http://localhost:8000/api/documentation/static/index.html
 
 💡 Le démarrage du serveur lance automatiquement les migrations du schéma de base de données avec [**db-migrate**](https://db-migrate.readthedocs.io/en/latest/). Se réferrer à sa documentation pour en savoir plus sur les commandes et les API de migration.
 
@@ -89,14 +92,14 @@ npm test
 
 Le workflow [Docker Image CI](https://github.com/AgenceBio/cartobio-api/blob/main/.github/workflows/docker.yml) dispose de trois jobs :
 
--   `build`
-    -   construit les images docker [agencebio/cartobio-api](https://hub.docker.com/r/agencebio/cartobio-api/tags)
--   `deploy-staging`
-    -   déclenché par un nouveau commit dans la branche `main`
-    -   déploie l'API de préproduction
--   `deploy-production`
-    -   déclenché par un nouvrau tag
-    -   déploie l'API de production
+- `build`
+    - construit les images docker [agencebio/cartobio-api](https://hub.docker.com/r/agencebio/cartobio-api/tags)
+- `deploy-staging`
+    - déclenché par un nouveau commit dans la branche `main`
+    - déploie l'API de préproduction
+- `deploy-production`
+    - déclenché par un nouvrau tag
+    - déploie l'API de production
 
 Pour créer un tag :
 
