@@ -68,6 +68,7 @@ type DBParcelle = {
     code_precision_pac?: string;
     controlee?: boolean;
     historique_cultures?: CartoBioHistoriqueCulture[];
+    attente_pac?:boolean;
     statut_import_geom?: string;
 };
 
