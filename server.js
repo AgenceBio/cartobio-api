@@ -1172,14 +1172,6 @@ app.register(async (app) => {
     }
   )
 
-  app.get('/api/v2/certification/parcellaire/:numeroBio', mergeSchemas(protectedWithToken({ oc: true }), operatorFromNumeroBio), async (request, reply) => {
-    const record = await getOperatorLastRecord(request.params.numeroBio, {
-      anneeAudit: request.query.anneeAudit,
-      statut: request.query.statut
-    })
-    return reply.code(200).send(await recordToApi(record))
-  })
-
   app.get('/api/v2/pdf/:numeroBio/:recordId', mergeSchemas(protectedWithToken()), async (request, reply) => {
     const force = request.query.force_refresh === 'true' ?? false
     const pac = request.query.pac === 'true' ?? false
@@ -1207,6 +1199,7 @@ app.register(async (app) => {
     } catch (e) {
       return reply.code(400).send({ message: e.message })
     }
+  }
   )
 
   app.get(
