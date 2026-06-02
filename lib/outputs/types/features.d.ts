@@ -25,6 +25,7 @@ export type CartoBioFeatureProperties = {
     CODE_PRECISION?: string;
     controlee?: boolean;
     historique?: CartoBioHistoriqueCulture[];
+    attente_pac?: boolean;
     /**
      * @deprecated
      */

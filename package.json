@@ -47,7 +47,7 @@
     "eslint-plugin-node": "^11.1.0",
     "eslint-plugin-promise": "^4.3.1",
     "fast-jwt": "^5.0.6",
-    "fast-xml-parser": "^4.4.1",
+    "fast-xml-parser": "^5.7.0",
     "fastify": "^5.8.5",
     "file-type": "^16.5.4",
     "form-data": "^4.0.4",
@@ -103,6 +103,7 @@
   "homepage": "https://github.com/AgenceBio/cartobio-api#readme",
   "dependencies": {
     "cli-progress": "^3.12.0",
+    "nodemailer": "^8.0.3",
     "pdf-lib": "^1.17.1",
     "puppeteer": "^24.3.0",
     "xlsx": "^0.18.5"
