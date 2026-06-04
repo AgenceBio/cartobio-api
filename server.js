@@ -1182,7 +1182,7 @@ app.register(async (app) => {
       const numberParcelle = (await gen.next()).value
 
       if (numberParcelle > 80) {
-        return reply.code(204).send()
+        reply.code(204).send()
       }
 
       const pdf = (await gen.next()).value
