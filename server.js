@@ -73,7 +73,8 @@ const {
   getImportLogs,
   getImportPayload,
   addErrorJob,
-  updateJobError
+  updateJobError,
+  formatParcelleId
 } = require('./lib/providers/api-parcellaire.js')
 // const JSONStream = require('jsonstream-next')
 const { generatePDF, getAttestationProduction } = require('./lib/providers/export-pdf.js')
@@ -674,10 +675,14 @@ app.register(async (app) => {
       }, jobId)
 
       const validRecords = validItems.map(v => v.numeroBio)
-      const invalidRecords = errors.map(({ numeroBio, error, errorType }) => ({
+      const invalidRecords = errors.map(({ numeroBio, message, code, idParcelle, nomParcelle }) => ({
         ...(numeroBio ? { numeroBio } : {}),
-        code: errorType,
-        message: error.message
+        code: code,
+        message: message,
+        ...(idParcelle && nomParcelle
+          ? { idParcelle, nomParcelle }
+          : {})
+
       }))
 
       if (invalidRecords.length === 0) {
@@ -689,6 +694,9 @@ app.register(async (app) => {
           listeNumeroBioValides: validRecords
         })
       } else if (validRecords.length > 0) {
+        for (const error of errors) {
+          await addErrorJob(jobId, error)
+        }
         reply.code(207).send({
           jobId,
           nbObjetRecus: validRecords.length + invalidRecords.length,
@@ -716,6 +724,7 @@ app.register(async (app) => {
 
       return reply
     } catch (error) {
+      console.log(error)
       if (error instanceof InvalidRequestApiError) {
         throw error
       }

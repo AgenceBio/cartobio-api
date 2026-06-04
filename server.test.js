@@ -1303,8 +1303,8 @@ describe('POST /api/v2/certification/parcelles', () => {
       errors: [
         {
           numeroBio: '999',
-          error: new Error('Numéro bio inconnu du portail de notification'),
-          errorType: 'UNKNOWN_NUMERO_BIO'
+          message: 'Numéro bio inconnu du portail de notification',
+          code: 'UNKNOWN_NUMERO_BIO'
         }
       ]
     })
@@ -1344,8 +1344,8 @@ describe('POST /api/v2/certification/parcelles', () => {
       errors: [
         {
           numeroBio: '123',
-          error: new Error('Numéro bio inconnu du portail de notification'),
-          errorType: 'UNKNOWN_NUMERO_BIO'
+          message: 'Numéro bio inconnu du portail de notification',
+          code: 'UNKNOWN_NUMERO_BIO'
         }
       ]
     })
