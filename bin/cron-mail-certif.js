@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 const pool = require('../lib/db')
-const { sendCertificationComplete } = require('../lib/mailer/utils.js')
+const { sendCertificationCompleteModifie } = require('../lib/mailer/utils.js')
 const { fetchEmailForNumeroBio } = require('../lib/providers/agence-bio.js')
 
 async function sendMail () {
@@ -23,7 +23,7 @@ async function sendMail () {
       const emails = await fetchEmailForNumeroBio(parcellaire.numerobio)
 
       for (const utilisateur of emails.utilisateurs) {
-        await sendCertificationComplete(parcellaire, utilisateur.email)
+        await sendCertificationCompleteModifie(parcellaire, utilisateur.email)
       }
 
       await pool.query(`
