@@ -22,9 +22,9 @@ const { CertificationState, EtatProduction } = require('../lib/enums.js')
 
 function parseCSV (text) {
   const [headerLine, ...lines] = text.trim().split('\n')
-  const headers = headerLine.split(',').map((h) => h.trim())
+  const headers = headerLine.split(';').map((h) => h.trim())
   return lines.map((line) => {
-    const values = line.split(',').map((v) => v.trim())
+    const values = line.split(';').map((v) => v.trim())
     return Object.fromEntries(
       headers.map((h, i) => [h.toUpperCase(), values[i]])
     )
