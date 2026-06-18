@@ -22,9 +22,9 @@ const { CertificationState, EtatProduction } = require('../lib/enums.js')
 
 function parseCSV (text) {
   const [headerLine, ...lines] = text.trim().split('\n')
-  const headers = headerLine.split(';').map((h) => h.trim())
+  const headers = headerLine.split(',').map((h) => h.trim())
   return lines.map((line) => {
-    const values = line.split(';').map((v) => v.trim())
+    const values = line.split(',').map((v) => v.trim())
     return Object.fromEntries(
       headers.map((h, i) => [h.toUpperCase(), values[i]])
     )
@@ -240,18 +240,18 @@ if (process.argv.length < 4) {
               parcelles: featureCollection,
               numerobio: operator.numeroBio,
               certification_state: CertificationState.OPERATOR_DRAFT,
-              version_name: 'Parcellaire déclaré PAC 2025',
+              version_name: 'Parcellaire déclaré PAC 2026',
               metadata: {
                 source: 'telepac',
-                campagne: '2025',
+                campagne: '2026',
                 pacage: operator.numeroPacage,
                 warnings: '',
-                provenance: 'asp-2025'
+                provenance: 'asp-2026'
               }
             }
             await client.query(
               `
-            INSERT INTO import_pac (numerobio, nb_parcelles, size, record, pacage, siret)
+            INSERT INTO import_pac_26 (numerobio, nb_parcelles, size, record, pacage, siret)
             VALUES ($1, $2, $3, $4, $5, $6)
             ON CONFLICT (numerobio, pacage, siret)
             DO UPDATE SET nb_parcelles = $2, size = $3, record = $4, updatedAt = CURRENT_TIMESTAMP
