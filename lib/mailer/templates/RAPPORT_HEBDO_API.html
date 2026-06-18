@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<head>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    body {
+      font-family: "Inter", Arial, sans-serif;
+    }
+  </style>
+</head>
+<html>
+  <body>
+    <img src="cid:logo" alt="Logo" style="max-width: 1200px" />
+    <br/>
+    <b>Bilan hebdomadaire des envois API </b>
+    <p>Du {{date_debut}} au {{date_fin}}</p>
+    <ul>
+      <li>Nombre d’objets envoyés : {{nb_envoye}}</li>
+      <li>Nombre d’objets traités : {{nb_traite}}</li>
+      <li><b>Nombre d’objets rejetés : {{nb_error}}</b></li>
+    </ul>
+    <p>
+      Pour consulter les retours des jobs en erreur, la route
+      <em>{{url}}</em> est à votre disposition. Vous pouvez également modifier
+      les paramètres d’état des jobs que vous souhaitez consulter, ainsi que la
+      période d’envoi.
+    </p>
+    <br />
+    <p>Bien cordialement,</p>
+  </body>
+</html>

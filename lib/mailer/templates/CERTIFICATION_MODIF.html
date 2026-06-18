@@ -1,0 +1,39 @@
+<!DOCTYPE html
+<head>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', Arial, sans-serif; }
+  </style>
+</head>
+<html>
+  <body>
+    <img src="cid:logo" alt="Logo" style="max-width:600px;" />
+    <p>Bonjour,</p>
+    <p>Votre parcellaire certifié "{{version_name}}" a été modifié par votre organisme certificateur. Votre nouvelle attestation est disponible sur CartoBio.</p>
+    <p>
+      Elle est disponible sous trois formats :
+    </p>
+    <ul>
+      <li>
+        L'attestation du parcellaire PAC listant les parcelles déclarées à la PAC
+        certifiées avec le détail par parcelle.
+      </li>
+      <li>
+        Un fichier ZIP contenant l'attestation du parcellaire PAC détaillée ainsi
+        qu'un document allégé avec la liste des parcelles uniquement.
+      </li>
+      <li>La liste des parcelles de l'exploitation.</li>
+    </ul>
+    <p>
+      Vous pouvez télécharger votre nouvelle attestation sur la page de
+      votre parcellaire certifié, via le bouton "Attestation" :
+      <a target="_blank" href="{{url}}"> {{version_name}} </a>
+    </p>
+    <p>
+      La génération du pdf peut prendre un peu de temps. Vous le retrouverez
+      ensuite sur votre ordinateur, dans les fichiers téléchargés.
+    </p>
+    <br />
+    <p>Bien cordialement,</p>
+  </body>
+</html>
