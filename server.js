@@ -746,7 +746,7 @@ app.register(async (app) => {
 
     const organismeCertificateur = request.organismeCertificateur.id
     const result = await getImportList(
-      { status, organismeCertificateur, from, to, withPayload,withRejected, logs, page, limit }
+      { status, organismeCertificateur, from, to, withPayload, withRejected, logs, page, limit }
     )
 
     const links = {}
