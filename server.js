@@ -740,12 +740,13 @@ app.register(async (app) => {
       withPayload = 'false',
       logs = 'none',
       page = 1,
-      limit = 20
+      limit = 20,
+      withRejected = 'false'
     } = request.query
 
     const organismeCertificateur = request.organismeCertificateur.id
     const result = await getImportList(
-      { status, organismeCertificateur, from, to, withPayload, logs, page, limit }
+      { status, organismeCertificateur, from, to, withPayload,withRejected, logs, page, limit }
     )
 
     const links = {}
