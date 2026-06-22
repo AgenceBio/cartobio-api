@@ -3,10 +3,9 @@
 const { sendRapportHebdo } = require('../lib/mailer/utils.js')
 const pool = require('../lib/db')
 
-// TODO : WIP => Comment on gére les différents mails ainsi que les ocIds
 async function sendMail () {
   const { rows: ocList } = await pool.query(`
-      SELECT id, email
+      SELECT id, UNNEST(emails) AS email
       FROM organisme_certificateur
       WHERE active = true
     `)
