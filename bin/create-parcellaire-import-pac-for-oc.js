@@ -35,7 +35,7 @@ if (process.argv.length < 3) {
     SELECT
     ip.record,
     ip.numerobio
-    FROM import_pac ip
+    FROM import_pac_26 ip
     WHERE ip.numerobio = ANY($1) AND ip.imported = false
         `,
   [operators.map((o) => o.numeroBio.toString())]
