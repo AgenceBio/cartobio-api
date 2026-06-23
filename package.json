@@ -9,7 +9,7 @@
     "npm": ">=8"
   },
   "devDependencies": {
-    "@agencebio/rosetta-cultures": "^2.4.1",
+    "@agencebio/rosetta-cultures": "^2.6.0",
     "@fastify/cors": "^11.2.0",
     "@fastify/formbody": "^8.0.2",
     "@fastify/multipart": "^9.4.0",
@@ -46,8 +46,8 @@
     "eslint-plugin-jest": "^24.3.2",
     "eslint-plugin-node": "^11.1.0",
     "eslint-plugin-promise": "^4.3.1",
-    "fast-jwt": "^5.0.6",
-    "fast-xml-parser": "^4.4.1",
+    "fast-jwt": "^6.2.4",
+    "fast-xml-parser": "^5.7.0",
     "fastify": "^5.8.5",
     "file-type": "^16.5.4",
     "form-data": "^4.0.4",

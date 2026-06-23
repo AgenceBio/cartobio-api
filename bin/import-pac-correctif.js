@@ -169,18 +169,18 @@ if (process.argv.length < 3) {
               parcelles: featureCollection,
               numerobio: tabCouplage[i].numeroBio,
               certification_state: CertificationState.OPERATOR_DRAFT,
-              version_name: 'Parcellaire déclaré PAC 2025',
+              version_name: 'Parcellaire déclaré PAC 2026',
               metadata: {
                 source: 'telepac',
-                campagne: '2025',
+                campagne: '2026',
                 pacage: tabCouplage[i].pacage,
                 warnings: '',
-                provenance: 'asp-2025'
+                provenance: 'asp-2026'
               }
             }
             await client.query(
               `
-            INSERT INTO import_pac (numerobio, nb_parcelles, size, record, pacage, siret)
+            INSERT INTO import_pac_2O26 (numerobio, nb_parcelles, size, record, pacage, siret)
             VALUES ($1, $2, $3, $4, $5, $6)
             ON CONFLICT (numerobio, pacage, siret)
             DO UPDATE SET nb_parcelles = $2, size = $3, record = $4, updatedAt = CURRENT_TIMESTAMP
