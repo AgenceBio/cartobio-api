@@ -9,7 +9,7 @@
     "npm": ">=8"
   },
   "devDependencies": {
-    "@agencebio/rosetta-cultures": "^2.5.0",
+    "@agencebio/rosetta-cultures": "^2.6.0",
     "@fastify/cors": "^11.2.0",
     "@fastify/formbody": "^8.0.2",
     "@fastify/multipart": "^9.4.0",
