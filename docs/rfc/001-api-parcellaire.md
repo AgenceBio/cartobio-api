@@ -1,7 +1,7 @@
 ---
 title: API d'envoi des parcellaires
 date: 2023-04-12
-updated_at: 2026-05-07
+updated_at: 2026-06-25
 contributors:
 - Laetita L (Ecocert)
 - Maud R (CartoBio)
@@ -185,18 +185,19 @@ Si le JSON est invalide, le message d'erreur est simplement le suivant :
 > Les cas de type **`erreur`** provoquent le rejet de la parcelle concernée. Ils alimentent le tableau `errors` dans le résultat du job.  
 > Les cas de type **`warning`** n'empêchent pas l'import mais signalent une correction automatique ou une donnée manquante non bloquante. Ils alimentent le tableau `warning` dans le résultat du job.
 
-| Cas                                           | Code                         | Type    | Message                                                                        |
-| --------------------------------------------- | ---------------------------- | ------- | ------------------------------------------------------------------------------ |
-| `etatProduction` invalide                     | `INVALID_ETAT_PRODUCTION`    | erreur  | `champ etatProduction incorrect`                                               |
-| `dateEngagement` absente pour une conversion  | `MISSING_DATE_ENGAGEMENT`    | erreur  | `Champ date dengagement obligatoire lorsque que la parcelle est en conversion` |
-| `dateEngagement` invalide                     | `INVALID_DATE_ENGAGEMENT`    | erreur  | `champ dateEngagement incorrect`                                               |
-| Cultures absentes                             | `MISSING_CULTURES`           | erreur  | `cultures absentes`                                                            |
-| `codeCPF` inconnu                             | `INVALID_CPF`                | erreur  | `cultures inconnues: <liste des codes>`                                        |
-| Géométrie mal formatée                        | `INVALID_GEOM`               | erreur  | `champ geom incorrect : <détail>`                                              |
-| Géométrie absente                             | `MISSING_GEOM`               | warning | `Parcelle <id> n'a pas de géométrie`                                           |
-| Géométrie hors zone autorisée                 | `GEOM_OUT_OF_BOUNDS`         | warning | `Parcelle <id> en dehors des régions autorisées`                               |
-| Géométrie corrigée                            | `GEOM_CORRECTED`             | warning | `Ces parcelles ont été corrigées : <liste des id>`                             |
-| Géométrie invalide acceptée mais non corrigée | `GEOM_INVALID_NOT_CORRECTED` | warning | `Ces parcelles n'ont pas été corrigées mais sont invalides : <liste des id>`   |
+| Cas                                              | Code                         | Type    | Message                                                                                 |
+| ------------------------------------------------ | ---------------------------- | ------- | --------------------------------------------------------------------------------------- |
+| `etatProduction` invalide                        | `INVALID_ETAT_PRODUCTION`    | erreur  | `champ etatProduction incorrect`                                                        |
+| `dateEngagement` absente pour une conversion     | `MISSING_DATE_ENGAGEMENT`    | erreur  | `Champ date dengagement obligatoire lorsque que la parcelle est en conversion`          |
+| `dateEngagement` invalide                        | `INVALID_DATE_ENGAGEMENT`    | erreur  | `champ dateEngagement incorrect`                                                        |
+| Cultures absentes                                | `MISSING_CULTURES`           | erreur  | `cultures absentes`                                                                     |
+| `codeCPF` inconnu                                | `INVALID_CPF`                | erreur  | `cultures inconnues: <liste des codes>`                                                 |
+| Géométrie mal formatée                           | `INVALID_GEOM`               | erreur  | `champ geom incorrect : <détail>`                                                       |
+| Géométrie absente                                | `MISSING_GEOM`               | warning | `Parcelle <id> n'a pas de géométrie`                                                    |
+| Géométrie hors zone autorisée                    | `GEOM_OUT_OF_BOUNDS`         | warning | `Parcelle <id> en dehors des régions autorisées`                                        |
+| Géométrie corrigée                               | `GEOM_CORRECTED`             | warning | `Ces parcelles ont été corrigées : <liste des id>`                                      |
+| Géométrie invalide acceptée mais non corrigée    | `GEOM_INVALID_NOT_CORRECTED` | warning | `Ces parcelles n'ont pas été corrigées mais sont invalides : <liste des id>`            |
+| En attente pac non accepté mais parcelle accepté | `PAC_PENDING_WITH_ILOT`      | warning | `Parcelle <id> accepté mais ne peut être en attente PAC alors qu'un ilôt est renseigné` |
 
 ### Suivi des jobs d'import (polling)
 
@@ -413,18 +414,19 @@ Retourne `404` si l'import n'existe pas.
 
 #### Parcelle
 
-| Chemin           | Type   | Obligatoire | Description                                                                                                                                                                           |
-| ---------------- | ------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`             | string | **oui**     | identifiant unique de parcelle (souvent appelé `PK`, `Primary Key` ou `Clé primaire`)                                                                                                 |
-| `etatProduction` | enum   | **oui**     | `CONV`,`AB`, `C1`, `C2`, `C3` ou `NB`                                                                                                                                                 |
-| `dateEngagement` | string | non         | date d'engagement au format [ISO 8601] (`YYYY-MM-DD`), **obligatoire** pour les parcelles en conversion (voir si on peut avoir la date d'import et la date de conversion différencier |
-| `numeroIlot`     | string | non         | numéro d'ilot PAC (si applicable)                                                                                                                                                     |
-| `numeroParcelle` | string | non         | numéro de parcelle PAC (si applicable)                                                                                                                                                |
-| `geom`           | string | non         | coordonnées géographiques. Obligatoire si la parcelle est nouvelle. Équivalent du champ `geometry.coordinates` d'une [_feature_ GeoJSON]                                              |
-| `commentaire`    | string | non         | notes d'audit spécifiques à la parcelle                                                                                                                                               |
-| `cultures`       | array  | **oui**     | liste d'éléments de type [Culture](#culture)                                                                                                                                          |
-| `commune`        | number | non         | Code commune de la parcelles                                                                                                                                                          |
-| `nom`            | string | non         | Nom de la parcelle                                                                                                                                                                    |
+| Chemin           | Type    | Obligatoire | Description                                                                                                                                                                           |
+| ---------------- | ------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`             | string  | **oui**     | identifiant unique de parcelle (souvent appelé `PK`, `Primary Key` ou `Clé primaire`)                                                                                                 |
+| `etatProduction` | enum    | **oui**     | `CONV`,`AB`, `C1`, `C2`, `C3` ou `NB`                                                                                                                                                 |
+| `dateEngagement` | string  | non         | date d'engagement au format [ISO 8601] (`YYYY-MM-DD`), **obligatoire** pour les parcelles en conversion (voir si on peut avoir la date d'import et la date de conversion différencier |
+| `numeroIlot`     | string  | non         | numéro d'ilot PAC (si applicable)                                                                                                                                                     |
+| `numeroParcelle` | string  | non         | numéro de parcelle PAC (si applicable)                                                                                                                                                |
+| `geom`           | string  | non         | coordonnées géographiques. Obligatoire si la parcelle est nouvelle. Équivalent du champ `geometry.coordinates` d'une [_feature_ GeoJSON]                                              |
+| `commentaire`    | string  | non         | notes d'audit spécifiques à la parcelle                                                                                                                                               |
+| `cultures`       | array   | **oui**     | liste d'éléments de type [Culture](#culture)                                                                                                                                          |
+| `commune`        | number  | non         | Code commune de la parcelles                                                                                                                                                          |
+| `nom`            | string  | non         | Nom de la parcelle                                                                                                                                                                    |
+| `enAttentePAC`   | boolean | non         | La parcelle est en attente d'attribution de la PAC pour  un numeroIlot et un numeroParcelle                                                                                           |
 
 #### Culture
 
