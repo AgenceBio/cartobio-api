@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+const fs = require('fs')
 const cliProgress = require('cli-progress')
 
 const pool = require('../lib/db')
@@ -19,17 +20,23 @@ if (process.argv.length < 3) {
 
   const client = await pool.connect()
   const operators = await fetchCustomersByOc(ocId)
+  console.log('Nombre d\'opérateurs retournés par l\'api: %d', operators.length)
   if (operators.length === 0) {
     console.warn('Aucun numerobio pour l\'oc', ocId)
     process.exit(0)
   }
 
-  const oc = operators[0].organismeCertificateur
+  const operatorsEngages = operators.filter((o) => {
+    const notification = o.notifications
+    return notification.etatCertification === 'ENGAGEE' && notification.organismeCertificateurId === +ocId
+  })
 
-  if (oc.id !== +ocId) {
-    console.warn('Id invalide lors de la récuperation des parcellaires', oc)
-    process.exit(1)
-  }
+  const oc = operatorsEngages[0].organismeCertificateur
+
+  console.log('Nombre d\'opérateurs ENGAGE pour cet OC: %d', operatorsEngages.length)
+
+  fs.writeFileSync('./numeros-bios-engages.txt', JSON.stringify(operatorsEngages.map((o) => o.numeroBio)))
+
   const { rows: parcellairesACreer } = await pool.query(
     /* sql */ `
     SELECT
@@ -38,7 +45,7 @@ if (process.argv.length < 3) {
     FROM import_pac_26 ip
     WHERE ip.numerobio = ANY($1) AND ip.imported = false
         `,
-  [operators.map((o) => o.numeroBio.toString())]
+  [operatorsEngages.map((o) => o.numeroBio.toString())]
   )
 
   const progress = new cliProgress.SingleBar(
@@ -46,6 +53,7 @@ if (process.argv.length < 3) {
     { ...cliProgress.Presets.rect, etaBuffer: 10000 }
   )
   progress.start(parcellairesACreer.length, 0)
+  let nbImportes = 0
   try {
     for (const parcelle of parcellairesACreer) {
       const { rows } = await pool.query(
@@ -78,6 +86,7 @@ if (process.argv.length < 3) {
       }
 
       await hideImport(parcelle.numerobio)
+      nbImportes++
       progress.increment()
     }
   } catch (error) {
@@ -86,5 +95,6 @@ if (process.argv.length < 3) {
   } finally {
     client.release()
     progress.stop()
+    console.log('Nombre de parcellaires réellement importés: %d', nbImportes)
   }
 })()
