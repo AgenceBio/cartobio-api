@@ -12,7 +12,7 @@
     "@agencebio/rosetta-cultures": "^2.6.0",
     "@fastify/cors": "^11.2.0",
     "@fastify/formbody": "^8.0.2",
-    "@fastify/multipart": "^9.4.0",
+    "@fastify/multipart": "^10.0.0",
     "@fastify/oauth2": "^8.1.2",
     "@fastify/swagger": "^9.6.1",
     "@fastify/swagger-ui": "^5.2.5",
