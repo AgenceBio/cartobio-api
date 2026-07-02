@@ -93,6 +93,8 @@ const { geofoliaImportSchema } = require('./lib/routes/index.js')
 
 const { verifyGeometry, getRpg, getGeometryEquals } = require('./lib/providers/geometry.js')
 
+const { parcellaireRoutes } = require('./lib/modules/stats/routes')
+
 const DURATION_ONE_MINUTE = 1000 * 60
 const DURATION_ONE_HOUR = DURATION_ONE_MINUTE * 60
 const DURATION_ONE_DAY = DURATION_ONE_HOUR * 24
@@ -192,6 +194,7 @@ app.register(fastifySwaggerUi, {
 })
 
 app.register(CartoBioDecoratorsPlugin)
+app.register(parcellaireRoutes, { prefix: '/api/v3/tdb-api' })
 
 app.register(async (app) => {
   // Begin Public API routes
