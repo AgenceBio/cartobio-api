@@ -180,7 +180,7 @@ if (process.argv.length < 3) {
             }
             await client.query(
               `
-            INSERT INTO import_pac_2O26 (numerobio, nb_parcelles, size, record, pacage, siret)
+            INSERT INTO import_pac_26 (numerobio, nb_parcelles, size, record, pacage, siret)
             VALUES ($1, $2, $3, $4, $5, $6)
             ON CONFLICT (numerobio, pacage, siret)
             DO UPDATE SET nb_parcelles = $2, size = $3, record = $4, updatedAt = CURRENT_TIMESTAMP
