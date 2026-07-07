@@ -550,7 +550,7 @@ app.register(async (app) => {
    * Retrieve a given Record
    */
   app.get('/api/v2/audits/:recordId/has-attestation-production', mergeSchemas(protectedWithToken(), operatorFromRecordId), async (request, reply) => {
-    const pac = request.query.pac === 'true' ?? false
+    const pac = (request.query.pac ?? 'false') === 'true'
 
     const attestation = await getAttestationProduction(request.record.record_id, pac ? AttestationsProductionsType.PACCOMPLET : AttestationsProductionsType.COMPLET)
 
@@ -1174,9 +1174,9 @@ app.register(async (app) => {
   )
 
   app.get('/api/v2/pdf/:numeroBio/:recordId', mergeSchemas(protectedWithToken()), async (request, reply) => {
-    const force = request.query.force_refresh === 'true' ?? false
-    const pac = request.query.pac === 'true' ?? false
-    const zip = request.query.zip === 'true' ?? false
+    const force = (request.query.force_refresh ?? 'false') === 'true'
+    const pac = (request.query.pac ?? 'false') === 'true'
+    const zip = (request.query.zip ?? 'false') === 'true'
 
     try {
       const gen = generatePDF(request.params.numeroBio, request.params.recordId, force, pac, zip)
@@ -1384,6 +1384,7 @@ app.get('/api/v3/health', async (request, reply) => {
       timestamp: Date.now()
     })
   } catch (err) {
+    console.error(err)
     return reply.status(503).send({
       status: 'ok',
       db: 'unreachable',
