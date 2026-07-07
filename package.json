@@ -5,8 +5,8 @@
   "main": "app.js",
   "private": true,
   "engines": {
-    "node": ">=20",
-    "npm": ">=8"
+    "node": ">=24",
+    "npm": ">=11"
   },
   "devDependencies": {
     "@agencebio/rosetta-cultures": "^2.6.0",
