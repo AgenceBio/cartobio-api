@@ -66,7 +66,7 @@ if (process.argv.length < 3) {
         co.certification_state IN ('CERTIFIED', 'AUDITED', 'PENDING_CERTIFICATION')
         AND numerobio = $1
       ORDER BY
-        certification_state = 'CERTIFIED' DESC, certification_date_debut DESC
+        certification_state = 'CERTIFIED' DESC, audit_date DESC
       LIMIT 1
             `,
   [parcelle.numerobio]
