@@ -108,7 +108,7 @@ const {
   protectedWithToken,
   routeWithRecordId,
   routeWithPacage,
-  checkCertificationStatus
+  checkCertificationStatus,
 } = require('./lib/routes/index.js')
 const {
   operatorsSchema,
@@ -566,7 +566,7 @@ app.register(async (app) => {
    */
   app.post(
     '/api/v2/audits/:recordId/:id/controlee',
-    mergeSchemas(protectedWithToken()),
+    mergeSchemas(protectedWithToken(), operatorFromRecordId),
     async (request, reply) => {
       await markFeatureControlled(
         request.params.recordId,
@@ -584,7 +584,7 @@ app.register(async (app) => {
    */
   app.post(
     '/api/v2/audits/:recordId/:id/non-controlee',
-    mergeSchemas(protectedWithToken()),
+    mergeSchemas(protectedWithToken(), operatorFromRecordId),
     async (request, reply) => {
       await markFeatureUncontrolled(
         request.params.recordId,
