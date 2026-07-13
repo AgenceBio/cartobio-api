@@ -43,7 +43,7 @@
     "eslint": "^7.32.0",
     "eslint-config-standard": "^16.0.2",
     "eslint-plugin-import": "^2.26.0",
-    "eslint-plugin-jest": "^24.3.2",
+    "eslint-plugin-jest": "^29.15.4",
     "eslint-plugin-node": "^11.1.0",
     "eslint-plugin-promise": "^4.3.1",
     "fast-jwt": "^5.0.6",
