@@ -108,7 +108,7 @@ const {
   protectedWithToken,
   routeWithRecordId,
   routeWithPacage,
-  checkCertificationStatus,
+  checkCertificationStatus
 } = require('./lib/routes/index.js')
 const {
   operatorsSchema,
@@ -208,7 +208,8 @@ app.register(fastifyOauth, {
     next(new Error('Invalid state'))
   },
   cookie: {
-    secure : true,
+    secure: true,
+    sameSite: 'strict'
   }
 })
 
@@ -286,7 +287,7 @@ app.register(async (app) => {
   /**
    * @private
    */
-  app.post('/api/v2/certification/adminsearch', mergeSchemas(certificationBodySearchSchema, protectedWithToken({admin:true})), async (request, reply) => {
+  app.post('/api/v2/certification/adminsearch', mergeSchemas(certificationBodySearchSchema, protectedWithToken({ admin: true })), async (request, reply) => {
     const { input, page, limit, filter } = request.body
     return reply.code(200).send(searchControlBodyRecordsAdmin({ input, page, limit, filter }))
   })
