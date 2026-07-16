@@ -57,7 +57,7 @@
     "jest": "^29.3.1",
     "jsonstream-next": "^3.0.0",
     "mnemonist": "^0.39.5",
-    "p-memoize": "^4.0.4",
+    "p-memoize": "^8.0.0",
     "pg": "^8.7.3",
     "pg-cursor": "^2.10.5",
     "reproject": "^1.2.6",
