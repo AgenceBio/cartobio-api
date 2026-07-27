@@ -206,6 +206,10 @@ app.register(fastifyOauth, {
       return next()
     }
     next(new Error('Invalid state'))
+  },
+  cookie: {
+    secure: true,
+    sameSite: 'strict'
   }
 })
 
@@ -283,7 +287,7 @@ app.register(async (app) => {
   /**
    * @private
    */
-  app.post('/api/v2/certification/adminsearch', mergeSchemas(certificationBodySearchSchema, protectedWithToken()), async (request, reply) => {
+  app.post('/api/v2/certification/adminsearch', mergeSchemas(certificationBodySearchSchema, protectedWithToken({ admin: true })), async (request, reply) => {
     const { input, page, limit, filter } = request.body
     return reply.code(200).send(searchControlBodyRecordsAdmin({ input, page, limit, filter }))
   })
@@ -515,7 +519,7 @@ app.register(async (app) => {
    */
   app.get(
     '/api/v2/operator/:numeroBio/importData',
-    mergeSchemas(protectedWithToken()),
+    mergeSchemas(protectedWithToken(), operatorFromNumeroBio),
     async (request, reply) => {
       const res = await getImportPAC(request.params.numeroBio)
       return reply.code(200).send({ data: res })
@@ -563,7 +567,7 @@ app.register(async (app) => {
    */
   app.post(
     '/api/v2/audits/:recordId/:id/controlee',
-    mergeSchemas(protectedWithToken()),
+    mergeSchemas(protectedWithToken(), operatorFromRecordId),
     async (request, reply) => {
       await markFeatureControlled(
         request.params.recordId,
@@ -581,7 +585,7 @@ app.register(async (app) => {
    */
   app.post(
     '/api/v2/audits/:recordId/:id/non-controlee',
-    mergeSchemas(protectedWithToken()),
+    mergeSchemas(protectedWithToken(), operatorFromRecordId),
     async (request, reply) => {
       await markFeatureUncontrolled(
         request.params.recordId,
