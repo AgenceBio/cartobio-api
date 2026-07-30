@@ -1,27 +1,41 @@
-FROM node:24-alpine3.22
+FROM node:24-alpine3.22 AS builder
 
-RUN apk add --update unzip gdal-dev cmake build-base python3
+RUN apk add --update --no-cache \
+      unzip gdal-dev cmake build-base python3
+
+WORKDIR /usr/src/app
+
+COPY package*.json ./
+COPY ./bin ./bin
+COPY ./data ./data
+
+RUN npm ci --include=dev --build-from-source --shared_gdal
+RUN npm run build:geo-data
+
+COPY ./tsconfig.json ./jsconfig.json ./
+COPY ./lib ./lib
+COPY ./migrations ./migrations
+COPY ./image-map ./image-map
+COPY ./pdf ./pdf/
+
+COPY --chown=node:node ./*.js ./
+COPY --chown=node:node ./*.ts ./
+COPY --chown=node:node ./*.d.ts ./
+
+RUN npm run build
+
+
+FROM node:24-alpine3.22
 
 ENV CHROME_BIN="/usr/bin/chromium-browser" \
       PUPPETEER_SKIP_CHROMIUM_DOWNLOAD="true"
 
 RUN apk add --no-cache \
-      chromium-swiftshader \
-      nss \
-      freetype \
-      harfbuzz \
-      ca-certificates \
-      ttf-freefont \
-      nodejs \
-      yarn \
-      mesa-dri-gallium \
-      mesa-egl \
-      mesa-gl \
-      libx11-dev \
-      libxext-dev \
+      chromium-swiftshader nss freetype harfbuzz ca-certificates \
+      ttf-freefont mesa-dri-gallium mesa-egl mesa-gl \
+      gdal \
       curl
 
-# Create app directory
 WORKDIR /usr/src/app
 
 # Install app dependencies
@@ -58,11 +72,12 @@ ENV     NODE_ENV  production
 ENV     PORT      8000
 ENV     HOST      0.0.0.0
 
+EXPOSE 8000
+ENV NODE_ENV=production PORT=8000 HOST=0.0.0.0
 ENV CHROMIUM_FLAGS="--disable-software-rasterizer --disable-dev-shm-usage"
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD curl -f http://localhost:8000/api/v3/health || exit 1
+      CMD curl -f http://localhost:8000/api/v3/health || exit 1
 
 USER node
-
-CMD [ "npm", "start" ]
+CMD ["node", "dist/server.js"]

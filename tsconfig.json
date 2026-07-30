@@ -1,22 +1,25 @@
 {
   "include": [
     "server.d.ts",
+    "*.ts",
+    "*.js",
     "lib/**/*.js",
-    "lib/types.d.ts"
+    "lib/**/*.ts",
+    "lib/types.d.ts",
+    "migrations/**/*.js",
+    "migrations/**/*.ts"
   ],
-  "exclude": [
-    "**/*.test.js"
-  ],
+  "exclude": ["**/*.test.js"],
   "compilerOptions": {
-    "noEmit": true,
     "allowJs": true,
     "checkJs": true,
-    "strictNullChecks": false,
-    "noImplicitAny": false,
-    "resolveJsonModule": false,
-    "lib": [
-      "es2023",
-    ],
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "target": "es2020",
+    "outDir": "./dist",
+    "rootDir": "./",
+    "module": "commonjs",
+    "lib": ["es2023"],
     "skipLibCheck": true
   }
 }
