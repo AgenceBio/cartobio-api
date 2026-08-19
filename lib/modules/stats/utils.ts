@@ -11,7 +11,7 @@ export type DashboardQuery = {
   recherche?: string;
   statuts?: string;
   etats?: string;
-  ordreDate?: string;
+  ordreDate?: string | OrdreTri;
 };
 
 export type DashboardRoute = {

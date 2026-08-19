@@ -1,3 +1,4 @@
+import { OrdreTri } from '@/types/tableau-de-bord'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import * as repo from './repository'
 import type { DashboardRoute } from './utils'
@@ -87,13 +88,18 @@ async function getTableauErreurs (
     ordreDate
   } = request.query
 
+  const ordreDateValue =
+  ordreDate === OrdreTri.ASC || ordreDate === OrdreTri.DESC
+    ? ordreDate as OrdreTri
+    : undefined
+
   const data = await repo.getTableauErreursRepo({
     from,
     to,
     page: Number(page),
     limit: Number(limit),
     recherche,
-    ordreDate
+    ordreDate: ordreDateValue
   })
 
   return reply.send(data)
@@ -121,7 +127,7 @@ async function getTopAnomaliesGrouped (
   return reply.send(data)
 }
 
-async function getRepetErreurs(
+async function getRepetErreurs (
   request: DashboardRequest,
   reply: FastifyReply
 ): Promise<void> {

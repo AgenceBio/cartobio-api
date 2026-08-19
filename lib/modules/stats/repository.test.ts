@@ -183,7 +183,7 @@ describe('dashboard repository', () => {
       })
       .mockResolvedValueOnce({ rows: [] })
 
-    const result = await getEnvoisSuspectsRepo({ from: '2026-01-01', to: '2026-01-02' })
+    const result = await getEnvoisSuspectsRepo({ from: '2026-01-01', to: '2026-01-02', page: 1, limit: 8 })
 
     expect(result).toHaveLength(1)
     expect(result[0]).toMatchObject({ numeroBio: 'B1', numeroClient: 'C1', auditDate: '2026-01-01' })
