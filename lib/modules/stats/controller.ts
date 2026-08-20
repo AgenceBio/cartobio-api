@@ -1,4 +1,4 @@
-import { OrdreTri } from '@/types/tableau-de-bord'
+import { OrdreTri } from './utils'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import * as repo from './repository'
 import type { DashboardRoute } from './utils'
@@ -88,10 +88,7 @@ async function getTableauErreurs (
     ordreDate
   } = request.query
 
-  const ordreDateValue =
-  ordreDate === OrdreTri.ASC || ordreDate === OrdreTri.DESC
-    ? ordreDate as OrdreTri
-    : undefined
+  const ordreDateValue = ordreDate === 'ASC' || ordreDate === 'DESC' ? ordreDate as OrdreTri : undefined
 
   const data = await repo.getTableauErreursRepo({
     from,
