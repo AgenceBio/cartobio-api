@@ -87,8 +87,7 @@ async function getTableauErreurs (
     recherche,
     ordreDate
   } = request.query
-
-  const ordreDateValue = ordreDate === 'ASC' || ordreDate === 'DESC' ? ordreDate as OrdreTri : undefined
+  const ordreDateValue = ordreDate === 'asc' || ordreDate === 'desc' ? ordreDate as OrdreTri : undefined
 
   const data = await repo.getTableauErreursRepo({
     from,
