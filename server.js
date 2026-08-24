@@ -91,7 +91,6 @@ const {
 const { InvalidRequestApiError, NotFoundApiError } = require('./lib/errors.js')
 const { revokeToken } = require('./lib/auth/revocation')
 
-
 const {
   mergeSchemas,
   swaggerConfig,
