@@ -21,7 +21,7 @@
     "@sentry/node": "^10.63.0",
     "@turf/area": "^7.3.5",
     "@turf/bbox-polygon": "^7.4.0",
-    "@turf/boolean-intersects": "^7.3.5",
+    "@turf/boolean-intersects": "^7.4.0",
     "@turf/boolean-point-in-polygon": "^7.4.0",
     "@turf/centroid": "^7.3.5",
     "@turf/helpers": "^7.3.5",
