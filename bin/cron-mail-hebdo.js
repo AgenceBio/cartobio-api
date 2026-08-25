@@ -5,7 +5,7 @@ const pool = require('../lib/db')
 
 async function sendMail () {
   const { rows: ocList } = await pool.query(`
-      SELECT id, UNNEST(emails) AS email
+      SELECT id, label, UNNEST(emails) AS email
       FROM organisme_certificateur
       WHERE active = true
     `)
@@ -17,7 +17,7 @@ async function sendMail () {
 
   try {
     for (const oc of ocList) {
-      await sendRapportHebdo(oc.id, oc.email)
+      await sendRapportHebdo(oc.id, oc.email, oc.label)
       console.log(`Rapport envoyé à ${oc.email}`)
     }
     process.exit(0)
