@@ -27,7 +27,7 @@ WORKDIR /usr/src/app
 # Install app dependencies
 # A wildcard is used to ensure both package.json AND package-lock.json are copied
 # where available (npm@5+)
-COPY package*.json ./
+COPY --chown=node:node package*.json ./
 
 # If building deps fails, the answer is: aim for pre-built binaries
 # https://www.npmjs.com/package/gdal-async#user-content-unit-tested-platforms-with-pre-built-binaries
@@ -35,25 +35,22 @@ COPY package*.json ./
 # https://github.com/mmomtchev/node-gdal-async/issues/30#issuecomment-1275888379
 
 # Build geo data files
-COPY ./bin ./bin
-COPY ./data ./data
+COPY --chown=node:node ./bin ./bin
+COPY --chown=node:node ./data ./data
 
 RUN npm ci --build-from-source --shared_gdal
 RUN npm run build:geo-data
 
 
 # Bundle app source
-COPY ./__mocks__ ./__mocks__
-COPY ./lib ./lib
-COPY ./migrations ./migrations
-COPY ./test ./test
-COPY ./image-map ./image-map
-COPY ./pdf ./pdf/
-COPY ./*.js ./
-COPY ./*.d.ts ./
-COPY ./.eslintrc.js ./.eslintrc.js
-COPY ./jsconfig.json ./jsconfig.json
-COPY ./tsconfig.json ./tsconfig.json
+COPY --chown=node:node ./lib ./lib
+COPY --chown=node:node ./migrations ./migrations
+COPY --chown=node:node ./image-map ./image-map
+COPY --chown=node:node ./pdf ./pdf/
+COPY --chown=node:node ./*.js ./
+COPY --chown=node:node ./*.d.ts ./
+COPY --chown=node:node ./jsconfig.json ./jsconfig.json
+COPY --chown=node:node ./tsconfig.json ./tsconfig.json
 
 EXPOSE  8000
 ENV     NODE_ENV  production
@@ -64,5 +61,7 @@ ENV CHROMIUM_FLAGS="--disable-software-rasterizer --disable-dev-shm-usage"
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD curl -f http://localhost:8000/api/v3/health || exit 1
+
+USER node
 
 CMD [ "npm", "start" ]
