@@ -49,6 +49,7 @@ COPY --chown=node:node ./image-map ./image-map
 COPY --chown=node:node ./pdf ./pdf/
 COPY --chown=node:node ./*.js ./
 COPY --chown=node:node ./*.d.ts ./
+COPY --chown=node:node ./eslint.config.js ./eslint.config.js
 COPY --chown=node:node ./jsconfig.json ./jsconfig.json
 COPY --chown=node:node ./tsconfig.json ./tsconfig.json
 
