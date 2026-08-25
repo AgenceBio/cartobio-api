@@ -185,19 +185,19 @@ Si le JSON est invalide, le message d'erreur est simplement le suivant :
 > Les cas de type **`erreur`** provoquent le rejet de la parcelle concernée. Ils alimentent le tableau `errors` dans le résultat du job.  
 > Les cas de type **`warning`** n'empêchent pas l'import mais signalent une correction automatique ou une donnée manquante non bloquante. Ils alimentent le tableau `warning` dans le résultat du job.
 
-| Cas                                              | Code                         | Type    | Message                                                                                 |
-| ------------------------------------------------ | ---------------------------- | ------- | --------------------------------------------------------------------------------------- |
-| `etatProduction` invalide                        | `INVALID_ETAT_PRODUCTION`    | erreur  | `champ etatProduction incorrect`                                                        |
-| `dateEngagement` absente pour une conversion     | `MISSING_DATE_ENGAGEMENT`    | erreur  | `Champ date dengagement obligatoire lorsque que la parcelle est en conversion`          |
-| `dateEngagement` invalide                        | `INVALID_DATE_ENGAGEMENT`    | erreur  | `champ dateEngagement incorrect`                                                        |
-| Cultures absentes                                | `MISSING_CULTURES`           | erreur  | `cultures absentes`                                                                     |
-| `codeCPF` inconnu                                | `INVALID_CPF`                | erreur  | `cultures inconnues: <liste des codes>`                                                 |
-| Géométrie mal formatée                           | `INVALID_GEOM`               | erreur  | `champ geom incorrect : <détail>`                                                       |
-| Géométrie absente                                | `MISSING_GEOM`               | warning | `Parcelle <id> n'a pas de géométrie`                                                    |
-| Géométrie hors zone autorisée                    | `GEOM_OUT_OF_BOUNDS`         | warning | `Parcelle <id> en dehors des régions autorisées`                                        |
-| Géométrie corrigée                               | `GEOM_CORRECTED`             | warning | `Ces parcelles ont été corrigées : <liste des id>`                                      |
-| Géométrie invalide acceptée mais non corrigée    | `GEOM_INVALID_NOT_CORRECTED` | warning | `Ces parcelles n'ont pas été corrigées mais sont invalides : <liste des id>`            |
-| En attente pac non accepté mais parcelle accepté | `PAC_PENDING_WITH_ILOT`      | warning | `Parcelle <id> accepté mais ne peut être en attente PAC alors qu'un ilôt est renseigné` |
+| Cas                                           | Code                         | Type    | Message                                                                                 |
+| --------------------------------------------- | ---------------------------- | ------- | --------------------------------------------------------------------------------------- |
+| `etatProduction` invalide                     | `INVALID_ETAT_PRODUCTION`    | erreur  | `champ etatProduction incorrect`                                                        |
+| `dateEngagement` absente pour une conversion  | `MISSING_DATE_ENGAGEMENT`    | erreur  | `Champ date dengagement obligatoire lorsque que la parcelle est en conversion`          |
+| `dateEngagement` invalide                     | `INVALID_DATE_ENGAGEMENT`    | erreur  | `champ dateEngagement incorrect`                                                        |
+| Cultures absentes                             | `MISSING_CULTURES`           | erreur  | `cultures absentes`                                                                     |
+| `codeCPF` inconnu                             | `INVALID_CPF`                | erreur  | `cultures inconnues: <liste des codes>`                                                 |
+| Géométrie mal formatée                        | `INVALID_GEOM`               | erreur  | `champ geom incorrect : <détail>`                                                       |
+| Géométrie absente                             | `MISSING_GEOM`               | warning | `Parcelle <id> n'a pas de géométrie`                                                    |
+| Géométrie hors zone autorisée                 | `GEOM_OUT_OF_BOUNDS`         | warning | `Parcelle <id> en dehors des régions autorisées`                                        |
+| Géométrie corrigée                            | `GEOM_CORRECTED`             | warning | `Ces parcelles ont été corrigées : <liste des id>`                                      |
+| Géométrie invalide acceptée mais non corrigée | `GEOM_INVALID_NOT_CORRECTED` | warning | `Ces parcelles n'ont pas été corrigées mais sont invalides : <liste des id>`            |
+| En attente pac ignoré mais parcelle acceptée  | `PAC_PENDING_WITH_ILOT`      | warning | `Parcelle <id> acceptée mais ne peut être en attente PAC car un ilôt PAC est renseigné` |
 
 ### Suivi des jobs d'import (polling)
 
@@ -426,7 +426,7 @@ Retourne `404` si l'import n'existe pas.
 | `cultures`       | array   | **oui**     | liste d'éléments de type [Culture](#culture)                                                                                                                                          |
 | `commune`        | number  | non         | Code commune de la parcelles                                                                                                                                                          |
 | `nom`            | string  | non         | Nom de la parcelle                                                                                                                                                                    |
-| `enAttentePAC`   | boolean | non         | La parcelle est en attente d'attribution de la PAC pour  un numeroIlot et un numeroParcelle                                                                                           |
+| `enAttentePac`   | boolean | non         | La parcelle fera l'objet de la prochaine déclaration PAC.                                                                                                                             |
 
 #### Culture
 
