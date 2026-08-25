@@ -89,6 +89,7 @@ const {
   geofoliaParcellaire
 } = require('./lib/providers/geofolia.js')
 const { InvalidRequestApiError, NotFoundApiError } = require('./lib/errors.js')
+const { revokeToken } = require('./lib/auth/revocation')
 
 const {
   mergeSchemas,
@@ -206,6 +207,10 @@ app.register(fastifyOauth, {
       return next()
     }
     next(new Error('Invalid state'))
+  },
+  cookie: {
+    secure: true,
+    sameSite: 'strict'
   }
 })
 
@@ -283,7 +288,7 @@ app.register(async (app) => {
   /**
    * @private
    */
-  app.post('/api/v2/certification/adminsearch', mergeSchemas(certificationBodySearchSchema, protectedWithToken()), async (request, reply) => {
+  app.post('/api/v2/certification/adminsearch', mergeSchemas(certificationBodySearchSchema, protectedWithToken({ admin: true })), async (request, reply) => {
     const { input, page, limit, filter } = request.body
     return reply.code(200).send(searchControlBodyRecordsAdmin({ input, page, limit, filter }))
   })
@@ -515,7 +520,7 @@ app.register(async (app) => {
    */
   app.get(
     '/api/v2/operator/:numeroBio/importData',
-    mergeSchemas(protectedWithToken()),
+    mergeSchemas(protectedWithToken(), operatorFromNumeroBio),
     async (request, reply) => {
       const res = await getImportPAC(request.params.numeroBio)
       return reply.code(200).send({ data: res })
@@ -563,7 +568,7 @@ app.register(async (app) => {
    */
   app.post(
     '/api/v2/audits/:recordId/:id/controlee',
-    mergeSchemas(protectedWithToken()),
+    mergeSchemas(protectedWithToken(), operatorFromRecordId),
     async (request, reply) => {
       await markFeatureControlled(
         request.params.recordId,
@@ -581,7 +586,7 @@ app.register(async (app) => {
    */
   app.post(
     '/api/v2/audits/:recordId/:id/non-controlee',
-    mergeSchemas(protectedWithToken()),
+    mergeSchemas(protectedWithToken(), operatorFromRecordId),
     async (request, reply) => {
       await markFeatureUncontrolled(
         request.params.recordId,
@@ -1277,13 +1282,15 @@ app.register(async (app) => {
   app.post('/api/auth-provider/logout', async (request, reply) => {
     const decode = createDecoder()
     const cartobioToken = request.headers.authorization?.split(' ')[1]
-    const { id_token: idToken } = decode(cartobioToken)
+    const { id_token: idToken, exp } = decode(cartobioToken)
     const ssoHost = config.get('notifications.sso.host')
     const logoutUrl = new URL('/oauth2/sessions/logout', ssoHost)
     if (idToken) {
       logoutUrl.searchParams.set('id_token_hint', idToken)
       logoutUrl.searchParams.set('post_logout_redirect_uri', config.get('frontendUrl'))
     }
+
+    await revokeToken(cartobioToken, exp)
 
     return reply.code(200).send({ logoutUrl: logoutUrl.toString() })
   })
