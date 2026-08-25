@@ -51,7 +51,7 @@ COPY ./image-map ./image-map
 COPY ./pdf ./pdf/
 COPY ./*.js ./
 COPY ./*.d.ts ./
-COPY ./.eslintrc.js ./.eslintrc.js
+COPY ./eslint.config.js ./eslint.config.js
 COPY ./jsconfig.json ./jsconfig.json
 COPY ./tsconfig.json ./tsconfig.json
 
