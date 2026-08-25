@@ -44,7 +44,7 @@
     "dotenv": "^17.4.2",
     "eslint": "^10.6.0",
     "eslint-plugin-jest": "^29.15.4",
-    "fast-jwt": "^6.2.4",
+    "fast-jwt": "^6.3.2",
     "fast-xml-parser": "^5.11.0",
     "fastify": "^5.12.1",
     "file-type": "^16.5.4",
