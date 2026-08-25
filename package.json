@@ -24,7 +24,7 @@
     "@turf/boolean-intersects": "^7.3.5",
     "@turf/boolean-point-in-polygon": "^7.3.5",
     "@turf/centroid": "^7.3.5",
-    "@turf/helpers": "^7.3.5",
+    "@turf/helpers": "^7.4.0",
     "@turf/union": "^7.3.5",
     "@types/convict": "^6.1.6",
     "@types/geojson": "^7946.0.16",
