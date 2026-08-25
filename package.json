@@ -63,7 +63,7 @@
     "socks-proxy-agent": "^8.0.2",
     "strip-bom-stream": "^4.0.0",
     "supertest": "^7.2.2",
-    "through2": "^5.0.4",
+    "through2": "^5.0.11",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.63.0",
     "typescript-json-schema": "^0.67.4",
