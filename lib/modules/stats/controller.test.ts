@@ -11,6 +11,9 @@ import {
   getTopAnomaliesGrouped
 } from './controller'
 
+import { describe, expect, it, beforeEach, jest } from '@jest/globals'
+
+
 jest.mock('./repository', () => ({
   getGeneralKpi: jest.fn(),
   getTableauBilanRepo: jest.fn(),

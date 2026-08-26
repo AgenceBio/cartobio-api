@@ -1,4 +1,6 @@
 import { getIndexesStreaksSuspectes } from './utils'
+import { describe, expect, it, beforeEach, jest } from '@jest/globals'
+
 
 describe('getIndexesStreaksSuspectes', () => {
   it('retourne un ensemble vide pour une liste vide', () => {

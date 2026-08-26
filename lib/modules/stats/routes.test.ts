@@ -1,6 +1,8 @@
 import { mergeSchemas, protectedWithToken } from '../../routes'
 import * as controller from './controller'
 import { parcellaireRoutes } from './routes'
+import { describe, expect, it, beforeEach, jest } from '@jest/globals'
+
 
 jest.mock('../../routes', () => ({
   protectedWithToken: jest.fn(),

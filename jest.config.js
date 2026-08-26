@@ -8,7 +8,7 @@ const config = {
 
   testMatch: ['**/*.test.ts', '**/*.test.js'],
   clearMocks: true,
-  restoreMocks: true
+  restoreMocks: true,
 }
 
 module.exports = config
