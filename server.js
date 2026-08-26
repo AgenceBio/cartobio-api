@@ -77,9 +77,7 @@ const {
   getImportLogs,
   getImportPayload,
   addErrorJob,
-  updateJobError,
-  formatParcelleId
-} = require('./lib/providers/api-parcellaire.js')
+  updateJobError} = require('./lib/providers/api-parcellaire.js')
 // const JSONStream = require('jsonstream-next')
 const { generatePDF, getAttestationProduction } = require('./lib/providers/export-pdf.js')
 const { evvLookup, evvParcellaire, pacageLookup, iterateOperatorLastRecords } = require('./lib/providers/cartobio.js')
