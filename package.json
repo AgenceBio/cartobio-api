@@ -2,7 +2,7 @@
   "name": "@agencebio/cartobio-api",
   "version": "3.5.0",
   "description": "api for cartobio",
-  "main": "app.js",
+  "main": "server.js",
   "private": true,
   "engines": {
     "node": ">=24",
@@ -83,6 +83,7 @@
     "clean-records": "node bin/clean-records.js",
     "clean-pdf": "node bin/delete-pdf.js",
     "import-pac": "node bin/import-pac.js",
+    "build": "tsc",
     "import-pac-correctif": "node bin/import-pac-correctif.js",
     "create-parcellaire-import-pac": "node bin/create-parcellaire-import-pac-for-oc.js",
     "create-parcellaire-import-xlsx": "node bin/create-parcellaire-import-xlsx.js"
@@ -106,6 +107,8 @@
     "nodemailer": "^9.0.3",
     "pdf-lib": "^1.17.1",
     "puppeteer": "^24.3.0",
+    "ts-jest": "^29.4.12",
+    "tsx": "^4.23.12",
     "xlsx": "^0.18.5"
   }
 }
