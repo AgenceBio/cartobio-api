@@ -13,7 +13,7 @@
     "@eslint/eslintrc": "^3.3.5",
     "@eslint/js": "^10.0.1",
     "@fastify/cors": "^11.3.0",
-    "@fastify/formbody": "^8.0.2",
+    "@fastify/formbody": "^9.0.0",
     "@fastify/multipart": "^10.1.1",
     "@fastify/oauth2": "^8.2.0",
     "@fastify/swagger": "^9.8.1",
