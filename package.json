@@ -58,7 +58,7 @@
     "mnemonist": "^0.40.4",
     "p-memoize": "^4.0.4",
     "pg": "^8.22.0",
-    "pg-cursor": "^2.21.0",
+    "pg-cursor": "^2.22.0",
     "reproject": "^1.2.7",
     "socks-proxy-agent": "^8.0.2",
     "strip-bom-stream": "^4.0.0",
