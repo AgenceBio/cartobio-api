@@ -102,14 +102,13 @@ describe('GET /api/v2/user/verify', () => {
       })
   })
 
-  test('responds well with an access_token query string value', () => {
+  test('responds bad with an access_token query string value', () => {
     return request(app.server)
       .get('/api/v2/user/verify')
       .query({ access_token: USER_DOC_AUTH_TOKEN })
       .type('json')
       .then((response) => {
-        expect(response.status).toEqual(200)
-        expect(response.body).toMatchObject(fakeUser)
+        expect(response.status).toEqual(401)
       })
   })
 
@@ -197,13 +196,13 @@ describe('GET /api/v2/test', () => {
     expect(response.body).toEqual({ message: 'OK' })
   })
 
-  test('responds well with an access_token query string value', async () => {
+  test('responds bad with an access_token query string value', async () => {
     const response = await request(app.server)
       .get('/api/v2/test')
       .query({ access_token: USER_DOC_AUTH_TOKEN })
       .type('json')
 
-    expect(response.status).toEqual(200)
+    expect(response.status).toEqual(401)
   })
 })
 
@@ -1303,8 +1302,8 @@ describe('POST /api/v2/certification/parcelles', () => {
       errors: [
         {
           numeroBio: '999',
-          error: new Error('Numéro bio inconnu du portail de notification'),
-          errorType: 'UNKNOWN_NUMERO_BIO'
+          message: 'Numéro bio inconnu du portail de notification',
+          code: 'UNKNOWN_NUMERO_BIO'
         }
       ]
     })
@@ -1344,8 +1343,8 @@ describe('POST /api/v2/certification/parcelles', () => {
       errors: [
         {
           numeroBio: '123',
-          error: new Error('Numéro bio inconnu du portail de notification'),
-          errorType: 'UNKNOWN_NUMERO_BIO'
+          message: 'Numéro bio inconnu du portail de notification',
+          code: 'UNKNOWN_NUMERO_BIO'
         }
       ]
     })

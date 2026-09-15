@@ -11,6 +11,8 @@
     "noEmit": true,
     "allowJs": true,
     "checkJs": true,
+    "strictNullChecks": false,
+    "noImplicitAny": false,
     "resolveJsonModule": false,
     "lib": [
       "es2023",

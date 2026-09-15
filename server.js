@@ -1,3 +1,4 @@
+// @ts-nocheck
 'use strict'
 
 const Sentry = require('@sentry/node')
@@ -76,8 +77,7 @@ const {
   getImportLogs,
   getImportPayload,
   addErrorJob,
-  updateJobError
-} = require('./lib/providers/api-parcellaire.js')
+  updateJobError} = require('./lib/providers/api-parcellaire.js')
 // const JSONStream = require('jsonstream-next')
 const { generatePDF, getAttestationProduction } = require('./lib/providers/export-pdf.js')
 const { evvLookup, evvParcellaire, pacageLookup, iterateOperatorLastRecords } = require('./lib/providers/cartobio.js')
@@ -89,6 +89,7 @@ const {
   geofoliaParcellaire
 } = require('./lib/providers/geofolia.js')
 const { InvalidRequestApiError, NotFoundApiError } = require('./lib/errors.js')
+const { revokeToken } = require('./lib/auth/revocation')
 
 const {
   mergeSchemas,
@@ -131,6 +132,8 @@ const {
   calculateParcelBorder
 } = require('./lib/providers/geometry.js')
 
+const { parcellaireRoutes } = require('./lib/modules/stats/routes')
+
 const DURATION_ONE_MINUTE = 1000 * 60
 const DURATION_ONE_HOUR = DURATION_ONE_MINUTE * 60
 const DURATION_ONE_DAY = DURATION_ONE_HOUR * 24
@@ -140,15 +143,9 @@ const { UnauthorizedApiError, errorHandler } = require('./lib/errors.js')
 const { normalizeRecord } = require('./lib/outputs/record')
 const { recordToApi } = require('./lib/outputs/api')
 const { isHandledError } = require('./lib/errors')
-const {
-  getPinnedOperators,
-  getConsultedOperators,
-  addRecordData
-} = require('./lib/outputs/operator.js')
-const sign = createSigner({
-  key: config.get('jwtSecret'),
-  expiresIn: DURATION_ONE_DAY * 30
-})
+const { getPinnedOperators, getConsultedOperators, addRecordData } = require('./lib/outputs/operator.js')
+const { AttestationsProductionsType } = require('./lib/enums.js')
+const sign = createSigner({ key: config.get('jwtSecret'), expiresIn: DURATION_ONE_DAY * 30 })
 
 app.setErrorHandler(errorHandler)
 if (reportErrors) {
@@ -212,6 +209,10 @@ app.register(fastifyOauth, {
       return next()
     }
     next(new Error('Invalid state'))
+  },
+  cookie: {
+    secure: true,
+    sameSite: 'strict'
   }
 })
 
@@ -245,6 +246,7 @@ app.register(fastifySwaggerUi, {
 })
 
 app.register(CartoBioDecoratorsPlugin)
+app.register(parcellaireRoutes, { prefix: '/api/v3/tdb-api' })
 
 app.register(async (app) => {
   // Begin Public API routes
@@ -289,7 +291,7 @@ app.register(async (app) => {
   /**
    * @private
    */
-  app.post('/api/v2/certification/adminsearch', mergeSchemas(certificationBodySearchSchema, protectedWithToken()), async (request, reply) => {
+  app.post('/api/v2/certification/adminsearch', mergeSchemas(certificationBodySearchSchema, protectedWithToken({ admin: true })), async (request, reply) => {
     const { input, page, limit, filter } = request.body
     return reply.code(200).send(searchControlBodyRecordsAdmin({ input, page, limit, filter }))
   })
@@ -521,7 +523,7 @@ app.register(async (app) => {
    */
   app.get(
     '/api/v2/operator/:numeroBio/importData',
-    mergeSchemas(protectedWithToken()),
+    mergeSchemas(protectedWithToken(), operatorFromNumeroBio),
     async (request, reply) => {
       const res = await getImportPAC(request.params.numeroBio)
       return reply.code(200).send({ data: res })
@@ -555,17 +557,13 @@ app.register(async (app) => {
   /**
    * Retrieve a given Record
    */
-  app.get(
-    '/api/v2/audits/:recordId/has-attestation-production',
-    mergeSchemas(protectedWithToken(), operatorFromRecordId),
-    async (request, reply) => {
-      const attestation = await getAttestationProduction(
-        request.record.record_id
-      )
+  app.get('/api/v2/audits/:recordId/has-attestation-production', mergeSchemas(protectedWithToken(), operatorFromRecordId), async (request, reply) => {
+    const pac = (request.query.pac ?? 'false') === 'true'
 
-      return reply.code(200).send({ hasAttestationProduction: !!attestation })
-    }
-  )
+    const attestation = await getAttestationProduction(request.record.record_id, pac ? AttestationsProductionsType.PACCOMPLET : AttestationsProductionsType.COMPLET)
+
+    return reply.code(200).send({ hasAttestationProduction: !!attestation })
+  })
 
   /**
    * @private
@@ -573,7 +571,7 @@ app.register(async (app) => {
    */
   app.post(
     '/api/v2/audits/:recordId/:id/controlee',
-    mergeSchemas(protectedWithToken()),
+    mergeSchemas(protectedWithToken(), operatorFromRecordId),
     async (request, reply) => {
       await markFeatureControlled(
         request.params.recordId,
@@ -591,7 +589,7 @@ app.register(async (app) => {
    */
   app.post(
     '/api/v2/audits/:recordId/:id/non-controlee',
-    mergeSchemas(protectedWithToken()),
+    mergeSchemas(protectedWithToken(), operatorFromRecordId),
     async (request, reply) => {
       await markFeatureUncontrolled(
         request.params.recordId,
@@ -959,10 +957,14 @@ app.register(async (app) => {
       }, jobId)
 
       const validRecords = validItems.map(v => v.numeroBio)
-      const invalidRecords = errors.map(({ numeroBio, error, errorType }) => ({
+      const invalidRecords = errors.map(({ numeroBio, message, code, idParcelle, nomParcelle }) => ({
         ...(numeroBio ? { numeroBio } : {}),
-        code: errorType,
-        message: error.message
+        code: code,
+        message: message,
+        ...(idParcelle && nomParcelle
+          ? { idParcelle, nomParcelle }
+          : {})
+
       }))
 
       if (invalidRecords.length === 0) {
@@ -974,6 +976,9 @@ app.register(async (app) => {
           listeNumeroBioValides: validRecords
         })
       } else if (validRecords.length > 0) {
+        for (const error of errors) {
+          await addErrorJob(jobId, error)
+        }
         reply.code(207).send({
           jobId,
           nbObjetRecus: validRecords.length + invalidRecords.length,
@@ -1001,6 +1006,7 @@ app.register(async (app) => {
 
       return reply
     } catch (error) {
+      console.log(error)
       if (error instanceof InvalidRequestApiError) {
         throw error
       }
@@ -1025,12 +1031,13 @@ app.register(async (app) => {
       withPayload = 'false',
       logs = 'none',
       page = 1,
-      limit = 20
+      limit = 20,
+      withRejected = 'false'
     } = request.query
 
     const organismeCertificateur = request.organismeCertificateur.id
     const result = await getImportList(
-      { status, organismeCertificateur, from, to, withPayload, logs, page, limit }
+      { status, organismeCertificateur, from, to, withPayload, withRejected, logs, page, limit }
     )
 
     const links = {}
@@ -1182,32 +1189,34 @@ app.register(async (app) => {
     }
   )
 
-  app.get(
-    '/api/v2/pdf/:numeroBio/:recordId',
-    mergeSchemas(protectedWithToken()),
-    async (request, reply) => {
-      const force = request.query.force_refresh === 'true' ?? false
+  app.get('/api/v2/pdf/:numeroBio/:recordId', mergeSchemas(protectedWithToken()), async (request, reply) => {
+    const force = (request.query.force_refresh ?? 'false') === 'true'
+    const pac = (request.query.pac ?? 'false') === 'true'
+    const zip = (request.query.zip ?? 'false') === 'true'
 
-      try {
-        const gen = generatePDF(
-          request.params.numeroBio,
-          request.params.recordId,
-          force
-        )
-        const numberParcelle = (await gen.next()).value
+    try {
+      const gen = generatePDF(request.params.numeroBio, request.params.recordId, force, pac, zip)
+      const numberParcelle = (await gen.next()).value
 
-        if (numberParcelle > 80) {
-          reply.code(204).send()
-        }
-
-        const pdf = (await gen.next()).value
-        if (numberParcelle <= 80) {
-          return reply.code(200).send(pdf)
-        }
-      } catch (e) {
-        return reply.code(400).send({ message: e.message })
+      if (numberParcelle > 80) {
+        reply.code(204).send()
       }
+
+      const pdf = (await gen.next()).value
+
+      if (zip) {
+        reply.headers({
+          'Content-Type': 'application/zip'
+        })
+        return reply.code(200).send(pdf)
+      }
+
+      reply.header('Content-Type', 'application/zip')
+      return reply.code(200).send(pdf)
+    } catch (e) {
+      return reply.code(400).send({ message: e.message })
     }
+  }
   )
 
   app.get(
@@ -1284,13 +1293,15 @@ app.register(async (app) => {
   app.post('/api/auth-provider/logout', async (request, reply) => {
     const decode = createDecoder()
     const cartobioToken = request.headers.authorization?.split(' ')[1]
-    const { id_token: idToken } = decode(cartobioToken)
+    const { id_token: idToken, exp } = decode(cartobioToken)
     const ssoHost = config.get('notifications.sso.host')
     const logoutUrl = new URL('/oauth2/sessions/logout', ssoHost)
     if (idToken) {
       logoutUrl.searchParams.set('id_token_hint', idToken)
       logoutUrl.searchParams.set('post_logout_redirect_uri', config.get('frontendUrl'))
     }
+
+    await revokeToken(cartobioToken, exp)
 
     return reply.code(200).send({ logoutUrl: logoutUrl.toString() })
   })
@@ -1391,6 +1402,7 @@ app.get('/api/v3/health', async (request, reply) => {
       timestamp: Date.now()
     })
   } catch (err) {
+    console.error(err)
     return reply.status(503).send({
       status: 'ok',
       db: 'unreachable',

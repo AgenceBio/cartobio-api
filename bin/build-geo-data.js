@@ -9,6 +9,7 @@ const got = require('got')
 const JSONStream = require('jsonstream-next')
 const fs = require('fs')
 const union = require('@turf/union').default
+const turf = require('@turf/helpers')
 
 const pipeline = promisify(stream.pipeline)
 
@@ -58,12 +59,12 @@ async function fetchRegionsBoundaries () {
   // Get metropole
   const metropoleCodes = ['11', '24', '27', '28', '32', '44', '52', '53', '75', '76', '84', '93', '94']
   const metropoleRegions = regions.features.filter(({ properties }) => metropoleCodes.includes(properties.code))
-  const metropole = metropoleRegions.reduce((acc, region) => union(acc, region))
+  const metropole = metropoleRegions.reduce((acc, region) => union(turf.featureCollection([acc, region])))
 
   // Get Antilles
   const guadeloupe = regions.features.find(({ properties }) => properties.code === '01')
   const martinique = regions.features.find(({ properties }) => properties.code === '02')
-  const antilles = union(guadeloupe, martinique)
+  const antilles = union(turf.featureCollection([guadeloupe, martinique]))
 
   // Get other droms
   const guyane = regions.features.find(({ properties }) => properties.code === '03')
