@@ -215,6 +215,11 @@ ogr2ogr -f PostgreSQL \
 
 Les fonds de carte sont servis statiquement, et générés à l'aide de l'outil en ligne de commande [tippecanoe] :
 
+<details>
+<summary><b>Fonds de carte RPG (non utilisé)</b></summary>
+
+### Génération des fonds de carte RPG (qui ne sont plus utilisé dans le projet)
+
 ```sh
 # Décompresser tous les fichiers ZIP départementaux dans un même dossier,
 # de telle sorte à ce que tous les fichiers .dbf .prj .shp .shx soient dans un même dossier.
@@ -224,6 +229,29 @@ for f in *.zip; do unzip "$f"; done
 ogr2ogr -t_srs EPSG:3857 -nln rpg rpg.gpkg .
 ogr2ogr rpg.geojson rpg.gpkg
 tippecanoe -Z10 -z14 --extend-zooms-if-still-dropping --no-tile-compression --simplify-only-low-zooms --drop-densest-as-needed --output-to-directory rpg-202x --projection EPSG:3857 --name "RPG 202x" --layer "rpg202x" --exclude NUM_ILOT --exclude NUM_PARCEL --exclude PACAGE --force rpg.geojson
+```
+
+</details>
+
+### Génération des fonds de carte Cartobio#
+
+Récuperer le fichier "France entière - gpkg - { année }" sur [data.gouv](https://www.data.gouv.fr/datasets/parcelles-certifiees-en-agriculture-biologique-sur-cartobio)
+
+```sh
+ogr2ogr -f "gpkg" -s_srs EPSG:4326 -t_srs EPSG:3857 cartobio-parcelles-2025.gpkg cartobio-parcelles-2025-france-4326.gpkg
+
+ogr2ogr cartobio-parcelles-2025.json cartobio-parcelles-2025.gpkg
+
+tippecanoe -Z10 -z14 --extend-zooms-if-still-dropping --no-tile-compression --simplify-only-low-zooms --drop-densest-as-needed --output-to-directory cartobio-parcelles-2025 --projection EPSG:3857 --name "Cartobio parcelles 2025" --layer "catobio-parcelles-2025" --force cartobio-parcelles-2025.json
+```
+
+Les fichiers sont ensuite servient via la configuration dans `sites-available`:
+
+```
+  location /cartobio-parcelles-2025/ {
+    alias /var/www/cartobio-parcelles-2025/;
+    add_header Access-Control-Allow-Origin *;
+  }
 ```
 
 ## Autodétéction des communes
