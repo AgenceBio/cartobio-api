@@ -15,7 +15,7 @@
     "@fastify/cors": "^11.3.0",
     "@fastify/formbody": "^9.0.0",
     "@fastify/multipart": "^10.1.1",
-    "@fastify/oauth2": "^8.2.0",
+    "@fastify/oauth2": "^8.3.0",
     "@fastify/swagger": "^9.8.1",
     "@fastify/swagger-ui": "^6.1.1",
     "@sentry/node": "^10.71.0",
