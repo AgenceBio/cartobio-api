@@ -46,7 +46,7 @@
     "eslint-plugin-jest": "^29.16.6",
     "fast-jwt": "^6.3.3",
     "fast-xml-parser": "^5.11.0",
-    "fastify": "^5.12.4",
+    "fastify": "^5.12.5",
     "file-type": "^16.5.4",
     "form-data": "^4.0.6",
     "gdal-async": "^3.12.3",
