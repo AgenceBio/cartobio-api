@@ -967,7 +967,15 @@ app.register(async (app) => {
 
       }))
 
-      if (invalidRecords.length === 0) {
+      const numeroBioError = [
+        ...new Set(
+          errors
+            .map(error => error.numeroBio)
+            .filter(Boolean)
+        )
+      ]
+
+      if (numeroBioError.length === 0) {
         reply.code(202).send({
           jobId,
           nbObjetRecus: validRecords.length,
@@ -981,9 +989,9 @@ app.register(async (app) => {
         }
         reply.code(207).send({
           jobId,
-          nbObjetRecus: validRecords.length + invalidRecords.length,
+          nbObjetRecus: validRecords.length + numeroBioError.length,
           nbObjetAcceptes: validRecords.length,
-          nbObjetRefuses: invalidRecords.length,
+          nbObjetRefuses: numeroBioError.length,
           listeNumeroBioValides: validRecords,
           listeProblemes: invalidRecords
         })
@@ -991,12 +999,12 @@ app.register(async (app) => {
         for (const error of errors) {
           await addErrorJob(jobId, error)
         }
-        await updateJobError(validRecords, invalidRecords, invalidRecords.length, [], jobId)
+        await updateJobError(validRecords, invalidRecords, numeroBioError.length, [], jobId)
         return reply.code(400).send({
           jobId,
-          nbObjetRecus: invalidRecords.length,
+          nbObjetRecus: numeroBioError.length,
           nbObjetAcceptes: 0,
-          nbObjetRefuses: invalidRecords.length,
+          nbObjetRefuses: numeroBioError.length,
           listeProblemes: invalidRecords
         })
       }
