@@ -31,7 +31,7 @@
     "@types/jest": "^30.0.0",
     "@types/node": "^26.6.2",
     "@types/pg": "^8.23.1",
-    "@typescript-eslint/eslint-plugin": "^8.70.0",
+    "@typescript-eslint/eslint-plugin": "^8.70.1",
     "@typescript-eslint/parser": "^8.70.0",
     "adm-zip": "^0.6.1",
     "ajv-formats": "^3.0.1",
