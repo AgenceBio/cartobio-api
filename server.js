@@ -1024,7 +1024,7 @@ app.register(async (app) => {
 
   app.get('/api/v3/import/jobs/:id', mergeSchemas(protectedWithToken({ oc: true })), async (request, reply) => {
     const { id } = request.params
-    const result = await getCurrentStatusJobs(id)
+    const result = await getCurrentStatusJobs(id, request.organismeCertificateur.id)
 
     if (result.status === 'error') {
       return reply.code(404).send(result)
@@ -1092,9 +1092,9 @@ app.register(async (app) => {
 
   app.get('/api/v3/import/parcellaire-imports/:id', mergeSchemas(protectedWithToken({ oc: true })), async (request, reply) => {
     const { id } = request.params
-    const { withPayload = 'false', logs = 'none' } = request.query
+    const { withPayload = 'false' } = request.query
 
-    const result = await getImportById({ id, withPayload, logs })
+    const result = await getImportById({ id, payload: withPayload, organismeCertificateur: request.organismeCertificateur.id })
 
     if (!result) {
       return reply.status(404).send({ message: 'Import introuvable' })
