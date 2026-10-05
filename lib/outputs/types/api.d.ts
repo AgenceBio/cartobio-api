@@ -27,7 +27,7 @@ export type InputApiParcelle = {
     geom: string;
     culture: InputApiCulture[];
     cultures?: InputApiCulture[] | undefined;
-    enAttentePac?:boolean | undefined;
+    enAttentePac?:boolean | number | undefined;
 };
 export type InputApiCulture = {
     codeCPF: string;
