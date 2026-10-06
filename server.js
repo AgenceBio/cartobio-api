@@ -1,3 +1,4 @@
+// @ts-nocheck
 'use strict'
 
 const Sentry = require('@sentry/node')
@@ -76,8 +77,7 @@ const {
   getImportLogs,
   getImportPayload,
   addErrorJob,
-  updateJobError
-} = require('./lib/providers/api-parcellaire.js')
+  updateJobError} = require('./lib/providers/api-parcellaire.js')
 // const JSONStream = require('jsonstream-next')
 const { generatePDF, getAttestationProduction } = require('./lib/providers/export-pdf.js')
 const { evvLookup, evvParcellaire, pacageLookup, iterateOperatorLastRecords } = require('./lib/providers/cartobio.js')
@@ -131,6 +131,8 @@ const {
   getGeometryEquals,
   calculateParcelBorder
 } = require('./lib/providers/geometry.js')
+
+const { parcellaireRoutes } = require('./lib/modules/stats/routes')
 
 const DURATION_ONE_MINUTE = 1000 * 60
 const DURATION_ONE_HOUR = DURATION_ONE_MINUTE * 60
@@ -244,6 +246,7 @@ app.register(fastifySwaggerUi, {
 })
 
 app.register(CartoBioDecoratorsPlugin)
+app.register(parcellaireRoutes, { prefix: '/api/v3/tdb-api' })
 
 app.register(async (app) => {
   // Begin Public API routes
@@ -954,13 +957,25 @@ app.register(async (app) => {
       }, jobId)
 
       const validRecords = validItems.map(v => v.numeroBio)
-      const invalidRecords = errors.map(({ numeroBio, error, errorType }) => ({
+      const invalidRecords = errors.map(({ numeroBio, message, code, idParcelle, nomParcelle }) => ({
         ...(numeroBio ? { numeroBio } : {}),
-        code: errorType,
-        message: error.message
+        code: code,
+        message: message,
+        ...(idParcelle && nomParcelle
+          ? { idParcelle, nomParcelle }
+          : {})
+
       }))
 
-      if (invalidRecords.length === 0) {
+      const numeroBioError = [
+        ...new Set(
+          errors
+            .map(error => error.numeroBio)
+            .filter(Boolean)
+        )
+      ]
+
+      if (numeroBioError.length === 0) {
         reply.code(202).send({
           jobId,
           nbObjetRecus: validRecords.length,
@@ -969,11 +984,14 @@ app.register(async (app) => {
           listeNumeroBioValides: validRecords
         })
       } else if (validRecords.length > 0) {
+        for (const error of errors) {
+          await addErrorJob(jobId, error)
+        }
         reply.code(207).send({
           jobId,
-          nbObjetRecus: validRecords.length + invalidRecords.length,
+          nbObjetRecus: validRecords.length + numeroBioError.length,
           nbObjetAcceptes: validRecords.length,
-          nbObjetRefuses: invalidRecords.length,
+          nbObjetRefuses: numeroBioError.length,
           listeNumeroBioValides: validRecords,
           listeProblemes: invalidRecords
         })
@@ -981,12 +999,12 @@ app.register(async (app) => {
         for (const error of errors) {
           await addErrorJob(jobId, error)
         }
-        await updateJobError(validRecords, invalidRecords, invalidRecords.length, [], jobId)
+        await updateJobError(validRecords, invalidRecords, numeroBioError.length, [], jobId)
         return reply.code(400).send({
           jobId,
-          nbObjetRecus: invalidRecords.length,
+          nbObjetRecus: numeroBioError.length,
           nbObjetAcceptes: 0,
-          nbObjetRefuses: invalidRecords.length,
+          nbObjetRefuses: numeroBioError.length,
           listeProblemes: invalidRecords
         })
       }
@@ -996,6 +1014,7 @@ app.register(async (app) => {
 
       return reply
     } catch (error) {
+      console.log(error)
       if (error instanceof InvalidRequestApiError) {
         throw error
       }
@@ -1005,7 +1024,7 @@ app.register(async (app) => {
 
   app.get('/api/v3/import/jobs/:id', mergeSchemas(protectedWithToken({ oc: true })), async (request, reply) => {
     const { id } = request.params
-    const result = await getCurrentStatusJobs(id)
+    const result = await getCurrentStatusJobs(id, request.organismeCertificateur.id)
 
     if (result.status === 'error') {
       return reply.code(404).send(result)
@@ -1073,9 +1092,9 @@ app.register(async (app) => {
 
   app.get('/api/v3/import/parcellaire-imports/:id', mergeSchemas(protectedWithToken({ oc: true })), async (request, reply) => {
     const { id } = request.params
-    const { withPayload = 'false', logs = 'none' } = request.query
+    const { withPayload = 'false' } = request.query
 
-    const result = await getImportById({ id, withPayload, logs })
+    const result = await getImportById({ id, payload: withPayload, organismeCertificateur: request.organismeCertificateur.id })
 
     if (!result) {
       return reply.status(404).send({ message: 'Import introuvable' })
