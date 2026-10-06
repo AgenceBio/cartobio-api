@@ -3,9 +3,10 @@
 const fs = require('fs')
 const cliProgress = require('cli-progress')
 
-const pool = require('../lib/db')
-const { fetchCustomersByOc } = require('../lib/providers/agence-bio.js')
-const { createOrUpdateOperatorRecord, hideImport } = require('../lib/providers/cartobio.js')
+const pool = require('../src/database/database')
+const { fetchCustomersByOc } = require('../src/clients/agence-bio.client.js')
+const { createOrUpdateOperatorRecord } = require('../src/shared/cartobio.service.js')
+const { hideImport } = require('../src/modules/operators/operators.service.js')
 /* main.js */
 
 if (process.argv.length < 3) {

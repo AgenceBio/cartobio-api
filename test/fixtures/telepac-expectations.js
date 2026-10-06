@@ -1,4 +1,4 @@
-const { EtatProduction } = require('../../lib/enums')
+const { EtatProduction } = require('../../src/shared/enums')
 const UUIDRe = /^[a-f0-9]+-[a-f0-9]+-[a-f0-9]+-[a-f0-9]+-[a-f0-9]+$/
 
 module.exports = {

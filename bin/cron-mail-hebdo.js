@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-const { sendRapportHebdo } = require('../lib/mailer/utils.js')
-const pool = require('../lib/db')
+const { sendRapportHebdo } = require('../src/services/mailer/utils.js')
+const pool = require('../src/database/database')
 
 async function sendMail () {
   const { rows: ocList } = await pool.query(`

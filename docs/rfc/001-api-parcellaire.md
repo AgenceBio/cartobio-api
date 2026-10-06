@@ -540,7 +540,7 @@ Le cas particulier des parcelles est traité de la manière suivante :
 
 ## Implémentation technique
 
-[`parseAPIParcellaireStream()` et `parcellaireStreamToDb()` dans `lib/providers/api-parcellaire.js`](../../lib/providers/api-parcellaire.js).
+[`parseAPIParcellaireStream()` et `parcellaireStreamToDb()` dans `src/modules/imports/imports.service.js`](../../src/modules/imports/imports.service.js).
 
 [GeoJSON]: https://geojson.org/
 [ISO 8601]: https://www.iso.org/iso-8601-date-and-time-format.html

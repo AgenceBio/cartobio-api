@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const pool = require('../lib/db')
+const pool = require('../src/database/database')
 
 /**
  * Script de nettoyage des parcellaires supprimés depuis plus de 6 mois

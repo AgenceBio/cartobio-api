@@ -9,16 +9,16 @@ const getStream = require('get-stream')
 const { post } = require('got')
 const gdal = require('gdal-async')
 
-const pool = require('../lib/db')
-const { surfaceForFeatureCollection } = require('../lib/outputs/api.js')
+const pool = require('../src/database/database')
+const { surfaceForFeatureCollection } = require('../src/shared/outputs/api.js')
 const { fromCodePacStrict } = require('@agencebio/rosetta-cultures')
 const {
   unzipGeographicalContent,
   detectSrs,
   wgs84
-} = require('../lib/providers/gdal')
-const { getRandomFeatureId } = require('../lib/outputs/features')
-const { CertificationState, EtatProduction } = require('../lib/enums.js')
+} = require('../src/shared/geo/gdal')
+const { getRandomFeatureId } = require('../src/shared/outputs/features')
+const { CertificationState, EtatProduction } = require('../src/shared/enums.js')
 
 function parseCSV (text) {
   const [headerLine, ...lines] = text.trim().split('\n')

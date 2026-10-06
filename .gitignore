@@ -4,15 +4,15 @@ node_modules
 .idea
 
 # built with npm run build:communes-centroids
-data/communes.json
-data/antilles.json
-data/guyane.json
-data/reunion.json
-data/mayotte.json
-data/metropole.json
+data/generated/*
+!data/generated/.gitkeep
 data/territoires.gpkg
 
 cartobio-asp*.gpkg*
+
+# Fichiers PDF temporaires générés par les exports
+storage/pdf/*
+!storage/pdf/.gitkeep
 
 # types
 docs/types

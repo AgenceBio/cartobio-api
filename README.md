@@ -34,7 +34,7 @@ Créer un fichier `.env` inspiré de `.example.env`.
 Démarrer le serveur de données :
 
 ```sh
-docker compose up db --force-recreate
+docker compose -f docker/compose.yml up db --force-recreate
 ```
 
 ### Application

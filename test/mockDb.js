@@ -44,15 +44,15 @@ expect.extend({
   }
 })
 
-jest.mock('../lib/db.js', () => {
+jest.mock('../src/database/database.js', () => {
   const { Client } = require('pg')
   const pgTypes = require('pg').types
   pgTypes.setTypeParser(
     pgTypes.builtins.DATE,
     (value) => value === null ? null : new Date(value).toISOString().split('T')[0]
   )
-  const connectionString = require('../lib/config.js').get('databaseUrl')
-  const testDatabaseName = require('../lib/config.js').get('testDatabaseName')
+  const connectionString = require('../src/config/env.js').get('databaseUrl')
+  const testDatabaseName = require('../src/config/env.js').get('testDatabaseName')
 
   const url = new URL(connectionString)
 
@@ -102,22 +102,22 @@ jest.mock('../lib/db.js', () => {
 })
 
 beforeAll(async () => {
-  const client = require('../lib/db.js')
+  const client = require('../src/database/database.js')
   await client._connect()
 })
 
 beforeEach(async () => {
-  const client = require('../lib/db.js')
+  const client = require('../src/database/database.js')
   await client.query('BEGIN')
   client.query.mockClear()
 })
 
 afterEach(async () => {
-  const client = require('../lib/db.js')
+  const client = require('../src/database/database.js')
   await client.query('ROLLBACK')
 })
 
 afterAll(async () => {
-  const client = require('../lib/db.js')
+  const client = require('../src/database/database.js')
   await client._end()
 })

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
-const pool = require('../lib/db')
-const { sendCertificationCompleteModifie } = require('../lib/mailer/utils.js')
-const { fetchEmailForNumeroBio } = require('../lib/providers/agence-bio.js')
+const pool = require('../src/database/database')
+const { sendCertificationCompleteModifie } = require('../src/services/mailer/utils.js')
+const { fetchEmailForNumeroBio } = require('../src/clients/agence-bio.client.js')
 
 async function sendMail () {
   try {

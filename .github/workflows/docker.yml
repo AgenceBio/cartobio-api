@@ -39,7 +39,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: docker/setup-buildx-action@v3
-    - run: docker build -t agencebio/cartobio-api .
+    - run: docker build -f docker/Dockerfile -t agencebio/cartobio-api .
 
     - name: Get services bridge network name
       id: network
@@ -89,7 +89,7 @@ jobs:
             --env SENTRY_RELEASE=${{ needs.build.outputs.version }}-dev-${{ github.sha }} \
             --name cartobio-api-staging \
             --init \
-            --volume /root/pdf:/usr/src/app/pdf \
+            --volume /root/pdf:/usr/src/app/storage/pdf \
             ${{ needs.build.outputs.image }}
   deploy-test:
     needs: [build]
@@ -112,7 +112,7 @@ jobs:
             --env SENTRY_RELEASE=${{ needs.build.outputs.version }}-test-${{ github.sha }} \
             --name cartobio-api-test \
             --init \
-            --volume /root/pdf_test:/usr/src/app/pdf \
+            --volume /root/pdf_test:/usr/src/app/storage/pdf \
             ${{ needs.build.outputs.image }}
   deploy-production:
     needs: [build]
@@ -134,5 +134,5 @@ jobs:
             --env-file=.env.cartobio-api-production \
             --name cartobio-api-production \
             --init \
-            --volume /root/pdf:/usr/src/app/pdf \
+            --volume /root/pdf:/usr/src/app/storage/pdf \
             ${{ needs.build.outputs.image }}

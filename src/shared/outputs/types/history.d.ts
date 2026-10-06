@@ -1,0 +1,12 @@
+import { EventType } from "../../enums.js";
+import type {CartoBioUser} from "../../../shared/types/cartobio.d.ts";
+
+export type HistoryEntry = {
+    type: EventType;
+    state?: string | undefined;
+    date: string;
+    metadata?: any | undefined;
+    description?: string | undefined;
+    user?: CartoBioUser | undefined;
+    featureIds?: Array<number> | undefined;
+};

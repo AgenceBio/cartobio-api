@@ -1,6 +1,6 @@
-const db = require('../lib/db')
-const records = require('../lib/providers/__fixtures__/records.json')
-const parcelles = require('../lib/providers/__fixtures__/parcelles.json')
+const db = require('../src/database/database')
+const records = require('./fixtures/providers/records.json')
+const parcelles = require('./fixtures/providers/parcelles.json')
 
 module.exports.loadRecordFixture = async function (data = records, pinnedRecords = [], userId = 1) {
   await db.query('TRUNCATE TABLE cartobio_parcelles')

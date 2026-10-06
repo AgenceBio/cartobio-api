@@ -2,14 +2,14 @@ name: Check and publish types package
 on:
   pull_request:
     paths:
-      - 'lib/**/*.d.ts'
-      - 'lib/package.json'
+      - 'src/shared/**/*.d.ts'
+      - 'src/shared/package.json'
   push:
     branches:
       - main
     paths:
-      - 'lib/**/*.d.ts'
-      - 'lib/package.json'
+      - 'src/shared/**/*.d.ts'
+      - 'src/shared/package.json'
 jobs:
   publish-types:
     runs-on: ubuntu-latest
@@ -22,7 +22,7 @@ jobs:
           scope: '@agencebio'
 
       # Get the version from the package.json file and check its different from the last version published
-      - run: echo "version=$(node -p "require('./lib/package.json').version")" >> $GITHUB_ENV
+      - run: echo "version=$(node -p "require('./src/shared/package.json').version")" >> $GITHUB_ENV
       - run: echo "last_version=$(npm show @agencebio/cartobio-types version)" >> $GITHUB_ENV
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -33,6 +33,6 @@ jobs:
       # Publish the package if the version has changed
       - run: npm publish --access public
         if: github.ref == 'refs/heads/main'
-        working-directory: lib
+        working-directory: src/shared
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

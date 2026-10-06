@@ -7,7 +7,8 @@ const jest = require("eslint-plugin-jest");
 module.exports = defineConfig([
   globalIgnores([
     "**/*.d.ts",
-    "migrations/**/*.js",
+    "database/old_migrations/**/*.js",
+    "src/db/index.ts",
   ]),
 
   js.configs.recommended,

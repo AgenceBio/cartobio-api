@@ -3,8 +3,8 @@ const DBMigrate = require('db-migrate')
 const { initTerritoires } = require('./init-territoires.js')
 
 module.exports = async function () {
-  const connectionString = require('../lib/config.js').get('databaseUrl')
-  const testDatabaseName = require('../lib/config.js').get('testDatabaseName')
+  const connectionString = require('../src/config/env.js').get('databaseUrl')
+  const testDatabaseName = require('../src/config/env.js').get('testDatabaseName')
 
   const client = new Client({ connectionString })
   await client.connect()
@@ -37,6 +37,9 @@ module.exports = async function () {
         password: url.password,
         database: testDatabaseName
       }
+    },
+    cmdOptions: {
+      'migrations-dir': 'database/old_migrations'
     },
     env: 'test'
   })

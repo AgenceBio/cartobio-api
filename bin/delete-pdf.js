@@ -17,7 +17,7 @@ async function clearPDFS () {
   }
 
   try {
-    fs.readdir('pdf', (err, files) => {
+    fs.readdir('storage/pdf', (err, files) => {
       if (err) throw err
 
       const now = Date.now()
@@ -25,7 +25,7 @@ async function clearPDFS () {
 
       for (const file of files) {
         if (file.toLowerCase().endsWith('.pdf')) {
-          const filePath = path.join('pdf', file)
+          const filePath = path.join('storage/pdf', file)
 
           fs.stat(filePath, (err, stats) => {
             if (err) throw err

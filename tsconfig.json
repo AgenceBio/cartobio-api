@@ -1,6 +1,6 @@
 {
   "include": [
-    "server.d.ts",
+    "src/types/fastify.d.ts",
     "lib/**/*.js",
     "lib/types.d.ts"
   ],

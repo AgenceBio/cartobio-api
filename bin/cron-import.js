@@ -1,6 +1,6 @@
 'use strict'
 
-const pool = require('../lib/db')
+const pool = require('../src/database/database')
 require('dotenv').config()
 
 async function cleanupJobsImportPayload () {

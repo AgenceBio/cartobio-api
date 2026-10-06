@@ -13,9 +13,11 @@ const turf = require('@turf/helpers')
 
 const pipeline = promisify(stream.pipeline)
 
+const generatedDataDirectory = join(__dirname, '..', 'data', 'generated')
+const referenceDataDirectory = join(__dirname, '..', 'data', 'reference')
 async function fetchCommunesBoundaries () {
   // Skip if file already exists
-  const outFile = join(__dirname, '..', 'data', 'communes.json')
+  const outFile = join(generatedDataDirectory, 'communes.json')
   if (fs.existsSync(outFile)) {
     console.log('Commune boundaries file already exists, skipping')
     return
@@ -41,7 +43,7 @@ async function fetchCommunesBoundaries () {
 async function fetchRegionsBoundaries () {
   // Skip if file already exists
   const files = ['metropole', 'antilles', 'guyane', 'reunion', 'mayotte']
-  if (files.every(name => fs.existsSync(join(__dirname, '..', 'data', `${name}.json`)))) {
+  if (files.every(name => fs.existsSync(join(generatedDataDirectory, `${name}.json`)))) {
     console.log('Region boundaries files already exist, skipping')
     return
   }
@@ -75,7 +77,7 @@ async function fetchRegionsBoundaries () {
   // Dump each file
   for (const output in outputs) {
     console.log(`Writing ${output}.json`, outputs[output]?.type)
-    const outputFile = join(__dirname, '..', 'data', `${output}.json`)
+    const outputFile = join(generatedDataDirectory, `${output}.json`)
     await pipeline([
       stream.Readable.from(JSON.stringify(outputs[output])),
       createWriteStream(outputFile)
@@ -85,7 +87,7 @@ async function fetchRegionsBoundaries () {
 
 async function fetchDepartementBoundaries () {
   // Skip if file already exists
-  const outFile = join(__dirname, '..', 'data', 'departements.json')
+  const outFile = join(referenceDataDirectory, 'departements.json')
   if (fs.existsSync(outFile)) {
     console.log('Departement boundaries file already exists, skipping')
     return
@@ -110,7 +112,7 @@ async function fetchDepartementBoundaries () {
 
 async function fetchAtOnceRegionsBoundaries () {
   // Skip if file already exists
-  const outFile = join(__dirname, '..', 'data', 'regions.json')
+  const outFile = join(referenceDataDirectory, 'regions.json')
   if (fs.existsSync(outFile)) {
     console.log('Departement boundaries file already exists, skipping')
     return

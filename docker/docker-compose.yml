@@ -1,0 +1,52 @@
+volumes:
+  geo-db-data:
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v3/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    volumes:
+    - "../.env:/usr/src/app/.env:ro"
+    environment:
+      DATABASE_URL: postgresql://docker:docker@db:5432/gis
+    depends_on:
+    - db
+    ports:
+    - 8000:8000
+    networks:
+    - internal
+    - external
+
+  db:
+    image: kartoza/postgis:15-3.4
+    volumes:
+      - geo-db-data:/var/lib/postgresql
+    restart: on-failure
+    healthcheck:
+      test: "pg_isready"
+    environment:
+      ALLOW_IP_RANGE: "0.0.0.0/0" # we need that to allow 'api' to connect
+      POSTGRES_USER: docker
+      POSTGRES_PASS: docker
+    ports:
+    - 15432:5432
+    networks:
+    - internal
+
+  maildev:
+    image: maildev/maildev
+    ports:
+      - 1080:1080
+      - 1025:1025
+    networks:
+      - internal
+
+networks:
+  internal:
+  external:

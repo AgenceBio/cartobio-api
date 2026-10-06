@@ -2,9 +2,10 @@
 
 const cliProgress = require('cli-progress')
 const xlsx = require('xlsx')
-const pool = require('../lib/db')
-const { fetchCustomersByOc } = require('../lib/providers/agence-bio.js')
-const { createOrUpdateOperatorRecord, hideImport } = require('../lib/providers/cartobio.js')
+const pool = require('../src/database/database')
+const { fetchCustomersByOc } = require('../src/clients/agence-bio.client.js')
+const { createOrUpdateOperatorRecord } = require('../src/shared/cartobio.service.js')
+const { hideImport } = require('../src/modules/operators/operators.service.js')
 
 if (process.argv.length < 4) {
   console.error('Usage: node create-parcellaire-import-pac-xlsx.js <XLSX> <OC_ID>')
