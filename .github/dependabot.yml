@@ -17,7 +17,7 @@ updates:
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "daily"
     target-branch: "test"
     ignore:
       - dependency-name: "file-type"
