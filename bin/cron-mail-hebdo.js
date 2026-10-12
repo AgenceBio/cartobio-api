@@ -10,21 +10,24 @@ async function sendMail () {
       WHERE active = true
     `)
 
-  if (!ocList) {
+  if (!ocList.length) {
     console.error('Aucun organisme certificateur')
     process.exit(1)
   }
 
-  try {
-    for (const oc of ocList) {
+  let hasError = false
+  for (const oc of ocList) {
+    try {
       await sendRapportHebdo(oc.id, oc.email, oc.label)
       console.log(`Rapport envoyé à ${oc.email}`)
+    } catch (err) {
+      hasError = true
+      console.error(`Erreur envoi rapport à ${oc.email}:`, err)
     }
-    process.exit(0)
-  } catch (err) {
-    console.error('Erreur envoi rapport:', err)
-    process.exit(1)
   }
+
+  await pool.end()
+  process.exit(hasError ? 1 : 0)
 }
 
 (async function () {
