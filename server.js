@@ -77,7 +77,8 @@ const {
   getImportLogs,
   getImportPayload,
   addErrorJob,
-  updateJobError} = require('./lib/providers/api-parcellaire.js')
+  updateJobError,
+  updateImportJobStatus} = require('./lib/providers/api-parcellaire.js')
 // const JSONStream = require('jsonstream-next')
 const { generatePDF, getAttestationProduction } = require('./lib/providers/export-pdf.js')
 const { evvLookup, evvParcellaire, pacageLookup, iterateOperatorLastRecords } = require('./lib/providers/cartobio.js')
@@ -948,9 +949,10 @@ app.register(async (app) => {
       return new PassThrough().end('{}')
     }
   }), async (request, reply) => {
+    let jobId
     try {
       const stream = request.originalPayload
-      const jobId = await createImportJob(request.organismeCertificateur.id)
+      jobId = await createImportJob(request.organismeCertificateur.id)
 
       const { errors, validItems } = await collectFullValidationResults(stream, {
         organismeCertificateur: request.organismeCertificateur
@@ -1015,6 +1017,13 @@ app.register(async (app) => {
       return reply
     } catch (error) {
       console.log(error)
+      if (jobId) {
+        try {
+          await updateImportJobStatus(jobId, 'ERROR', JSON.stringify({ name: error.name, message: error.message }))
+        } catch (err) {
+          console.error('updateImportJobStatus error:', err)
+        }
+      }
       if (error instanceof InvalidRequestApiError) {
         throw error
       }
