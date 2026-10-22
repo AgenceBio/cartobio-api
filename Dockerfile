@@ -1,25 +1,20 @@
-FROM node:24-alpine3.22
+FROM node:24-slim
 
-RUN apk add --update unzip gdal-dev cmake build-base python3
+ENV CHROME_BIN="/usr/bin/chromium" \
+    PUPPETEER_SKIP_DOWNLOAD="true" \
+    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD="true"
 
-ENV CHROME_BIN="/usr/bin/chromium-browser" \
-      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD="true"
-
-RUN apk add --no-cache \
-      chromium-swiftshader \
-      nss \
-      freetype \
-      harfbuzz \
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      chromium \
+      fonts-freefont-ttf \
       ca-certificates \
-      ttf-freefont \
-      nodejs \
-      yarn \
-      mesa-dri-gallium \
-      mesa-egl \
-      mesa-gl \
-      libx11-dev \
-      libxext-dev \
-      curl
+      curl \
+      unzip \
+      libgl1 \
+      libegl1 \
+      libgl1-mesa-dri \
+ && rm -rf /var/lib/apt/lists/*
 
 # Create app directory
 WORKDIR /usr/src/app
@@ -29,18 +24,16 @@ WORKDIR /usr/src/app
 # where available (npm@5+)
 COPY --chown=node:node package*.json ./
 
-# If building deps fails, the answer is: aim for pre-built binaries
+# gdal-async : on Debian (glibc), the pre-built binary is downloaded, no compilation needed
 # https://www.npmjs.com/package/gdal-async#user-content-unit-tested-platforms-with-pre-built-binaries
-# And until arm64 prebuilt images are provided, we branch out
-# https://github.com/mmomtchev/node-gdal-async/issues/30#issuecomment-1275888379
+# Note: no arm64 pre-built binary for Node 24 -> on arm64, add python3 make g++ above
 
 # Build geo data files
 COPY --chown=node:node ./bin ./bin
 COPY --chown=node:node ./data ./data
 
-RUN npm ci --build-from-source --shared_gdal
+RUN npm ci
 RUN npm run build:geo-data
-
 
 # Bundle app source
 COPY --chown=node:node ./lib ./lib
@@ -53,12 +46,11 @@ COPY --chown=node:node ./eslint.config.js ./eslint.config.js
 COPY --chown=node:node ./jsconfig.json ./jsconfig.json
 COPY --chown=node:node ./tsconfig.json ./tsconfig.json
 
-EXPOSE  8000
-ENV     NODE_ENV  production
-ENV     PORT      8000
-ENV     HOST      0.0.0.0
-
-ENV CHROMIUM_FLAGS="--disable-software-rasterizer --disable-dev-shm-usage"
+EXPOSE 8000
+ENV NODE_ENV=production \
+    PORT=8000 \
+    HOST=0.0.0.0 \
+    CHROMIUM_FLAGS="--disable-software-rasterizer --disable-dev-shm-usage"
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD curl -f http://localhost:8000/api/v3/health || exit 1
