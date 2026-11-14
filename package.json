@@ -57,7 +57,7 @@
     "jsonstream-next": "^3.0.0",
     "mnemonist": "^0.40.5",
     "p-memoize": "^4.0.4",
-    "pg": "^8.23.0",
+    "pg": "^8.23.1",
     "pg-cursor": "^2.22.0",
     "reproject": "^1.2.7",
     "socks-proxy-agent": "^8.0.2",
