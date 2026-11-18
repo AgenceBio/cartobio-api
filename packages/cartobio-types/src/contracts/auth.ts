@@ -42,13 +42,28 @@ export const cartobioUserSchema = z.looseObject({
   organismeCertificateur: organismeCertificateurSchema.optional()
 })
 
+export const userRoleSchema = z.enum(['admin', 'certif', 'audit', 'agri']).meta({
+  description: 'Rôle CartoBio : `admin`, `certif` (chargé de certification), `audit` (auditeur), `agri` (opérateur)'
+})
+
 export const verifyResponseSchema = z
-  .union([cartobioUserSchema.omit({ groups: true }), organismeCertificateurSchema])
+  .union([
+    cartobioUserSchema.extend({
+      roles: z.array(userRoleSchema).meta({ description: "Rôles CartoBio de l'utilisateur" })
+    }),
+    organismeCertificateurSchema
+  ])
   .nullable()
+
+export const refreshResponseSchema = z.object({
+  token: z.string().meta({ description: "Jeton d'accès CartoBio, valable 15 minutes" })
+})
 
 export const exchangeTokenResponseSchema = z.object({
   operator: operatorSchema.meta({ description: 'Opérateur concerné par la notification' }),
-  token: z.string().meta({ description: 'Jeton CartoBio, valable 2 heures' })
+  token: z.string().meta({
+    description: "Jeton CartoBio, valable 15 minutes et limité à l'opérateur de la notification"
+  })
 })
 
 export type SsoCallbackQuery = z.infer<typeof ssoCallbackQuerySchema>
@@ -60,3 +75,5 @@ export type CartoBioUser = z.infer<typeof cartobioUserSchema>
 export type CartoBioOCUser = CartoBioUser & { organismeCertificateur: OrganismeCertificateur }
 export type VerifyResponse = z.infer<typeof verifyResponseSchema>
 export type ExchangeTokenResponse = z.infer<typeof exchangeTokenResponseSchema>
+export type UserRole = z.infer<typeof userRoleSchema>
+export type RefreshResponse = z.infer<typeof refreshResponseSchema>

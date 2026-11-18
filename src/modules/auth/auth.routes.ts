@@ -1,45 +1,49 @@
-import { createSigner, createVerifier } from 'fast-jwt'
 import config from '../../config/env.js'
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
-import { devLoginSchema, exchangeTokenSchema, logoutSchema, ssoCallbackSchema, verifySchema } from './auth.schema.js'
-import { cartobioTokenSchema } from './auth.tokens.js'
-import { ForbiddenApiError, UnauthorizedApiError } from '../../shared/errors.js'
+import {
+  devLoginSchema,
+  exchangeTokenSchema,
+  logoutSchema,
+  refreshSchema,
+  ssoCallbackSchema,
+  verifySchema
+} from './auth.schema.js'
+import { ForbiddenApiError, InvalidCredentialsApiError, UnauthorizedApiError } from '../../shared/errors.js'
 import * as service from './auth.service.js'
-import { decodeAuthState } from './auth.utils.js'
+import { decodeAuthState, userRoles } from './auth.utils.js'
 
-const DURATION_ONE_HOUR = 1000 * 60 * 60
+const SESSION_COOKIE = 'cartobio_session'
+const SESSION_COOKIE_PATH = '/api/auth-provider'
 
-export interface AuthRoutesOptions {
-  sign: (payload: object) => string
+function setSessionCookie(reply: FastifyReply, token: string, expiresAt: Date): void {
+  reply.setCookie(SESSION_COOKIE, token, {
+    path: SESSION_COOKIE_PATH,
+    httpOnly: true,
+    secure: true,
+    sameSite: 'strict',
+    expires: expiresAt
+  })
 }
 
-export default async function authenticationRoutes(
-  fastify: FastifyInstance,
-  options: AuthRoutesOptions
-): Promise<void> {
+function clearSessionCookie(reply: FastifyReply): void {
+  reply.clearCookie(SESSION_COOKIE, { path: SESSION_COOKIE_PATH, httpOnly: true, secure: true, sameSite: 'strict' })
+}
+
+function assertSameOriginRequest(request: FastifyRequest): void {
+  if (!request.headers['x-requested-with']) {
+    throw new ForbiddenApiError("l'en-tête X-Requested-With est obligatoire.")
+  }
+}
+
+export default async function authenticationRoutes(fastify: FastifyInstance): Promise<void> {
   const app = fastify.withTypeProvider<ZodTypeProvider>()
-  const { sign } = options
-  const verifyIgnoringExpiration = createVerifier({
-    key: config.get('jwtSecret'),
-    ignoreExpiration: true
-  })
-  const signExchangeToken = createSigner({
-    key: config.get('jwtSecret'),
-    expiresIn: DURATION_ONE_HOUR * 2
-  })
+
   app.get('/api/v2/user/verify', verifySchema, async (request, reply) => {
     const { user, organismeCertificateur } = request
     if (!user) return reply.send(organismeCertificateur)
 
-    const { id, nom, prenom, mainGroup } = user
-    return reply.send({
-      id,
-      nom,
-      prenom,
-      mainGroup,
-      organismeCertificateur: user.organismeCertificateur
-    })
+    return reply.send({ ...user, roles: userRoles(user) })
   })
 
   app.get('/api/v2/user/exchangeToken', exchangeTokenSchema, async (request, reply) => {
@@ -62,8 +66,7 @@ export default async function authenticationRoutes(
 
     return reply.send({
       operator,
-      // @todo use Notification pubkey and time based token to passthrough the requests to both Agence Bio and CartoBio APIs
-      token: signExchangeToken(userProfile)
+      token: service.signExchangeToken(userProfile.id, String(operator.numeroBio))
     })
   })
 
@@ -81,32 +84,39 @@ export default async function authenticationRoutes(
         })
       })
     const userProfile = await service.getUserProfileFromSSOToken(token.access_token)
+    const session = await service.createSession(userProfile.id, token.id_token ?? null)
 
-    const cartobioToken = sign({ ...userProfile, id_token: token.id_token })
-
+    setSessionCookie(reply, session.token, session.expiresAt)
     return reply.redirect(
-      `${config.get('frontendUrl')}/login?mode=${encodeURIComponent(mode)}&returnto=${encodeURIComponent(returnto)}#token=${cartobioToken}`
+      `${config.get('frontendUrl')}/login?mode=${encodeURIComponent(mode)}&returnto=${encodeURIComponent(returnto)}`
     )
   })
 
+  app.post('/api/auth-provider/refresh', refreshSchema, async (request, reply) => {
+    assertSameOriginRequest(request)
+    const sessionToken = request.cookies[SESSION_COOKIE]
+    if (!sessionToken) throw new InvalidCredentialsApiError('aucune session, veuillez vous connecter.')
+
+    const session = await service.refreshSession(sessionToken).catch((error: unknown) => {
+      clearSessionCookie(reply)
+      throw error
+    })
+    if (session.token && session.expiresAt) setSessionCookie(reply, session.token, session.expiresAt)
+
+    return reply.send({ token: service.signAccessToken(session.userId) })
+  })
+
   app.post('/api/auth-provider/logout', logoutSchema, async (request, reply) => {
-    const cartobioToken = request.headers.authorization?.split(' ')[1]
-    if (!cartobioToken) throw new UnauthorizedApiError("un jeton d'API est nécessaire pour se déconnecter.")
-    let payload: unknown
-    try {
-      payload = verifyIgnoringExpiration(cartobioToken)
-    } catch (error) {
-      throw new UnauthorizedApiError('impossible de vérifier ce jeton', { cause: error })
-    }
-    const { id_token: idToken, exp } = cartobioTokenSchema.parse(payload)
-    const ssoHost = config.get('notifications.sso.host')
-    const logoutUrl = new URL('/oauth2/sessions/logout', ssoHost)
+    assertSameOriginRequest(request)
+    const sessionToken = request.cookies[SESSION_COOKIE]
+    const idToken = sessionToken ? await service.endSession(sessionToken) : null
+    clearSessionCookie(reply)
+
+    const logoutUrl = new URL('/oauth2/sessions/logout', config.get('notifications.sso.host'))
     if (idToken) {
       logoutUrl.searchParams.set('id_token_hint', idToken)
       logoutUrl.searchParams.set('post_logout_redirect_uri', config.get('frontendUrl'))
     }
-
-    await service.revokeToken(cartobioToken, exp)
 
     return reply.code(200).send({ logoutUrl: logoutUrl.toString() })
   })

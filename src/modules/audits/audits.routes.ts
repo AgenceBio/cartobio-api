@@ -64,13 +64,14 @@ export default async function auditRoutes(fastify: FastifyInstance): Promise<voi
 
   app.post('/api/v2/operator/:numeroBio/records', createRecordSchema, async (request, reply) => {
     const { numeroBio } = request.params
-    const { id: ocId, nom: ocLabel } = requireOperator(request).organismeCertificateur
+    const { id: ocId, nom: ocLabel, numeroClient } = requireOperator(request).organismeCertificateur
     const record = await service.createOrUpdateOperatorRecord(
       {
         ...request.body,
         numerobio: String(numeroBio),
         oc_id: ocId,
-        oc_label: ocLabel
+        oc_label: ocLabel,
+        numero_client: numeroClient
       },
       {
         user: request.user,

@@ -3,6 +3,7 @@ import {
   enforceAdminRole,
   enforceRecordAndOperator,
   enforceOperator,
+  enforceTokenScope,
   verifyAgenceBioToken,
   enforceAnyFastifyDecorator,
   compareOperatorOutputAndToken,
@@ -11,7 +12,6 @@ import {
   haveRightToUpdate
 } from './middlewares.js'
 import { getRecord } from './parcellaires/parcellaires.service.js'
-import config from '../config/env.js'
 import merge from 'deepmerge'
 import { apiErrorSchema, auditParamsSchema, numeroBioParamsSchema } from '@agencebio/cartobio-types'
 import { z } from 'zod'
@@ -35,6 +35,7 @@ export type WithSchema<B extends CartobioExtendedRouteShorthandOptions, S extend
 export type ProtectedRoute = {
   schema: { security: Array<Record<string, string[]>> }
   onRequest: Array<onRequestHookHandler | ((request: FastifyRequest, reply: FastifyReply) => Promise<void>)>
+  preHandler: Array<(request: FastifyRequest) => Promise<void>>
   preSerialization: preSerializationHookHandler[]
 }
 
@@ -119,11 +120,12 @@ const hiddenSchema: CartobioExtendedRouteShorthandOptions = {
 /**
  * Use to protect a route with one or more authentication methods
  */
-function protectedWithToken({ oc = false, cartobio = true, admin = false } = {}): ProtectedRoute {
+function protectedWithToken({ oc = false, cartobio = true, admin = false, exchange = false } = {}): ProtectedRoute {
   const requiredDecorators: Array<'user' | 'organismeCertificateur'> = []
   const root: ProtectedRoute = {
     schema: { security: [] },
     onRequest: [],
+    preHandler: [],
     preSerialization: []
   }
 
@@ -136,7 +138,8 @@ function protectedWithToken({ oc = false, cartobio = true, admin = false } = {})
   if (cartobio || admin) {
     requiredDecorators.push('user')
     root.schema.security.push({ bearerAuth: [] })
-    root.onRequest.push(decodeUserToken(config.get('jwtSecret')))
+    root.onRequest.push(decodeUserToken())
+    if (!exchange) root.preHandler.push(enforceTokenScope())
   }
 
   if (requiredDecorators.length) {

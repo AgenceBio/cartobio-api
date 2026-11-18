@@ -67,7 +67,9 @@ describe('generatePDF', () => {
 
     expect(yielded).toEqual([1])
     expect(result).toBe(Buffer.from('complet').toString('base64'))
-    const file = path.join(directory, `${RECORD}_complet_0.pdf`)
+    const [name] = fs.readdirSync(directory)
+    expect(name).toMatch(new RegExp(`^${RECORD}_complet_0_\\d+\\.pdf$`))
+    const file = path.join(directory, name as string)
     expect(fs.readFileSync(file, 'utf8')).toBe('complet')
     expect(mockedRepo.updateAttestationsProductions).toHaveBeenCalledWith(
       RECORD,
@@ -131,7 +133,7 @@ describe('generatePDF', () => {
       RECORD,
       AttestationsProductionsStatus.GENERATED,
       AttestationsProductionsType.PACCOMPLET,
-      path.join(directory, `${RECORD}_PAC_1.pdf`)
+      expect.stringMatching(new RegExp(`/${RECORD}_PAC_1_\\d+\\.pdf$`))
     )
   })
 

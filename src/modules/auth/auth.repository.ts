@@ -1,22 +1,42 @@
-import { eq } from 'drizzle-orm'
+import { and, eq, or } from 'drizzle-orm'
 import { db } from '../../database/database.js'
-import { revokedTokens } from '../../database/schema/index.js'
-import { createRevokedTokenSchema } from '../../database/validations/auth.js'
+import { sessions } from '../../database/schema/index.js'
+import { createSessionSchema, rotateSessionSchema } from '../../database/validations/auth.js'
 
-async function insertRevokedToken(tokenHash: string, expiration: number): Promise<void> {
-  await db
-    .insert(revokedTokens)
-    .values(createRevokedTokenSchema.parse({ tokenHash, expiresAt: new Date(expiration * 1000) }))
-    .onConflictDoNothing({ target: revokedTokens.tokenHash })
+type Session = typeof sessions.$inferSelect
+
+async function insertSession(values: {
+  userId: number
+  tokenHash: string
+  idToken: string | null
+  expiresAt: Date
+}): Promise<void> {
+  await db.insert(sessions).values(createSessionSchema.parse(values))
 }
 
-async function hasRevokedToken(tokenHash: string): Promise<boolean> {
+async function findSessionByTokenHash(tokenHash: string): Promise<Session | undefined> {
   const [row] = await db
-    .select({ tokenHash: revokedTokens.tokenHash })
-    .from(revokedTokens)
-    .where(eq(revokedTokens.tokenHash, tokenHash))
+    .select()
+    .from(sessions)
+    .where(or(eq(sessions.tokenHash, tokenHash), eq(sessions.previousTokenHash, tokenHash)))
     .limit(1)
-  return row !== undefined
+  return row
 }
 
-export { insertRevokedToken, hasRevokedToken }
+async function rotateSession(
+  id: string,
+  currentTokenHash: string,
+  values: { tokenHash: string; previousTokenHash: string; rotatedAt: Date; expiresAt: Date }
+): Promise<boolean> {
+  const { rowCount } = await db
+    .update(sessions)
+    .set(rotateSessionSchema.parse(values))
+    .where(and(eq(sessions.id, id), eq(sessions.tokenHash, currentTokenHash)))
+  return rowCount === 1
+}
+
+async function deleteSession(id: string): Promise<void> {
+  await db.delete(sessions).where(eq(sessions.id, id))
+}
+
+export { insertSession, findSessionByTokenHash, rotateSession, deleteSession }

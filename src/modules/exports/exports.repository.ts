@@ -80,13 +80,10 @@ async function findKeptAttestationsPaths(): Promise<string[]> {
   const rows = await db
     .select({ path: sql<string>`${attestationsProduction.path}` })
     .from(attestationsProduction)
-    .innerJoin(parcellaires, eq(parcellaires.recordId, attestationsProduction.recordId))
     .where(
       and(
         isNotNull(attestationsProduction.path),
-        eq(attestationsProduction.status, productionAttestationStatusEnumSchema.enum.generated),
-        gt(attestationsProduction.updatedAt, parcellaires.updatedAt),
-        gt(attestationsProduction.updatedAt, sql`now() - interval '2 months'`)
+        eq(attestationsProduction.status, productionAttestationStatusEnumSchema.enum.generated)
       )
     )
 

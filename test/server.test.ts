@@ -22,13 +22,13 @@ import geofoliaParcelles from './fixtures/geofolia-parcelles.js'
 
 import { normalizeRecord } from '../src/shared/outputs/record.js'
 import { surfaceForFeatureCollection, recordToApi } from '../src/shared/outputs/api.js'
-import { getCachedUserProfile, getHistoryUser } from '../src/modules/auth/auth.service.js'
+import { getCachedUserProfile, getHistoryUser, signAccessToken } from '../src/modules/auth/auth.service.js'
 import type { CartoBioUser } from '@agencebio/cartobio-types'
 import { collectValidationResult, createImportJob, processFullJob } from '../src/modules/imports/imports.service.js'
 import { asStoredParcelles, loadRecordFixture, expectDeepCloseTo } from './utils.js'
 import { asAgenceBioOperator, asDBRecordWithParcelles } from './factories.js'
 
-const sign = createSigner({ key: config.get('jwtSecret') })
+const sign = (user: { id: number }): string => signAccessToken(user.id)
 
 const fakeOcToken = 'aaaa-bbbb-cccc-dddd'
 const fakeOc = { id: 999, nom: 'CartobiOC', numeroControleEu: 'FR-BIO-999' }

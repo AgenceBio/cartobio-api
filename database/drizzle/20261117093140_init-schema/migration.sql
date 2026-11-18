@@ -50,6 +50,7 @@ CREATE TABLE "cartobio"."parcellaires" (
 	"record_id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 	"numero_bio" integer NOT NULL,
 	"oc_id" integer,
+	"numero_client" varchar,
 	"certification_etat" "cartobio"."certification_type" NOT NULL,
 	"certification_date_debut" date,
 	"certification_date_fin" date,
@@ -219,9 +220,14 @@ CREATE TABLE "cartobio"."parcellaire_import_payload" (
 	"payload" jsonb
 );
 --> statement-breakpoint
-CREATE TABLE "cartobio"."revoked_tokens" (
-	"token_hash" varchar PRIMARY KEY,
-	"user_id" text,
+CREATE TABLE "cartobio"."sessions" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+	"user_id" integer NOT NULL,
+	"token_hash" varchar NOT NULL UNIQUE,
+	"previous_token_hash" varchar UNIQUE,
+	"rotated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"id_token" text,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"expires_at" timestamp with time zone NOT NULL
 );
 --> statement-breakpoint
@@ -244,7 +250,8 @@ CREATE UNIQUE INDEX "import_pac_numero_bio_pacage_siret_idx" ON "cartobio"."impo
 CREATE INDEX "parcellaire_import_organisme_created_at_idx" ON "cartobio"."parcellaire_import" ("organisme_certificateur","created_at");--> statement-breakpoint
 CREATE INDEX "parcellaire_import_logs_import_id_idx" ON "cartobio"."parcellaire_import_logs" ("import_id");--> statement-breakpoint
 CREATE INDEX "parcellaire_import_payload_import_id_idx" ON "cartobio"."parcellaire_import_payload" ("import_id");--> statement-breakpoint
-CREATE INDEX "revoked_tokens_expires_at_idx" ON "cartobio"."revoked_tokens" ("expires_at");--> statement-breakpoint
+CREATE INDEX "sessions_user_id_idx" ON "cartobio"."sessions" ("user_id");--> statement-breakpoint
+CREATE INDEX "sessions_expires_at_idx" ON "cartobio"."sessions" ("expires_at");--> statement-breakpoint
 ALTER TABLE "cartobio"."departements" ADD CONSTRAINT "departements_code_region_regions_code_fkey" FOREIGN KEY ("code_region") REFERENCES "cartobio"."regions"("code");--> statement-breakpoint
 ALTER TABLE "cartobio"."parcellaires" ADD CONSTRAINT "parcellaires_oc_id_organisme_certificateur_id_fkey" FOREIGN KEY ("oc_id") REFERENCES "cartobio"."organisme_certificateur"("id");--> statement-breakpoint
 ALTER TABLE "cartobio"."parcellaires_evenements" ADD CONSTRAINT "parcellaires_evenements_record_id_parcellaires_record_id_fkey" FOREIGN KEY ("record_id") REFERENCES "cartobio"."parcellaires"("record_id") ON DELETE CASCADE;--> statement-breakpoint

@@ -1,4 +1,4 @@
-import { createVerifier, TokenError } from 'fast-jwt'
+import { TokenError } from 'fast-jwt'
 import type { FastifyRequest, FastifyReply, onRequestHookHandler, preSerializationHookHandler } from 'fastify'
 import { CertificationState, recordIdSchema } from '@agencebio/cartobio-types'
 import type {
@@ -21,8 +21,7 @@ import {
 import { hasRecordForOc } from './parcellaires/parcellaires.repository.js'
 import { maskOcAgents } from './outputs/history.js'
 import { redactAuditNotes } from './outputs/record.js'
-import { getCachedUserProfile, isRevoked } from '../modules/auth/auth.service.js'
-import { userTokenSchema } from '../modules/auth/auth.tokens.js'
+import { getCachedUserProfile, verifyAccessToken } from '../modules/auth/auth.service.js'
 import {
   isAdmin,
   isOc,
@@ -32,6 +31,7 @@ import {
   requiresOrganismeCertificateur
 } from '../modules/auth/auth.utils.js'
 import config from '../config/env.js'
+import type { AccessToken } from '../modules/auth/auth.types.js'
 
 type RequestHook = (request: FastifyRequest) => Promise<void>
 type RecordQuery = (id: string, user?: CartoBioUser | null) => Promise<NormalizedRecord | null>
@@ -96,21 +96,15 @@ function hasCartobioRole(user: CartoBioUser): boolean {
   return isAdmin(user) || isOperatorUser(user) || isOc(user)
 }
 
-async function assertNotRevoked(token: string): Promise<void> {
-  if (await isRevoked(token)) throw new InvalidCredentialsApiError('Le token a été révoqué')
-}
-
-function decodeUserToken(key: string): onRequestHookHandler {
-  const verify = createVerifier({ key: async () => key, cache: true })
-
+function decodeUserToken(): onRequestHookHandler {
   return async function decodeUserTokenMiddleware(request: FastifyRequest): Promise<void> {
     const { authorization } = request.headers
     const token = authorization?.startsWith('Bearer ') ? authorization.slice('Bearer '.length).trim() : ''
     if (!token) return
 
-    let userId: number
+    let accessToken: AccessToken
     try {
-      userId = userTokenSchema.parse(await verify(token)).id
+      accessToken = verifyAccessToken(token)
     } catch (error) {
       if (error instanceof TokenError && tokenExpirationErrorCodes.includes(error.code)) {
         throw new ExpiredCredentialsApiError(error.code)
@@ -118,9 +112,7 @@ function decodeUserToken(key: string): onRequestHookHandler {
       throw new InvalidCredentialsApiError("nous n'avons pas réussi à vérifier le jeton d'authentification.")
     }
 
-    await assertNotRevoked(token)
-
-    const profile = await getCachedUserProfile(userId).catch((error: unknown) => {
+    const profile = await getCachedUserProfile(accessToken.sub).catch((error: unknown) => {
       if (getResponseStatusCode(error) === 404) {
         throw new InvalidCredentialsApiError("votre compte n'existe plus.", { cause: error })
       }
@@ -133,6 +125,7 @@ function decodeUserToken(key: string): onRequestHookHandler {
     }
 
     request.user = profile
+    request.tokenNumeroBio = accessToken.typ === 'exchange' ? accessToken.numeroBio : null
   }
 }
 
@@ -149,8 +142,6 @@ function verifyAgenceBioToken(): onRequestHookHandler {
       }
       throw new BadGatewayApiError(PORTAL_UNREACHABLE, { cause: error })
     })
-
-    await assertNotRevoked(token)
 
     request.organismeCertificateur = organismeCertificateur
   }
@@ -176,7 +167,8 @@ function enforceAdminRole(): RequestHook {
 }
 
 async function loadOperator(request: FastifyRequest, numeroBio: string | number): Promise<void> {
-  const { user } = request
+  const { user, tokenNumeroBio } = request
+  if (tokenNumeroBio != null && tokenNumeroBio !== String(numeroBio)) throw new ForbiddenApiError(ACCESS_DENIED)
 
   try {
     if (user && isOperatorUser(user)) {
@@ -189,6 +181,15 @@ async function loadOperator(request: FastifyRequest, numeroBio: string | number)
   } catch (error) {
     if (getResponseStatusCode(error) === 404) throw new NotFoundApiError('Opérateur introuvable')
     throw error
+  }
+}
+
+function enforceTokenScope(): RequestHook {
+  return async function enforceTokenScopeMiddleware(request: FastifyRequest): Promise<void> {
+    const { tokenNumeroBio, operator } = request
+    if (tokenNumeroBio != null && String(operator?.numeroBio) !== tokenNumeroBio) {
+      throw new ForbiddenApiError(ACCESS_DENIED)
+    }
   }
 }
 
@@ -439,6 +440,7 @@ export {
   enforceOperator,
   enforceOperatorAccess,
   enforceRecordAndOperator,
+  enforceTokenScope,
   getRequestOc,
   haveRightToUpdate,
   loadRecordAndOperator,

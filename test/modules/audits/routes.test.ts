@@ -1,13 +1,11 @@
 import request from 'supertest'
-import { createSigner } from 'fast-jwt'
 import { and, eq, isNull } from 'drizzle-orm'
 import { AttestationsProductionsType } from '@agencebio/cartobio-types'
 import type { CartoBioUser } from '@agencebio/cartobio-types'
 import app from '../../../src/app.js'
-import config from '../../../src/config/env.js'
 import { db } from '../../../src/database/database.js'
 import { parcellaires, parcelles, parcellesControles } from '../../../src/database/schema/index.js'
-import { getCachedUserProfile, getHistoryUser } from '../../../src/modules/auth/auth.service.js'
+import { getCachedUserProfile, getHistoryUser, signAccessToken } from '../../../src/modules/auth/auth.service.js'
 import {
   deleteRecordAttestations,
   findValidAttestationProduction
@@ -27,7 +25,7 @@ vi.mock('../../../src/modules/exports/exports.service.js', async (importOriginal
   deleteRecordAttestations: vi.fn()
 }))
 
-const sign = createSigner({ key: config.get('jwtSecret') })
+const sign = (user: { id: number }): string => signAccessToken(user.id)
 const fakeOc = { id: 999, nom: 'CartobiOC', numeroControleEu: 'FR-BIO-999' }
 const fakeUser = {
   id: 1,

@@ -2,6 +2,7 @@ import {
   exchangeTokenResponseSchema,
   externalExploitationParamsSchema,
   logoutResponseSchema,
+  refreshResponseSchema,
   ssoCallbackQuerySchema,
   verifyResponseSchema
 } from '@agencebio/cartobio-types'
@@ -33,7 +34,8 @@ export const exchangeTokenSchema = withSchema(internalSchema, {
   operationId: 'exchangeNotificationToken',
   tags: [TAGS.AUTH],
   summary: 'Échanger un jeton du portail Notifications contre un jeton CartoBio',
-  description: 'Le jeton CartoBio émis est valable 2 heures.',
+  description:
+    "Le jeton CartoBio émis est valable 15 minutes et n'est accepté que pour l'opérateur de la notification.",
   response: {
     ...commonErrorResponses,
     200: exchangeTokenResponseSchema.meta({ description: 'Opérateur et jeton CartoBio' }),
@@ -50,9 +52,26 @@ export const devLoginSchema = withSchema(hiddenSchema, {
 export const ssoCallbackSchema = withSchema(hiddenSchema, {
   operationId: 'ssoCallback',
   summary: 'Retour de la connexion SSO Agence Bio',
-  description: "Émet un jeton CartoBio et redirige vers le front, sur l'onglet demandé à l'ouverture de la connexion.",
+  description:
+    "Ouvre une session CartoBio (cookie `httpOnly`) et redirige vers le front, sur l'onglet demandé à l'ouverture de la connexion.",
   querystring: ssoCallbackQuerySchema
 })
+
+export const refreshSchema = withSchema(
+  {},
+  {
+    operationId: 'refreshSession',
+    tags: [TAGS.AUTH],
+    summary: "Renouveler le jeton d'accès",
+    description:
+      "Renouvelle le cookie de session et émet un jeton d'accès de 15 minutes. L'en-tête `X-Requested-With` est obligatoire.",
+    response: {
+      ...commonErrorResponses,
+      200: refreshResponseSchema.meta({ description: "Jeton d'accès" }),
+      403: apiError('En-tête `X-Requested-With` absent')
+    }
+  }
+)
 
 export const logoutSchema = withSchema(
   {},
@@ -61,8 +80,11 @@ export const logoutSchema = withSchema(
     tags: [TAGS.AUTH],
     summary: 'Se déconnecter',
     description:
-      "Révoque le jeton CartoBio passé dans l'entête `Authorization` et renvoie l'URL de déconnexion du SSO.",
-    response: { 200: logoutResponseSchema.meta({ description: 'Jeton révoqué' }) }
+      "Supprime la session CartoBio du cookie et renvoie l'URL de déconnexion du SSO. L'en-tête `X-Requested-With` est obligatoire.",
+    response: {
+      200: logoutResponseSchema.meta({ description: 'Session supprimée' }),
+      403: apiError('En-tête `X-Requested-With` absent')
+    }
   }
 )
 

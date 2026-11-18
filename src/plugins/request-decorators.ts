@@ -6,6 +6,7 @@ async function requestDecorators(app: FastifyInstance): Promise<void> {
   app.decorateRequest('organismeCertificateur', null)
   app.decorateRequest('operator', null)
   app.decorateRequest('record', null)
+  app.decorateRequest('tokenNumeroBio', null)
 }
 
 export default fp(requestDecorators, { name: 'request-decorators' })

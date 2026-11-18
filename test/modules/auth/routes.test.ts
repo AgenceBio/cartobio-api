@@ -1,5 +1,5 @@
 import request from 'supertest'
-import { createSigner, createVerifier } from 'fast-jwt'
+import { createVerifier } from 'fast-jwt'
 import type { CartoBioUser } from '@agencebio/cartobio-types'
 import app from '../../../src/app.js'
 import config from '../../../src/config/env.js'
@@ -13,15 +13,12 @@ vi.mock('../../../src/modules/auth/auth.service.js', async (importOriginal) => (
   fetchOperatorByNumeroBio: vi.fn(),
   getUserProfileById: vi.fn(),
   canAccessOperator: vi.fn(),
-  getUserProfileFromSSOToken: vi.fn(),
-  revokeToken: vi.fn()
+  getUserProfileFromSSOToken: vi.fn()
 }))
 
-const sign = createSigner({ key: config.get('jwtSecret') })
-const verify = createVerifier({ key: config.get('jwtSecret') })
+const verify = createVerifier({ key: config.get('jwtSecret'), allowedIss: 'cartobio', allowedAud: 'cartobio' })
 const user = buildOcUser() as CartoBioUser
 const operator = buildOperator()
-const nowSeconds = (): number => Math.floor(Date.now() / 1000)
 
 beforeAll(() => app.ready())
 afterAll(() => app.close())
@@ -48,10 +45,8 @@ describe('GET /api/v2/user/exchangeToken', () => {
     expect(response.status).toBe(200)
     expect(response.body.operator).toMatchObject({ numeroBio: '99999' })
     const payload = verify(response.body.token)
-    expect(payload).toMatchObject({
-      id: user.id,
-      organismeCertificateur: user.organismeCertificateur
-    })
+    expect(payload).toMatchObject({ sub: String(user.id), typ: 'exchange', numeroBio: '99999' })
+    expect(payload).not.toHaveProperty('organismeCertificateur')
     expect(payload.exp - payload.iat).toBe(2 * 60 * 60)
     expect(service.fetchOperatorByNumeroBio).toHaveBeenCalledWith('99999')
     expect(service.getUserProfileById).toHaveBeenCalledWith(1)
@@ -83,45 +78,46 @@ describe('GET /api/v2/user/exchangeToken', () => {
 })
 
 describe('POST /api/auth-provider/logout', () => {
-  test("révoque le jeton et renvoie l'URL de déconnexion SSO", async () => {
-    const exp = nowSeconds() + 3600
-    const token = sign({ ...user, id_token: 'id-token-sso', exp })
+  test("supprime la session et renvoie l'URL de déconnexion SSO", async () => {
+    const { token } = await service.createSession(user.id, 'id-token-sso')
 
-    const response = await request(app.server).post('/api/auth-provider/logout').set('Authorization', `Bearer ${token}`)
+    const response = await request(app.server)
+      .post('/api/auth-provider/logout')
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .set('Cookie', `cartobio_session=${token}`)
 
     expect(response.status).toBe(200)
     const logoutUrl = new URL(response.body.logoutUrl)
     expect(logoutUrl.pathname).toBe('/oauth2/sessions/logout')
     expect(logoutUrl.searchParams.get('id_token_hint')).toBe('id-token-sso')
     expect(logoutUrl.searchParams.get('post_logout_redirect_uri')).toBe(config.get('frontendUrl'))
-    expect(service.revokeToken).toHaveBeenCalledWith(token, exp)
+    expect(([] as string[]).concat(response.headers['set-cookie'] ?? [])[0]).toMatch(/^cartobio_session=;/)
+    expect(await service.endSession(token)).toBeNull()
   })
 
-  test('accepte un jeton expiré et sans id_token', async () => {
-    const exp = nowSeconds() - 60
-    const token = sign({ ...user, exp })
-
-    const response = await request(app.server).post('/api/auth-provider/logout').set('Authorization', `Bearer ${token}`)
+  test('accepte une déconnexion sans session', async () => {
+    const response = await request(app.server)
+      .post('/api/auth-provider/logout')
+      .set('X-Requested-With', 'XMLHttpRequest')
 
     expect(response.status).toBe(200)
     expect(new URL(response.body.logoutUrl).search).toBe('')
-    expect(service.revokeToken).toHaveBeenCalledWith(token, exp)
   })
 
-  test.each([
-    ['absent', undefined],
-    ['mal signé', `Bearer ${createSigner({ key: 'autre-secret' })({ ...user, exp: nowSeconds() + 60 })}`]
-  ])('refuse un jeton %s', async (_, header) => {
-    const req = request(app.server).post('/api/auth-provider/logout')
-    const response = header ? await req.set('Authorization', header) : await req
+  test("refuse une déconnexion sans l'en-tête X-Requested-With", async () => {
+    const { token } = await service.createSession(user.id, 'id-token-sso')
 
-    expect(response.status).toBe(401)
-    expect(service.revokeToken).not.toHaveBeenCalled()
+    const response = await request(app.server)
+      .post('/api/auth-provider/logout')
+      .set('Cookie', `cartobio_session=${token}`)
+
+    expect(response.status).toBe(403)
+    expect(await service.endSession(token)).toBe('id-token-sso')
   })
 })
 
 describe('GET /api/auth-provider/agencebio/callback', () => {
-  test("redirige vers le front avec le jeton CartoBio et l'état d'origine", async () => {
+  test("ouvre une session et redirige vers le front avec l'état d'origine", async () => {
     vi.spyOn(app.agenceBioOAuth2, 'getAccessTokenFromAuthorizationCodeFlow').mockResolvedValue({
       token: { access_token: 'access', id_token: 'id-token-sso' }
     } as never)
@@ -135,8 +131,15 @@ describe('GET /api/auth-provider/agencebio/callback', () => {
     expect(`${location.origin}${location.pathname}`).toBe(`${new URL(config.get('frontendUrl')).origin}/login`)
     expect(location.searchParams.get('mode')).toBe('oc')
     expect(location.searchParams.get('returnto')).toBe('/exploitations/99999')
-    const token = location.hash.replace('#token=', '')
-    expect(verify(token)).toMatchObject({ id: user.id, id_token: 'id-token-sso' })
+    expect(location.hash).toBe('')
+    const cookie = ([] as string[])
+      .concat(response.headers['set-cookie'] ?? [])
+      .find((value) => value.startsWith('cartobio_session='))
+    expect(cookie).toMatch(/HttpOnly/)
+    expect(cookie).toMatch(/Secure/)
+    expect(cookie).toMatch(/SameSite=Strict/)
+    const sessionToken = cookie!.split(';')[0]!.split('=')[1]!
+    expect(await service.endSession(sessionToken)).toBe('id-token-sso')
     expect(service.getUserProfileFromSSOToken).toHaveBeenCalledWith('access')
   })
 

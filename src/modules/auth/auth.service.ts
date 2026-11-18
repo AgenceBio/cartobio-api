@@ -1,13 +1,15 @@
-import { createHash } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import memo from 'p-memoize'
 import ExpiryMap from 'expiry-map'
 import got, { HTTPError } from 'got'
 const { get } = got
-import { createDecoder, createVerifier } from 'fast-jwt'
+import { createDecoder, createSigner, createVerifier } from 'fast-jwt'
 import config from '../../config/env.js'
 import { logger } from '../../config/logger.js'
 import * as repository from './auth.repository.js'
-import { notificationsTokenSchema, ssoAccessTokenSchema } from './auth.tokens.js'
+import { accessTokenSchema, notificationsTokenSchema, ssoAccessTokenSchema } from './auth.tokens.js'
+import type { AccessToken, RefreshedSession } from './auth.types.js'
+import { InvalidCredentialsApiError } from '../../shared/errors.js'
 import { fetchOperatorByNumeroBio, fetchUserOperators } from '../../clients/agence-bio.client.js'
 import { organismeCertificateurSchema } from '@agencebio/cartobio-types'
 import type { AgenceBioNormalizedOperator, CartoBioUser, OrganismeCertificateur } from '@agencebio/cartobio-types'
@@ -19,8 +21,32 @@ import { isAdmin, isOperatorUser } from './auth.utils.js'
 
 const origin = config.get('notifications.origin')
 const decode = createDecoder()
-const verify = createVerifier({ key: config.get('notifications.publicKey') })
+const verify = createVerifier({ key: config.get('notifications.publicKey'), requiredClaims: ['exp'] })
 const oneHour = 60 * 60 * 1000
+
+const TOKEN_ISSUER = 'cartobio'
+const ACCESS_TOKEN_DURATION = 15 * 60 * 1000
+const EXCHANGE_TOKEN_DURATION = 2 * oneHour
+const SESSION_IDLE_DURATION = 7 * 24 * oneHour
+const SESSION_MAX_DURATION = 30 * 24 * oneHour
+const ROTATION_GRACE_DURATION = 30 * 1000
+
+const signerOptions = {
+  key: config.get('jwtSecret'),
+  algorithm: 'HS256',
+  iss: TOKEN_ISSUER,
+  aud: TOKEN_ISSUER
+} as const
+const signToken = createSigner({ ...signerOptions, expiresIn: ACCESS_TOKEN_DURATION })
+const signExchange = createSigner({ ...signerOptions, expiresIn: EXCHANGE_TOKEN_DURATION })
+const verifyToken = createVerifier({
+  key: config.get('jwtSecret'),
+  algorithms: ['HS256'],
+  allowedIss: TOKEN_ISSUER,
+  allowedAud: TOKEN_ISSUER,
+  requiredClaims: ['iss', 'aud', 'exp', 'sub', 'typ'],
+  cache: true
+})
 
 type NotificationsDecodedToken = z.infer<typeof notificationsTokenSchema>
 
@@ -137,14 +163,63 @@ async function canAccessOperator(user: CartoBioUser, operator: AgenceBioNormaliz
 }
 
 const hashToken = (token: string): string => createHash('sha256').update(token).digest('hex')
+const newRefreshToken = (): string => randomBytes(32).toString('base64url')
 
-async function revokeToken(token: string, exp: number): Promise<void> {
-  if (exp - Math.floor(Date.now() / 1000) <= 0) return
-  await repository.insertRevokedToken(hashToken(token), exp)
+function signAccessToken(userId: number): string {
+  return signToken({ sub: String(userId), typ: 'session' })
 }
 
-function isRevoked(token: string): Promise<boolean> {
-  return repository.hasRevokedToken(hashToken(token))
+function signExchangeToken(userId: number, numeroBio: string): string {
+  return signExchange({ sub: String(userId), typ: 'exchange', numeroBio })
+}
+
+function verifyAccessToken(token: string): AccessToken {
+  return accessTokenSchema.parse(verifyToken(token))
+}
+
+async function createSession(userId: number, idToken: string | null): Promise<{ token: string; expiresAt: Date }> {
+  const token = newRefreshToken()
+  const expiresAt = new Date(Date.now() + SESSION_IDLE_DURATION)
+  await repository.insertSession({ userId, tokenHash: hashToken(token), idToken, expiresAt })
+  return { token, expiresAt }
+}
+
+async function refreshSession(token: string): Promise<RefreshedSession> {
+  const tokenHash = hashToken(token)
+  const session = await repository.findSessionByTokenHash(tokenHash)
+  if (!session) throw new InvalidCredentialsApiError('session inconnue, veuillez vous reconnecter.')
+
+  const now = Date.now()
+  if (session.expiresAt.getTime() <= now) {
+    await repository.deleteSession(session.id)
+    throw new InvalidCredentialsApiError('session expirée, veuillez vous reconnecter.')
+  }
+
+  if (session.previousTokenHash === tokenHash) {
+    if (now - session.rotatedAt.getTime() <= ROTATION_GRACE_DURATION) return { userId: session.userId }
+    await repository.deleteSession(session.id)
+    logger.warn({ userId: session.userId }, "Réutilisation d'un jeton de session, session révoquée")
+    throw new InvalidCredentialsApiError('session révoquée, veuillez vous reconnecter.')
+  }
+
+  const nextToken = newRefreshToken()
+  const expiresAt = new Date(Math.min(now + SESSION_IDLE_DURATION, session.createdAt.getTime() + SESSION_MAX_DURATION))
+  const rotated = await repository.rotateSession(session.id, tokenHash, {
+    tokenHash: hashToken(nextToken),
+    previousTokenHash: tokenHash,
+    rotatedAt: new Date(now),
+    expiresAt
+  })
+  if (!rotated) return { userId: session.userId }
+
+  return { userId: session.userId, token: nextToken, expiresAt }
+}
+
+async function endSession(token: string): Promise<string | null> {
+  const session = await repository.findSessionByTokenHash(hashToken(token))
+  if (!session) return null
+  await repository.deleteSession(session.id)
+  return session.idToken
 }
 
 export {
@@ -155,6 +230,10 @@ export {
   getCachedUserProfile,
   getHistoryUser,
   getUserProfileFromSSOToken,
-  revokeToken,
-  isRevoked
+  signAccessToken,
+  signExchangeToken,
+  verifyAccessToken,
+  createSession,
+  refreshSession,
+  endSession
 }

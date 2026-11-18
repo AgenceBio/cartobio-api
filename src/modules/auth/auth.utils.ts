@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { authStateSchema } from './auth.tokens.js'
 import type { AuthState } from './auth.types.js'
-import type { CartoBioUser } from '@agencebio/cartobio-types'
+import type { CartoBioUser, UserRole } from '@agencebio/cartobio-types'
 import { UnauthorizedApiError } from '../../shared/errors.js'
 
 export function encodeAuthState(state: AuthState): string {
@@ -60,4 +60,13 @@ export function isOcCertif(user: CartoBioUser | null | undefined): boolean {
 
 export function isOcAudit(user: CartoBioUser | null | undefined): boolean {
   return hasGroup(user, GROUPE.ADMIN, GROUPE.SUPER_OC, GROUPE.AUDITEUR)
+}
+
+export function userRoles(user: CartoBioUser): UserRole[] {
+  if (isOperatorUser(user)) return ['agri']
+  return [
+    ...(isAdmin(user) ? (['admin'] as const) : []),
+    ...(isOcCertif(user) ? (['certif'] as const) : []),
+    ...(isOcAudit(user) ? (['audit'] as const) : [])
+  ]
 }

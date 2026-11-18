@@ -1,7 +1,11 @@
 import { z } from 'zod'
-import { cartobioUserSchema } from '@agencebio/cartobio-types'
 
-export const userTokenSchema = cartobioUserSchema.partial({ nom: true, prenom: true, groups: true })
+const userIdSchema = z.coerce.number().int().positive()
+
+export const accessTokenSchema = z.discriminatedUnion('typ', [
+  z.looseObject({ typ: z.literal('session'), sub: userIdSchema }),
+  z.looseObject({ typ: z.literal('exchange'), sub: userIdSchema, numeroBio: z.string().regex(/^\d+$/) })
+])
 
 export const notificationsTokenSchema = z.looseObject({
   numeroBio: z.union([z.string(), z.number()]).transform(String),
@@ -10,11 +14,6 @@ export const notificationsTokenSchema = z.looseObject({
 
 export const ssoAccessTokenSchema = z.looseObject({
   sub: z.string()
-})
-
-export const cartobioTokenSchema = z.looseObject({
-  id_token: z.string().optional(),
-  exp: z.number()
 })
 
 export const authStateSchema = z.object({

@@ -12,6 +12,7 @@ export const createParcellaireSchema = createInsertSchema(parcellaires, {
   numeroBio: (schema) => schema.int().positive(),
   anneeReferenceControle: (schema) => schema.int().min(2020).max(2100),
   versionNom: (schema) => schema.trim().min(1).max(255),
+  numeroClient: () => emptyToNull(z.string().trim()),
   auditNotesCertif: () => emptyToNull(z.string().trim().max(10_000)),
   auditDemandesOperateur: () => emptyToNull(z.string().trim().max(10_000))
 })

@@ -1,11 +1,9 @@
 import { toIsoDateTime } from '@agencebio/cartobio-types'
 import request from 'supertest'
-import { createSigner } from 'fast-jwt'
 import app from '../../../src/app.js'
-import config from '../../../src/config/env.js'
 import { got } from '../../got-mock.js'
 import * as service from '../../../src/modules/tableau-de-bord/tableau-de-bord.service.js'
-import { getCachedUserProfile } from '../../../src/modules/auth/auth.service.js'
+import { getCachedUserProfile, signAccessToken } from '../../../src/modules/auth/auth.service.js'
 import type { CartoBioUser } from '@agencebio/cartobio-types'
 
 vi.mock('../../../src/modules/auth/auth.service.js', async (importOriginal) => ({
@@ -23,7 +21,7 @@ vi.mock('../../../src/modules/tableau-de-bord/tableau-de-bord.service.js', () =>
   getRepetErreurs: vi.fn()
 }))
 
-const sign = createSigner({ key: config.get('jwtSecret') })
+const sign = (user: { id: number }): string => signAccessToken(user.id)
 const fakeOc = { id: 999, nom: 'CartobiOC', numeroControleEu: 'FR-BIO-999' }
 const fakeUser = {
   id: 1,

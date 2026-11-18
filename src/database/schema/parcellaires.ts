@@ -10,6 +10,7 @@ export const parcellaires = cartobio.table(
     recordId: uuid('record_id').primaryKey().defaultRandom(),
     numeroBio: integer('numero_bio').notNull(),
     ocId: integer('oc_id').references(() => organismeCertificateur.id),
+    numeroClient: varchar('numero_client'),
     certificationEtat: certificationType('certification_etat').notNull(),
     certificationDateDebut: date('certification_date_debut'),
     certificationDateFin: date('certification_date_fin'),

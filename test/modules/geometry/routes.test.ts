@@ -1,9 +1,7 @@
 import request from 'supertest'
-import { createSigner } from 'fast-jwt'
 import type { CartoBioUser } from '@agencebio/cartobio-types'
 import app from '../../../src/app.js'
-import config from '../../../src/config/env.js'
-import { getCachedUserProfile } from '../../../src/modules/auth/auth.service.js'
+import { getCachedUserProfile, signAccessToken } from '../../../src/modules/auth/auth.service.js'
 import * as service from '../../../src/modules/geometry/geometry.service.js'
 import { got } from '../../got-mock.js'
 import { loadRecordFixture } from '../../utils.js'
@@ -20,7 +18,7 @@ vi.mock('../../../src/modules/geometry/geometry.service.js', async (importOrigin
   calculateParcelBorder: vi.fn()
 }))
 
-const sign = createSigner({ key: config.get('jwtSecret') })
+const sign = (user: { id: number }): string => signAccessToken(user.id)
 const ocUser = {
   id: 1,
   prenom: 'Tonio',

@@ -16,11 +16,22 @@ const oneHourInMs = 60 * 60 * 1000
 
 try {
   const keptPaths = new Set((await findKeptAttestationsPaths()).map((keptPath) => path.resolve(keptPath)))
+  const files = (await readdir(directory)).filter((file) => file.toLowerCase().endsWith('.pdf'))
+  const versions = new Map<string, Array<{ file: string; version: number }>>()
+  for (const file of files) {
+    const match = /^(.+_(?:complet|PAC)_\d+)_(\d+)\.pdf$/i.exec(file)
+    if (!match?.[1] || !match[2]) continue
+    versions.set(match[1], [...(versions.get(match[1]) ?? []), { file, version: Number(match[2]) }])
+  }
+  for (const fileVersions of versions.values()) {
+    fileVersions
+      .sort((a, b) => b.version - a.version)
+      .slice(0, 2)
+      .forEach(({ file }) => keptPaths.add(path.resolve(directory, file)))
+  }
   let deleted = 0
 
-  for (const file of await readdir(directory)) {
-    if (!file.toLowerCase().endsWith('.pdf')) continue
-
+  for (const file of files) {
     const filePath = path.resolve(directory, file)
     if (keptPaths.has(filePath)) continue
 

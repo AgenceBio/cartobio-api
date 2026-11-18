@@ -5,8 +5,13 @@ import type { CartoBioUser } from '@agencebio/cartobio-types'
 import app from '../src/app.js'
 import config from '../src/config/env.js'
 import { db } from '../src/database/database.js'
-import { parcellaireImport } from '../src/database/schema/index.js'
-import { getCachedUserProfile } from '../src/modules/auth/auth.service.js'
+import { parcellaireImport, sessions } from '../src/database/schema/index.js'
+import {
+  createSession,
+  getCachedUserProfile,
+  signAccessToken,
+  signExchangeToken
+} from '../src/modules/auth/auth.service.js'
 import { got } from './got-mock.js'
 import { loadRecordFixture } from './utils.js'
 import agencebioOperator from './fixtures/providers/agence-bio-operateur.json' with { type: 'json' }
@@ -16,7 +21,7 @@ vi.mock('../src/modules/auth/auth.service.js', async (importOriginal) => ({
   getCachedUserProfile: vi.fn()
 }))
 
-const sign = createSigner({ key: config.get('jwtSecret') })
+const sign = (user: { id: number }): string => signAccessToken(user.id)
 
 const ocProprietaire = { id: 999, nom: 'CartobiOC', numeroControleEu: 'FR-BIO-999' }
 const autreOc = { id: 1111, nom: 'Certificator', numeroControleEu: 'FR-BIO-1111' }
@@ -223,41 +228,147 @@ describe('isolation des imports entre organismes certificateurs', () => {
   )
 })
 
-describe('déconnexion', () => {
-  const signWithExpiration = createSigner({
-    key: config.get('jwtSecret'),
-    expiresIn: 60 * 60 * 1000
+describe("jeton d'échange", () => {
+  test("donne accès à l'opérateur de la notification", async () => {
+    const token = `Bearer ${signExchangeToken(1, '99999')}`
+
+    expect((await request(app.server).get(R).set('Authorization', token)).status).toBe(200)
+    expect((await request(app.server).get('/api/v2/operator/99999').set('Authorization', token)).status).toBe(200)
   })
 
-  test("révoque le jeton : il n'est plus accepté par l'API", async () => {
-    const token = `Bearer ${signWithExpiration(users[1]!)}`
-
-    expect((await request(app.server).get('/api/v2/test').set('Authorization', token)).status).toBe(200)
-
-    const logout = await request(app.server).post('/api/auth-provider/logout').set('Authorization', token)
-    expect(logout.status).toBe(200)
-    expect(logout.body.logoutUrl).toContain('/oauth2/sessions/logout')
-
-    const after = await request(app.server).get('/api/v2/test').set('Authorization', token)
-    expect(after.status).toBe(401)
-  })
-
-  test("ne révoque pas les autres jetons de l'utilisateur", async () => {
-    const revoked = `Bearer ${signWithExpiration({ ...users[1]!, jti: 'a' })}`
-    const other = `Bearer ${signWithExpiration({ ...users[1]!, jti: 'b' })}`
-
-    await request(app.server).post('/api/auth-provider/logout').set('Authorization', revoked)
-
-    expect((await request(app.server).get('/api/v2/test').set('Authorization', other)).status).toBe(200)
-  })
-
-  test('refuse un jeton signé avec une autre clé, sans le révoquer', async () => {
-    const forged = `Bearer ${createSigner({ key: 'autre-cle', expiresIn: 60 * 60 * 1000 })(users[1]!)}`
+  test("refuse chaque route d'un autre opérateur, sans modifier la base", async () => {
+    const token = `Bearer ${signExchangeToken(1, '88888')}`
     const before = await snapshot()
 
-    const response = await request(app.server).post('/api/auth-provider/logout').set('Authorization', forged)
+    for (const [method, url, body] of routes) {
+      const response = await send(method, url, body, token)
+      expect({ route: `${method.toUpperCase()} ${url}`, status: response.status }).toEqual({
+        route: `${method.toUpperCase()} ${url}`,
+        status: 403
+      })
+    }
+
+    expect(await snapshot()).toEqual(before)
+  })
+
+  test('refuse les routes sans opérateur', async () => {
+    const token = `Bearer ${signExchangeToken(1, '99999')}`
+
+    expect((await request(app.server).get('/api/v2/test').set('Authorization', token)).status).toBe(403)
+  })
+})
+
+describe('session', () => {
+  const refresh = (token: string): request.Test =>
+    request(app.server)
+      .post('/api/auth-provider/refresh')
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .set('Cookie', `cartobio_session=${token}`)
+  const sessionCookie = (response: request.Response): string | undefined =>
+    ([] as string[])
+      .concat(response.headers['set-cookie'] ?? [])
+      .find((cookie) => cookie.startsWith('cartobio_session='))
+  const cookieValue = (cookie: string | undefined): string => cookie!.split(';')[0]!.split('=')[1]!
+
+  test("renouvelle la session et émet un jeton d'accès accepté par l'API", async () => {
+    const { token } = await createSession(1, 'id-token-sso')
+
+    const response = await refresh(token)
+
+    expect(response.status).toBe(200)
+    const cookie = sessionCookie(response)
+    expect(cookie).toMatch(/HttpOnly/)
+    expect(cookie).toMatch(/Secure/)
+    expect(cookie).toMatch(/SameSite=Strict/)
+    expect(cookie).toMatch(/Path=\/api\/auth-provider/)
+    expect(cookieValue(cookie)).not.toBe(token)
+    const test = await request(app.server).get('/api/v2/test').set('Authorization', `Bearer ${response.body.token}`)
+    expect(test.status).toBe(200)
+  })
+
+  test("refuse un renouvellement sans l'en-tête X-Requested-With", async () => {
+    const { token } = await createSession(1, null)
+
+    const response = await request(app.server)
+      .post('/api/auth-provider/refresh')
+      .set('Cookie', `cartobio_session=${token}`)
+
+    expect(response.status).toBe(403)
+  })
+
+  test.each([
+    ['absente', undefined],
+    ['inconnue', 'n-importe-quoi']
+  ])('refuse une session %s', async (_, token) => {
+    const req = request(app.server).post('/api/auth-provider/refresh').set('X-Requested-With', 'XMLHttpRequest')
+    const response = token ? await req.set('Cookie', `cartobio_session=${token}`) : await req
 
     expect(response.status).toBe(401)
-    expect(await snapshot()).toEqual(before)
+  })
+
+  test('refuse une session expirée', async () => {
+    const { token } = await createSession(1, null)
+    await db.update(sessions).set({ expiresAt: new Date(Date.now() - 1000) })
+
+    expect((await refresh(token)).status).toBe(401)
+    expect(await db.select().from(sessions)).toHaveLength(0)
+  })
+
+  test("tolère l'ancien jeton pendant le délai de grâce, sans nouvelle rotation", async () => {
+    const { token } = await createSession(1, null)
+    const first = await refresh(token)
+
+    const concurrent = await refresh(token)
+
+    expect(concurrent.status).toBe(200)
+    expect(sessionCookie(concurrent)).toBeUndefined()
+    expect((await refresh(cookieValue(sessionCookie(first)))).status).toBe(200)
+  })
+
+  test('révoque la session quand un ancien jeton est réutilisé après le délai de grâce', async () => {
+    const { token } = await createSession(1, null)
+    const first = await refresh(token)
+    await db.update(sessions).set({ rotatedAt: new Date(Date.now() - 60 * 1000) })
+
+    expect((await refresh(token)).status).toBe(401)
+    expect((await refresh(cookieValue(sessionCookie(first)))).status).toBe(401)
+  })
+
+  test('la déconnexion supprime la session', async () => {
+    const { token } = await createSession(1, 'id-token-sso')
+
+    const logout = await request(app.server)
+      .post('/api/auth-provider/logout')
+      .set('X-Requested-With', 'XMLHttpRequest')
+      .set('Cookie', `cartobio_session=${token}`)
+
+    expect(logout.status).toBe(200)
+    expect(new URL(logout.body.logoutUrl).searchParams.get('id_token_hint')).toBe('id-token-sso')
+    expect((await refresh(token)).status).toBe(401)
+  })
+
+  test("refuse un jeton d'accès signé avec une autre clé", async () => {
+    const forged = createSigner({ key: 'autre-cle', iss: 'cartobio', aud: 'cartobio', expiresIn: 60 * 1000 })({
+      sub: '1',
+      typ: 'session'
+    })
+
+    const response = await request(app.server).get('/api/v2/test').set('Authorization', `Bearer ${forged}`)
+
+    expect(response.status).toBe(401)
+  })
+
+  test.each([
+    ['sans audience', { iss: 'cartobio' }],
+    ["d'un autre émetteur", { iss: 'autre', aud: 'cartobio' }]
+  ])("refuse un jeton d'accès %s", async (_, claims) => {
+    const token = createSigner({ key: config.get('jwtSecret'), expiresIn: 60 * 1000, ...claims })({
+      sub: '1',
+      typ: 'session'
+    })
+
+    const response = await request(app.server).get('/api/v2/test').set('Authorization', `Bearer ${token}`)
+
+    expect(response.status).toBe(401)
   })
 })

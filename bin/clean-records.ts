@@ -2,7 +2,7 @@
 
 import { and, count, isNotNull, lt, sql } from 'drizzle-orm'
 import { db, firstRow } from '../src/database/database.js'
-import { parcellaires, revokedTokens } from '../src/database/schema/index.js'
+import { parcellaires, sessions } from '../src/database/schema/index.js'
 
 if (process.argv[2] === '-h' || process.argv[2] === '--help') {
   console.log('Usage: npm run cron:clean-records -- [--dry-run]')
@@ -43,8 +43,8 @@ try {
   console.log(countDeletedRecords, 'parcellaires supprimés')
 
   if (!dryRun) {
-    const { rowCount } = await db.delete(revokedTokens).where(lt(revokedTokens.expiresAt, sql`now()`))
-    console.log(rowCount, 'jetons révoqués expirés supprimés')
+    const { rowCount } = await db.delete(sessions).where(lt(sessions.expiresAt, sql`now()`))
+    console.log(rowCount, 'sessions expirées supprimées')
   }
 } finally {
   await db.$client.end()

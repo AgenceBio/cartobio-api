@@ -19,7 +19,7 @@ import {
 } from '../../src/shared/errors.js'
 import { hasRecordForOc } from '../../src/shared/parcellaires/parcellaires.repository.js'
 import { checkOcToken, fetchOperatorByNumeroBio, fetchUserOperators } from '../../src/clients/agence-bio.client.js'
-import { getCachedUserProfile, revokeToken } from '../../src/modules/auth/auth.service.js'
+import { getCachedUserProfile } from '../../src/modules/auth/auth.service.js'
 import config from '../../src/config/env.js'
 import { createSigner } from 'fast-jwt'
 import {
@@ -640,9 +640,10 @@ describe('checkCertification()', () => {
 })
 
 describe('decodeUserToken()', () => {
-  const hook = decodeUserToken(config.get('jwtSecret')) as (request: unknown) => Promise<void>
-  const sign = createSigner({ key: config.get('jwtSecret') })
+  const hook = decodeUserToken() as (request: unknown) => Promise<void>
+  const sign = createSigner({ key: config.get('jwtSecret'), iss: 'cartobio', aud: 'cartobio', expiresIn: 60 * 1000 })
   const ocUser = buildOcUser()
+  const session = { sub: String(ocUser.id), typ: 'session' }
   const bearer = (payload: object) =>
     ({ headers: { authorization: `Bearer ${sign(payload)}` } }) as Record<string, unknown>
 
@@ -660,16 +661,37 @@ describe('decodeUserToken()', () => {
   })
 
   test("charge le profil à jour de l'utilisateur", async () => {
-    const request = bearer({ ...ocUser, nom: 'ancien nom' })
+    const request = bearer(session)
 
     await hook(request)
 
     expect(request.user).toBe(ocUser)
+    expect(request.tokenNumeroBio).toBeNull()
     expect(getCachedUserProfile).toHaveBeenCalledWith(ocUser.id)
   })
 
+  test("limite un jeton d'échange à l'opérateur de la notification", async () => {
+    const request = bearer({ sub: String(ocUser.id), typ: 'exchange', numeroBio: '99999' })
+
+    await hook(request)
+
+    expect(request.user).toBe(ocUser)
+    expect(request.tokenNumeroBio).toBe('99999')
+  })
+
+  test.each([
+    ['sans type', { sub: String(ocUser.id) }],
+    ["d'échange sans numéro bio", { sub: String(ocUser.id), typ: 'exchange' }]
+  ])('refuse un jeton %s', async (_, payload) => {
+    await expect(hook(bearer(payload))).rejects.toThrow(InvalidCredentialsApiError)
+  })
+
   test('signale un jeton expiré', async () => {
-    const request = bearer({ ...ocUser, exp: Math.floor(Date.now() / 1000) - 10 })
+    const request = {
+      headers: {
+        authorization: `Bearer ${createSigner({ key: config.get('jwtSecret'), iss: 'cartobio', aud: 'cartobio' })({ ...session, exp: Math.floor(Date.now() / 1000) - 10 })}`
+      }
+    }
 
     await expect(hook(request)).rejects.toMatchObject({
       statusCode: 401,
@@ -679,7 +701,7 @@ describe('decodeUserToken()', () => {
 
   test('refuse un jeton signé avec une autre clé comme expiré pour déconnecter le front', async () => {
     const request = {
-      headers: { authorization: `Bearer ${createSigner({ key: 'autre' })(ocUser)}` }
+      headers: { authorization: `Bearer ${createSigner({ key: 'autre', iss: 'cartobio', aud: 'cartobio' })(session)}` }
     }
 
     await expect(hook(request)).rejects.toMatchObject({
@@ -692,24 +714,10 @@ describe('decodeUserToken()', () => {
     await expect(hook({ headers: { authorization: 'Bearer pas.un.jwt' } })).rejects.toThrow(InvalidCredentialsApiError)
   })
 
-  test('refuse un jeton révoqué', async () => {
-    const payload = { ...ocUser, nonce: 'revoque' }
-    const request = bearer(payload)
-    await revokeToken(
-      (request.headers as { authorization: string }).authorization.slice(7),
-      Math.floor(Date.now() / 1000) + 60
-    )
-
-    await expect(hook(request)).rejects.toMatchObject({
-      statusCode: 401,
-      message: 'Accès refusé : Le token a été révoqué'
-    })
-  })
-
   test("refuse un compte supprimé de l'Agence Bio", async () => {
     vi.mocked(getCachedUserProfile).mockRejectedValue(notFound)
 
-    await expect(hook(bearer(ocUser))).rejects.toMatchObject({
+    await expect(hook(bearer(session))).rejects.toMatchObject({
       statusCode: 401,
       message: "Accès refusé : votre compte n'existe plus."
     })
@@ -718,7 +726,7 @@ describe('decodeUserToken()', () => {
   test('signale un portail injoignable', async () => {
     vi.mocked(getCachedUserProfile).mockRejectedValue(new Error('ETIMEDOUT'))
 
-    await expect(hook(bearer(ocUser))).rejects.toMatchObject({ statusCode: 502 })
+    await expect(hook(bearer(session))).rejects.toMatchObject({ statusCode: 502 })
   })
 
   test('refuse un compte sans rôle CartoBio', async () => {
@@ -726,7 +734,7 @@ describe('decodeUserToken()', () => {
       buildUser({ groups: [{ id: '99', nom: 'Autre' }], mainGroup: { id: '99' } })
     )
 
-    await expect(hook(bearer(ocUser))).rejects.toMatchObject({
+    await expect(hook(bearer(session))).rejects.toMatchObject({
       statusCode: 403,
       message: "Accès refusé : votre compte n'a pas de rôle CartoBio."
     })
@@ -738,7 +746,7 @@ describe('decodeUserToken()', () => {
       organismeCertificateur: undefined
     })
 
-    await expect(hook(bearer(ocUser))).rejects.toMatchObject({ statusCode: 403 })
+    await expect(hook(bearer(session))).rejects.toMatchObject({ statusCode: 403 })
   })
 })
 

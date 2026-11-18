@@ -322,10 +322,6 @@ const STEPS: Step[] = [
       nb_parcelles: /^\d+$/.test(String(pac.nb_parcelles ?? '')) ? Number(pac.nb_parcelles) : null,
       size: /^\d+(\.\d+)?$/.test(String(pac.size ?? '')) ? Number(pac.size) : null
     })
-  },
-  {
-    table: 'revoked_tokens',
-    extract: 'SELECT rtrim(token_hash) AS token_hash, user_id, expires_at FROM revoked_tokens'
   }
 ]
 

@@ -45,7 +45,7 @@ const featureCollectionResponse = {
   400: apiError('Fichier absent, illisible ou invalide')
 }
 
-export const convertTelepacSchema = withSchema(ocOrCartobio(), {
+export const convertTelepacSchema = withSchema(protectedWithToken({ cartobio: true, oc: true, exchange: true }), {
   operationId: 'convertTelepac',
   tags: [TAGS.IMPORT],
   summary: 'Convertir un export Telepac en GeoJSON',
@@ -53,7 +53,7 @@ export const convertTelepacSchema = withSchema(ocOrCartobio(), {
   response: featureCollectionResponse
 })
 
-export const convertGeofoliaSchema = withSchema(protectedWithToken(), {
+export const convertGeofoliaSchema = withSchema(protectedWithToken({ exchange: true }), {
   operationId: 'convertGeofolia',
   tags: [TAGS.IMPORT],
   summary: 'Convertir un export Geofolia en GeoJSON',
@@ -61,7 +61,7 @@ export const convertGeofoliaSchema = withSchema(protectedWithToken(), {
   response: featureCollectionResponse
 })
 
-export const convertAnyGeoSchema = withSchema(protectedWithToken(), {
+export const convertAnyGeoSchema = withSchema(protectedWithToken({ exchange: true }), {
   operationId: 'convertGeographicalFile',
   tags: [TAGS.IMPORT],
   summary: 'Convertir un fichier géographique en GeoJSON',

@@ -284,6 +284,7 @@ async function parseAPIParcellaire(
       certification_state: CertificationState.CERTIFIED,
       oc_id: organismeCertificateur.id,
       oc_label: organismeCertificateur.nom,
+      numero_client: String(record.numeroClient),
       parcelles: {
         type: 'FeatureCollection' as const,
         features: features.filter((f) => f !== null)

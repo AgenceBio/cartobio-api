@@ -1,22 +1,20 @@
 import { createHash } from 'node:crypto'
 import { eq } from 'drizzle-orm'
 import { db } from '../../../src/database/database.js'
-import { revokedTokens } from '../../../src/database/schema/index.js'
+import { sessions } from '../../../src/database/schema/index.js'
 import { fetchUserOperators } from '../../../src/clients/agence-bio.client.js'
 import {
   canAccessOperator,
+  createSession,
+  endSession,
   getUserProfileById,
   getUserProfileFromSSOToken,
-  isRevoked,
-  revokeToken,
   verifyNotificationAuthorization
 } from '../../../src/modules/auth/auth.service.js'
 import { buildOcUser, buildOperator, buildUser } from '../../factories.js'
 import { get, HTTPError } from '../../got-mock.js'
 
 vi.mock('../../../src/clients/agence-bio.client.js')
-
-const now = (): number => Math.floor(Date.now() / 1000)
 
 describe('canAccessOperator', () => {
   beforeEach(() => {
@@ -77,36 +75,23 @@ describe('canAccessOperator', () => {
   })
 })
 
-describe('revokeToken / isRevoked', () => {
-  test('révoque un jeton encore valide en ne stockant que son empreinte', async () => {
-    await revokeToken('jeton-actif', now() + 3600)
+describe('createSession / endSession', () => {
+  test("ne stocke que l'empreinte du jeton de session", async () => {
+    const { token, expiresAt } = await createSession(1, 'id-token-sso')
 
-    expect(await isRevoked('jeton-actif')).toBe(true)
-    expect(await isRevoked('autre-jeton')).toBe(false)
-
-    const rows = await db.select().from(revokedTokens)
-    expect(rows.map(({ tokenHash }) => tokenHash)).not.toContain('jeton-actif')
     const [row] = await db
       .select()
-      .from(revokedTokens)
-      .where(eq(revokedTokens.tokenHash, createHash('sha256').update('jeton-actif').digest('hex')))
-    expect(row?.expiresAt.getTime()).toBe((now() + 3600) * 1000)
+      .from(sessions)
+      .where(eq(sessions.tokenHash, createHash('sha256').update(token).digest('hex')))
+    expect(row).toMatchObject({ userId: 1, idToken: 'id-token-sso', expiresAt })
+    expect((await db.select().from(sessions)).map(({ tokenHash }) => tokenHash)).not.toContain(token)
   })
 
-  test('ne stocke pas un jeton déjà expiré', async () => {
-    await revokeToken('jeton-expire', now() - 1)
-    await revokeToken('jeton-expirant', now())
+  test('supprime la session et renvoie son id_token', async () => {
+    const { token } = await createSession(1, 'id-token-sso')
 
-    expect(await isRevoked('jeton-expire')).toBe(false)
-    expect(await isRevoked('jeton-expirant')).toBe(false)
-  })
-
-  test('accepte de révoquer deux fois le même jeton', async () => {
-    const exp = now() + 3600
-    await revokeToken('jeton-double', exp)
-    await expect(revokeToken('jeton-double', exp)).resolves.toBeUndefined()
-
-    expect(await isRevoked('jeton-double')).toBe(true)
+    expect(await endSession(token)).toBe('id-token-sso')
+    expect(await endSession(token)).toBeNull()
   })
 })
 

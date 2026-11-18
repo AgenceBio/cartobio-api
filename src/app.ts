@@ -8,7 +8,6 @@ import httpPlugin from './plugins/http.js'
 import swaggerPlugin from './plugins/swagger.js'
 import requestDecoratorsPlugin from './plugins/request-decorators.js'
 import fastifyOauth, { type FastifyOAuth2Options } from '@fastify/oauth2'
-import { createSigner } from 'fast-jwt'
 import { errorHandler } from './shared/errors.js'
 import { encodeAuthState } from './modules/auth/auth.utils.js'
 import systemRoutes from './modules/system/system.routes.js'
@@ -30,9 +29,6 @@ const app = Fastify({ ...loggerOptions(), trustProxy: config.get('env') === 'pro
 
 app.setValidatorCompiler(validatorCompiler)
 app.setSerializerCompiler(serializerCompiler)
-
-const DURATION_ONE_DAY = 1000 * 60 * 60 * 24
-const sign = createSigner({ key: config.get('jwtSecret'), expiresIn: DURATION_ONE_DAY })
 
 app.setErrorHandler(errorHandler)
 
@@ -91,7 +87,7 @@ app.register(operatorsRoutes)
 app.register(auditsRoutes)
 app.register(importsRoutes)
 app.register(exportsRoutes)
-app.register(authRoutes, { sign })
+app.register(authRoutes)
 app.register(authExternalRoutes)
 app.register(geometryRoutes)
 app.register(referentielRoutes)

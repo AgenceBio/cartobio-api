@@ -118,6 +118,7 @@ async function* generatePDF(
   pdfsInProgress.add(lockKey)
   const isQueued = runningPdfGenerations >= MAX_PDF_GENERATIONS || pdfGenerationQueue.length > 0
   let hasSlot = false
+  const paths: string[] = []
   try {
     await updateProductions(recordId, AttestationsProductionsStatus.STARTED, types)
     if (isQueued) yield PDF_QUEUED
@@ -134,9 +135,9 @@ async function* generatePDF(
     const operator = { ...operatorData, ...record }
     const pdfs = await createPdfContent(numeroBio, recordId, parcelles, operator, pac || zip)
     const directory = config.get('attestationsProductions.directory')
-    const paths: string[] = []
+    const version = Date.now()
     for (const [index, pdf] of pdfs.entries()) {
-      const filename = path.resolve(directory, `${recordId}_${pac || zip ? 'PAC' : 'complet'}_${index}.pdf`)
+      const filename = path.resolve(directory, `${recordId}_${pac || zip ? 'PAC' : 'complet'}_${index}_${version}.pdf`)
       await fs.promises.writeFile(filename, await pdf.save())
       paths.push(filename)
     }
@@ -146,6 +147,7 @@ async function* generatePDF(
     return zip ? archivePdfs(paths, operator) : pdf.saveAsBase64()
   } catch (error) {
     await updateProductions(recordId, AttestationsProductionsStatus.ERROR, types)
+    await Promise.all(paths.map((filePath) => fs.promises.rm(filePath, { force: true })))
     if (isHandledError(error)) throw error
     throw new Error("Une erreur s'est produite, impossible de générer l'attestation du parcellaire", { cause: error })
   } finally {

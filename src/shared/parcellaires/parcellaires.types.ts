@@ -31,6 +31,7 @@ type PlainDate<V> = V extends IsoDate | IsoDateTime ? string : V
 
 export type RecordInput = Partial<{ [K in keyof RecordInfos]: PlainDate<RecordInfos[K]> }> & {
   parcelles: CartoBioFeatureCollectionInput
+  numero_client?: string | null
 }
 
 export type PreviousParcelle = Pick<DBParcelle, 'id' | 'cultures' | 'conversion_niveau' | 'engagement_date' | 'name'>

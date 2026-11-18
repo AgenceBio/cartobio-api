@@ -508,10 +508,11 @@ async function upsertOperator(
       .insert(parcellaires)
       .values({
         ...createParcellaireSchema
-          .pick({ numeroBio: true, ocId: true, certificationEtat: true, auditNotesCertif: true })
+          .pick({ numeroBio: true, ocId: true, numeroClient: true, certificationEtat: true, auditNotesCertif: true })
           .parse({
             numeroBio: Number(record.numerobio),
             ocId: record.oc_id ?? null,
+            numeroClient: record.numero_client ?? null,
             certificationEtat: certificationState,
             auditNotesCertif: blankToNull(record.audit_notes)
           }),
@@ -527,6 +528,7 @@ async function upsertOperator(
         targetWhere: sql`${parcellaires.deletedAt} IS NULL`,
         set: {
           ocId: record.oc_id ?? null,
+          numeroClient: coalesceBlank(record.numero_client, parcellaires.numeroClient),
           updatedAt: sql`now()`,
           certificationEtat: sql`coalesce(${certificationState}::cartobio.certification_type, ${parcellaires.certificationEtat})`,
           certificationDateDebut: sql`nullif(coalesce(${record.certification_date_debut ?? null}::text, ${parcellaires.certificationDateDebut}::text), '')::date`,

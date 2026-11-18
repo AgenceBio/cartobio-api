@@ -86,6 +86,7 @@
   "dependencies": {
     "@agencebio/cartobio-types": "*",
     "@agencebio/rosetta-cultures": "2.7.0",
+    "@fastify/cookie": "11.0.2",
     "@fastify/cors": "11.4.1",
     "@fastify/error": "4.2.1",
     "@fastify/formbody": "9.0.1",

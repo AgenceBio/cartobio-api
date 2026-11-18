@@ -1,9 +1,7 @@
 import request from 'supertest'
-import { createSigner } from 'fast-jwt'
 import type { CartoBioUser } from '@agencebio/cartobio-types'
 import app from '../../../src/app.js'
-import config from '../../../src/config/env.js'
-import { getCachedUserProfile } from '../../../src/modules/auth/auth.service.js'
+import { getCachedUserProfile, signAccessToken } from '../../../src/modules/auth/auth.service.js'
 import * as service from '../../../src/modules/referentiel/referentiel.service.js'
 
 vi.mock('../../../src/modules/auth/auth.service.js', async (importOriginal) => ({
@@ -19,7 +17,7 @@ const user = {
   groups: [{ id: '4', nom: 'Opérateur' }],
   mainGroup: { id: '4', nom: 'Opérateur' }
 }
-const AUTH = `Bearer ${createSigner({ key: config.get('jwtSecret') })(user)}`
+const AUTH = `Bearer ${signAccessToken(user.id)}`
 
 beforeAll(() => app.ready())
 afterAll(() => app.close())
