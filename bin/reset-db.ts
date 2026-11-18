@@ -20,7 +20,7 @@ try {
   await db.execute(sql`DROP SCHEMA IF EXISTS cartobio CASCADE`)
   await db.execute(sql`DROP SCHEMA IF EXISTS drizzle CASCADE`)
 
-  const { rowCount } = await db.execute(
+  const { rowCount } = await db.execute<Record<string, unknown>>(
     sql`SELECT 1 FROM information_schema.schemata WHERE schema_name IN ('cartobio', 'drizzle')`
   )
   if (rowCount) throw new Error('Les schémas cartobio ou drizzle existent toujours après la suppression')

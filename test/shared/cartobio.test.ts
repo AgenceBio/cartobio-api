@@ -1,3 +1,4 @@
+import type { SentMessageInfo } from 'nodemailer'
 import { createOrUpdateOperatorRecord, getRecord } from '../../src/shared/parcellaires/parcellaires.service.js'
 import {
   pinOperator,
@@ -81,7 +82,7 @@ vi.mock('../../src/clients/agence-bio.client.js', async (importOriginal) => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(mailer.sendCertificationComplete).mockResolvedValue(() => ({ messageId: 'test' }))
+  vi.mocked(mailer.sendCertificationComplete).mockResolvedValue({ messageId: 'test' } as SentMessageInfo)
   vi.mocked(fetchEmailForNumeroBio).mockResolvedValue({
     numerobio: '123',
     utilisateurs: [{ email: 'test@test.fr' }]

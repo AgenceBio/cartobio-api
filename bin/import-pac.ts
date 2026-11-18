@@ -5,9 +5,8 @@ import { randomUUID } from 'node:crypto'
 import dotenv from 'dotenv'
 
 import cliProgress from 'cli-progress'
-import getStream from 'get-stream'
-import gotModule from 'got'
-const got = gotModule.default
+import { getStreamAsBuffer } from 'get-stream'
+import got from 'got'
 const { post } = got
 import gdal from 'gdal-async'
 import type { Feature } from 'geojson'
@@ -115,7 +114,7 @@ if (aspFile === undefined || csvFile === undefined) {
 ;(async (): Promise<void> => {
   dotenv.config({ path: process.argv[4] })
 
-  const zipBuffer = await getStream.buffer(fs.createReadStream(aspFile))
+  const zipBuffer = await getStreamAsBuffer(fs.createReadStream(aspFile))
   const { files, cleanup } = await unzipGeographicalContent(zipBuffer)
   const correspondance = parseCSV(fs.readFileSync(csvFile, 'utf8'))
   const correspondanceParPacage = new Map<string, (typeof correspondance)[number]>()

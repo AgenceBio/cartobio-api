@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import { randomUUID } from 'node:crypto'
 
 import cliProgress from 'cli-progress'
-import getStream from 'get-stream'
+import { getStreamAsBuffer } from 'get-stream'
 import gdal from 'gdal-async'
 import type { Feature } from 'geojson'
 import { sql } from 'drizzle-orm'
@@ -60,7 +60,7 @@ if (aspFile === undefined || csvFile === undefined) {
 }
 
 ;(async (): Promise<void> => {
-  const zipBuffer = await getStream.buffer(fs.createReadStream(aspFile))
+  const zipBuffer = await getStreamAsBuffer(fs.createReadStream(aspFile))
   const { files, cleanup } = await unzipGeographicalContent(zipBuffer)
   const correspondance = parseCSV(fs.readFileSync(csvFile, 'utf8'))
 

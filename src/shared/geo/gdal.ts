@@ -1,5 +1,5 @@
 import gdal from 'gdal-async'
-import getStream from 'get-stream'
+import { getStreamAsBuffer } from 'get-stream'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { extname, join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -9,7 +9,7 @@ import bboxPolygon from '@turf/bbox-polygon'
 import polygonInPolygon from '@turf/boolean-intersects'
 import pointInPolygon from '@turf/boolean-point-in-polygon'
 import AdmZip from 'adm-zip'
-import FileType from 'file-type'
+import { fileTypeFromBuffer } from 'file-type'
 import { getRandomFeatureId } from '../outputs/features.js'
 import { InvalidRequestApiError } from '../errors.js'
 import { LegalProjections, RegionBounds } from '@agencebio/cartobio-types'
@@ -130,16 +130,15 @@ async function unzipGeographicalContent(buffer: Buffer): Promise<FileAnalysisRes
 async function identifyFiles(file: Promise<MultipartFile | undefined>): Promise<FileAnalysisResult> {
   const data = await file
   if (!data) throw new InvalidRequestApiError('Aucun fichier transmis.')
-  const stream = await FileType.stream(data.file)
+  const buffer = await getStreamAsBuffer(data.file)
+  const fileType = await fileTypeFromBuffer(buffer)
 
-  if (stream.fileType?.mime === 'application/zip') {
-    return unzipGeographicalContent(await getStream.buffer(stream))
+  if (fileType?.mime === 'application/zip') {
+    return unzipGeographicalContent(buffer)
   }
 
-  if (['application/x-sqlite3', undefined, 'application/xml'].includes(stream.fileType?.mime)) {
-    const buffer = await getStream.buffer(stream)
-
-    if (stream.fileType?.mime === 'application/xml') {
+  if (['application/x-sqlite3', 'application/x-esri-shape', undefined, 'application/xml'].includes(fileType?.mime)) {
+    if (fileType?.mime === 'application/xml') {
       const xmlContent = buffer.toString('utf-8')
       const kmlNamespacePattern = /<kml[^>]*xmlns\s*=\s*["']([^"']*)opengis\.net\/kml[^"']*["'][^>]*>/i
 

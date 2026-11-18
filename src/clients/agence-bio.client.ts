@@ -1,6 +1,6 @@
 import memo from 'p-memoize'
-import gotModule from 'got'
-const got = gotModule.default
+import ExpiryMap from 'expiry-map'
+import got from 'got'
 const { get, post } = got
 import { normalizeOperator } from '../shared/outputs/operator.js'
 
@@ -153,7 +153,7 @@ async function _getOperatorsForAdmin({
  * Returns operators related to an OC, and eventual filters (numeroBio, or pacage)
  */
 const getOperatorsByOc = memo(_getOperatorsByOc, {
-  maxAge: 10 * ONE_MINUTE,
+  cache: new ExpiryMap(10 * ONE_MINUTE),
   cacheKey: JSON.stringify
 })
 
@@ -161,7 +161,7 @@ const getOperatorsByOc = memo(_getOperatorsByOc, {
  * Returns operators related to admin, and eventual filters (numeroBio, or pacage)
  */
 const getOperatorsForAdmin = memo(_getOperatorsForAdmin, {
-  maxAge: 10 * ONE_MINUTE,
+  cache: new ExpiryMap(10 * ONE_MINUTE),
   cacheKey: JSON.stringify
 })
 

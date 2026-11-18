@@ -196,11 +196,9 @@ export const deleteFeatureBodySchema = z.object({
 
 export const createFeaturesFromOtherBodySchema = z.object({
   features: z.array(newFeatureSchema).meta({ description: 'Nouvelles parcelles (features GeoJSON)' }),
-  from: z
-    .array(z.union([z.string(), z.number()]))
-    .meta({
-      description: 'Identifiants des parcelles remplacées : supprimées et référencées comme origine des nouvelles'
-    })
+  from: z.array(z.union([z.string(), z.number()])).meta({
+    description: 'Identifiants des parcelles remplacées : supprimées et référencées comme origine des nouvelles'
+  })
 })
 
 export const historyEntrySchema = z.looseObject({

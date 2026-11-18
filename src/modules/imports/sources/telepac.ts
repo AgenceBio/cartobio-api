@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import gdal from 'gdal-async'
-import getStream from 'get-stream'
-import FileType from 'file-type'
+import { getStreamAsBuffer } from 'get-stream'
+import { fileTypeFromBuffer } from 'file-type'
 import { XMLParser } from 'fast-xml-parser'
 import { z } from 'zod'
 import { featureCollection, feature as Feature } from '@turf/helpers'
@@ -70,13 +70,13 @@ const removeEmptyElements = (item: unknown): unknown => item
 async function parseTelepacArchive(file: Promise<MultipartFile | undefined>): Promise<FeatureCollection> {
   const data = await file
   if (!data) throw new InvalidRequestApiError('Aucun fichier transmis.')
-  const stream = await FileType.stream(data.file)
+  const buffer = await getStreamAsBuffer(data.file)
 
-  if (stream.fileType?.mime === 'application/zip') {
-    return fromShapefileArchive(stream)
+  if ((await fileTypeFromBuffer(buffer))?.mime === 'application/zip') {
+    return fromShapefileArchive(buffer)
   }
 
-  const content = await getStream(stream)
+  const content = buffer.toString('utf-8')
   if (content.includes('<rpg>')) {
     return fromXMLFile(content)
   }
@@ -87,8 +87,8 @@ async function parseTelepacArchive(file: Promise<MultipartFile | undefined>): Pr
 /**
  * Parse a Telepac Shapefile archive to GeoJSON
  */
-async function fromShapefileArchive(stream: FileType.ReadableStreamWithFileType): Promise<FeatureCollection> {
-  const { files, cleanup } = await unzipGeographicalContent(await getStream.buffer(stream))
+async function fromShapefileArchive(buffer: Buffer): Promise<FeatureCollection> {
+  const { files, cleanup } = await unzipGeographicalContent(buffer)
   const featureCollection: FeatureCollection = {
     type: 'FeatureCollection',
     features: []

@@ -1,7 +1,7 @@
-import gotModule from 'got'
+import gotModule, * as gotExports from 'got'
 import type { Mock } from 'vitest'
 
-export const got = gotModule.default as unknown as {
+export const got = gotModule as unknown as {
   get: Mock
   post: Mock
   stream: Mock
@@ -10,7 +10,7 @@ export const got = gotModule.default as unknown as {
 }
 
 type MockedErrorClass = new (...args: unknown[]) => Error & { response?: unknown }
-export const HTTPError = gotModule.HTTPError as unknown as MockedErrorClass
-export const TimeoutError = gotModule.TimeoutError as unknown as MockedErrorClass
+export const HTTPError = gotExports.HTTPError as unknown as MockedErrorClass
+export const TimeoutError = gotExports.TimeoutError as unknown as MockedErrorClass
 
 export const { get, post } = got

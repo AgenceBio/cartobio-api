@@ -1,4 +1,4 @@
-import gotModule from 'got'
+import got, { HTTPError } from 'got'
 import { XMLParser } from 'fast-xml-parser'
 import { SocksProxyAgent } from 'socks-proxy-agent'
 import { feature, featureCollection } from '@turf/helpers'
@@ -10,7 +10,7 @@ import type { FeatureCollection } from 'geojson'
 import { z } from 'zod'
 import { parseApiResponse } from '../../../clients/clients.utils.js'
 
-const { extend, HTTPError } = gotModule.default
+const { extend } = got
 
 const evvSpcvSchema = z.looseObject({
   etatGestion: z.string(),

@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto'
 import memo from 'p-memoize'
-import gotModule from 'got'
-const got = gotModule.default
-const { get, HTTPError } = got
+import ExpiryMap from 'expiry-map'
+import got, { HTTPError } from 'got'
+const { get } = got
 import { createDecoder, createVerifier } from 'fast-jwt'
 import config from '../../config/env.js'
 import * as repository from './auth.repository.js'
@@ -31,7 +31,7 @@ async function fetchCertificationBodies(): Promise<OrganismeCertificateur[]> {
   )
 }
 
-const getCertificationBodies = memo(fetchCertificationBodies, { maxAge: 24 * oneHour })
+const getCertificationBodies = memo(fetchCertificationBodies, { cache: new ExpiryMap(24 * oneHour) })
 
 async function getUserProfileById(userId: number): Promise<CartoBioUser> {
   const [userProfile, certificationBodies] = await Promise.all([
@@ -60,7 +60,7 @@ async function getUserProfileById(userId: number): Promise<CartoBioUser> {
   }
 }
 
-const getCachedUserProfile = memo(getUserProfileById, { maxAge: oneHour })
+const getCachedUserProfile = memo(getUserProfileById, { cache: new ExpiryMap(oneHour) })
 
 async function getHistoryUser(userId: string | number, userRole: string | null): Promise<CartoBioUser> {
   try {

@@ -23,11 +23,9 @@ export const borderCutBodySchema = z
 
 export const geometryEqualsBodySchema = z.object({
   payload: z.object({
-    old: z
-      .guid()
-      .meta({
-        description: "Premier parcellaire (record_id). L'ordre chronologique est recalculé à partir des dates d'audit"
-      }),
+    old: z.guid().meta({
+      description: "Premier parcellaire (record_id). L'ordre chronologique est recalculé à partir des dates d'audit"
+    }),
     new: z.guid().meta({ description: 'Second parcellaire (record_id)' })
   })
 })

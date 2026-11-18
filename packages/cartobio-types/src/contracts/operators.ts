@@ -17,14 +17,9 @@ export const operatorFilterSchema = z.object({
   departement: z.array(z.string()).nullable().optional().meta({ description: 'Codes de départements' }),
   engagement: z.array(z.string()).nullable().optional().meta({ description: 'Mixité du dernier parcellaire certifié' }),
   pinned: z.boolean().nullable().optional().meta({ description: 'Uniquement les opérateurs épinglés' }),
-  etatCertification: z
-    .string()
-    .nullable()
-    .optional()
-    .meta({
-      description:
-        '`CERTIFIED`, `NO_CERTIFIED` ou `ALL` : parcellaire certifié ou non pour `anneeReferenceCertification`'
-    }),
+  etatCertification: z.string().nullable().optional().meta({
+    description: '`CERTIFIED`, `NO_CERTIFIED` ou `ALL` : parcellaire certifié ou non pour `anneeReferenceCertification`'
+  }),
   anneeReferenceCertification: z.number().nullable().optional().meta({ description: 'Année de référence du contrôle' }),
   etatNotification: z
     .array(z.string())

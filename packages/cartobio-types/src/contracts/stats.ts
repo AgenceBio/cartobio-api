@@ -22,13 +22,10 @@ export const statsQuerySchema = z.object({
     .pipe(z.array(z.enum(['CREATED', 'UPDATED', 'UNKNOWN'])))
     .optional()
     .meta({ description: 'Effets sur le parcellaire séparés par des virgules (`CREATED`, `UPDATED`, `UNKNOWN`)' }),
-  type: z
-    .enum(['envois', 'refus'])
-    .optional()
-    .meta({
-      description:
-        'Type de série suspecte (au moins 4 envois consécutifs de même issue) : `envois` (acceptés) ou `refus` (rejetés ou en erreur)'
-    }),
+  type: z.enum(['envois', 'refus']).optional().meta({
+    description:
+      'Type de série suspecte (au moins 4 envois consécutifs de même issue) : `envois` (acceptés) ou `refus` (rejetés ou en erreur)'
+  }),
   ordreDate: z
     .enum(['asc', 'desc'])
     .optional()

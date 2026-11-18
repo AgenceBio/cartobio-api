@@ -35,8 +35,6 @@ const got = Object.assign(vi.fn(), {
   })
 })
 
-Object.assign(got, { default: got })
-
 export default got
 export const { get, post, put, patch, stream, extend } = got
 export { HTTPError, TimeoutError }

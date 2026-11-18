@@ -1,6 +1,7 @@
 import AdmZip from 'adm-zip'
 import memo from 'p-memoize'
-import gotModule from 'got'
+import ExpiryMap from 'expiry-map'
+import got from 'got'
 import { parse } from 'wkt'
 import { featureCollection, feature as Feature } from '@turf/helpers'
 import reproject from 'reproject'
@@ -13,7 +14,7 @@ import { z } from 'zod'
 import { parseApiResponse } from '../../../clients/clients.utils.js'
 import { jsonString } from '../../../shared/validation.js'
 
-const { get, post } = gotModule.default
+const { get, post } = got
 const { toWgs84 } = reproject
 
 const geofoliaFieldSchema = z.looseObject({
@@ -128,7 +129,7 @@ function fetchAuthToken(): Promise<string> {
  * Authenticate a user based on environment variables
  * It is a good idea to memoize it for a few hours to save on API calls
  */
-const auth = memo(() => fetchAuthToken(), { maxAge: 0.9 * ONE_HOUR })
+const auth = memo(() => fetchAuthToken(), { cache: new ExpiryMap(0.9 * ONE_HOUR) })
 
 async function geofoliaTriggerDataOrder(numeroSiret: string, year: number): Promise<unknown> {
   const token = await auth()
@@ -197,7 +198,9 @@ async function geofoliaFetchDataOrder(order: { id: string }): Promise<Buffer> {
     searchParams: {
       serviceCode: config.get('geofolia.api.serviceCode')
     }
-  }).buffer()
+  })
+    .buffer()
+    .then((data) => Buffer.from(data))
 }
 
 async function geofoliaParcellaire(numeroSiret: string): Promise<FeatureCollection | null> {
