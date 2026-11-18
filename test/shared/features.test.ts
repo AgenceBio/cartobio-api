@@ -152,3 +152,40 @@ describe('populateWithMultipleCultures', () => {
     expect(populateWithMultipleCultures(featureWithCPF)).toEqual(featureWithCPF)
   })
 })
+
+describe('normalizeParcelle : historique des cultures', () => {
+  const entry = (annee_controle: number, cpfs: string[] | null) => ({
+    annee_controle,
+    cultures: cpfs === null ? null : cpfs.map((CPF) => buildCulture({ CPF }))
+  })
+  const historique = (entries: ReturnType<typeof entry>[]) =>
+    normalizeParcelle(buildDBParcelle({ historique_cultures: entries as never })).properties.historique
+
+  test("ne garde que les changements d'année ou d'assolement", () => {
+    const result = historique([
+      entry(2022, ['A']),
+      entry(2022, ['A']),
+      entry(2022, ['A', 'B']),
+      entry(2022, ['B', 'C']),
+      entry(2022, ['C', 'B']),
+      entry(2023, ['C', 'B']),
+      entry(2023, null),
+      entry(2023, ['A'])
+    ])
+
+    expect(
+      result?.map(({ annee_controle, cultures }) => [annee_controle, cultures?.map(({ CPF }) => CPF) ?? null])
+    ).toEqual([
+      [2022, ['A']],
+      [2022, ['A', 'B']],
+      [2022, ['B', 'C']],
+      [2023, ['C', 'B']],
+      [2023, null],
+      [2023, ['A']]
+    ])
+  })
+
+  test("n'a pas d'historique sans données", () => {
+    expect(historique(undefined as never)).toBeNull()
+  })
+})

@@ -4,7 +4,9 @@ import {
   getAllParcelles,
   calculateGlobalBoundingBox,
   formatDate,
+  formatRefCad,
   launchStyleTab,
+  restrictNetwork,
   drawParcelleHighlightOnMap,
   drawAllParcellesOnMap,
   mergeAndAddFooter
@@ -64,6 +66,71 @@ describe('formatDate', () => {
     const dateStr = '2025-04-02'
     const formattedDate = formatDate(dateStr)
     expect(formattedDate).toBe('02/04/2025')
+  })
+})
+
+describe('formatRefCad', () => {
+  test('retire le code commune et sépare préfixe, section et numéro', () => {
+    expect(formatRefCad('75056000AB0123')).toBe('000 AB 0123')
+  })
+
+  test('retourne le reste brut si le format est inattendu', () => {
+    expect(formatRefCad('75056AB')).toBe('AB')
+    expect(formatRefCad('7505')).toBe('')
+  })
+})
+
+describe('restrictNetwork', () => {
+  const intercept = async (url: string): Promise<Record<string, Mock>> => {
+    const pageMock = { setRequestInterception: vi.fn().mockResolvedValue(undefined), on: vi.fn() }
+    await restrictNetwork(asPage(pageMock))
+    const request = { url: vi.fn(() => url), respond: vi.fn(), continue: vi.fn(), abort: vi.fn() }
+    pageMock.on.mock.calls[0]![1](request)
+    return request
+  }
+
+  test("active l'interception des requêtes", async () => {
+    const pageMock = { setRequestInterception: vi.fn().mockResolvedValue(undefined), on: vi.fn() }
+    await restrictNetwork(asPage(pageMock))
+    expect(pageMock.setRequestInterception).toHaveBeenCalledWith(true)
+    expect(pageMock.on).toHaveBeenCalledWith('request', expect.any(Function))
+  })
+
+  test('sert la page de carte locale', async () => {
+    const request = await intercept('https://pdf.cartobio.invalid/map.html')
+    expect(request.respond).toHaveBeenCalledWith(expect.objectContaining({ status: 200, contentType: 'text/html' }))
+    expect(request.continue).not.toHaveBeenCalled()
+  })
+
+  test('ne sert que le nom de fichier des ressources maplibre', async () => {
+    const request = await intercept('https://pdf.cartobio.invalid/maplibre-gl/../../../etc/passwd')
+    expect(request.respond).not.toHaveBeenCalled()
+    expect(request.abort).toHaveBeenCalled()
+  })
+
+  test.each([
+    'https://openmaptiles.geo.data.gouv.fr/data/france.json',
+    'https://openmaptiles.github.io/fonts/a.pbf',
+    'data:image/png;base64,AAAA',
+    'blob:https://pdf.cartobio.invalid/1234'
+  ])('laisse passer %s', async (url) => {
+    const request = await intercept(url)
+    expect(request.continue).toHaveBeenCalled()
+    expect(request.abort).not.toHaveBeenCalled()
+  })
+
+  test.each([
+    'http://openmaptiles.geo.data.gouv.fr/data/france.json',
+    'https://evil.example.com/',
+    'https://openmaptiles.github.io.evil.example.com/',
+    'file:///etc/passwd',
+    'http://169.254.169.254/latest/meta-data/',
+    'https://pdf.cartobio.invalid/autre.html'
+  ])('bloque %s', async (url) => {
+    const request = await intercept(url)
+    expect(request.abort).toHaveBeenCalled()
+    expect(request.continue).not.toHaveBeenCalled()
+    expect(request.respond).not.toHaveBeenCalled()
   })
 })
 

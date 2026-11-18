@@ -5,11 +5,14 @@ import { revokedTokens } from '../../../src/database/schema/index.js'
 import { fetchUserOperators } from '../../../src/clients/agence-bio.client.js'
 import {
   canAccessOperator,
+  getUserProfileById,
+  getUserProfileFromSSOToken,
   isRevoked,
   revokeToken,
   verifyNotificationAuthorization
 } from '../../../src/modules/auth/auth.service.js'
 import { buildOcUser, buildOperator, buildUser } from '../../factories.js'
+import { get, HTTPError } from '../../got-mock.js'
 
 vi.mock('../../../src/clients/agence-bio.client.js')
 
@@ -114,5 +117,114 @@ describe('verifyNotificationAuthorization', () => {
     expect(result.error).toBeDefined()
     expect(result.decodedToken).toBeUndefined()
     expect(result.token).toBeUndefined()
+  })
+})
+
+const unsignedJwt = (payload: object): string =>
+  `${Buffer.from('{"alg":"none"}').toString('base64url')}.${Buffer.from(JSON.stringify(payload)).toString('base64url')}.`
+
+const profiles: Record<string, object> = {
+  '/api/users/10': {
+    id: 10,
+    prenom: 'Jeanne',
+    nom: 'Dupont',
+    organismeCertificateurId: 1,
+    groupes: [
+      { id: 8, nom: 'Auditeur' },
+      { id: 2, nom: 'Chargé de certification' }
+    ]
+  },
+  '/api/users/11': { id: 11, prenom: null, nom: null, organismeCertificateurId: 99, groupes: [] },
+  '/api/users/12': { id: 12, groupes: [{ id: 4, nom: 'Opérateur' }] }
+}
+
+describe('profil utilisateur', () => {
+  beforeEach(() => {
+    get.mockReset()
+    get.mockImplementation((url: string) => ({
+      async json() {
+        if (url.endsWith('/api/oc')) return [{ id: 1, nom: "CartoBi'OC" }]
+        if (url.endsWith('/api/utilisateur/by-email')) return { id: 10 }
+        const path = Object.keys(profiles).find((key) => url.endsWith(key))
+        if (!path) throw new Error(`URL inattendue ${url}`)
+        return profiles[path]
+      }
+    }))
+  })
+
+  test("construit le profil avec le nom de l'OC et le groupe principal", async () => {
+    expect(await getUserProfileById(10)).toEqual({
+      id: 10,
+      prenom: 'Jeanne',
+      nom: 'Dupont',
+      organismeCertificateur: { id: 1, nom: "CartoBi'OC" },
+      groups: [
+        { id: 8, nom: 'Auditeur' },
+        { id: 2, nom: 'Chargé de certification' }
+      ],
+      mainGroup: { id: 8, nom: 'Auditeur' }
+    })
+  })
+
+  test('tolère un OC inconnu et des noms absents', async () => {
+    expect(await getUserProfileById(11)).toEqual({
+      id: 11,
+      prenom: '',
+      nom: '',
+      organismeCertificateur: { id: 99, nom: '' },
+      groups: [],
+      mainGroup: { id: undefined, nom: undefined }
+    })
+  })
+
+  test("n'ajoute pas d'OC à un utilisateur qui n'en a pas", async () => {
+    expect(await getUserProfileById(12)).not.toHaveProperty('organismeCertificateur')
+  })
+
+  test("retrouve l'utilisateur par l'email du jeton SSO", async () => {
+    const profile = await getUserProfileFromSSOToken(unsignedJwt({ sub: 'jeanne@example.com' }))
+
+    expect(profile.id).toBe(10)
+    const byEmailCall = get.mock.calls.find(([url]) => String(url).endsWith('/api/utilisateur/by-email'))
+    expect(byEmailCall![1]).toMatchObject({ searchParams: { email: 'jeanne@example.com' } })
+  })
+
+  test('refuse un jeton SSO sans sujet', async () => {
+    await expect(getUserProfileFromSSOToken(unsignedJwt({ email: 'x@example.com' }))).rejects.toThrow()
+    expect(get).not.toHaveBeenCalled()
+  })
+})
+
+describe('getHistoryUser', () => {
+  let getHistoryUser: typeof import('../../../src/modules/auth/auth.service.js').getHistoryUser
+
+  beforeAll(async () => {
+    ;({ getHistoryUser } = await vi.importActual<typeof import('../../../src/modules/auth/auth.service.js')>(
+      '../../../src/modules/auth/auth.service.js'
+    ))
+  })
+
+  beforeEach(() => {
+    get.mockReset()
+  })
+
+  test('retourne un utilisateur supprimé quand le profil est introuvable', async () => {
+    const notFound = Object.assign(new HTTPError(), { response: { statusCode: 404 } })
+    get.mockReturnValue({ json: () => Promise.reject(notFound) })
+
+    expect(await getHistoryUser('404', 'Auditeur')).toEqual({
+      id: 404,
+      nom: 'Utilisateur supprimé',
+      prenom: '',
+      groups: [],
+      mainGroup: { nom: 'Auditeur' }
+    })
+  })
+
+  test('propage les autres erreurs', async () => {
+    const serverError = Object.assign(new HTTPError(), { response: { statusCode: 500 } })
+    get.mockReturnValue({ json: () => Promise.reject(serverError) })
+
+    await expect(getHistoryUser(500, null)).rejects.toBe(serverError)
   })
 })

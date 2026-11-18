@@ -329,6 +329,112 @@ describe('createOrUpdateOperatorRecord', () => {
     ).rejects.toMatchObject({ code: 'MISSING_GEOMETRY' })
   })
 
+  const simpleFeatureCollection = () => ({
+    type: 'FeatureCollection',
+    features: parcelles.map((parcelle) => ({
+      type: 'Feature',
+      id: parcelle.id,
+      geometry: parcelle.geometry,
+      properties: { id: parcelle.id, cultures: parcelle.cultures, conversion_niveau: 'AB' }
+    }))
+  })
+
+  test("refuse une nouvelle version à la date d'audit d'une version certifiée", async () => {
+    await drizzleDb
+      .update(schema.parcellaires)
+      .set({ certificationEtat: 'CERTIFIED' })
+      .where(eq(schema.parcellaires.recordId, recordToUpdate.record_id))
+
+    await expect(
+      createOrUpdateOperatorRecord(asRecordInput({ ...recordToUpdate, parcelles: simpleFeatureCollection() }), { user })
+    ).rejects.toMatchObject({ statusCode: 400, message: "Une version certifiée existe déjà à cette date d'audit." })
+  })
+
+  test("interdit à un opérateur de changer l'état de certification d'une version existante", async () => {
+    await expect(
+      createOrUpdateOperatorRecord(
+        asRecordInput({ ...recordToUpdate, certification_state: 'AUDITED', parcelles: simpleFeatureCollection() }),
+        { user: buildUser() }
+      )
+    ).rejects.toMatchObject({ statusCode: 403 })
+  })
+
+  test("conserve l'état de la version existante quand un OC n'en précise pas", async () => {
+    const result = await createOrUpdateOperatorRecord(
+      asRecordInput({ ...recordToUpdate, certification_state: undefined, parcelles: simpleFeatureCollection() }),
+      { user }
+    )
+
+    expect(result.certification_state).toBe('PENDING_CERTIFICATION')
+  })
+
+  test('refuse une version certifiée sans dates de certification', async () => {
+    await expect(
+      createOrUpdateOperatorRecord(
+        asRecordInput({
+          ...recordToUpdate,
+          audit_date: '2025-01-15',
+          certification_state: 'CERTIFIED',
+          parcelles: simpleFeatureCollection()
+        }),
+        { user }
+      )
+    ).rejects.toMatchObject({ statusCode: 400, message: 'Les dates de certification sont manquantes.' })
+  })
+
+  test('notifie une seule fois chaque adresse quand la version est certifiée', async () => {
+    vi.mocked(fetchEmailForNumeroBio).mockResolvedValue({
+      numerobio: recordToUpdate.numerobio,
+      utilisateurs: [{ email: 'a@test.fr' }, { email: 'b@test.fr' }, { email: 'a@test.fr' }]
+    })
+
+    const result = await createOrUpdateOperatorRecord(
+      asRecordInput({
+        ...recordToUpdate,
+        certification_state: 'CERTIFIED',
+        certification_date_debut: '2024-01-01',
+        certification_date_fin: '2025-12-31',
+        parcelles: simpleFeatureCollection()
+      }),
+      { user }
+    )
+
+    await vi.waitFor(async () => {
+      const [stored] = await drizzleDb
+        .select({ notifiedAt: schema.parcellaires.dateDerniereNotif })
+        .from(schema.parcellaires)
+        .where(eq(schema.parcellaires.recordId, result.record_id))
+      expect(stored?.notifiedAt).not.toBeNull()
+    })
+    expect(vi.mocked(mailer.sendCertificationComplete).mock.calls.map(([, email]) => email)).toEqual([
+      'a@test.fr',
+      'b@test.fr'
+    ])
+  })
+
+  test("n'échoue pas si la notification de certification échoue", async () => {
+    vi.mocked(mailer.sendCertificationComplete).mockRejectedValue(new Error('SMTP down'))
+
+    const result = await createOrUpdateOperatorRecord(
+      asRecordInput({
+        ...recordToUpdate,
+        certification_state: 'CERTIFIED',
+        certification_date_debut: '2024-01-01',
+        certification_date_fin: '2025-12-31',
+        parcelles: simpleFeatureCollection()
+      }),
+      { user }
+    )
+
+    expect(result.certification_state).toBe('CERTIFIED')
+    await vi.waitFor(() => expect(mailer.sendCertificationComplete).toHaveBeenCalled())
+    const [stored] = await drizzleDb
+      .select({ notifiedAt: schema.parcellaires.dateDerniereNotif })
+      .from(schema.parcellaires)
+      .where(eq(schema.parcellaires.recordId, result.record_id))
+    expect(stored?.notifiedAt).toBeNull()
+  })
+
   test('successfully update a record without data from previous record', async () => {
     const record: Record<string, unknown> = { ...recordToUpdate }
 

@@ -1,15 +1,18 @@
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { toIsoDateTime } from '@agencebio/cartobio-types'
 import { db } from '../../../src/database/database.js'
-import { parcellaireImport, parcellaires } from '../../../src/database/schema/index.js'
+import { parcellaireImport, parcellaireImportPayload, parcellaires } from '../../../src/database/schema/index.js'
+import { failInterruptedImportJobs } from '../../../src/modules/imports/imports.repository.js'
 import {
+  getImportById,
+  getImportList,
   parseAPIParcellaire,
   getCurrentStatusJobs,
   updateImportJobStatus,
   updateStatus
 } from '../../../src/modules/imports/imports.service.js'
 
-import { fetchOperatorByNumeroBio } from '../../../src/clients/agence-bio.client.js'
+import { fetchOperatorByNumeroBio, parsePacDetailsFromComment } from '../../../src/clients/agence-bio.client.js'
 import { buildOperator } from '../../factories.js'
 
 vi.mock('../../../src/clients/agence-bio.client.js')
@@ -565,6 +568,196 @@ describe('parseAPIParcellaire', () => {
   })
 })
 
+describe('parseAPIParcellaire : contrôles complémentaires', () => {
+  const organismeCertificateur = { id: 1, nom: 'Ecocert France' }
+  const geom =
+    '[[[4.8740990843182042,44.255949709765304],[4.8739614029301244,44.255016135661734],[4.8736532263747678,44.255001848456033],[4.8738004728368587,44.255928756333255],[4.8740990843182042,44.255949709765304]]]'
+  const parcelle = (overrides: Record<string, unknown> = {}) => ({
+    id: 'p1',
+    etatProduction: 'AB',
+    geom,
+    culture: [{ codeCPF: '01.92', quantite: 25, unite: '%' as const }],
+    ...overrides
+  })
+  const record = (overrides: Record<string, unknown> = {}) => ({
+    numeroBio: '99999',
+    numeroClient: '100012',
+    dateAudit: '2023-04-27',
+    dateCertificationDebut: '2023-01-01',
+    dateCertificationFin: '2025-03-31',
+    parcelles: [parcelle()],
+    ...overrides
+  })
+  const codes = (result: ParsedItem) => (result.errors ?? []).map(({ code }) => code)
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValue(
+      buildOperator({
+        isProduction: true,
+        organismeCertificateur: { id: 1, nom: 'Ecocert France', numeroClient: '100012' }
+      })
+    )
+  })
+
+  test('signale un opérateur sans organisme certificateur', async () => {
+    vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValue(
+      buildOperator({ isProduction: true, organismeCertificateur: {} })
+    )
+
+    expect(codes(await parseAPIParcellaire(record(), { organismeCertificateur }))).toEqual(['NO_OC'])
+  })
+
+  test('signale un opérateur certifié par un autre OC', async () => {
+    vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValue(
+      buildOperator({ isProduction: true, organismeCertificateur: { id: 2, nom: 'Autre', numeroClient: '100012' } })
+    )
+
+    expect(codes(await parseAPIParcellaire(record(), { organismeCertificateur }))).toEqual(['OC_MISMATCH'])
+  })
+
+  test('remonte une indisponibilité du portail', async () => {
+    vi.mocked(mockFetchOperatorByNumeroBio).mockRejectedValue(
+      Object.assign(new Error('boom'), { response: { statusCode: 500 } })
+    )
+
+    await expect(parseAPIParcellaire(record(), { organismeCertificateur })).rejects.toMatchObject({ statusCode: 502 })
+  })
+
+  test.each([
+    ['une date de début invalide', { dateCertificationDebut: 'pas-une-date' }, ['INVALID_DATE_CERTIFICATION_DEBUT']],
+    ['une date de fin invalide', { dateCertificationFin: '2025-13-45' }, ['INVALID_DATE_CERTIFICATION_FIN']],
+    ['sans date de fin', { dateCertificationFin: undefined }, ['MISSING_CERTIFICATION_DATES']],
+    ['une date d’audit invalide', { dateAudit: 'demain' }, ['INVALID_DATE_AUDIT']],
+    ['sans date d’audit', { dateAudit: undefined }, ['INVALID_DATE_AUDIT']]
+  ])('signale %s', async (_, overrides, expected) => {
+    expect(codes(await parseAPIParcellaire(record(overrides), { organismeCertificateur }))).toEqual(expected)
+  })
+
+  test("signale une date d'engagement invalide", async () => {
+    const result = await parseAPIParcellaire(record({ parcelles: [parcelle({ dateEngagement: 'jamais' })] }), {
+      organismeCertificateur
+    })
+
+    expect(codes(result)).toEqual(['INVALID_DATE_ENGAGEMENT'])
+  })
+
+  test.each([
+    ['latitude', '[[[4.87,95],[4.88,95],[4.88,96],[4.87,95]]]', 'la latitude doit être comprise entre 90 et -90'],
+    ['longitude', '[[[185,44],[186,44],[186,45],[185,44]]]', 'la longitude doit être comprise entre 180 et -180'],
+    [
+      'anneau non fermé',
+      '[[[4.87,44.25],[4.88,44.25],[4.88,44.26],[4.87,44.26]]]',
+      'First and last Position are not equivalent.'
+    ]
+  ])('refuse une géométrie avec une %s invalide', async (_, invalidGeom, message) => {
+    const result = await parseAPIParcellaire(record({ parcelles: [parcelle({ geom: invalidGeom })] }), {
+      organismeCertificateur
+    })
+
+    expect(result.errors).toEqual([
+      expect.objectContaining({ code: 'INVALID_GEOM', message: `champ geom incorrect : ${message}` })
+    ])
+  })
+
+  test.each([
+    [{ nom: 'Champ du haut', numeroIlot: 3, numeroParcelle: 4 }, 'Champ du haut'],
+    [{ numeroIlot: 3, numeroParcelle: 4 }, 'Îlot 3 parcelle 4'],
+    [{ numeroIlot: 3 }, 'Îlot 3'],
+    [{ numeroParcelle: 4 }, 'Parcelle 4'],
+    [{}, '-']
+  ])('nomme la parcelle en erreur %#', async (overrides, nomParcelle) => {
+    const result = await parseAPIParcellaire(record({ parcelles: [parcelle({ culture: [], ...overrides })] }), {
+      organismeCertificateur
+    })
+
+    expect(result.errors).toEqual([
+      expect.objectContaining({ code: 'MISSING_CULTURES', idParcelle: 'p1', nomParcelle })
+    ])
+  })
+
+  test('accepte une parcelle sans géométrie avec un avertissement', async () => {
+    const result = await parseAPIParcellaire(record({ parcelles: [parcelle({ geom: 'null' })] }), {
+      organismeCertificateur
+    })
+
+    expect(recordOf(result).parcelles.features[0]).toMatchObject({ id: 'p1', geometry: null })
+    expect(result.warnings).toEqual([expect.objectContaining({ code: 'MISSING_GEOM' })])
+  })
+
+  test('avertit pour une parcelle hors des régions autorisées', async () => {
+    const result = await parseAPIParcellaire(
+      record({ parcelles: [parcelle({ geom: '[[[-40,10],[-39.99,10],[-39.99,10.01],[-40,10]]]' })] }),
+      { organismeCertificateur }
+    )
+
+    expect(recordOf(result).parcelles.features).toHaveLength(1)
+    expect(result.warnings).toEqual([expect.objectContaining({ code: 'GEOM_OUT_OF_BOUNDS' })])
+  })
+
+  test("retire l'attente PAC d'une parcelle qui a déjà un îlot", async () => {
+    const result = await parseAPIParcellaire(
+      record({ parcelles: [parcelle({ numeroIlot: 2, numeroParcelle: 1, enAttentePac: 1 })] }),
+      { organismeCertificateur }
+    )
+
+    expect(recordOf(result).parcelles.features[0]!.properties).toMatchObject({
+      attente_pac: false,
+      NUMERO_I: '2',
+      NUMERO_P: '1'
+    })
+    expect(result.warnings).toEqual([expect.objectContaining({ code: 'PAC_PENDING_WITH_ILOT' })])
+  })
+
+  test("garde l'attente PAC d'une parcelle sans îlot", async () => {
+    const result = await parseAPIParcellaire(record({ parcelles: [parcelle({ enAttentePac: true })] }), {
+      organismeCertificateur
+    })
+
+    expect(recordOf(result).parcelles.features[0]!.properties).toMatchObject({ attente_pac: true, NUMERO_I: null })
+    expect(result.warnings).toEqual([])
+  })
+
+  test("déduit l'îlot et la parcelle PAC du commentaire", async () => {
+    const actual = await vi.importActual<typeof import('../../../src/clients/agence-bio.client.js')>(
+      '../../../src/clients/agence-bio.client.js'
+    )
+    vi.mocked(parsePacDetailsFromComment).mockImplementation(actual.parsePacDetailsFromComment)
+    const result = await parseAPIParcellaire(record({ parcelles: [parcelle({ commentaire: 'ilot 12 parcelle 5' })] }), {
+      organismeCertificateur
+    })
+
+    expect(recordOf(result).parcelles.features[0]!.properties).toMatchObject({
+      NUMERO_I: '12',
+      NUMERO_P: '5',
+      auditeur_notes: 'ilot 12 parcelle 5'
+    })
+  })
+
+  test("convertit l'enregistrement validé en parcellaire certifié de l'OC", async () => {
+    const result = await parseAPIParcellaire(
+      record({ numeroPacage: 84012821, commentaire: 'RAS', anneeAssolement: 2023 }),
+      {
+        organismeCertificateur
+      }
+    )
+
+    expect(recordOf(result)).toMatchObject({
+      certification_state: 'CERTIFIED',
+      oc_id: 1,
+      oc_label: 'Ecocert France',
+      audit_notes: 'RAS',
+      audit_date: '2023-04-27T00:00:00.000Z',
+      metadata: { source: 'API_PARCELLAIRE', anneeAssolement: 2023 }
+    })
+    expect(recordOf(result).parcelles.features[0]!.properties).toMatchObject({
+      PACAGE: '84012821',
+      conversion_niveau: 'AB',
+      cultures: [expect.objectContaining({ CPF: '01.92', surface: 25, unit: '%' })]
+    })
+  })
+})
+
 describe('getCurrentStatusJobs', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -726,5 +919,96 @@ describe('updateStatus', () => {
 
     expect(await findJob(sansClient)).toMatchObject({ etat: 'UNKNOWN', numeroClient: null })
     expect(await findJob(dateInvalide)).toMatchObject({ etat: 'UNKNOWN', auditDate: null })
+  })
+})
+
+describe('getImportList / getImportById', () => {
+  let done: number
+  let rejected: number
+  let pending: number
+
+  beforeEach(async () => {
+    await db.delete(parcellaireImport)
+    done = await insertJob({
+      status: 'DONE',
+      statutJob: 'VALID',
+      numeroBio: '1',
+      createdAt: new Date('2026-01-10T10:00:00Z')
+    })
+    rejected = await insertJob({
+      status: 'DONE',
+      statutJob: 'REJECTED',
+      numeroBio: '2',
+      createdAt: new Date('2026-01-15T20:00:00Z')
+    })
+    pending = await insertJob({ status: 'PENDING', numeroBio: '3', createdAt: new Date('2026-01-20T10:00:00Z') })
+    await insertJob({ status: 'DONE', organismeCertificateur: '2', createdAt: new Date('2026-01-12T10:00:00Z') })
+    await db.insert(parcellaireImportPayload).values({ id: 'p-done', importId: done, payload: { numeroBio: '1' } })
+  })
+
+  const list = (filters: Partial<Parameters<typeof getImportList>[0]> = {}) =>
+    getImportList({ organismeCertificateur: 1, payload: false, withRejected: false, page: 1, limit: 10, ...filters })
+
+  test("liste les imports de l'OC du plus récent au plus ancien", async () => {
+    const { data, meta } = await list()
+
+    expect(data.map(({ jobId }) => jobId)).toEqual([pending, rejected, done])
+    expect(meta).toEqual({ total: 3, page: 1, limit: 10 })
+    expect(data[0]).toMatchObject({ status: 'PENDING', numeroBio: '3', endedAt: null, payload: null })
+  })
+
+  test('filtre par statuts, sans tenir compte de la casse', async () => {
+    expect((await list({ status: 'pending, error' })).data.map(({ jobId }) => jobId)).toEqual([pending])
+  })
+
+  test('filtre sur une période, jour de fin inclus', async () => {
+    const { data } = await list({ from: '2026-01-11', to: '2026-01-15' })
+
+    expect(data.map(({ jobId }) => jobId)).toEqual([rejected])
+  })
+
+  test('ne garde que les imports rejetés', async () => {
+    expect((await list({ withRejected: true })).data.map(({ jobId }) => jobId)).toEqual([rejected])
+  })
+
+  test('pagine sans changer le total', async () => {
+    const { data, meta } = await list({ page: 2, limit: 2 })
+
+    expect(data.map(({ jobId }) => jobId)).toEqual([done])
+    expect(meta.total).toBe(3)
+  })
+
+  test('joint la charge utile sur demande', async () => {
+    const { data } = await list({ payload: true })
+
+    expect(data.find(({ jobId }) => jobId === done)?.payload).toEqual({ id: 'p-done', payload: { numeroBio: '1' } })
+  })
+
+  test("retrouve un import de l'OC par son identifiant", async () => {
+    expect(await getImportById({ id: done, payload: true, organismeCertificateur: 1 })).toMatchObject({
+      jobId: done,
+      payload: { id: 'p-done', payload: { numeroBio: '1' } }
+    })
+    expect(await getImportById({ id: done, payload: false, organismeCertificateur: 2 })).toBeNull()
+  })
+})
+
+describe('failInterruptedImportJobs', () => {
+  test("passe en erreur les imports bloqués depuis plus d'une heure", async () => {
+    await db.delete(parcellaireImport)
+    const old = await insertJob({ status: 'PENDING', createdAt: sql`now() - interval '2 hours'` as unknown as Date })
+    const oldCreated = await insertJob({
+      status: 'CREATED',
+      createdAt: sql`now() - interval '2 hours'` as unknown as Date
+    })
+    const recent = await insertJob({ status: 'PENDING' })
+    const finished = await insertJob({ status: 'DONE', createdAt: sql`now() - interval '2 hours'` as unknown as Date })
+
+    expect(await failInterruptedImportJobs()).toBe(2)
+
+    expect((await findJob(old)).status).toBe('ERROR')
+    expect((await findJob(oldCreated)).statutJob).toBe('ERROR')
+    expect((await findJob(recent)).status).toBe('PENDING')
+    expect((await findJob(finished)).status).toBe('DONE')
   })
 })

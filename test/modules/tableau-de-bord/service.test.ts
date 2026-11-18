@@ -3,6 +3,7 @@ import * as repository from '../../../src/modules/tableau-de-bord/tableau-de-bor
 import {
   getGeneralKpi,
   getHistoriqueSpecificParcellaire,
+  getRepetErreurs,
   getTableauBilan,
   getTableauErreurs,
   getTopAnomalies
@@ -146,5 +147,34 @@ describe('dashboard service', () => {
       organismeCertificateur: 999
     })
     expect(result).toEqual(data)
+  })
+
+  it("exige au moins un critère pour l'historique parcellaire", async () => {
+    await expect(getHistoriqueSpecificParcellaire({}, 999)).rejects.toMatchObject({ statusCode: 400 })
+    expect(mockedRepo.getHistoriqueSpecificParcellaireRepo).not.toHaveBeenCalled()
+  })
+
+  it('découpe une liste de codes séparés par des virgules', async () => {
+    mockedRepo.getTableauErreursRepo.mockResolvedValue({ data: [], meta: { total: 0, page: 1, limit: 20 } })
+
+    await getTableauErreurs({ codes: ' E1, ,E2 ' }, 999)
+
+    expect(mockedRepo.getTableauErreursRepo).toHaveBeenCalledWith(expect.objectContaining({ codes: ['E1', 'E2'] }))
+  })
+
+  it("n'envoie pas de filtre de codes vide", async () => {
+    mockedRepo.getTableauErreursRepo.mockResolvedValue({ data: [], meta: { total: 0, page: 1, limit: 20 } })
+
+    await getTableauErreurs({ codes: ' , ' }, 999)
+
+    expect(mockedRepo.getTableauErreursRepo).toHaveBeenCalledWith(expect.objectContaining({ codes: undefined }))
+  })
+
+  it('exige une période pour les envois répétés', async () => {
+    await expect(getRepetErreurs({ from: '2026-01-01' }, 999)).rejects.toMatchObject({
+      statusCode: 400,
+      message: 'La période (from et to) est obligatoire.'
+    })
+    expect(mockedRepo.getEnvoisSuspectsRepo).not.toHaveBeenCalled()
   })
 })
