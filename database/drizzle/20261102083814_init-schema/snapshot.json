@@ -1,9 +1,9 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "5e6ee9cf-5531-4fb4-bcd6-38d68c5b4585",
+  "id": "5a106a53-40a8-4a97-9246-acd7c3fbcbee",
   "prevIds": [
-    "21529f7f-36f7-4609-899a-3418f5d25a2c"
+    "00000000-0000-0000-0000-000000000000"
   ],
   "ddl": [
     {
@@ -84,6 +84,23 @@
         "PENDING"
       ],
       "name": "import_status",
+      "entityType": "enums",
+      "schema": "cartobio"
+    },
+    {
+      "values": [
+        "TELEPAC",
+        "API_PARCELLAIRE",
+        "ANYGEO",
+        "GEOFOLIA",
+        "MES_PARCELLES",
+        "CVI",
+        "RPG",
+        "MANUEL",
+        "COPIE_VERSION",
+        "COPIE_CONFLIT"
+      ],
+      "name": "metadata_source",
       "entityType": "enums",
       "schema": "cartobio"
     },
@@ -732,7 +749,7 @@
     {
       "type": "certification_type",
       "typeSchema": "cartobio",
-      "notNull": true,
+      "notNull": false,
       "dimensions": 0,
       "default": null,
       "generated": null,
@@ -751,6 +768,32 @@
       "generated": null,
       "identity": null,
       "name": "date",
+      "entityType": "columns",
+      "schema": "cartobio",
+      "table": "parcellaires_evenements"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "description",
+      "entityType": "columns",
+      "schema": "cartobio",
+      "table": "parcellaires_evenements"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "metadata",
       "entityType": "columns",
       "schema": "cartobio",
       "table": "parcellaires_evenements"
@@ -808,8 +851,8 @@
       "table": "parcellaires_metadata"
     },
     {
-      "type": "text",
-      "typeSchema": null,
+      "type": "metadata_source",
+      "typeSchema": "cartobio",
       "notNull": false,
       "dimensions": 0,
       "default": null,
@@ -823,7 +866,7 @@
     {
       "type": "timestamp with time zone",
       "typeSchema": null,
-      "notNull": true,
+      "notNull": false,
       "dimensions": 0,
       "default": null,
       "generated": null,
@@ -886,11 +929,37 @@
       "table": "parcellaires_metadata"
     },
     {
-      "type": "uuid",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "copy_of",
+      "entityType": "columns",
+      "schema": "cartobio",
+      "table": "parcellaires_metadata"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "warnings",
+      "entityType": "columns",
+      "schema": "cartobio",
+      "table": "parcellaires_metadata"
+    },
+    {
+      "type": "text",
       "typeSchema": null,
       "notNull": true,
       "dimensions": 0,
-      "default": "gen_random_uuid()",
+      "default": null,
       "generated": null,
       "identity": null,
       "name": "id",
@@ -998,6 +1067,32 @@
       "generated": null,
       "identity": null,
       "name": "date_semis",
+      "entityType": "columns",
+      "schema": "cartobio",
+      "table": "parcelle_cultures"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "commentaire",
+      "entityType": "columns",
+      "schema": "cartobio",
+      "table": "parcelle_cultures"
+    },
+    {
+      "type": "smallint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "0",
+      "generated": null,
+      "identity": null,
+      "name": "position",
       "entityType": "columns",
       "schema": "cartobio",
       "table": "parcelle_cultures"
@@ -1354,14 +1449,27 @@
       "table": "parcelles_annotations"
     },
     {
-      "type": "date",
+      "type": "timestamp with time zone",
       "typeSchema": null,
       "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "cartobio",
+      "table": "parcelles_annotations"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": false,
       "dimensions": 0,
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "created_at",
+      "name": "metadata",
       "entityType": "columns",
       "schema": "cartobio",
       "table": "parcelles_annotations"
@@ -1640,7 +1748,7 @@
       "table": "import_pac"
     },
     {
-      "type": "varchar(20)",
+      "type": "integer",
       "typeSchema": null,
       "notNull": false,
       "dimensions": 0,
@@ -1653,7 +1761,7 @@
       "table": "import_pac"
     },
     {
-      "type": "varchar",
+      "type": "numeric",
       "typeSchema": null,
       "notNull": false,
       "dimensions": 0,
@@ -2194,6 +2302,34 @@
       "nameExplicit": true,
       "columns": [
         {
+          "value": "numerobio",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "audit_date",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": "\"deleted_at\" IS NULL",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "parcellaires_numerobio_audit_date_idx",
+      "entityType": "indexes",
+      "schema": "cartobio",
+      "table": "parcellaires"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
           "value": "record_id",
           "isExpression": false,
           "asc": true,
@@ -2427,6 +2563,41 @@
       "entityType": "indexes",
       "schema": "cartobio",
       "table": "attestations_production"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "numerobio",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "pacage",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "siret",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "import_pac_numerobio_pacage_siret_idx",
+      "entityType": "indexes",
+      "schema": "cartobio",
+      "table": "import_pac"
     },
     {
       "nameExplicit": true,
@@ -2709,7 +2880,7 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
-      "name": "parcellaire_import_logs_import_id_parcellaires_import_id_fkey",
+      "name": "parcellaire_import_logs_import_id_parcellaire_import_id_fkey",
       "entityType": "fks",
       "schema": "cartobio",
       "table": "parcellaire_import_logs"
@@ -2726,10 +2897,22 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
-      "name": "parcellaire_import_payload_QzYBWqSykZMj_fkey",
+      "name": "parcellaire_import_payload_import_id_parcellaire_import_id_fkey",
       "entityType": "fks",
       "schema": "cartobio",
       "table": "parcellaire_import_payload"
+    },
+    {
+      "columns": [
+        "record_id",
+        "parcelle_id",
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "parcelle_cultures_pkey",
+      "entityType": "pks",
+      "schema": "cartobio",
+      "table": "parcelle_cultures"
     },
     {
       "columns": [
@@ -2741,6 +2924,18 @@
       "entityType": "pks",
       "schema": "cartobio",
       "table": "parcelles"
+    },
+    {
+      "columns": [
+        "record_id",
+        "parcelle_id",
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "parcelles_annotations_pkey",
+      "entityType": "pks",
+      "schema": "cartobio",
+      "table": "parcelles_annotations"
     },
     {
       "columns": [
@@ -2861,26 +3056,6 @@
         "id"
       ],
       "nameExplicit": false,
-      "name": "parcelle_cultures_pkey",
-      "schema": "cartobio",
-      "table": "parcelle_cultures",
-      "entityType": "pks"
-    },
-    {
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "name": "parcelles_annotations_pkey",
-      "schema": "cartobio",
-      "table": "parcelles_annotations",
-      "entityType": "pks"
-    },
-    {
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
       "name": "attestations_production_pkey",
       "schema": "cartobio",
       "table": "attestations_production",
@@ -2901,7 +3076,7 @@
         "id"
       ],
       "nameExplicit": false,
-      "name": "parcellaires_import_pkey",
+      "name": "parcellaire_import_pkey",
       "schema": "cartobio",
       "table": "parcellaire_import",
       "entityType": "pks"

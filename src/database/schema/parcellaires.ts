@@ -12,7 +12,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { cartobio } from "./cartobio.js";
-import { certificationType, mixiteType, parcellaireEventType } from './enums.js';
+import { certificationType, metadataSource, mixiteType, parcellaireEventType } from './enums.js';
 import { organismeCertificateur } from './references.js';
 
 export const parcellaires = cartobio.table(
@@ -31,7 +31,7 @@ export const parcellaires = cartobio.table(
     versionNom: text('version_nom').notNull(),
     mixite: mixiteType('mixite'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow().$onUpdate(() => sql`now()`),
     dateDerniereNotif: timestamp('date_derniere_notif', { withTimezone: true }),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
@@ -48,7 +48,7 @@ export const parcellairesMetadata = cartobio.table('parcellaires_metadata', {
   recordId: uuid('record_id')
     .primaryKey()
     .references(() => parcellaires.recordId, { onDelete: 'cascade' }),
-  source: text('source'),
+  source: metadataSource('source'),
   sourceUpdatedAt: timestamp('source_updated_at', { withTimezone: true }),
   provenance: text('provenance'),
   campagne: smallint('campagne'),

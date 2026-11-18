@@ -11,16 +11,17 @@ async function sendMail (): Promise<void> {
     process.exit(1)
   }
 
-  try {
-    for (const oc of ocList) {
+  let errors = 0
+  for (const oc of ocList) {
+    try {
       await sendRapportHebdo(oc.id, oc.email, oc.label)
       console.log(`Rapport envoyé à ${oc.email}`)
+    } catch (err) {
+      errors++
+      console.error(`Erreur envoi rapport à ${oc.email}:`, err)
     }
-    process.exit(0)
-  } catch (err) {
-    console.error('Erreur envoi rapport:', err)
-    process.exit(1)
   }
+  process.exit(errors > 0 ? 1 : 0)
 }
 
 (async function (): Promise<void> {

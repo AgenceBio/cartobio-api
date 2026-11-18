@@ -16,10 +16,13 @@ import {
   numeroBioParamsSchema,
   recordInfosBodySchema
 } from '@agencebio/cartobio-types'
-import { apiError, checkCertificationStatus, commonErrorResponses, describedResponse, mergeSchemas, operatorFromNumeroBio, operatorFromRecordId, protectedWithToken, routeWithRecordId, TAGS, withSchema } from '../../shared/routes.js'
+import { apiError, checkCertificationStatus, commonErrorResponses, describedResponse, mergeSchemas, operatorFromNumeroBio, operatorFromRecordId, protectedWithToken, TAGS, withSchema } from '../../shared/routes.js'
+import type { CartobioExtendedRouteShorthandOptions, WithSchema } from '../../shared/routes.js'
+import { enforceOperatorAccess, haveRightToUpdate } from '../../shared/middlewares.js'
 
-const recordRoute = () => withSchema(mergeSchemas(protectedWithToken(), operatorFromRecordId), { params: auditParamsSchema })
-const recordWithOperatorRoute = () => withSchema(mergeSchemas(protectedWithToken(), routeWithRecordId, operatorFromRecordId), { params: auditParamsSchema })
+const operatorAccess = { preHandler: [enforceOperatorAccess()] }
+
+const recordRoute = (): WithSchema<CartobioExtendedRouteShorthandOptions, { params: typeof auditParamsSchema }> => withSchema(mergeSchemas(protectedWithToken(), operatorFromRecordId, operatorAccess), { params: auditParamsSchema })
 
 const recordErrorResponses = {
   ...commonErrorResponses,
@@ -68,7 +71,7 @@ export const getFeaturesSchema = withSchema(recordRoute(), {
 })
 
 export const createRecordSchema = withSchema(
-  mergeSchemas(operatorFromNumeroBio, checkCertificationStatus, protectedWithToken()),
+  mergeSchemas(operatorFromNumeroBio, checkCertificationStatus, protectedWithToken(), { preValidation: [haveRightToUpdate()] }),
   {
     operationId: 'createRecord',
     tags: [TAGS.PARCELLAIRES],
@@ -85,7 +88,7 @@ export const createRecordSchema = withSchema(
   }
 )
 
-export const deleteRecordSchema = withSchema(mergeSchemas(protectedWithToken(), routeWithRecordId), {
+export const deleteRecordSchema = withSchema(recordRoute(), {
   operationId: 'deleteRecord',
   tags: [TAGS.PARCELLAIRES],
   summary: 'Supprimer un parcellaire',
@@ -94,7 +97,7 @@ export const deleteRecordSchema = withSchema(mergeSchemas(protectedWithToken(), 
   response: { ...recordErrorResponses, 204: describedResponse('Parcellaire supprimé') }
 })
 
-export const patchRecordSchema = withSchema(mergeSchemas(protectedWithToken(), operatorFromRecordId, routeWithRecordId), {
+export const patchRecordSchema = withSchema(recordRoute(), {
   operationId: 'patchRecord',
   tags: [TAGS.PARCELLAIRES],
   summary: 'Modifier les informations d\'un parcellaire',
@@ -104,7 +107,7 @@ export const patchRecordSchema = withSchema(mergeSchemas(protectedWithToken(), o
   response: recordResponse
 })
 
-export const createFeatureSchema = withSchema(recordWithOperatorRoute(), {
+export const createFeatureSchema = withSchema(recordRoute(), {
   operationId: 'createParcelle',
   tags: [TAGS.PARCELLES],
   summary: 'Ajouter une parcelle',
@@ -112,7 +115,7 @@ export const createFeatureSchema = withSchema(recordWithOperatorRoute(), {
   response: recordResponse
 })
 
-export const patchFeatureCollectionSchema = withSchema(recordWithOperatorRoute(), {
+export const patchFeatureCollectionSchema = withSchema(recordRoute(), {
   operationId: 'patchParcelles',
   tags: [TAGS.PARCELLES],
   summary: 'Modifier plusieurs parcelles',
@@ -121,7 +124,7 @@ export const patchFeatureCollectionSchema = withSchema(recordWithOperatorRoute()
   response: recordResponse
 })
 
-export const updateFeaturePropertiesSchema = withSchema(recordWithOperatorRoute(), {
+export const updateFeaturePropertiesSchema = withSchema(recordRoute(), {
   operationId: 'patchParcelle',
   tags: [TAGS.PARCELLES],
   summary: 'Modifier une parcelle',
@@ -131,7 +134,7 @@ export const updateFeaturePropertiesSchema = withSchema(recordWithOperatorRoute(
   response: recordResponse
 })
 
-export const deleteSingleFeatureSchema = withSchema(recordWithOperatorRoute(), {
+export const deleteSingleFeatureSchema = withSchema(recordRoute(), {
   operationId: 'deleteParcelle',
   tags: [TAGS.PARCELLES],
   summary: 'Supprimer une parcelle',
@@ -140,7 +143,7 @@ export const deleteSingleFeatureSchema = withSchema(recordWithOperatorRoute(), {
   response: recordResponse
 })
 
-export const createFeaturesFromOtherSchema = withSchema(recordWithOperatorRoute(), {
+export const createFeaturesFromOtherSchema = withSchema(recordRoute(), {
   operationId: 'replaceParcelles',
   tags: [TAGS.PARCELLES],
   summary: 'Remplacer des parcelles par de nouvelles',

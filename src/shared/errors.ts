@@ -1,8 +1,9 @@
 import createError from '@fastify/error'
-import type { FastifyReply, FastifyRequest } from 'fastify'
+import type { FastifyError, FastifyReply, FastifyRequest } from 'fastify'
 import { hasZodFastifySchemaValidationErrors } from 'fastify-type-provider-zod'
-import type { HTTPError as GotHttpError } from 'got'
+import { z, ZodError } from 'zod'
 import type { ApiError, ValidationIssue } from '@agencebio/cartobio-types'
+import config from '../config/env.js'
 
 
 const ExpiredCredentialsApiError = createError('EXPIRED_CREDENTIALS', 'Accès refusé : ce jeton n\'est plus valide (%s).', 401)
@@ -25,6 +26,11 @@ const getErrorCode = (error: unknown): unknown => {
   return hasProperty(error, 'cause') ? getErrorCode(error.cause) : undefined
 }
 
+const getErrorConstraint = (error: unknown): unknown => {
+  if (hasProperty(error, 'constraint')) return error.constraint
+  return hasProperty(error, 'cause') ? getErrorConstraint(error.cause) : undefined
+}
+
 const getResponseStatusCode = (error: unknown): unknown =>
   hasProperty(error, 'response') && hasProperty(error.response, 'statusCode') ? error.response.statusCode : undefined
 
@@ -42,7 +48,7 @@ const validationErrorBody = (location: string, validation: { instancePath: strin
   }))
   const [first] = details
   const others = details.length - 1
-  const summary = first.path ? `${first.path} : ${first.message}` : first.message
+  const summary = first?.path ? `${first.path} : ${first.message}` : first?.message ?? 'Valeur invalide'
 
   return {
     statusCode: 400,
@@ -53,14 +59,23 @@ const validationErrorBody = (location: string, validation: { instancePath: strin
   }
 }
 
-const errorHandler = (error: Error & { validation?: unknown; validationContext?: string; statusCode?: number } & GotHttpError, request: FastifyRequest, reply: FastifyReply) => {
-  // These are user-led errors, we do not need to log them.
+const errorHandler = (error: FastifyError, request: FastifyRequest, reply: FastifyReply): FastifyReply => {
   if (hasZodFastifySchemaValidationErrors(error)) {
-    return reply.code(400).send(validationErrorBody(error.validationContext ?? 'body', error.validation))
+    const body = validationErrorBody(error.validationContext ?? 'body', error.validation)
+    if (config.get('env') === 'dev') request.log.warn({ details: body.details }, body.message)
+    return reply.code(400).send(body)
+  }
+
+  if (error instanceof ZodError) {
+    return reply.send(new InvalidRequestApiError(z.prettifyError(error), { cause: error }))
   }
 
   if (error.validation) {
     return reply.send(new InvalidRequestApiError(error.message, { cause: error }))
+  }
+
+  if (getErrorConstraint(error) === 'parcelles_commune_communes_fid_fkey') {
+    return reply.send(new InvalidRequestApiError('Code commune inconnu.', { cause: error }))
   }
 
   // All handled errors (status code < 500) are already formatted to be exposed to the client

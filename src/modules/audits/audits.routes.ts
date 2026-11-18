@@ -20,7 +20,7 @@ export default async function auditRoutes (fastify: FastifyInstance): Promise<vo
   )
 
   app.get('/api/v2/audits/:recordId/has-attestation-production', attestationProductionSchema, async (request, reply) => {
-    const pac = (request.query.pac ?? 'false') === 'true'
+    const { pac } = request.query
 
     const attestation = await service.getAttestationProduction(requireRecord(request).record_id, pac ? AttestationsProductionsType.PACCOMPLET : AttestationsProductionsType.COMPLET)
 

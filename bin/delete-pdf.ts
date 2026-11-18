@@ -1,13 +1,10 @@
 #!/usr/bin/env node
-import fs from 'fs'
-import path from 'path'
+import { readdir, stat, unlink } from 'node:fs/promises'
+import path from 'node:path'
+import config from '../src/config/env.js'
 /**
  * Script de nettoyage des pdfs non utile depuis plus de 2 jours (déchet d'une mauvaise génération)
  */
-async function exit (): Promise<void> {
-  process.exit(1)
-}
-
 async function clearPDFS (): Promise<void> {
   if (process.argv[2] === '-h' || process.argv[2] === '--help') {
     console.log(
@@ -16,36 +13,23 @@ async function clearPDFS (): Promise<void> {
     process.exit(0)
   }
 
-  try {
-    fs.readdir('storage/pdf', (err, files): void => {
-      if (err) throw err
+  const directory = config.get('attestationsProductions.directory')
+  const now = Date.now()
+  const twoDaysInMs = 2 * 24 * 60 * 60 * 1000
 
-      const now = Date.now()
-      const twoDaysInMs = 2 * 24 * 60 * 60 * 1000
+  for (const file of await readdir(directory)) {
+    if (!file.toLowerCase().endsWith('.pdf')) continue
 
-      for (const file of files) {
-        if (file.toLowerCase().endsWith('.pdf')) {
-          const filePath = path.join('storage/pdf', file)
+    const filePath = path.join(directory, file)
+    const stats = await stat(filePath)
 
-          fs.stat(filePath, (err, stats): void => {
-            if (err) throw err
-            const fileAge = now - stats.mtime.getTime()
-
-            if (fileAge > twoDaysInMs) {
-              fs.unlink(filePath, (err): void => {
-                if (err) throw err
-              })
-            }
-          })
-        }
-      }
-    })
-  } catch (e) {
-    console.error(e)
-    await exit()
+    if (now - stats.mtime.getTime() > twoDaysInMs) {
+      await unlink(filePath)
+    }
   }
 }
 
-(async function (): Promise<void> {
-  await clearPDFS()
-})()
+clearPDFS().catch((e) => {
+  console.error(e)
+  process.exit(1)
+})

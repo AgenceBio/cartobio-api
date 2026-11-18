@@ -6,48 +6,41 @@ const { get, HTTPError } = got
 import { createDecoder, createVerifier } from 'fast-jwt'
 import config from '../../config/env.js'
 import * as repository from './auth.repository.js'
-import type { DepartementRow, UserProfile } from './auth.types.js'
+import { notificationsTokenSchema, ssoAccessTokenSchema } from './auth.tokens.js'
 import { fetchOperatorByNumeroBio } from '../../clients/agence-bio.client.js'
-import type { AgenceBioUserGroup, OrganismeCertificateur } from '@agencebio/cartobio-types'
+import { organismeCertificateurSchema } from '@agencebio/cartobio-types'
+import type { CartoBioUser, OrganismeCertificateur } from '@agencebio/cartobio-types'
+import { agenceBioUserByEmailSchema, agenceBioUserProfileSchema } from '../../clients/agence-bio.types.js'
+import { parseApiResponse } from '../../clients/clients.utils.js'
+import { z } from 'zod'
 
 const origin = config.get('notifications.origin')
 const decode = createDecoder()
 const verify = createVerifier({ key: config.get('notifications.publicKey') })
 const oneHour = 60 * 60 * 1000
 
-interface NotificationsDecodedToken {
-  numeroBio: string
-  userId: number
-}
+type NotificationsDecodedToken = z.infer<typeof notificationsTokenSchema>
 
-interface NotificationsUserProfile {
-  id: number
-  prenom: string
-  nom: string
-  organismeCertificateurId?: number | null
-  groupes: AgenceBioUserGroup[]
-}
-
-function fetchCertificationBodies() {
-  return get(`${config.get('notifications.endpoint')}/api/oc`, {
+async function fetchCertificationBodies(): Promise<OrganismeCertificateur[]> {
+  return parseApiResponse(z.array(organismeCertificateurSchema), await get(`${config.get('notifications.endpoint')}/api/oc`, {
     headers: { Authorization: config.get('notifications.serviceToken'), Origin: origin }
-  }).json<OrganismeCertificateur[]>()
+  }).json(), 'l\'API Agence Bio')
 }
 
 const getCertificationBodies = memo(fetchCertificationBodies, { maxAge: 24 * oneHour })
 
-async function getUserProfileById(userId: number): Promise<UserProfile> {
+async function getUserProfileById(userId: number): Promise<CartoBioUser> {
   const [userProfile, certificationBodies] = await Promise.all([
     get(`${config.get('notifications.endpoint')}/api/users/${userId}`, {
       headers: { Authorization: config.get('notifications.serviceToken'), Origin: origin }
-    }).json<NotificationsUserProfile>(),
+    }).json().then((data) => parseApiResponse(agenceBioUserProfileSchema, data, 'l\'API Agence Bio')),
     getCertificationBodies()
   ])
 
   return {
     id: userProfile.id,
-    prenom: userProfile.prenom,
-    nom: userProfile.nom,
+    prenom: userProfile.prenom ?? '',
+    nom: userProfile.nom ?? '',
     ...(userProfile.organismeCertificateurId
       ? { organismeCertificateur: { id: userProfile.organismeCertificateurId, nom: certificationBodies.find(({ id }) => userProfile.organismeCertificateurId === id)?.nom ?? '' } }
       : {}),
@@ -58,7 +51,7 @@ async function getUserProfileById(userId: number): Promise<UserProfile> {
 
 const getCachedUserProfile = memo(getUserProfileById, { maxAge: oneHour })
 
-async function getHistoryUser(userId: string | number, userRole: string | null): Promise<UserProfile> {
+async function getHistoryUser(userId: string | number, userRole: string | null): Promise<CartoBioUser> {
   try {
     return await getCachedUserProfile(Number(userId))
   } catch (error) {
@@ -70,41 +63,31 @@ async function getHistoryUser(userId: string | number, userRole: string | null):
   }
 }
 
-async function getUserProfileFromSSOToken(accessToken: string) {
-  const { sub: email }: { sub: string } = decode(accessToken)
-  const userProfile = await get(`${config.get('notifications.endpoint')}/api/utilisateur/by-email`, {
+async function getUserProfileFromSSOToken(accessToken: string): Promise<CartoBioUser> {
+  const { sub: email } = ssoAccessTokenSchema.parse(decode(accessToken))
+  const userProfile = parseApiResponse(agenceBioUserByEmailSchema, await get(`${config.get('notifications.endpoint')}/api/utilisateur/by-email`, {
     headers: { Authorization: config.get('notifications.serviceToken'), Origin: origin }, searchParams: { email }
-  }).json<{ id: number }>()
+  }).json(), 'l\'API Agence Bio')
   return getUserProfileById(userProfile.id)
 }
 
 function verifyNotificationAuthorization(authorizationHeader: string | undefined): { decodedToken: NotificationsDecodedToken; token: string; error?: undefined } | { error: unknown; decodedToken?: undefined; token?: undefined } {
   const token = (authorizationHeader ?? '').replace(/Bearer /i, '')
   try {
-    return { decodedToken: verify(token) as NotificationsDecodedToken, token }
+    return { decodedToken: notificationsTokenSchema.parse(verify(token)), token }
   } catch (error) {
     return { error }
   }
 }
 
-async function getDepartement() {
-  const rows = await repository.findDepartements()
-  const grouped = rows.reduce<Record<string, DepartementRow[]>>((regions, row) => {
-    regions[row.nomRegion] ??= []
-    regions[row.nomRegion].push(row)
-    return regions
-  }, {})
-  return Object.fromEntries(Object.keys(grouped).sort().map(region => [region, grouped[region].map(({ code, nom }) => ({ code, nom })).sort((a, b) => a.nom.localeCompare(b.nom))]))
-}
-
-const hashToken = (token: string) => createHash('sha256').update(token).digest('hex')
+const hashToken = (token: string): string => createHash('sha256').update(token).digest('hex')
 
 async function revokeToken(token: string, exp: number): Promise<void> {
   if (exp - Math.floor(Date.now() / 1000) <= 0) return
   await repository.insertRevokedToken(hashToken(token), exp)
 }
 
-function isRevoked(token: string) {
+function isRevoked(token: string): Promise<boolean> {
   return repository.hasRevokedToken(hashToken(token))
 }
 
@@ -114,7 +97,6 @@ export {
   getUserProfileById,
   getHistoryUser,
   getUserProfileFromSSOToken,
-  getDepartement,
   revokeToken,
   isRevoked
 }

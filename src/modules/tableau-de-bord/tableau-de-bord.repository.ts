@@ -1,6 +1,6 @@
 import { and, asc, count, desc, eq, exists, gte, ilike, inArray, lte, or, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
-import { db } from '../../database/database.js'
+import { db, firstRow } from '../../database/database.js'
 import { parcellaireImportLogs, parcellaireImportPayload, parcellaireImport } from '../../database/schema/index.js'
 import { importJobResultEnumSchema, importStatusEnumSchema } from '../../database/validations/imports.js'
 import { getStreaksSuspectes } from './tableau-de-bord.utils.js'
@@ -17,13 +17,11 @@ import type {
   AlerteSuspecte,
   DateRange,
   ErrorDetail,
-  EtatJob,
   GroupeEnvois,
   HistoriqueParams,
   Numeric,
   PaginationParams,
-  PeriodeAnomalies,
-  StatutJob
+  PeriodeAnomalies
 } from './tableau-de-bord.types.js'
 
 function organismeCondition(organismeCertificateur?: number): SQL {
@@ -70,7 +68,7 @@ async function getErrorLogsByJobId(jobIds: number[]): Promise<Record<number, Err
       message: parcellaireImportLogs.message
     })
     .from(parcellaireImportLogs)
-    .where(and(inArray(parcellaireImportLogs.importId, jobIds), eq(parcellaireImportLogs.type, 'error')))
+    .where(and(sql`${parcellaireImportLogs.importId} = ANY(${sql.param(jobIds)}::int[])`, eq(parcellaireImportLogs.type, 'error')))
     .orderBy(asc(parcellaireImportLogs.id))
 
   const logsByJobId: Record<number, ErrorDetail[]> = {}
@@ -84,7 +82,7 @@ async function getErrorLogsByJobId(jobIds: number[]): Promise<Record<number, Err
 }
 
 async function getGeneralKpi({ from, to, organismeCertificateur }: DateRange): Promise<GeneralKpiResponse['data']> {
-  const [[bilanRow], [anomalyRow]] = await Promise.all([
+  const [bilanRows, [anomalyRow]] = await Promise.all([
     db
       .select({
         totalEnvoyes: sql<Numeric>`COALESCE(SUM((${parcellaireImport.resultJob}->>'count')::int), 0)`,
@@ -118,6 +116,7 @@ async function getGeneralKpi({ from, to, organismeCertificateur }: DateRange): P
       .orderBy(desc(count()))
       .limit(1)
   ])
+  const bilanRow = firstRow(bilanRows)
 
   return {
     totalEnvoyes: Number(bilanRow.totalEnvoyes),
@@ -147,8 +146,8 @@ async function getTableauBilanRepo({
     organismeCondition(organismeCertificateur),
     ...periodConditions({ from, to }),
     rechercheCondition(recherche),
-    statuts?.length ? inArray(parcellaireImport.statutJob, statuts as StatutJob[]) : undefined,
-    etats?.length ? inArray(parcellaireImport.etat, etats as EtatJob[]) : undefined
+    statuts?.length ? inArray(parcellaireImport.statutJob, statuts) : undefined,
+    etats?.length ? inArray(parcellaireImport.etat, etats) : undefined
   )
 
   const ordre = ordreDate === 'asc' ? asc : desc
@@ -286,7 +285,7 @@ async function getHistoriqueSpecificParcellaireRepo({
             payload: parcellaireImportPayload.payload
           })
           .from(parcellaireImportPayload)
-          .where(inArray(parcellaireImportPayload.importId, jobIds))
+          .where(sql`${parcellaireImportPayload.importId} = ANY(${sql.param(jobIds)}::int[])`)
       : []
   ])
 
@@ -414,20 +413,17 @@ async function getTopAnomaliesGroupedRepo({ from, to, organismeCertificateur }: 
   for (const row of rows) {
     const key = new Date(row.period).toISOString()
 
-    if (!periods.has(key)) {
-      periods.set(key, {
+    let currentPeriod = periods.get(key)
+
+    if (!currentPeriod) {
+      currentPeriod = {
         period: row.period,
         accepted: row.accepted,
         refused: row.refused,
         errorCount: 0,
         errors: []
-      })
-    }
-
-    const currentPeriod = periods.get(key)
-
-    if (!currentPeriod) {
-      continue
+      }
+      periods.set(key, currentPeriod)
     }
 
     if (row.code) {
@@ -480,16 +476,19 @@ async function getEnvoisSuspectsRepo({
   for (const row of rows) {
     const key = `${row.numeroBio}|${row.numeroClient}|${row.auditDate}`
 
-    if (!groupes.has(key)) {
-      groupes.set(key, {
+    let groupe = groupes.get(key)
+
+    if (!groupe) {
+      groupe = {
         numeroBio: row.numeroBio,
         numeroClient: row.numeroClient,
         auditDate: row.auditDate,
         envois: []
-      })
+      }
+      groupes.set(key, groupe)
     }
 
-    groupes.get(key)?.envois.push({
+    groupe.envois.push({
       jobId: row.jobId,
       statut: row.statut,
       etat: row.etat,

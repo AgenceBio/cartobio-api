@@ -33,6 +33,13 @@ export default defineConfig([
   },
 
   {
+    files: ['src/**/*.ts', 'bin/**/*.ts', 'packages/cartobio-types/src/**/*.ts'],
+    rules: {
+      '@typescript-eslint/explicit-function-return-type': ['error', { allowExpressions: true, allowTypedFunctionExpressions: true }]
+    }
+  },
+
+  {
     files: ['test/**/*.ts', '__mocks__/**/*.ts'],
     languageOptions: {
       globals: {

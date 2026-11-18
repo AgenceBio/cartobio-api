@@ -20,6 +20,7 @@ describe('normalizeFeature', () => {
     const parcelle = buildDBParcelle({
       id: '1234',
       commune: '26108',
+      commune_label: 'Crest',
       cultures: [culture]
     })
 

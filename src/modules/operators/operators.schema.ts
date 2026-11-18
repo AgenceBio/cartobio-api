@@ -17,6 +17,7 @@ import {
 } from '@agencebio/cartobio-types'
 import { apiError, commonErrorResponses, describedResponse, mergeSchemas, protectedWithToken, operatorFromNumeroBio, TAGS, withSchema } from '../../shared/routes.js'
 import { enforceOperatorAccess } from '../../shared/middlewares.js'
+import type { CartobioExtendedRouteShorthandOptions, WithSchema } from '../../shared/routes.js'
 
 const operatorErrorResponses = {
   ...commonErrorResponses,
@@ -76,7 +77,7 @@ export const dashboardSummarySchema = withSchema(protectedWithToken({ oc: true, 
   response: { ...commonErrorResponses, 200: dashboardSummaryResponseSchema.meta({ description: 'Compteurs par état' }) }
 })
 
-const operatorRoute = () => withSchema(mergeSchemas(protectedWithToken(), operatorFromNumeroBio), { params: numeroBioParamsSchema })
+const operatorRoute = (): WithSchema<CartobioExtendedRouteShorthandOptions, { params: typeof numeroBioParamsSchema }> => withSchema(mergeSchemas(protectedWithToken(), operatorFromNumeroBio), { params: numeroBioParamsSchema })
 
 export const getOperatorSchema = withSchema(operatorRoute(), {
   operationId: 'getOperator',
@@ -100,7 +101,7 @@ export const operatorImportPacSchema = withSchema(operatorRoute(), {
   response: { ...operatorErrorResponses, 200: operatorImportPacResponseSchema.meta({ description: 'Données d\'import PAC' }) }
 })
 
-const operatorActionRoute = () => withSchema(mergeSchemas(protectedWithToken(), operatorFromNumeroBio, { preHandler: [enforceOperatorAccess()] }), { params: numeroBioStringParamsSchema })
+const operatorActionRoute = (): WithSchema<CartobioExtendedRouteShorthandOptions, { params: typeof numeroBioStringParamsSchema }> => withSchema(mergeSchemas(protectedWithToken(), operatorFromNumeroBio, { preHandler: [enforceOperatorAccess()] }), { params: numeroBioStringParamsSchema })
 
 export const pinOperatorSchema = withSchema(operatorActionRoute(), {
   operationId: 'pinOperator',

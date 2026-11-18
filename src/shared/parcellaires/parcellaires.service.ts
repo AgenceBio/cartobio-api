@@ -3,7 +3,8 @@ import type { Polygon } from 'geojson'
 import { db } from '../../database/database.js'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import { CertificationState, EventType } from '@agencebio/cartobio-types'
-import type { CartoBioUser, DBOperatorRecord, DBOperatorRecordWithParcelles, DBParcelle, NormalizedRecord, HistoryEntry, CartoBioCulture, CartoBioFeatureInput, CartoBioFeatureCollectionInput, CultureInput } from '@agencebio/cartobio-types'
+import type { CartoBioUser, HistoryEntry, CartoBioCulture, CartoBioFeatureInput, CultureInput, NormalizedRecord, NormalizedRecordSummary } from '@agencebio/cartobio-types'
+import type { DBOperatorRecord, DBOperatorRecordWithParcelles, PreviousParcelle, RecordInput } from './parcellaires.types.js'
 import { fetchEmailForNumeroBio } from '../../clients/agence-bio.client.js'
 import { sendCertificationComplete } from '../../services/mailer/utils.js'
 import { logger } from '../../config/logger.js'
@@ -19,13 +20,13 @@ import { setHistoryUsers } from './parcellaires.utils.js'
  * Create a new record unless we find a dangling one with the same numeroBio and audit date, in which case we update it
  * with the merge algorithm described in ../../docs/rfc/[001-api-parcellaire.md](http://001-api-parcellaire.md)
  */
-async function createOrUpdateOperatorRecord (record: Omit<Partial<NormalizedRecord>, 'parcelles'> & { parcelles: CartoBioFeatureCollectionInput }, context: { user?: CartoBioUser | null; copyParcellesData?: boolean; previousRecordId?: string; fromAPI?: boolean } | null = {}, parentTx: NodePgDatabase = db): Promise<DBOperatorRecordWithParcelles> {
+async function createOrUpdateOperatorRecord (record: RecordInput, context: { user?: CartoBioUser | null; copyParcellesData?: boolean; previousRecordId?: string; fromAPI?: boolean } | null = {}, parentTx: NodePgDatabase = db): Promise<DBOperatorRecordWithParcelles> {
   const certificationState =
     record.certification_state || CertificationState.OPERATOR_DRAFT
 
   try {
     const { operator, parcelles, shouldNotifyCertification } = await parentTx.transaction(async (tx) => {
-      let preparedFeatures = await prepareFeatures(record.parcelles.features)
+      let preparedFeatures = await prepareFeatures(record.parcelles.features, tx)
 
       const previousMap = await loadPreviousFullData(
         tx,
@@ -116,22 +117,19 @@ async function notifyCertificationComplete (record: Parameters<typeof sendCertif
 /**
  * Load the parcelles of a previous record to allow data copy across records
  */
-async function loadPreviousFullData (tx: NodePgDatabase, context: { copyParcellesData?: boolean; previousRecordId?: string } | null, numerobio: string, features: Array<CartoBioFeatureInput>): Promise<Map<string | number, DBParcelle>> {
+async function loadPreviousFullData (tx: NodePgDatabase, context: { copyParcellesData?: boolean; previousRecordId?: string } | null, numerobio: string, features: Array<CartoBioFeatureInput>): Promise<Map<string | number, PreviousParcelle>> {
   if (!context?.copyParcellesData || !context?.previousRecordId) {
     return new Map()
   }
 
-  const previousMap = new Map<string | number, DBParcelle>()
+  const previousMap = new Map<string | number, PreviousParcelle>()
+  const located = features.filter((feature) => feature.id && feature.geometry)
+  const previous = await repository.findMatchingPreviousParcelles(tx, numerobio, context.previousRecordId, located.map((feature) => feature.geometry))
 
-  for (const feature of features) {
-    if (!feature.id || !feature.geometry) continue
-
-    const previous = await repository.findMatchingPreviousParcelle(tx, numerobio, context.previousRecordId, feature.geometry)
-
-    if (previous) {
-      previousMap.set(feature.id, previous)
-    }
-  }
+  located.forEach((feature, index) => {
+    const match = previous[index]
+    if (feature.id && match) previousMap.set(feature.id, match)
+  })
 
   return previousMap
 }
@@ -143,65 +141,40 @@ async function loadPreviousFullData (tx: NodePgDatabase, context: { copyParcelle
  * - resolves commune code
  * - flags features as foreign (hors France)
  */
-async function prepareFeatures (features: Array<CartoBioFeatureInput>): Promise<Array<CartoBioFeatureInput>> {
-  const sorted = [...features]
+async function prepareFeatures (features: Array<CartoBioFeatureInput>, tx: NodePgDatabase): Promise<Array<CartoBioFeatureInput>> {
+  const prepared = features.map((feature) => populateWithMultipleCultures(feature.id ? feature : { ...feature, id: getRandomFeatureId() }))
+  const withGeometry = prepared.filter((feature) => feature.geometry)
+  const analyses = await repository.analyzeGeometries(withGeometry.map((feature) => ({ geometry: feature.geometry as Polygon, commune: feature.properties.COMMUNE })), tx)
+  const analysisByFeature = new Map(withGeometry.map((feature, index) => [feature, analyses[index]]))
 
-  return await Promise.all(sorted.map(async (feature) => {
-    if (!feature.id) {
-      feature = { ...feature, id: getRandomFeatureId() }
-    }
-    feature = populateWithMultipleCultures(feature)
-    if (feature.geometry) {
-      let geometry = feature.geometry
-      const fixResult = await fixGeometry(geometry)
-      const id = feature.id
+  return prepared.map((feature) => {
+    const analysis = analysisByFeature.get(feature)
+    if (!analysis) return feature
+
+    if (analysis.statut === 'UNCORRECTABLE') {
       const featureLabel = feature.properties.NUMERO_I && feature.properties.NUMERO_P
         ? `îlot ${feature.properties.NUMERO_I} parcelle ${feature.properties.NUMERO_P}`
         : feature.properties.NOM || feature.id
-
-      if (fixResult.statut === 'UNCORRECTABLE') {
-        throw new InvalidRequestApiError(`Une géométrie n'est pas corrigeable (${featureLabel})`)
-      }
-
-      if (fixResult.statut === 'CORRIGE') {
-        feature = polygon(
-          fixResult.geometry.coordinates,
-          feature.properties,
-          { id }
-        )
-        geometry = fixResult.geometry
-      }
-
-      feature.properties.statut_import_geom =
-      fixResult.statut === 'CORRIGE'
-        ? 'CORRIGE'
-        : fixResult.statut === 'ACCEPTENONCORRIGE'
-          ? 'ACCEPTENONCORRIGE'
-          : 'ACCEPTE'
-
-      const etranger = await repository.isEtranger(geometry)
-      feature.properties.etranger = etranger
-
-      if (etranger) {
-        feature.properties.COMMUNE = null
-      } else {
-        const valid =
-        feature.properties.COMMUNE &&
-        await repository.communeExists(geometry, feature.properties.COMMUNE)
-        feature.properties.COMMUNE = valid
-          ? feature.properties.COMMUNE
-          : await repository.findCommune(geometry, feature.properties.COMMUNE)
-      }
+      throw new InvalidRequestApiError(`Une géométrie n'est pas corrigeable (${featureLabel})`)
     }
-    return feature
-  }))
+
+    const result = analysis.statut === 'CORRIGE' && analysis.geometry
+      ? polygon(analysis.geometry.coordinates, feature.properties, { id: feature.id })
+      : feature
+
+    result.properties.statut_import_geom = analysis.statut
+    result.properties.etranger = analysis.etranger ?? false
+    result.properties.COMMUNE = analysis.commune
+
+    return result
+  })
 }
 
 /**
  * Merge data from a previous record into the prepared features (conversion_niveau, engagement_date, NOM, cultures)
  * No-op if context.copyParcellesData is falsy
  */
-function applyPreviousData (features: Array<CartoBioFeatureInput>, previousMap: Map<string | number, DBParcelle>, context: { copyParcellesData?: boolean } | null): Array<CartoBioFeatureInput> {
+function applyPreviousData (features: Array<CartoBioFeatureInput>, previousMap: Map<string | number, PreviousParcelle>, context: { copyParcellesData?: boolean } | null): Array<CartoBioFeatureInput> {
   if (!context?.copyParcellesData) return features
 
   return features.map(f => {
@@ -256,28 +229,6 @@ function mergeCulturesExact (newCultures: Array<CultureInput> = [], oldCultures:
     variete: c.variete || map.get(c.CPF) || ''
   }))
 }
-type FixGeometryResult =
-  | { statut: 'ACCEPTE' | 'UNCORRECTABLE' | 'ACCEPTENONCORRIGE' }
-  | { statut: 'CORRIGE'; geometry: Polygon }
-
-async function fixGeometry (geometry: Polygon): Promise<FixGeometryResult> {
-  const analysis = await repository.analyzeGeometryFix(geometry)
-
-  if (analysis.already_valid) {
-    return { statut: 'ACCEPTE' }
-  }
-
-  if (!analysis.is_polygon) {
-    return { statut: 'UNCORRECTABLE' }
-  }
-
-  if (analysis.diff_ha >= 1 || analysis.diff_pct >= 1) {
-    return { statut: 'ACCEPTENONCORRIGE' }
-  }
-
-  return { statut: 'CORRIGE', geometry: analysis.geometry }
-}
-
 async function findHistoryUsers (entries: HistoryEntry[]): Promise<Map<string, CartoBioUser>> {
   const roles = new Map<string, string | null>()
   for (const { user } of entries) {
@@ -294,13 +245,13 @@ async function withHistoryUsers<T extends { audit_history: HistoryEntry[] }> (re
   return setHistoryUsers(record, await findHistoryUsers(record.audit_history))
 }
 
-async function getRecords (numeroBio: string | number) {
+async function getRecords (numeroBio: string | number): Promise<NormalizedRecordSummary[]> {
   const records = await repository.findRecords(numeroBio)
   const users = await findHistoryUsers(records.flatMap((record) => record.audit_history ?? []))
   return records.map((record) => normalizeRecordSummary(setHistoryUsers(record, users)))
 }
 
-async function getRecord (recordId: string, user: CartoBioUser | null = null) {
+async function getRecord (recordId: string, user: CartoBioUser | null = null): Promise<NormalizedRecord | null> {
   const record = await repository.findRecord(recordId)
   if (!record) return null
 
@@ -308,7 +259,7 @@ async function getRecord (recordId: string, user: CartoBioUser | null = null) {
   return normalizeRecord(await withHistoryUsers(recordWithParcelles))
 }
 
-async function joinRecordParcelles (record: DBOperatorRecord, userId: number | null = null) {
+async function joinRecordParcelles (record: DBOperatorRecord, userId: number | null = null): Promise<DBOperatorRecordWithParcelles> {
   return repository.findRecordParcelles(record, userId)
 }
 

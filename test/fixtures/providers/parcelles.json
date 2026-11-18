@@ -14,6 +14,7 @@
       ]
     },
     "commune": "26108",
+    "commune_label": "Crest",
     "conversion_niveau": "AB",
     "engagement_date": "2015-01-01",
     "numero_ilot_pac": "1",
@@ -93,6 +94,7 @@
       ]
     },
     "commune": "26108",
+    "commune_label": "Crest",
     "cultures": [
       {
         "id": 1,
@@ -213,6 +215,7 @@
       ]
     },
     "commune": "26113",
+    "commune_label": "Die",
     "cultures": [
       {
         "id": 1,

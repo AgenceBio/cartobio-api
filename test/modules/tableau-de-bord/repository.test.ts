@@ -9,10 +9,10 @@ import { parcellaireImportLogs, parcellaireImport } from '../../../src/database/
 const organismeCertificateur = 7
 
 async function insertJob (job: Partial<typeof parcellaireImport.$inferInsert>): Promise<number> {
-  const [{ id }] = await db
+  const { id } = (await db
     .insert(parcellaireImport)
     .values({ organismeCertificateur: String(organismeCertificateur), status: 'DONE', ...job })
-    .returning({ id: parcellaireImport.id })
+    .returning({ id: parcellaireImport.id }))[0]!
 
   return id
 }

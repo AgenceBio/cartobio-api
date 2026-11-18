@@ -21,9 +21,9 @@ export const geometryEqualsBodySchema = z.object({
 })
 
 export const addGeometryBodySchema = z.object({
-  payload: z.looseObject({
+  payload: z.object({
     geometry: z.unknown().optional(),
-    properties: z.looseObject({
+    properties: z.object({
       id: z.union([z.string(), z.number()]).optional().meta({ description: 'Parcelle en cours d\'édition, exclue de la détection' })
     }).optional()
   }).meta({ description: 'Feature GeoJSON à vérifier' })

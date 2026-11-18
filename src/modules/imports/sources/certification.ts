@@ -5,7 +5,7 @@ import type { NormalizedRecord } from '@agencebio/cartobio-types'
 import * as repository from '../imports.repository.js'
 import type { OperatorRecordFilters } from '../imports.types.js'
 
-async function getOperatorLastRecord (numeroBio: string | number, { anneeAudit = null, statut = null }: OperatorRecordFilters = {}) {
+async function getOperatorLastRecord (numeroBio: string | number, { anneeAudit = null, statut = null }: OperatorRecordFilters = {}): Promise<NormalizedRecord> {
   const record = await repository.findLastOperatorRecord(numeroBio, { anneeAudit, statut })
 
   if (!record) {
@@ -15,13 +15,6 @@ async function getOperatorLastRecord (numeroBio: string | number, { anneeAudit =
   return normalizeRecord(await cartobio.joinRecordParcelles(record))
 }
 
-/**
- * @param options.anneeAudit Filtre par année d'audit
- * @param options.statut Filtre par statut de certification
- * @param options.anneeReferenceControle Filtre par anneeReferenceControle
- * @param options.limit Taille de page
- * @param options.start Décalage (OFFSET)
- */
 async function iterateOperatorLastRecords (
   ocId: number,
   { anneeAudit = null, statut = null, anneeReferenceControle = null, limit = null, start = null }: OperatorRecordFilters = {}

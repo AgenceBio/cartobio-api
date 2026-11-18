@@ -3,26 +3,12 @@ import { applyOperatorTextSearch, filterOperatorForAutocomplete, sortRecord } fr
 
 import * as repository from './operators.repository.js'
 import { getHistoryUser } from '../auth/auth.service.js'
-import type { OperatorRecordWithUser } from './operators.types.js'
-import type { OperatorFilter, AgenceBioNormalizedOperator, AgenceBioNormalizedOperatorWithRecord, AgenceBioNormalizedOperatorWithFilterData, AgenceBioNormalizedOperatorWithPinnedStatus, CartoBioOCUser } from '@agencebio/cartobio-types'
+import type { ImportPacRow, OperatorRecordWithUser, AgenceBioNormalizedOperatorWithFilterData } from './operators.types.js'
+import type { OperatorAutocompleteResponse, OperatorFilterInput, AgenceBioNormalizedOperator, AgenceBioNormalizedOperatorWithRecord, AgenceBioNormalizedOperatorWithPinnedStatus, CartoBioUser, NormalizedRecordSummary } from '@agencebio/cartobio-types'
 import { getRecords } from '../../shared/parcellaires/parcellaires.service.js'
 
 type NumeroBio = string | number
-type SortOrder = 'asc' | 'desc'
-type SortableOperator = Pick<AgenceBioNormalizedOperator, 'nom' | 'denominationCourante' | 'notifications'> & {
-  audit_date?: string | null
-  certification_state?: string | null
-}
-type OperatorComparator = (a: SortableOperator, b: SortableOperator) => number
-type RecordSort = { fn: (order: SortOrder) => OperatorComparator; psql: (order: SortOrder) => string }
-
-type OperatorAutocompleteResult = {
-  numeroBio: string
-  nom: string
-  denominationCourante: string
-  siret: string
-  numeroClient?: string
-}
+type SortableOperator = Pick<AgenceBioNormalizedOperator, 'nom' | 'denominationCourante' | 'notifications'>
 
 async function serializeUser (userId: string | null, userRole: string | null): Promise<string | null> {
   if (userId === null) {
@@ -38,14 +24,15 @@ async function withUser<T extends { user_id?: string | null; user_role?: string 
 }
 
 async function addRecordData (operateur: AgenceBioNormalizedOperator): Promise<AgenceBioNormalizedOperatorWithRecord> {
-  const { otherParcellaire, ...record } = await repository.addRecordData(operateur)
+  const { otherParcellaire, user_id: userId, user_role: userRole, ...record } = await repository.addRecordData(operateur)
 
   if (record.record_id === undefined) {
     return record
   }
 
   return {
-    ...await withUser(record),
+    ...record,
+    user: await serializeUser(userId ?? null, userRole ?? null),
     otherParcellaire: otherParcellaire ? await Promise.all(otherParcellaire.map(withUser)) : null
   }
 }
@@ -62,32 +49,12 @@ async function consultOperator (numeroBio: NumeroBio, userId: number): Promise<v
   await repository.consultOperator(numeroBio, userId)
 }
 
-async function getImportPAC (numeroBio: NumeroBio) {
+async function getImportPAC (numeroBio: NumeroBio): Promise<ImportPacRow | null> {
   return repository.findImportPac(numeroBio)
 }
 
 async function hideImport (numeroBio: NumeroBio): Promise<void> {
   await repository.hideImport(numeroBio)
-}
-
-const SORT = {
-  ASCENDING: 1,
-  DESCENDING: -1
-}
-
-const STATUS_PRIORITY: Record<string, number> = {
-  UNKNOWN: 0,
-  undefined: 0,
-  null: 0,
-  '': 0,
-  // Phase 2
-  OPERATOR_DRAFT: 20,
-  // Phase 3
-  AUDITED: 30,
-  // Phase 4
-  PENDING_CERTIFICATION: 40,
-  // Phase 5
-  CERTIFIED: 50
 }
 
 const NOTIF_PRIORITY: Record<string, number> = {
@@ -100,127 +67,35 @@ const NOTIF_PRIORITY: Record<string, number> = {
   RETIREE: 2
 }
 
-const RECORD_SORTS: Record<'audit_date' | 'engagement_date' | 'notifications' | 'nom' | 'statut', RecordSort> = {
-  audit_date: {
-    fn (order) {
-      const collator = new Intl.Collator('fr-FR', { usage: 'sort' })
-      return function sortByAuditDate (a, b) {
-        if (!a.audit_date && !!b.audit_date) {
-          return (order === 'asc' ? SORT.DESCENDING : SORT.ASCENDING)
-        } else if (!!a.audit_date && !b.audit_date) {
-          return (order === 'asc' ? SORT.ASCENDING : SORT.DESCENDING)
-        } if (!a.audit_date && !b.audit_date) {
-          return collator.compare(a.nom || a.denominationCourante || '', b.nom || b.denominationCourante || '')
-        }
+const collator = new Intl.Collator('fr-FR', { usage: 'sort' })
 
-        return collator.compare(a.audit_date ?? '', b.audit_date ?? '') * (order === 'asc' ? SORT.ASCENDING : SORT.DESCENDING)
-      }
-    },
-    psql (order) {
-      return /* sql */`
-        audit_date ${order === 'asc' ? 'ASC NULLS FIRST' : 'DESC NULLS LAST'}
-      `
-    }
-  },
-  engagement_date: {
-    fn (order) {
-      const collator = new Intl.Collator('fr-FR', { usage: 'sort' })
+function compareByName (a: SortableOperator, b: SortableOperator): number {
+  const nameA = a.nom || a.denominationCourante || ''
+  const nameB = b.nom || b.denominationCourante || ''
 
-      return function sortByEngagementDate (a, b) {
-        const aNotif = a.notifications
-        const bNotif = b.notifications
+  const startsWithSpecial = (str: string): boolean => /^[^a-zA-Z]/.test(str)
 
-        if (aNotif?.dateDemarrage == null && bNotif?.dateDemarrage != null) {
-          return (order === 'asc' ? SORT.DESCENDING : SORT.ASCENDING)
-        } else if (bNotif?.dateDemarrage == null && aNotif?.dateDemarrage != null) {
-          return (order === 'asc' ? SORT.ASCENDING : SORT.DESCENDING)
-        } else if (bNotif?.dateDemarrage == null && aNotif?.dateDemarrage == null) {
-          return collator.compare(a.nom || a.denominationCourante || '', b.nom || b.denominationCourante || '')
-        }
+  const isSpecialA = startsWithSpecial(nameA)
+  const isSpecialB = startsWithSpecial(nameB)
 
-        return collator.compare(aNotif?.dateDemarrage ?? '', bNotif?.dateDemarrage ?? '') * (order === 'asc' ? SORT.ASCENDING : SORT.DESCENDING)
-      }
-    },
-    psql () {
-      // we are not supposed to enter this case
-      return 'audit_date DESC NULLS LAST'
-    }
-  },
-  notifications: {
-    fn (order) {
-      const collator = new Intl.Collator('fr-FR', { usage: 'sort' })
+  if (isSpecialA && !isSpecialB) return 1
+  if (!isSpecialA && isSpecialB) return -1
 
-      return function sortByNotifications (a, b) {
-        const aNotif = a.notifications?.etatCertification || 'BROUILLON'
-        const bNotif = b.notifications?.etatCertification || 'BROUILLON'
+  return collator.compare(nameA, nameB)
+}
 
-        if (aNotif === bNotif) {
-          return collator.compare(a.nom || a.denominationCourante || '', b.nom || b.denominationCourante || '')
-        }
+function compareByNotificationsDesc (a: SortableOperator, b: SortableOperator): number {
+  const aNotif = a.notifications?.etatCertification || 'BROUILLON'
+  const bNotif = b.notifications?.etatCertification || 'BROUILLON'
 
-        return (NOTIF_PRIORITY[aNotif] - NOTIF_PRIORITY[bNotif]) * (order === 'asc' ? SORT.ASCENDING : SORT.DESCENDING)
-      }
-    },
-    psql () {
-      // we are not supposed to enter this case
-      return 'audit_date DESC NULLS LAST'
-    }
-  },
-  nom: {
-    fn (order) {
-      const collator = new Intl.Collator('fr-FR', { usage: 'sort' })
-      return function sortByName (a, b) {
-        const nameA = a.nom || a.denominationCourante || ''
-        const nameB = b.nom || b.denominationCourante || ''
-
-        const startsWithSpecial = (str: string) => /^[^a-zA-Z]/.test(str)
-
-        const isSpecialA = startsWithSpecial(nameA)
-        const isSpecialB = startsWithSpecial(nameB)
-
-        if (isSpecialA && !isSpecialB) return 1
-        if (!isSpecialA && isSpecialB) return -1
-
-        return collator.compare(nameA, nameB) * (order === 'asc' ? SORT.ASCENDING : SORT.DESCENDING)
-      }
-    },
-    psql () {
-      // we are not supposed to enter this case
-      return 'audit_date DESC NULLS LAST'
-    }
-  },
-  statut: {
-    fn (order) {
-      const collator = new Intl.Collator('fr-FR', { usage: 'sort' })
-
-      return function sortByStatut (a, b) {
-        if (a.certification_state === b.certification_state) {
-          return collator.compare(a.nom || a.denominationCourante || '', b.nom || b.denominationCourante || '')
-        }
-
-        return (STATUS_PRIORITY[String(a.certification_state)] - STATUS_PRIORITY[String(b.certification_state)]) * (order === 'asc' ? SORT.ASCENDING : SORT.DESCENDING)
-      }
-    },
-    psql (order) {
-      return /* sql */`
-        CASE certification_state
-          ${Object.entries(STATUS_PRIORITY).map(([key, value]) => `WHEN '${key}' THEN ${value} `).join(' ')}
-        END
-        ${order === 'asc' ? 'ASC' : 'DESC'} NULLS LAST,
-        audit_date DESC NULLS LAST
-      `
-    }
+  if (aNotif === bNotif) {
+    return collator.compare(a.nom || a.denominationCourante || '', b.nom || b.denominationCourante || '')
   }
+
+  return (NOTIF_PRIORITY[bNotif] ?? 0) - (NOTIF_PRIORITY[aNotif] ?? 0)
 }
 
-function recordSorts (type: 'fn', sort: keyof typeof RECORD_SORTS, order: SortOrder): OperatorComparator
-function recordSorts (type: 'psql', sort: keyof typeof RECORD_SORTS, order: SortOrder): string
-function recordSorts (type: keyof RecordSort, sort: keyof typeof RECORD_SORTS, order: SortOrder): OperatorComparator | string {
-  return RECORD_SORTS[sort][type](order)
-}
-
-async function searchControlBodyRecords ({ ocId, userId, input, page, filter, limit = 7 }: { ocId: number; userId: number; input: string; page: number; filter?: OperatorFilter; limit?: number }): Promise<{ pagination: { page: number; total: number; page_max: number }; records: AgenceBioNormalizedOperatorWithRecord[] }> {
-  const PER_PAGE = limit
+async function findControlBodyOperators ({ ocId, userId, input, filter }: { ocId: number; userId: number; input: string; filter?: OperatorFilterInput }): Promise<Array<AgenceBioNormalizedOperatorWithFilterData & { epingle: boolean }>> {
   let pinnedOperators: number[] | null = null
 
   if (filter?.pinned === true) {
@@ -229,7 +104,7 @@ async function searchControlBodyRecords ({ ocId, userId, input, page, filter, li
   // we search by input — all operators comes hydrated from the Agence Bio API
   // all we have then to do is to recoup with record states
   // pagination is software-based
-  const records = await Promise.all(
+  return Promise.all(
     [
       pinnedOperators ? Promise.resolve(pinnedOperators) : getPinnedOperators(userId),
       getCustomersByOcWithRecords(input, ocId, filter, pinnedOperators)
@@ -241,7 +116,7 @@ async function searchControlBodyRecords ({ ocId, userId, input, page, filter, li
           return true
         }
 
-        if (item.notifications?.organismeCertificateurId === ocId && ['ARRETEE', 'RETIREE'].includes(item.notifications.etatCertification)) {
+        if (item.notifications?.organismeCertificateurId === ocId && ['ARRETEE', 'RETIREE'].includes(item.notifications.etatCertification ?? '')) {
           return false
         }
 
@@ -296,7 +171,11 @@ async function searchControlBodyRecords ({ ocId, userId, input, page, filter, li
 
       return records.map((r) => ({ ...r, epingle: numeroBioPinned.includes(+r.numeroBio) }))
     })
-    .then(records => records.toSorted(recordSorts('fn', 'nom', 'asc')))
+}
+
+async function searchControlBodyRecords ({ ocId, userId, input, page, filter, limit = 7 }: { ocId: number; userId: number; input: string; page: number; filter?: OperatorFilterInput; limit?: number }): Promise<{ pagination: { page: number; total: number; page_max: number }; records: AgenceBioNormalizedOperatorWithRecord[] }> {
+  const PER_PAGE = limit
+  const records = await findControlBodyOperators({ ocId, userId, input, filter })
 
   const pagination = {
     page,
@@ -304,7 +183,7 @@ async function searchControlBodyRecords ({ ocId, userId, input, page, filter, li
     page_max: Math.max(Math.ceil(records.length / PER_PAGE), 1)
   }
 
-  const pageRecords = records.sort((a, b) => sortRecord(a, b, filter?.sort)).slice(
+  const pageRecords = records.sort((a, b) => sortRecord(a, b, filter?.sort) || compareByName(a, b)).slice(
     (pagination.page - 1) * PER_PAGE,
     (pagination.page) * PER_PAGE).map((record) => addRecordData(record))
   return {
@@ -313,7 +192,7 @@ async function searchControlBodyRecords ({ ocId, userId, input, page, filter, li
   }
 }
 
-async function searchControlBodyRecordsAdmin ({ input, page, filter, limit = 7 }: { input: string; page: number; filter?: OperatorFilter; limit?: number }): Promise<{ pagination: { page: number; total: number; page_max: number }; records: AgenceBioNormalizedOperatorWithRecord[] }> {
+async function searchControlBodyRecordsAdmin ({ input, page, filter, limit = 7 }: { input: string; page: number; filter?: OperatorFilterInput; limit?: number }): Promise<{ pagination: { page: number; total: number; page_max: number }; records: AgenceBioNormalizedOperatorWithRecord[] }> {
   const records = await getCustomersForAdmin({ input })
 
   const pagination = {
@@ -333,7 +212,7 @@ async function searchControlBodyRecordsAdmin ({ input, page, filter, limit = 7 }
   }
 }
 
-async function searchForAutocomplete (ocId: number, userId: number, input?: string): Promise<OperatorAutocompleteResult[]> {
+async function searchForAutocomplete (ocId: number | undefined, userId: number, input?: string): Promise<OperatorAutocompleteResponse> {
   const records = ocId ? (await fetchCustomersByOc(ocId)).filter((operator) => filterOperatorForAutocomplete(operator, ocId)) : (await fetchUserOperators(userId)).operators
 
   return records.filter((record) => applyOperatorTextSearch(record, input))
@@ -352,15 +231,15 @@ async function getDashboardSummary (ocId: number, departements: string[], anneeR
 
   const numeroBios = records
     .filter(
-      (item) => (departements.length === 0 || departements.includes(item.departement)) &&
+      (item) => (departements.length === 0 || departements.includes(item.departement ?? '')) &&
       item.notifications &&
       item.notifications.certification_state !== 'ARRETEE' &&
       item.notifications.organismeCertificateurId === ocId &&
-      ['ENGAGEE', 'ENGAGEE FUTUR'].includes(item.notifications.etatCertification) &&
+      ['ENGAGEE', 'ENGAGEE FUTUR'].includes(item.notifications.etatCertification ?? '') &&
       item.notifications.dateDemarrage && new Date(item.notifications.dateDemarrage).getFullYear() <= anneeReferenceControle &&
       item.isProduction === true
     )
-    .map((r) => r.numeroBio)
+    .map((r) => String(r.numeroBio))
 
   const rows = await repository.findDashboardStates(numeroBios, anneeReferenceControle)
 
@@ -386,7 +265,7 @@ async function getCustomersForAdmin ({ input = '' }: { input?: string }): Promis
   return repository.getFilterData(await fetchOperatorsForAdmin(input), false)
 }
 
-async function getCustomersByOcWithRecords (input: string, oc: number, filter: OperatorFilter = {}, pinnedOperators: number[] | null = []): Promise<AgenceBioNormalizedOperatorWithFilterData[]> {
+async function getCustomersByOcWithRecords (input: string, oc: number, filter: OperatorFilterInput = {}, pinnedOperators: number[] | null = []): Promise<AgenceBioNormalizedOperatorWithFilterData[]> {
   let operators = (await fetchCustomersByOc(oc))
     .filter((operator) => operator.notifications.status !== 'BROUILLON')
 
@@ -400,7 +279,7 @@ async function getCustomersByOcWithRecords (input: string, oc: number, filter: O
   const etatNotification = filter?.etatNotification
   if (etatNotification && etatNotification.length > 0) {
     operators = operators.filter((item) =>
-      (item.notifications.organismeCertificateurId === oc && etatNotification.includes(item.notifications.etatCertification)) ||
+      (item.notifications.organismeCertificateurId === oc && etatNotification.includes(item.notifications.etatCertification ?? '')) ||
       (item.notifications.organismeCertificateurId !== oc && etatNotification.includes('ARRETEE')))
   }
   // on filtre sur les opérateurs qui n'étaient pas engagés sur l'année concernée
@@ -446,14 +325,14 @@ async function listUserOperators (userId: number, { search, limit, offset }: { s
   const userInput = search?.toLowerCase().trim()
   const filteredOperators = userInput
     ? operators.filter((e) =>
-      e.denominationCourante.toLowerCase().includes(userInput) ||
+      e.denominationCourante?.toLowerCase().includes(userInput) ||
       e.numeroBio.toString().includes(userInput) ||
-      e.nom.toLowerCase().includes(userInput) ||
-      e.siret.toLowerCase().includes(userInput))
+      e.nom?.toLowerCase().includes(userInput) ||
+      e.siret?.toLowerCase().includes(userInput))
     : operators
 
   const paginatedOperators = filteredOperators
-    .toSorted(recordSorts('fn', 'notifications', 'desc'))
+    .toSorted(compareByNotificationsDesc)
     .slice(offset, Number(offset) + Number(limit))
     .map((o) => ({
       ...o,
@@ -478,7 +357,7 @@ async function getOperatorsDashboard (userId: number, ocId: number): Promise<{ p
       uniqueNumerobios.includes(Number(operator.numeroBio)) &&
       operator.notifications.certification_state !== 'ARRETEE' &&
       operator.notifications.organismeCertificateurId === ocId &&
-      ['ENGAGEE', 'ENGAGEE FUTUR'].includes(operator.notifications.etatCertification)
+      ['ENGAGEE', 'ENGAGEE FUTUR'].includes(operator.notifications.etatCertification ?? '')
   )
   const operatorsWithData = await Promise.all(operators.map((o) => addRecordData(o)))
   const findOperator = (numeroBio: number): AgenceBioNormalizedOperatorWithRecord | undefined =>
@@ -494,22 +373,23 @@ async function getOperatorsDashboard (userId: number, ocId: number): Promise<{ p
   }
 }
 
-async function getOperatorRecordsForUser (numeroBio: string | number, user: CartoBioOCUser, operator: AgenceBioNormalizedOperator) {
+async function getOperatorRecordsForUser (numeroBio: string | number, user: CartoBioUser, operator: AgenceBioNormalizedOperator): Promise<NormalizedRecordSummary[]> {
   const records = await getRecords(numeroBio)
+  const oc = user.organismeCertificateur
 
-  if (!user.organismeCertificateur || user.organismeCertificateur.id === operator.organismeCertificateur.id) {
+  if (!oc || oc.id === operator.organismeCertificateur.id) {
     return records
   }
 
-  return records.filter((r) => r.oc_id === user.organismeCertificateur.id)
+  return records.filter((r) => r.oc_id === oc.id)
 }
 
 export { fetchUserOperators, fetchCustomersByOc }
 export {
+  findControlBodyOperators,
   searchControlBodyRecords,
   searchControlBodyRecordsAdmin,
   searchForAutocomplete,
-  recordSorts,
   pinOperator,
   unpinOperator,
   consultOperator,

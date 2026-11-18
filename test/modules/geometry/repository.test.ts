@@ -19,7 +19,7 @@ describe('verifyGeometry', () => {
         ]
       ]
     }
-    expect(await verifyGeometry(geomGeoJSon, records[0].record_id)).toEqual({
+    expect(await verifyGeometry(geomGeoJSon, records[0]!.record_id)).toEqual({
       valid: true
     })
   })
@@ -51,7 +51,7 @@ describe('verifyGeometry', () => {
         ]
       ]
     }
-    expect(await verifyGeometry(geomGeoJSon, records[0].record_id)).toEqual({
+    expect(await verifyGeometry(geomGeoJSon, records[0]!.record_id)).toEqual({
       valid: false
     })
   })
@@ -85,7 +85,7 @@ describe('verifyGeometry', () => {
       ]
     }
 
-    expect(await verifyGeometry(geomGeoJSon, records[0].record_id, 1)).toEqual({
+    expect(await verifyGeometry(geomGeoJSon, records[0]!.record_id, 1)).toEqual({
       valid: true
     })
   })
@@ -117,7 +117,7 @@ describe('verifyGeometry', () => {
         ]
       ]
     }
-    expect(await verifyGeometry(geomGeoJSon, records[0].record_id)).toEqual({
+    expect(await verifyGeometry(geomGeoJSon, records[0]!.record_id)).toEqual({
       valid: false,
       corrections: [{
         id: '1',
@@ -227,7 +227,7 @@ describe('verifyGeometry', () => {
       ]
     }
 
-    expect(await verifyGeometry(geomGeoJSon, records[0].record_id)).toEqual({
+    expect(await verifyGeometry(geomGeoJSon, records[0]!.record_id)).toEqual({
       valid: false,
       corrections: [
         {

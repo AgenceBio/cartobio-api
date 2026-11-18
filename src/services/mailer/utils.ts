@@ -3,6 +3,8 @@ import path from 'path'
 
 import { sendMail } from './index.js'
 import config from '../../config/env.js'
+import { MAIL_TEMPLATES_DIR } from '../../shared/paths.js'
+import { escapeHtml } from '../../shared/html.js'
 import { getStatsByOrganisme } from './repository.js'
 
 type CertificationMailRecord = {
@@ -13,30 +15,14 @@ type CertificationMailRecord = {
 }
 
 /**
- * Échappe les caractères HTML dangereux
- */
-function sanitize (value: unknown): string {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-}
-
-/**
  * Charge un template HTML et remplace les variables
- *
- * @param templateName Nom du fichier template (sans extension)
- * @param variables Variables à injecter dans le template
- * @returns HTML final
  */
 function renderTemplate (templateName: string, variables: Record<string, unknown>): string {
-  const filePath = path.join(import.meta.dirname, 'templates', `${templateName}.html`)
+  const filePath = path.join(MAIL_TEMPLATES_DIR, `${templateName}.html`)
   let html = fs.readFileSync(filePath, 'utf-8')
 
   for (const key in variables) {
-    const value = sanitize(variables[key])
+    const value = escapeHtml(variables[key])
     html = html.replace(new RegExp(`{{\\s*${key}\\s*}}`, 'g'), value)
   }
 
@@ -58,7 +44,7 @@ const getLastWeekDates = (): { dateDebut: string; dateFin: string } => {
   const lastSunday = new Date(lastMonday)
   lastSunday.setDate(lastMonday.getDate() + 6)
 
-  const format = (date: Date) => date.toISOString().split('T')[0]
+  const format = (date: Date): string => date.toISOString().slice(0, 10)
 
   return {
     dateDebut: format(lastMonday),

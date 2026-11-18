@@ -1,4 +1,4 @@
-import { departementsResponseSchema, exchangeTokenResponseSchema, externalExploitationParamsSchema, logoutResponseSchema, ssoCallbackQuerySchema, verifyResponseSchema } from '@agencebio/cartobio-types'
+import { exchangeTokenResponseSchema, externalExploitationParamsSchema, logoutResponseSchema, ssoCallbackQuerySchema, verifyResponseSchema } from '@agencebio/cartobio-types'
 import { apiError, commonErrorResponses, describedResponse, hiddenSchema, internalSchema, mergeSchemas, protectedWithToken, TAGS, withSchema } from '../../shared/routes.js'
 
 export const verifySchema = withSchema(mergeSchemas(protectedWithToken({ oc: true, cartobio: true }), internalSchema), {
@@ -18,13 +18,6 @@ export const exchangeTokenSchema = withSchema(internalSchema, {
     200: exchangeTokenResponseSchema.meta({ description: 'Opérateur et jeton CartoBio' }),
     404: apiError('Opérateur introuvable')
   }
-})
-
-export const departementsSchema = withSchema(protectedWithToken(), {
-  operationId: 'listDepartements',
-  tags: [TAGS.REFERENTIELS],
-  summary: 'Liste des départements',
-  response: { ...commonErrorResponses, 200: departementsResponseSchema }
 })
 
 export const devLoginSchema = withSchema(hiddenSchema, {

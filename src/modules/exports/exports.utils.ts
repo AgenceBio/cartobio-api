@@ -1,7 +1,7 @@
 import { eq, sql } from 'drizzle-orm'
 import type { SQL, SQLWrapper } from 'drizzle-orm'
 import { parcelles } from '../../database/schema/index.js'
-import type { ConversionNiveau } from './exports.types.js'
+import type { ConversionNiveau } from '../../database/validations/parcelles.js'
 
 export function sansDateParDefaut (date: SQLWrapper): SQL<string | null> {
   return sql<string | null>`NULLIF(${date}, '1970-01-01')`

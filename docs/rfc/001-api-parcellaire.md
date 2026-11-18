@@ -1,7 +1,7 @@
 ---
 title: API d'envoi des parcellaires
 date: 2023-04-12
-updated_at: 2026-06-25
+updated_at: 2026-10-27
 contributors:
 - Laetita L (Ecocert)
 - Maud R (CartoBio)
@@ -37,6 +37,16 @@ Afin de répondre à la problématique des traitements longs et coûteux en ress
    - L'utilisateur peut ensuite interroger régulièrement l'endpoint `/api/v3/import/jobs/{id}` pour récupérer l'état du traitement (`pending`, `error`, `done`, `created`) et accéder aux résultats dès qu'ils sont disponibles.
    - Ce mécanisme évite les **timeouts**, améliore la **robustesse du système** et permet de mieux **gérer la charge serveur**.  
 
+### MAJ Octobre 2026
+
+Chaque appel transmet **un seul parcellaire** : le corps de la requête est un objet JSON (`numeroBio`, `numeroClient`, `dateAudit`, `parcelles`…), et non plus un tableau ou une suite de parcellaires. Pour envoyer plusieurs opérateurs, faire un appel par opérateur.
+
+Conséquences :
+
+- le statut `207 Multi-Status` n'est plus renvoyé : le parcellaire est soit accepté (`202`), soit refusé (`400`) ;
+- un corps qui n'est pas un objet JSON contenant un tableau `parcelles` est refusé en `400` avant la création du job ;
+- la taille du corps de la requête est limitée à 50 Mo (au-delà : `413 Payload Too Large`).
+
 ### Authentification
 
 L'entête `Authorization` contient le jeton de service fourni par
@@ -54,11 +64,11 @@ le chemin `/api/oc/check-token`.
 | Code HTTP | Message HTTP            | Signification                                                                                                             |
 | --------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `202`     | `Accepted`              | Les données d'entrée sont validées et le processus d'import va se lancer.                                                 |
-| `207`     | `Multi-Status`          | Les données d'entrée sont partiellement validées et le processus d'import va se lancer sur les données valides.           |
 | `400`     | `Bad Request`           | Le fichier JSON est invalide ou certaines données sont incorrectes et donc le traitement ne se lancera pas.               |
 | `401`     | `Unauthorized`          | Le jeton d'`Authorization` est manquant.                                                                                  |
 | `403`     | `Forbidden`             | Ce jeton d'`Authorization` n'est pas attribué, ou a expiré.                                                               |
 | `405`     | `Method Not Allowed`    | L'appel utilise un autre verbe HTTP que `POST`.                                                                           |
+| `413`     | `Payload Too Large`     | Le corps de la requête dépasse 50 Mo.                                                                                     |
 | `500`     | `Internal Server Error` | Une erreur inattendue s'est produite de notre côté — un bug doit être résolu pour qu'une nouvelle requête puisse aboutir. |
 
 #### Réponse
@@ -85,16 +95,15 @@ En cas de statut `202`, un objet représente le nombre d'objets traités.
 }
 ```
 
-En cas de statut `207`, un objet représente les objets acceptés et refusés. Seulement les données valides seront traitées.
+En cas de statut `400`, un objet représente le parcellaire refusé. Aucune donnée n'est enregistrée.
 
-| Chemin                  | Type    | Description                                     |
-| ----------------------- | ------- | ----------------------------------------------- |
-| `jobId`                 | integer | id du job d'import                              |
-| `nbObjetRecus`          | integer | nombre d'objets reçus                           |
-| `nbObjetAcceptes`       | integer | nombre d'objets acceptes                        |
-| `nbObjetRefuses`        | integer | nombre d'objets refuses                         |
-| `listeNumeroBioValides` | array   | liste des numéros bios qui vont etre traités    |
-| `listeProblemes`        | array   | liste des entrées qui ne vont pas etre traitées |
+| Chemin            | Type    | Description                                     |
+| ----------------- | ------- | ----------------------------------------------- |
+| `jobId`           | integer | id du job d'import                              |
+| `nbObjetRecus`    | integer | nombre d'objets reçus                           |
+| `nbObjetAcceptes` | integer | nombre d'objets acceptes                        |
+| `nbObjetRefuses`  | integer | nombre d'objets refuses                         |
+| `listeProblemes`  | array   | liste des entrées qui ne vont pas etre traitées |
 
 Chaque entrée de `listeProblemes` :
 
@@ -109,36 +118,6 @@ Chaque entrée de `listeProblemes` :
 ```json
 {
   "jobId": 26,
-  "nbObjetRecus": 3,
-  "nbObjetAcceptes": 2,
-  "nbObjetRefuses": 1,
-  "listeNumeroBioValides": [
-    "181932",
-    "181933"
-  ],
-  "listeProblemes": [
-    {
-      "numeroBio": "181934",
-      "code": "OC_MISMATCH",
-      "message": "Numéro client différent"
-    }
-  ]
-}
-```
-
-En cas de statut `400`, un objet représente les objets refusés. Aucune donnée n'est enregistrée.
-
-| Chemin            | Type    | Description                                     |
-| ----------------- | ------- | ----------------------------------------------- |
-| `nbObjetRecus`    | integer | nombre d'objets reçus                           |
-| `nbObjetAcceptes` | integer | nombre d'objets acceptes                        |
-| `nbObjetRefuses`  | integer | nombre d'objets refuses                         |
-| `listeProblemes`  | array   | liste des entrées qui ne vont pas etre traitées |
-
-Chaque entrée de `listeProblemes` : identique au tableau ci-dessus.
-
-```json
-{
   "nbObjetRecus": 1,
   "nbObjetAcceptes": 0,
   "nbObjetRefuses": 1,
@@ -152,11 +131,21 @@ Chaque entrée de `listeProblemes` : identique au tableau ci-dessus.
 }
 ```
 
-Si le JSON est invalide, le message d'erreur est simplement le suivant :
+Si le JSON est invalide, ou s'il ne contient pas de tableau `parcelles`, aucun job n'est créé et l'erreur suit le format commun de l'API :
 
 ```json
 {
-  "error": "Le JSON est invalide"
+  "statusCode": 400,
+  "code": "INVALID_API_REQUEST",
+  "error": "Bad Request",
+  "message": "Requête invalide — parcelles : Entrée invalide : tableau attendu, indéfini reçu",
+  "details": [
+    {
+      "location": "body",
+      "path": "parcelles",
+      "message": "Entrée invalide : tableau attendu, indéfini reçu"
+    }
+  ]
 }
 ```
 

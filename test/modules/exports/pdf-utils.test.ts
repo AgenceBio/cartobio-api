@@ -6,7 +6,6 @@ import pdflib from 'pdf-lib'
 import { findPdfParcelles } from '../../../src/modules/exports/exports.repository.js'
 import type { MapDrawOptions, PdfParcelle } from '../../../src/modules/exports/exports.types.js'
 import { asBrowser, asPage, asPdfDocument, buildPdfParcelle } from '../../factories.js'
-import { logger } from '../../../src/config/logger.js'
 
 vi.mock('../../../src/modules/exports/exports.repository.js', () => ({
   findPdfParcelles: vi.fn()
@@ -76,7 +75,7 @@ describe('launchStyleTab', () => {
   })
 
   it('devrait gérer une erreur lors du chargement', async () => {
-    pageMock.goto.mockRejectedValue(new Error('Page style'))
+    pageMock.goto!.mockRejectedValue(new Error('Page style'))
 
     await expect(launchStyleTab(asBrowser(browserMock))).rejects.toThrow('Timeout lors du chargement de la page avec le style Page style')
     expect(pageMock.close).toHaveBeenCalled()
@@ -120,14 +119,14 @@ describe('drawAllParcellesOnMap', () => {
   })
 
   it('devrait retourner une erreur si page.evaluate renvoie une erreur', async () => {
-    pageMock.evaluate.mockResolvedValue('Erreur JS dans le navigateur')
+    pageMock.evaluate!.mockResolvedValue('Erreur JS dans le navigateur')
 
     const result = await drawAllParcellesOnMap(asPage(pageMock), parcelles, options)
     expect(result).toEqual({ error: 'Erreur JS dans le navigateur' })
   })
 
   it('devrait retourner une erreur de timeout', async () => {
-    pageMock.waitForFunction.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('Timeout'))
+    pageMock.waitForFunction!.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('Timeout'))
 
     const result = await drawAllParcellesOnMap(asPage(pageMock), parcelles, options)
     expect(result).toEqual({ error: 'Timeout exceeded (5000ms)' })
@@ -152,7 +151,7 @@ describe('drawParcelleHighlightOnMap', () => {
     buildPdfParcelle({ id: '2', geojson: JSON.stringify({ type: 'Polygon', coordinates: [[[1, 1], [2, 1], [2, 2], [1, 2], [1, 1]]] }) })
   ]
 
-  const highlight = { ...parcelles[0], name: 'Test', nbilot: '12', nbp: '34' }
+  const highlight = { ...parcelles[0]!, name: 'Test', nbilot: '12', nbp: '34' }
 
   const options: MapDrawOptions = {
     width: 800,
@@ -174,7 +173,7 @@ describe('drawParcelleHighlightOnMap', () => {
   })
 
   it('retourne une erreur si evaluate échoue', async () => {
-    pageMock.evaluate.mockResolvedValue("Erreur dans l'éval")
+    pageMock.evaluate!.mockResolvedValue("Erreur dans l'éval")
     const result = await drawParcelleHighlightOnMap(asPage(pageMock), parcelles, highlight, options)
     expect(result).toEqual({ error: "Erreur dans l'éval" })
   })
@@ -267,19 +266,10 @@ describe('getAllParcelles', () => {
     })
   })
 
-  it('retourne [] et loggue en cas d\'erreur', async () => {
-    const loggerErrorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {})
+  it('propage l\'erreur de la base', async () => {
     vi.mocked(findPdfParcelles).mockRejectedValueOnce(new Error('DB down'))
 
-    const result = await getAllParcelles('fail-id')
-
+    await expect(getAllParcelles('fail-id')).rejects.toThrow('DB down')
     expect(findPdfParcelles).toHaveBeenCalled()
-    expect(result).toEqual([])
-    expect(loggerErrorSpy).toHaveBeenCalledWith(
-      { err: expect.any(Error) },
-      'Erreur lors de la récupération des parcelles'
-    )
-
-    loggerErrorSpy.mockRestore()
   })
 })

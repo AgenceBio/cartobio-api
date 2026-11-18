@@ -96,20 +96,14 @@ function getOptimalZoom (bboxWidth: number, bboxHeight: number, viewportWidth: n
 
 /**
  * Récupère toutes les parcelles d'un opérateur
- * @param pac Boolean permettant de savoir si on doit récuperer uniquement les parcelles PAC (numéro ilot et parcelle)
+ * Avec `pac`, uniquement les parcelles PAC (numéro d'îlot et de parcelle)
  */
 async function getAllParcelles (recordId: string, pac: boolean = false): Promise<Array<PdfParcelle>> {
-  try {
-    return await findPdfParcelles(recordId, pac)
-  } catch (error) {
-    logger.error({ err: error }, 'Erreur lors de la récupération des parcelles')
-    return []
-  }
+  return findPdfParcelles(recordId, pac)
 }
 
 /**
  * Calcule la bounding box englobant toutes les parcelles
- * @returns Bounding box et centre
  */
 function calculateGlobalBoundingBox (parcelles: Array<PdfParcelle>): BoundingBox | null {
   if (parcelles.length === 0) return null
@@ -207,7 +201,6 @@ async function drawAllParcellesOnMap (page: Page, parcelles: Array<PdfParcelle>,
 
 /**
  * Dessine toutes les parcelles avec une parcelle en surbrillance
- * @param parcelleHighlight Parcelle à mettre en surbrillance
  */
 async function drawParcelleHighlightOnMap (page: Page, parcelles: Array<PdfParcelle>, parcelleHighlight: PdfParcelle, { width, height, center, zoom, timeout }: MapDrawOptions): Promise<MapDrawResult> {
   await page.setViewport({ width, height })
@@ -331,17 +324,6 @@ async function mergeAndAddFooter (pdfPaths: string[], name: string, deleteFilesA
   return mergedPdf
 }
 
-function imageToBase64 (imagePath: string): string {
-  try {
-    const ext = path.extname(imagePath).substring(1)
-    const data = fs.readFileSync(imagePath).toString('base64')
-    return `data:image/${ext};base64,${data}`
-  } catch (error) {
-    logger.error({ err: error }, `Erreur chargement image ${imagePath}`)
-    return ''
-  }
-}
-
 function formatDate (dateStr: string): string {
   const [year, month, day] = dateStr.split('-')
   return `${day}/${month}/${year}`
@@ -366,6 +348,5 @@ export {
   drawAllParcellesOnMap,
   mergeAndAddFooter,
   getAllParcelles,
-  imageToBase64,
   formatRefCad
 }

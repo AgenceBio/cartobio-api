@@ -50,7 +50,7 @@ export default async function importRoutes (fastify: FastifyInstance): Promise<v
       const { siret } = requireOperator(request)
       const { year } = request.query
 
-      const isWellKnown = await service.geofoliaLookup(siret, year)
+      const isWellKnown = await service.geofoliaLookup(siret ?? '', year)
 
       return reply.code(isWellKnown === true ? 204 : 404).send()
     }
@@ -62,7 +62,7 @@ export default async function importRoutes (fastify: FastifyInstance): Promise<v
     async (request, reply) => {
       const { siret } = requireOperator(request)
 
-      const featureCollection = await service.geofoliaParcellaire(siret)
+      const featureCollection = await service.geofoliaParcellaire(siret ?? '')
 
       if (!featureCollection) {
         return reply.code(202).send()
@@ -164,10 +164,10 @@ export default async function importRoutes (fastify: FastifyInstance): Promise<v
       status,
       from,
       to,
-      withPayload = 'false',
+      withPayload,
       page = '1',
       limit = '20',
-      withRejected = 'false'
+      withRejected
     } = request.query
 
     const finalPage = parseInt(page)
@@ -184,7 +184,7 @@ export default async function importRoutes (fastify: FastifyInstance): Promise<v
 
     if (finalLimit > 0) {
       if (finalPage > 1) {
-        const prevParams = new URLSearchParams(request.query as Record<string, string>)
+        const prevParams = new URLSearchParams(request.url.split('?')[1])
         prevParams.set('page', String(finalPage - 1))
         prevParams.set('limit', String(finalLimit))
         links.prev = `${baseUrl}?${prevParams.toString()}`
@@ -193,7 +193,7 @@ export default async function importRoutes (fastify: FastifyInstance): Promise<v
       }
 
       if ((finalPage * finalLimit) < result.meta.total) {
-        const nextParams = new URLSearchParams(request.query as Record<string, string>)
+        const nextParams = new URLSearchParams(request.url.split('?')[1])
         nextParams.set('page', String(finalPage + 1))
         nextParams.set('limit', String(finalLimit))
         links.next = `${baseUrl}?${nextParams.toString()}`
@@ -202,7 +202,7 @@ export default async function importRoutes (fastify: FastifyInstance): Promise<v
       }
     } else {
       if (finalPage > 1) {
-        const prevParams = new URLSearchParams(request.query as Record<string, string>)
+        const prevParams = new URLSearchParams(request.url.split('?')[1])
         prevParams.delete('page')
         links.prev = `${baseUrl}?${prevParams.toString()}`
       } else {
@@ -217,7 +217,7 @@ export default async function importRoutes (fastify: FastifyInstance): Promise<v
 
   app.get('/api/v3/import/parcellaire-imports/:id', importDetailsSchema, async (request, reply) => {
     const { id } = request.params
-    const { withPayload = 'false' } = request.query
+    const { withPayload } = request.query
 
     const result = await service.getImportById({ id, payload: withPayload, organismeCertificateur: requireOrganismeCertificateur(request).id })
 
@@ -227,28 +227,6 @@ export default async function importRoutes (fastify: FastifyInstance): Promise<v
 
     return reply.send(result)
   })
-
-  // Décommenter si les utilisateurs en font la demande
-  // app.get('/api/v3/import/parcellaire-imports/:id/logs', importLogsSchema, async (request, reply) => {
-  //   const { id } = request.params
-  //   const { type = 'all' } = request.query
-
-  //   const result = await service.getImportLogs({ id, type })
-
-  //   return reply.send(result)
-  // })
-
-  // app.get('/api/v3/import/parcellaire-imports/:id/payload', importPayloadSchema, async (request, reply) => {
-  //   const { id } = request.params
-
-  //   const result = await service.getImportPayload({ id })
-
-  //   if (!result) {
-  //     return reply.status(404).send({ message: 'Payload introuvable' })
-  //   }
-
-  //   return reply.send(result)
-  // })
 
   app.get(
     '/api/v2/certification/parcellaires',
@@ -271,7 +249,7 @@ export default async function importRoutes (fastify: FastifyInstance): Promise<v
         }
       )
 
-      const apiRecords = await Promise.all(records.map((r) => service.recordToApi(r)))
+      const apiRecords = await service.recordsToApi(records)
       const links: { prev?: string | null; next?: string | null } = {}
 
       const host = request.hostname
@@ -279,7 +257,7 @@ export default async function importRoutes (fastify: FastifyInstance): Promise<v
 
       if (finalLimit !== null && finalLimit > 0) {
         if (finalStart > 0) {
-          const prevParams = new URLSearchParams(request.query as Record<string, string>)
+          const prevParams = new URLSearchParams(request.url.split('?')[1])
           prevParams.set('start', String(Math.max(0, finalStart - finalLimit)))
           prevParams.set('limit', String(finalLimit))
           links.prev = `${baseUrl}?${prevParams.toString()}`
@@ -288,7 +266,7 @@ export default async function importRoutes (fastify: FastifyInstance): Promise<v
         }
 
         if (records.length === finalLimit) {
-          const nextParams = new URLSearchParams(request.query as Record<string, string>)
+          const nextParams = new URLSearchParams(request.url.split('?')[1])
           nextParams.set('start', String(finalStart + finalLimit))
           nextParams.set('limit', String(finalLimit))
           links.next = `${baseUrl}?${nextParams.toString()}`
@@ -297,7 +275,7 @@ export default async function importRoutes (fastify: FastifyInstance): Promise<v
         }
       } else {
         if (finalStart > 0) {
-          const prevParams = new URLSearchParams(request.query as Record<string, string>)
+          const prevParams = new URLSearchParams(request.url.split('?')[1])
           prevParams.delete('start')
           links.prev = `${baseUrl}?${prevParams.toString()}`
         } else {

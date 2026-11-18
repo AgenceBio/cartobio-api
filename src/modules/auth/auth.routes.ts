@@ -1,8 +1,9 @@
-import { createSigner, createDecoder } from 'fast-jwt'
+import { createSigner, createVerifier } from 'fast-jwt'
 import config from '../../config/env.js'
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
-import { departementsSchema, devLoginSchema, exchangeTokenSchema, logoutSchema, ssoCallbackSchema, verifySchema } from './auth.schema.js'
+import { devLoginSchema, exchangeTokenSchema, logoutSchema, ssoCallbackSchema, verifySchema } from './auth.schema.js'
+import { cartobioTokenSchema } from './auth.tokens.js'
 import { UnauthorizedApiError } from '../../shared/errors.js'
 import * as service from './auth.service.js'
 
@@ -20,6 +21,7 @@ export interface AuthRoutesOptions {
 export default async function authenticationRoutes (fastify: FastifyInstance, options: AuthRoutesOptions): Promise<void> {
   const app = fastify.withTypeProvider<ZodTypeProvider>()
   const { stateCache, sign } = options
+  const verifyIgnoringExpiration = createVerifier({ key: config.get('jwtSecret'), ignoreExpiration: true })
   app.get(
     '/api/v2/user/verify',
     verifySchema,
@@ -62,22 +64,14 @@ export default async function authenticationRoutes (fastify: FastifyInstance, op
     }
   )
 
-  app.get(
-    '/api/v2/departements',
-    departementsSchema,
-    async (request, reply) => {
-      const departements = await service.getDepartement()
-      return reply.code(200).send(departements)
-    }
-  )
-
-  app.get('/auth-provider/agencebio/login', devLoginSchema, (request, reply) => reply.redirect('/api/auth-provider/agencebio/login'))
+  app.get('/auth-provider/agencebio/login', devLoginSchema, (_request, reply) => reply.redirect('/api/auth-provider/agencebio/login'))
   app.get('/api/auth-provider/agencebio/callback', ssoCallbackSchema, async (request, reply) => {
     // forwards to the UI the user-selected tab
     const state = stateCache.get(request.query.state)
     if (!state) throw new UnauthorizedApiError('état de connexion inconnu ou expiré, veuillez vous reconnecter.')
     const { mode = '', returnto = '' } = state
     const { token } = await app.agenceBioOAuth2.getAccessTokenFromAuthorizationCodeFlow(request)
+    stateCache.delete(request.query.state)
     const userProfile = await service.getUserProfileFromSSOToken(token.access_token)
 
     const cartobioToken = sign({ ...userProfile, id_token: token.id_token })
@@ -86,10 +80,15 @@ export default async function authenticationRoutes (fastify: FastifyInstance, op
   })
 
   app.post('/api/auth-provider/logout', logoutSchema, async (request, reply) => {
-    const decode = createDecoder()
     const cartobioToken = request.headers.authorization?.split(' ')[1]
     if (!cartobioToken) throw new UnauthorizedApiError('un jeton d\'API est nécessaire pour se déconnecter.')
-    const { id_token: idToken, exp } = decode(cartobioToken)
+    let payload: unknown
+    try {
+      payload = verifyIgnoringExpiration(cartobioToken)
+    } catch (error) {
+      throw new UnauthorizedApiError('impossible de vérifier ce jeton', { cause: error })
+    }
+    const { id_token: idToken, exp } = cartobioTokenSchema.parse(payload)
     const ssoHost = config.get('notifications.sso.host')
     const logoutUrl = new URL('/oauth2/sessions/logout', ssoHost)
     if (idToken) {

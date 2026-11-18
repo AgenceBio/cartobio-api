@@ -1,4 +1,4 @@
-import type { CartoBioOCUser, OrganismeCertificateur, AgenceBioNormalizedOperator, NormalizedRecord } from '@agencebio/cartobio-types'
+import type { CartoBioUser, OrganismeCertificateur, AgenceBioNormalizedOperator, NormalizedRecord } from '@agencebio/cartobio-types'
 import type { OAuth2Namespace } from '@fastify/oauth2'
 
 declare module 'fastify' {
@@ -8,7 +8,7 @@ declare module 'fastify' {
   }
 
   interface FastifyRequest {
-    user: CartoBioOCUser | null;
+    user: CartoBioUser | null;
     organismeCertificateur: OrganismeCertificateur | null;
     operator: AgenceBioNormalizedOperator | null;
     record: NormalizedRecord | null;

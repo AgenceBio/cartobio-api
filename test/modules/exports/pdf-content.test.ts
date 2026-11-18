@@ -41,8 +41,8 @@ describe('generateOperatorMapImages', () => {
 
     expect(result.global?.buffer).toBe('global-image')
     expect(result.parcelles).toHaveLength(2)
-    expect(result.parcelles[0].id).toBe('parcelle-1')
-    expect(result.parcelles[0].buffer).toBe('parcelle-image')
+    expect(result.parcelles[0]!.id).toBe('parcelle-1')
+    expect(result.parcelles[0]!.buffer).toBe('parcelle-image')
   })
 
   it('gère une erreur dans drawAllParcellesOnMap', async () => {
@@ -72,6 +72,6 @@ describe('generateOperatorMapImages', () => {
     const result = await generatePdf.generateOperatorMapImages(sampleParcelles, mockPage)
 
     expect(result.parcelles).toHaveLength(1)
-    expect(result.parcelles[0].id).toBe('parcelle-1')
+    expect(result.parcelles[0]!.id).toBe('parcelle-1')
   })
 })

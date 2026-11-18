@@ -9,8 +9,9 @@ import type { ArchiveOperator, ExportRow, PdfParcelle } from './exports.types.js
 import { getAllParcelles } from './pdf-utils.js'
 import { createPdfContent } from './pdf-content.js'
 import * as repository from './exports.repository.js'
-import { searchControlBodyRecords } from '../operators/operators.service.js'
+import { findControlBodyOperators } from '../operators/operators.service.js'
 import { logger } from "../../config/logger.js";
+import { InvalidRequestApiError, NotFoundApiError, isHandledError } from "../../shared/errors.js";
 
 async function updateProductions(recordId: string, status: AttestationsProductionsStatus, types: AttestationsProductionsType[], paths: string[] = []): Promise<void> {
   await Promise.all(
@@ -27,7 +28,7 @@ async function updateProductions(recordId: string, status: AttestationsProductio
 
 function assertParcellesCanProducePdf(parcelles: PdfParcelle[], recordId: string): void {
   if (parcelles.length === 0)
-    throw new Error(`Aucune parcelle trouvée pour l'opérateur ${recordId}`);
+    throw new InvalidRequestApiError(`Aucune parcelle trouvée pour l'opérateur ${recordId}`);
   if (
     parcelles.some(
       ({ cultures }) =>
@@ -36,7 +37,7 @@ function assertParcellesCanProducePdf(parcelles: PdfParcelle[], recordId: string
         !cultures.some(({ CPF }) => Boolean(CPF))
     )
   ) {
-    throw new Error(
+    throw new InvalidRequestApiError(
       "Culture manquante, impossible de générer l'attestation du parcellaire"
     );
   }
@@ -51,7 +52,7 @@ function assertParcellesCanProducePdf(parcelles: PdfParcelle[], recordId: string
             p.refcad.every((r) => r === "" || r == null)))
     )
   ) {
-    throw new Error(
+    throw new InvalidRequestApiError(
       "Nom manquant de parcelle, impossible de générer l'attestation du parcellaire"
     );
   }
@@ -93,11 +94,12 @@ async function* generatePDF(
         )
       )
     ).filter((production) => production !== null);
-    if (productions.length > 0) {
+    const [production] = productions;
+    if (production) {
       yield 0;
       try {
         if (!zip)
-          return fs.readFileSync(productions[0].path, { encoding: "base64" });
+          return fs.readFileSync(production.path, { encoding: "base64" });
         return archivePdfs(
           productions.map(({ path }) => path),
           { annee_reference_controle: "", numeroBio }
@@ -118,7 +120,7 @@ async function* generatePDF(
       repository.findPdfRecord(recordId),
       getAllParcelles(recordId, pac || zip),
     ]);
-    if (!record) throw new Error(`Parcellaire introuvable : ${recordId}`);
+    if (!record) throw new NotFoundApiError(`Parcellaire introuvable : ${recordId}`);
     assertParcellesCanProducePdf(parcelles, recordId);
     yield parcelles.length;
     const operator = { ...operatorData, ...record };
@@ -134,7 +136,7 @@ async function* generatePDF(
     for (const [index, pdf] of pdfs.entries()) {
       const filename = path.resolve(
         directory,
-        `${recordId}_${pac ? "PAC" : "complet"}_${index}.pdf`
+        `${recordId}_${pac || zip ? "PAC" : "complet"}_${index}.pdf`
       );
       await fs.promises.writeFile(filename, await pdf.save());
       paths.push(filename);
@@ -145,13 +147,16 @@ async function* generatePDF(
       types,
       paths
     );
-    return zip ? archivePdfs(paths, operator) : pdfs[0].saveAsBase64();
+    const [pdf] = pdfs;
+    if (!pdf) throw new Error(`Aucun PDF généré pour le parcellaire ${recordId}`);
+    return zip ? archivePdfs(paths, operator) : pdf.saveAsBase64();
   } catch (error) {
     await updateProductions(
       recordId,
       AttestationsProductionsStatus.ERROR,
       types
     );
+    if (isHandledError(error)) throw error;
     throw new Error(
       "Une erreur s'est produite, impossible de générer l'attestation du parcellaire",
       { cause: error }
@@ -159,25 +164,14 @@ async function* generatePDF(
   }
 }
 
-function createdAtTime(record: { created_at?: string | null }): number {
-  return record.created_at ? new Date(record.created_at).getTime() : 0;
-}
-
 async function exportDataOcId(ocId: number, filter: ExportParcellaireBody['payload'], userId: number): Promise<ExportParcellaireResponse | null> {
   try {
-    const operators = await searchControlBodyRecords({
+    const records = (await findControlBodyOperators({
       ocId,
       userId,
       input: filter.input,
-      page: 1,
-      limit: Infinity,
       filter: filter.filterForSearch,
-    });
-    const records = [...operators.records].sort((a, b) =>
-      a.numeroBio === b.numeroBio
-        ? createdAtTime(b) - createdAtTime(a)
-        : Number(a.numeroBio) - Number(b.numeroBio)
-    );
+    })).sort((a, b) => Number(a.numeroBio) - Number(b.numeroBio));
     const rows: ExportRow[] = [];
     for (let index = 0; index < records.length; index += 10000)
       rows.push(

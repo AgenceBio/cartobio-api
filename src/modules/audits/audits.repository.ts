@@ -1,17 +1,23 @@
-import { SQL, and, eq, inArray, isNull, sql } from 'drizzle-orm'
-import type { DBOperatorRecord, FeatureInput, FeaturePropertiesInput, HistoryEntry } from '@agencebio/cartobio-types'
+import { SQL, and, eq, inArray, sql } from 'drizzle-orm'
+import type { FeatureInput, FeaturePropertiesInput, HistoryEntry } from '@agencebio/cartobio-types'
+import type { DBOperatorRecord } from '../../shared/parcellaires/parcellaires.types.js'
 import { db } from '../../database/database.js'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import { parcellaires, parcelles, parcellesControles } from '../../database/schema/index.js'
 import {
   ensureOrganismeCertificateur,
+  findMixite,
   findRecord,
   insertEvent,
+  updateMixite,
   upsertAnnotations,
   upsertCultures
 } from '../../shared/parcellaires/parcellaires.repository.js'
-import { blankToNull } from '../../shared/parcellaires/parcellaires.utils.js'
-import { featureUpdateSet, geometryInput, mixiteParcelles, recordColumnsByLegacyName } from './audits.utils.js'
+import { blankToNull, parcelleInsertValues } from '../../shared/parcellaires/parcellaires.utils.js'
+import { featureUpdateSet, geometryInput, recordColumnsByLegacyName } from './audits.utils.js'
+import { createParcelleControleSchema } from '../../database/validations/activites.js'
+import { updateParcellaireSchema } from '../../database/validations/parcellaires.js'
+import type { AuditRecordChanges } from './audits.types.js'
 
 type FeatureId = string | number
 
@@ -21,7 +27,7 @@ async function deleteRecord(recordId: string): Promise<void> {
 async function markFeatureControlled(recordId: string, id: FeatureId, userId: number): Promise<void> {
   await db
     .insert(parcellesControles)
-    .values({ recordId, parcelleId: String(id), userId: String(userId) })
+    .values(createParcelleControleSchema.parse({ recordId, parcelleId: String(id), userId: String(userId) }))
     .onConflictDoNothing({ target: [parcellesControles.recordId, parcellesControles.parcelleId, parcellesControles.userId] })
 }
 async function markFeatureUncontrolled(recordId: string, id: FeatureId, userId: number): Promise<void> {
@@ -33,31 +39,29 @@ async function markFeatureUncontrolled(recordId: string, id: FeatureId, userId: 
       eq(parcellesControles.userId, String(userId))
     ))
 }
-async function findMixite(recordId: string): Promise<string | null> {
-  const [row] = await db
-    .select({ mixite: mixiteParcelles })
-    .from(parcelles)
-    .where(and(eq(parcelles.recordId, recordId), isNull(parcelles.deletedAt)))
-  return row?.mixite ?? null
-}
 async function updateAuditRecord(
   recordId: string,
-  changes: Record<string, unknown>,
+  changes: AuditRecordChanges,
   historyEntry: HistoryEntry | null
 ): Promise<DBOperatorRecord[]> {
   const set: Record<string, SQL> = {}
-  for (const [field, value] of Object.entries(changes)) {
+  const values: Record<string, unknown> = {}
+  for (const [field, value] of Object.entries<unknown>(changes)) {
     if (field === 'oc_label') continue
     const column = recordColumnsByLegacyName[field]
     if (!column) throw new Error(`column "${field}" of relation "parcellaires" does not exist`)
     const isBlank = value != null && blankToNull(value) === null
     if (isBlank && column === 'versionNom') continue
-    set[column] = value instanceof SQL ? value : sql`${isBlank ? null : value ?? null}`
+    if (value instanceof SQL) set[column] = value
+    else values[column] = isBlank ? null : column === 'ocId' && value != null ? String(value) : value ?? null
+  }
+  if (Object.keys(values).length > 0) {
+    for (const [column, value] of Object.entries(updateParcellaireSchema.parse(values))) set[column] = sql`${value}`
   }
 
   return db.transaction(async (tx) => {
     if (changes.oc_id != null) {
-      await ensureOrganismeCertificateur(tx, changes.oc_id as number, changes.oc_label as string | null | undefined)
+      await ensureOrganismeCertificateur(tx, changes.oc_id, changes.oc_label)
     }
     await tx.update(parcellaires).set(set).where(eq(parcellaires.recordId, recordId))
     await insertEvent(tx, recordId, historyEntry)
@@ -127,28 +131,9 @@ async function deleteFeature(tx: NodePgDatabase, recordId: string, featureId: Fe
 }
 async function insertFeature(tx: NodePgDatabase, recordId: string, id: FeatureId, feature: FeatureInput, from: FeatureId[] | null): Promise<void> {
   const properties = feature.properties ?? {}
-  const geometry = geometryInput(feature.geometry)
-  await tx.insert(parcelles).values({
-    recordId,
-    id: String(id),
-    geometry,
-    surfaceHa: sql`round((ST_Area(${geometry}::geography) / 10000)::numeric, 4)`,
-    commune: blankToNull(properties.COMMUNE),
-    conversionNiveau: sql`${properties.conversion_niveau || null}::cartobio.conversion_niveau`,
-    engagementDate: sql`${properties.engagement_date || null}::date`,
-    commentaireOperateur: blankToNull(properties.commentaires),
-    auditeurNotesParcelles: blankToNull(properties.auditeur_notes),
-    createdAt: sql`now()`,
-    updatedAt: sql`now()`,
-    name: blankToNull(properties.NOM),
-    numeroPacage: blankToNull(properties.PACAGE),
-    numeroIlotPac: sql`${blankToNull(properties.NUMERO_I)}::smallint`,
-    numeroParcellesPac: sql`${blankToNull(properties.NUMERO_P)}::smallint`,
-    referenceCadastre: sql`${properties.cadastre ?? null}::text[]`,
-    codeCulturePac: blankToNull(properties.TYPE),
-    codePrecisionPac: blankToNull(properties.CODE_VAR),
-    fromParcelles: from ? from.map(String) : null
-  })
+  await tx
+    .insert(parcelles)
+    .values(parcelleInsertValues(recordId, String(id), properties, geometryInput(feature.geometry), sql`false`, from ? from.map(String) : null))
   await upsertCultures(tx, recordId, String(id), properties.cultures ?? [])
   await upsertAnnotations(tx, recordId, String(id), properties.annotations ?? [])
 }
@@ -164,23 +149,12 @@ async function softDeleteFeatures(tx: NodePgDatabase, recordId: string, featureI
 async function addFeaturesFromOther(
   tx: NodePgDatabase,
   recordId: string,
-  features: FeatureInput[],
+  features: Array<FeatureInput & { id: FeatureId }>,
   from: FeatureId[]
 ): Promise<void> {
   for (const feature of features) {
-    const id = Date.now() + Math.round(Math.random() * 1000)
-    await insertFeature(tx, recordId, id, feature, from)
+    await insertFeature(tx, recordId, feature.id, feature, from)
   }
-}
-async function refreshMixite(tx: NodePgDatabase, recordId: string): Promise<void> {
-  const [{ mixite }] = await tx
-    .select({ mixite: mixiteParcelles })
-    .from(parcelles)
-    .where(and(eq(parcelles.recordId, recordId), isNull(parcelles.deletedAt)))
-  await tx
-    .update(parcellaires)
-    .set({ mixite: sql`${mixite}::cartobio.mixite_type` })
-    .where(eq(parcellaires.recordId, recordId))
 }
 
 export {
@@ -196,5 +170,5 @@ export {
   addFeature,
   softDeleteFeatures,
   addFeaturesFromOther,
-  refreshMixite
+  updateMixite
 }

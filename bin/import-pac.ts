@@ -11,29 +11,39 @@ const got = gotModule.default
 const { post } = got
 import gdal from 'gdal-async'
 import type { Feature } from 'geojson'
+import { sql } from 'drizzle-orm'
 
-import { withTransaction } from '../src/database/transaction.js'
+import { db } from '../src/database/database.js'
+import { importPac } from '../src/database/schema/index.js'
+import { createImportPacSchema } from '../src/database/validations/imports.js'
 import { surfaceForFeatureCollection } from '../src/shared/outputs/api.js'
 import { fromCodePacStrict } from '@agencebio/rosetta-cultures'
 import { unzipGeographicalContent, detectSrs, wgs84 } from '../src/shared/geo/gdal.js'
 import { getRandomFeatureId } from '../src/shared/outputs/features.js'
-import { CertificationState, EtatProduction } from '@agencebio/cartobio-types'
-import type { AgenceBioOperator } from '@agencebio/cartobio-types'
+import { CertificationState, EtatProduction, MetadataSource } from '@agencebio/cartobio-types'
+import type { AgenceBioOperator } from '../src/clients/agence-bio.types.js'
 
-function parseCSV(text: string): Record<string, string>[] {
-  const [headerLine, ...lines] = text.trim().split('\n')
+type CorrespondanceRow = Record<string, string> & { PACAGE: string; SIRET: string }
+
+function parseCSV(text: string): CorrespondanceRow[] {
+  const [headerLine = '', ...lines] = text.trim().split('\n')
   const headers = headerLine.split(';').map((h) => h.trim())
   return lines.map((line) => {
     const values = line.split(';').map((v) => v.trim())
-    return Object.fromEntries(
-      headers.map((h, i) => [h.toUpperCase(), values[i]])
-    )
+    return {
+      PACAGE: '',
+      SIRET: '',
+      ...Object.fromEntries(
+        headers.map((h, i) => [h.toUpperCase(), values[i] ?? ''])
+      )
+    }
   })
 }
 
-function toCSV(data: Array<Record<string, string>>, delimiter = ';', header: string[] = []) {
-  if (data.length === 0) return ''
-  const headers = [...Object.keys(data[0]), ...header]
+function toCSV(data: Array<Record<string, string>>, delimiter = ';', header: string[] = []): string {
+  const [first] = data
+  if (!first) return ''
+  const headers = [...Object.keys(first), ...header]
   const lines = data.map((obj) =>
     headers.map((h) => obj[h] ?? '').join(delimiter)
   )
@@ -104,7 +114,9 @@ function splitToNTabs<T>(array: T[], n: number): T[][] {
 
 /* main.js */
 
-if (process.argv.length < 4) {
+const [, , aspFile, csvFile] = process.argv
+
+if (aspFile === undefined || csvFile === undefined) {
   console.error(
     'Usage: node import-pac.js <fichier-zip-asp> <correspondance.csv>'
   )
@@ -112,13 +124,15 @@ if (process.argv.length < 4) {
 }
 
 (async (): Promise<void> => {
-  const aspFile = process.argv[2]
-  const csvFile = process.argv[3]
   dotenv.config({ path: process.argv[4] })
 
   const zipBuffer = await getStream.buffer(fs.createReadStream(aspFile))
   const { files, cleanup } = await unzipGeographicalContent(zipBuffer)
   const correspondance = parseCSV(fs.readFileSync(csvFile, 'utf8'))
+  const correspondanceParPacage = new Map<string, (typeof correspondance)[number]>()
+  for (const row of correspondance) {
+    if (!correspondanceParPacage.has(row.PACAGE)) correspondanceParPacage.set(row.PACAGE, row)
+  }
   const exportNoCorrespondance: Array<Record<string, string>> = []
 
   const progress = new cliProgress.SingleBar({ etaBuffer: 10000 }, cliProgress.Presets.rect)
@@ -131,7 +145,7 @@ if (process.argv.length < 4) {
   const warningsSiretVide: string[] = []
   const warningsNoNumeroBio: SiretPacage[] = []
   try {
-    await withTransaction(async (client): Promise<void> => {
+    await db.transaction(async (tx): Promise<void> => {
       for await (const filepath of files) {
         const dataset = await gdal.openAsync(filepath)
 
@@ -139,13 +153,13 @@ if (process.argv.length < 4) {
           const srs = await detectSrs(layer)
           const reproject = new gdal.CoordinateTransformation(srs, wgs84)
           const tabCouplage: SiretPacage[] = []
-          const tabGeom: Array<{ pacage: string; geom: gdal.Feature[] }> = []
+          const tabGeom = new Map<string, gdal.Feature[]>()
           const group = groupByPACAGE(layer.features)
           for await (const featureGroup of group) {
-            const pacage = featureGroup[0].fields.toObject().PACAGE
-            const siretMapping = correspondance.find(
-              (row) => row.PACAGE === pacage
-            )
+            const [firstFeature] = featureGroup
+            if (!firstFeature) continue
+            const pacage = firstFeature.fields.toObject().PACAGE
+            const siretMapping = correspondanceParPacage.get(pacage)
 
             if (!siretMapping) {
               warningsCorrespondance.push(pacage)
@@ -170,15 +184,12 @@ if (process.argv.length < 4) {
               siret: siretMapping.SIRET,
               pacage: siretMapping.PACAGE
             })
-            tabGeom.push({
-              pacage: siretMapping.PACAGE,
-              geom: featureGroup
-            })
+            if (!tabGeom.has(siretMapping.PACAGE)) tabGeom.set(siretMapping.PACAGE, featureGroup)
           }
-          const splitTab = splitToNTabs([...tabCouplage], Math.round(tabCouplage.length / 30))
+          const splitTab = splitToNTabs([...tabCouplage], Math.ceil(tabCouplage.length / 30))
 
-          for (let i = 0; i < splitTab.length; i++) {
-            const data = await getValidOperator(splitTab[i])
+          for (const couplages of splitTab) {
+            const data = await getValidOperator(couplages)
             if (!data) throw new Error('Échec de la récupération des opérateurs (siret-pacage)')
             if (data.doublons.length > 0) {
               for (const doublon of data.doublons) {
@@ -200,11 +211,8 @@ if (process.argv.length < 4) {
               skipped = skipped + data.sansOperateur.length
             }
             for (const operator of data.operateurs) {
-              const pacageGeom = tabGeom.find(
-                (e) => e.pacage === operator.numeroPacage
-              )
-              if (!pacageGeom) throw new Error(`PACAGE ${operator.numeroPacage} renvoyé par l'API absent du fichier`)
-              const pacageFeatures = pacageGeom.geom
+              const pacageFeatures = tabGeom.get(operator.numeroPacage ?? '')
+              if (!pacageFeatures) throw new Error(`PACAGE ${operator.numeroPacage} renvoyé par l'API absent du fichier`)
 
               const featureCollection = {
                 type: 'FeatureCollection',
@@ -253,29 +261,28 @@ if (process.argv.length < 4) {
                 certification_state: CertificationState.OPERATOR_DRAFT,
                 version_name: 'Parcellaire déclaré PAC 2026',
                 metadata: {
-                  source: 'telepac',
+                  source: MetadataSource.TELEPAC,
                   campagne: '2026',
                   pacage: operator.numeroPacage,
                   warnings: '',
                   provenance: 'asp-2026'
                 }
               }
-              await client.query(
-                `
-              INSERT INTO import_pac_26 (numerobio, nb_parcelles, size, record, pacage, siret)
-              VALUES ($1, $2, $3, $4, $5, $6)
-              ON CONFLICT (numerobio, pacage, siret)
-              DO UPDATE SET nb_parcelles = $2, size = $3, record = $4, updatedAt = CURRENT_TIMESTAMP
-            `,
-                [
-                  operator.numeroBio,
-                  featureCollection.features.length,
-                  await surfaceForFeatureCollection(featureCollection),
-                  JSON.stringify(record),
-                  operator.numeroPacage,
-                  operator.siret
-                ]
-              )
+              const values = createImportPacSchema.parse({
+                numeroBio: operator.numeroBio,
+                nbParcelles: featureCollection.features.length,
+                size: await surfaceForFeatureCollection(featureCollection),
+                record,
+                pacage: operator.numeroPacage,
+                siret: operator.siret
+              })
+              await tx
+                .insert(importPac)
+                .values(values)
+                .onConflictDoUpdate({
+                  target: [importPac.numeroBio, importPac.pacage, importPac.siret],
+                  set: { nbParcelles: values.nbParcelles, size: values.size, record: values.record, updatedAt: sql`CURRENT_TIMESTAMP` }
+                })
               imported++
               progress.increment()
             }

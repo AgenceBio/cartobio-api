@@ -1,10 +1,10 @@
 import { createOrUpdateOperatorRecord, getRecord } from '../../src/shared/parcellaires/parcellaires.service.js'
 import { pinOperator, unpinOperator, consultOperator, searchControlBodyRecords, getPinnedOperators } from '../../src/modules/operators/operators.service.js'
-import { markFeatureControlled, markFeatureUncontrolled, updateAuditRecordState, deleteSingleFeature, updateFeature } from '../../src/modules/audits/audits.service.js'
+import { markFeatureControlled, markFeatureUncontrolled, updateAuditRecordState, deleteSingleFeature, updateFeature, addRecordFeature } from '../../src/modules/audits/audits.service.js'
 import { get, HTTPError, TimeoutError } from '../got-mock.js'
 import { NotFoundApiError } from '../../src/shared/errors.js'
 import _records from '../fixtures/providers/records.json' with { type: 'json' }
-const [record] = _records
+const record = _records[0]!
 import records from '../fixtures/providers/records.json' with { type: 'json' }
 import recordToUpdate from '../fixtures/providers/records-to-update.json' with { type: 'json' }
 import parcelles from '../fixtures/providers/parcelles.json' with { type: 'json' }
@@ -16,7 +16,7 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import { normalizeRecord } from '../../src/shared/outputs/record.js'
 import { eq, sql } from 'drizzle-orm'
-import db, { db as drizzleDb } from '../../src/database/database.js'
+import { db as drizzleDb } from '../../src/database/database.js'
 import * as schema from '../../src/database/schema/index.js'
 import { upsertCultures } from '../../src/shared/parcellaires/parcellaires.repository.js'
 import { loadRecordFixture } from '../utils.js'
@@ -68,7 +68,7 @@ describe('updateFeature', () => {
     await loadRecordFixture()
 
     const featureId = 1
-    const properties: FeaturePropertiesInput = {
+    const properties = {
       commune: '26108',
       conversion_niveau: 'AB',
       engagement_date: '2015-01-01',
@@ -85,7 +85,7 @@ describe('updateFeature', () => {
           variete: 'rouge bleue'
         }
       ]
-    }
+    } as FeaturePropertiesInput
     const result = await updateFeature({ featureId, record: normalizedRecord, user }, { properties })
     expect(result).toMatchObject({
       record_id: record.record_id,
@@ -110,7 +110,7 @@ describe('updateFeature', () => {
     const properties = {
       numero_ilot_pac: '1',
       numero_parcelle_pac: '2'
-    }
+    } as FeaturePropertiesInput
     const result = await updateFeature({ featureId, record: normalizedRecord, user }, { properties })
     Object.freeze(result)
     expect(result).toMatchObject({
@@ -137,7 +137,7 @@ describe('updateFeature', () => {
     const properties = {
       numero_ilot_pac: '1',
       numero_parcelle_pac: '2'
-    }
+    } as FeaturePropertiesInput
     const result = await updateFeature({ featureId, record: normalizedRecord, user: null, operator: buildOperator({ organismeCertificateur: user.organismeCertificateur }) }, { properties })
 
     expect(result).toMatchObject({
@@ -168,7 +168,7 @@ describe('updateFeature', () => {
     const properties = {
       numero_ilot_pac: '1',
       numero_parcelle_pac: '2'
-    }
+    } as FeaturePropertiesInput
     const result = await updateFeature({ featureId, record: normalizedRecord, user: tmpUser }, { properties })
 
     expect(result).toMatchObject({
@@ -190,10 +190,10 @@ describe('deleteSingleFeature', () => {
   beforeEach(() => loadRecordFixture())
 
   const featureId = 1
-  const reason: DeleteFeatureBody['reason'] = {
+  const reason = {
     code: 'other',
     details: 'parce que'
-  }
+  } as DeleteFeatureBody['reason']
 
   test('successfully removes a given feature based on its id', async () => {
     const result = await deleteSingleFeature({ featureId, record: normalizedRecord, user }, { reason })
@@ -212,8 +212,31 @@ describe('deleteSingleFeature', () => {
   })
 
   test('throws an error when trying to remove a non-existing feature', async () => {
+    const transaction = vi.spyOn(drizzleDb, 'transaction')
     await expect(deleteSingleFeature({ featureId: 9999, record: normalizedRecord, user }, { reason })).rejects.toThrow(NotFoundApiError)
-    expect(db.connect).not.toHaveBeenCalled()
+    expect(transaction).not.toHaveBeenCalled()
+  })
+})
+
+describe('addRecordFeature', () => {
+  beforeEach(() => loadRecordFixture())
+
+  const addedParcelle = async (coordinates: number[][][]) => {
+    const result = await addRecordFeature({ user, record: normalizedRecord }, { geometry: { type: 'Polygon', coordinates }, properties: { conversion_niveau: 'AB' } })
+    const existingIds = normalizedRecord.parcelles.features.map(({ id }) => String(id))
+    return result.parcelles.find(({ id }) => !existingIds.includes(String(id)))
+  }
+
+  test('computes the commune and sets the AB engagement date when missing', async () => {
+    const parcelle = await addedParcelle([[[4.85, 45.75], [4.851, 45.75], [4.851, 45.751], [4.85, 45.751], [4.85, 45.75]]])
+
+    expect(parcelle).toMatchObject({ commune: '69387', etranger: false, engagement_date: '1900-01-01' })
+  })
+
+  test('flags a feature outside France as foreign, without commune', async () => {
+    const parcelle = await addedParcelle([[[-3.7, 40.41], [-3.699, 40.41], [-3.699, 40.411], [-3.7, 40.411], [-3.7, 40.41]]])
+
+    expect(parcelle).toMatchObject({ commune: null, etranger: true })
   })
 })
 
@@ -248,7 +271,7 @@ describe('createOrUpdateOperatorRecord', () => {
     const record: Record<string, unknown> = recordToUpdate
 
     // Data we don't want to copy
-    await upsertCultures(drizzleDb, record.record_id as string, parcelles[0].id, [{"id": "1", "CPF": "123", "variete": "VARIETE DIFFERENTE"}])
+    await upsertCultures(drizzleDb, record.record_id as string, parcelles[0]!.id, [{"id": "1", "CPF": "123", "variete": "VARIETE DIFFERENTE"}])
 
     const featureCollection = {
       type: 'FeatureCollection',
@@ -272,7 +295,7 @@ describe('createOrUpdateOperatorRecord', () => {
       })
     }
 
-    featureCollection.features[0].properties.cultures = [
+    featureCollection.features[0]!.properties.cultures = [
       {
         id: 1,
         CPF: '123'
@@ -296,7 +319,7 @@ describe('createOrUpdateOperatorRecord', () => {
     })
     expect(result.audit_history).toHaveLength(2)
     expect(result.parcelles).toHaveLength(3)
-    expect(result.parcelles[0].cultures[0].variete).toBeUndefined()
+    expect(result.parcelles[0]!.cultures[0]!.variete).toBeUndefined()
   })
 
   test('successfully create a record and add annee reference from audit date', async () => {
@@ -364,7 +387,7 @@ describe('createOrUpdateOperatorRecord', () => {
     const record: Record<string, unknown> = recordToUpdate
 
     // Data we want to copy
-    await upsertCultures(drizzleDb, record.record_id as string, parcelles[0].id, [{"id": "1", "CPF": "123", "variete": "VARIETE DIFFERENTE"}])
+    await upsertCultures(drizzleDb, record.record_id as string, parcelles[0]!.id, [{"id": "1", "CPF": "123", "variete": "VARIETE DIFFERENTE"}])
 
     // To avoid ON CONFLICT condition
     const yesterday = new Date()
@@ -393,7 +416,7 @@ describe('createOrUpdateOperatorRecord', () => {
       })
     }
 
-    featureCollection.features[0].properties.cultures = [
+    featureCollection.features[0]!.properties.cultures = [
       {
         id: 1,
         CPF: '123'
@@ -416,8 +439,8 @@ describe('createOrUpdateOperatorRecord', () => {
     })
     expect(result.audit_history).toHaveLength(1)
     expect(result.parcelles).toHaveLength(3)
-    expect(result.parcelles[0].cultures[0].variete).toEqual('VARIETE DIFFERENTE')
-    expect(result.parcelles[1].cultures[0].variete).toEqual(parcelles[1].cultures[0].variete)
+    expect(result.parcelles[0]!.cultures[0]!.variete).toEqual('VARIETE DIFFERENTE')
+    expect(result.parcelles[1]!.cultures[0]!.variete).toEqual(parcelles[1]!.cultures[0]!.variete)
   })
 
   test('successfully create a record without data from previous record', async () => {
@@ -429,7 +452,7 @@ describe('createOrUpdateOperatorRecord', () => {
     await drizzleDb.update(schema.parcellaires).set({ auditDate: sql`${yesterday.toISOString()}::date`, createdAt: yesterday }).where(eq(schema.parcellaires.recordId, record.record_id as string))
 
     // Data we don't want to copy
-    await upsertCultures(drizzleDb, record.record_id as string, parcelles[0].id, [{"id": "1", "CPF": "123", "variete": "VARIETE DIFFERENTE"}])
+    await upsertCultures(drizzleDb, record.record_id as string, parcelles[0]!.id, [{"id": "1", "CPF": "123", "variete": "VARIETE DIFFERENTE"}])
 
     const featureCollection = {
       type: 'FeatureCollection',
@@ -453,7 +476,7 @@ describe('createOrUpdateOperatorRecord', () => {
       })
     }
 
-    featureCollection.features[0].properties.cultures = [
+    featureCollection.features[0]!.properties.cultures = [
       {
         id: 1,
         CPF: '123'
@@ -476,8 +499,8 @@ describe('createOrUpdateOperatorRecord', () => {
     })
     expect(result.audit_history).toHaveLength(1)
     expect(result.parcelles).toHaveLength(3)
-    expect(result.parcelles[0].cultures[0].variete).toBeUndefined()
-    expect(result.parcelles[1].cultures[0].variete).toEqual(parcelles[1].cultures[0].variete)
+    expect(result.parcelles[0]!.cultures[0]!.variete).toBeUndefined()
+    expect(result.parcelles[1]!.cultures[0]!.variete).toEqual(parcelles[1]!.cultures[0]!.variete)
   })
 
   test('successfully update a record with data from previous record with multiple same culture CPF', async () => {
@@ -485,8 +508,8 @@ describe('createOrUpdateOperatorRecord', () => {
     const yesterday = new Date()
     yesterday.setDate(yesterday.getDate() - 1)
 
-    for (const { recordId } of await drizzleDb.select({ recordId: schema.parcelles.recordId }).from(schema.parcelles).where(eq(schema.parcelles.id, parcelles[0].id))) {
-      await upsertCultures(drizzleDb, recordId, parcelles[0].id, [{"id": "1", "CPF": "123", "variete": "VARIETE 1"}, {"id": "2", "CPF": "123", "variete": "VARIETE 2"}])
+    for (const { recordId } of await drizzleDb.select({ recordId: schema.parcelles.recordId }).from(schema.parcelles).where(eq(schema.parcelles.id, parcelles[0]!.id))) {
+      await upsertCultures(drizzleDb, recordId, parcelles[0]!.id, [{"id": "1", "CPF": "123", "variete": "VARIETE 1"}, {"id": "2", "CPF": "123", "variete": "VARIETE 2"}])
     }
     await drizzleDb.update(schema.parcellaires).set({ auditDate: sql`${yesterday.toISOString()}::date`, createdAt: yesterday }).where(eq(schema.parcellaires.recordId, record.record_id as string))
 
@@ -512,7 +535,7 @@ describe('createOrUpdateOperatorRecord', () => {
       })
     }
 
-    featureCollection.features[0].properties.cultures = [
+    featureCollection.features[0]!.properties.cultures = [
       {
         id: 1,
         CPF: '123'
@@ -535,8 +558,8 @@ describe('createOrUpdateOperatorRecord', () => {
     })
     expect(result.audit_history).toHaveLength(1)
     expect(result.parcelles).toHaveLength(3)
-    expect(result.parcelles[0].cultures[0].variete).toEqual('VARIETE 1; VARIETE 2')
-    expect(result.parcelles[1].cultures[0].variete).toEqual(parcelles[1].cultures[0].variete)
+    expect(result.parcelles[0]!.cultures[0]!.variete).toEqual('VARIETE 1; VARIETE 2')
+    expect(result.parcelles[1]!.cultures[0]!.variete).toEqual(parcelles[1]!.cultures[0]!.variete)
   })
 
   test('successfully update a record with data from previous record with no variety', async () => {
@@ -544,7 +567,7 @@ describe('createOrUpdateOperatorRecord', () => {
     const yesterday = new Date()
     yesterday.setDate(yesterday.getDate() - 1)
 
-    await upsertCultures(drizzleDb, record.record_id as string, parcelles[0].id, [{"id": "1", "CPF": "123"}])
+    await upsertCultures(drizzleDb, record.record_id as string, parcelles[0]!.id, [{"id": "1", "CPF": "123"}])
     await drizzleDb.update(schema.parcellaires).set({ auditDate: sql`${yesterday.toISOString()}::date`, createdAt: yesterday }).where(eq(schema.parcellaires.recordId, record.record_id as string))
 
     const featureCollection = {
@@ -569,7 +592,7 @@ describe('createOrUpdateOperatorRecord', () => {
       })
     }
 
-    featureCollection.features[0].properties.cultures = [
+    featureCollection.features[0]!.properties.cultures = [
       {
         id: 1,
         CPF: '123'
@@ -592,8 +615,8 @@ describe('createOrUpdateOperatorRecord', () => {
     })
     expect(result.audit_history).toHaveLength(1)
     expect(result.parcelles).toHaveLength(3)
-    expect(result.parcelles[0].cultures[0].variete).toBeUndefined()
-    expect(result.parcelles[1].cultures[0].variete).toEqual(parcelles[1].cultures[0].variete)
+    expect(result.parcelles[0]!.cultures[0]!.variete).toBeUndefined()
+    expect(result.parcelles[1]!.cultures[0]!.variete).toEqual(parcelles[1]!.cultures[0]!.variete)
   })
 
   test('commune are found with update_communes trigger', async () => {
@@ -620,7 +643,7 @@ describe('createOrUpdateOperatorRecord', () => {
     featureCollection.features.push(/** @type {Feature} */{
       type: 'Feature',
       id: 1,
-      geometry: otherParcelles[0].geometry,
+      geometry: otherParcelles[0]!.geometry,
       properties: {
         id: 1,
         COMMUNE: null
@@ -646,18 +669,18 @@ describe('createOrUpdateOperatorRecord', () => {
     )
 
     expect(result.parcelles).toHaveLength(6)
-    expect(result.parcelles[0].commune).toEqual('26108')
-    expect(result.parcelles[0].etranger).toEqual(false)
-    expect(result.parcelles[1].commune).toEqual('12266')
-    expect(result.parcelles[1].etranger).toEqual(false)
-    expect(result.parcelles[2].commune).toEqual('70278')
-    expect(result.parcelles[2].etranger).toEqual(false)
-    expect(result.parcelles[3].commune).toEqual('59183')
-    expect(result.parcelles[3].etranger).toEqual(false)
-    expect(result.parcelles[4].commune).toEqual('59183')
-    expect(result.parcelles[4].etranger).toEqual(false)
-    expect(result.parcelles[5].commune).toBeNull()
-    expect(result.parcelles[5].etranger).toEqual(true)
+    expect(result.parcelles[0]!.commune).toEqual('59183')
+    expect(result.parcelles[0]!.etranger).toEqual(false)
+    expect(result.parcelles[1]!.commune).toEqual('12266')
+    expect(result.parcelles[1]!.etranger).toEqual(false)
+    expect(result.parcelles[2]!.commune).toEqual('70421')
+    expect(result.parcelles[2]!.etranger).toEqual(false)
+    expect(result.parcelles[3]!.commune).toEqual('59183')
+    expect(result.parcelles[3]!.etranger).toEqual(false)
+    expect(result.parcelles[4]!.commune).toEqual('59183')
+    expect(result.parcelles[4]!.etranger).toEqual(false)
+    expect(result.parcelles[5]!.commune).toBeNull()
+    expect(result.parcelles[5]!.etranger).toEqual(true)
   })
 })
 
@@ -873,7 +896,7 @@ describe('test search with filter', () => {
       async json () {
         return {
           nbTotal: 11,
-          operateurs: agencebioOperatorsApiResults.map((o) => ({ ...o, notifications: o.notifications.map((n) => ({ ...n, dateDemarrage: new Date(), updatedAt: new Date() })) }))
+          operateurs: agencebioOperatorsApiResults.map((o) => ({ ...o, notifications: o.notifications.map((n) => ({ ...n, dateDemarrage: new Date().toISOString(), updatedAt: new Date().toISOString() })) }))
         }
       }
     })
@@ -1077,13 +1100,13 @@ describe('test search with filter', () => {
     expect(resNomAsc.pagination).toEqual({ page: 1, page_max: 1, total: 7 })
 
     expect(res).toMatchObject(resNomAsc)
-    expect(resNomAsc.records[0].nom).toEqual('Alfred')
-    expect(resNomAsc.records[1].nom).toEqual('Benoit')
-    expect(resNomAsc.records[2].nom).toEqual('Édouard')
-    expect(resNomAsc.records[3].nom).toEqual('Françoise')
-    expect(resNomAsc.records[4].nom).toEqual('Gregoire')
-    expect(resNomAsc.records[5].nom).toEqual('- Joël')
-    expect(resNomAsc.records[6].nom).toEqual('3Denise')
+    expect(resNomAsc.records[0]!.nom).toEqual('Alfred')
+    expect(resNomAsc.records[1]!.nom).toEqual('Benoit')
+    expect(resNomAsc.records[2]!.nom).toEqual('Édouard')
+    expect(resNomAsc.records[3]!.nom).toEqual('Françoise')
+    expect(resNomAsc.records[4]!.nom).toEqual('Gregoire')
+    expect(resNomAsc.records[5]!.nom).toEqual('- Joël')
+    expect(resNomAsc.records[6]!.nom).toEqual('3Denise')
 
     const resNomDesc = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, limit: 10, filter: { sort: 'nom-DESC' } })
     expect(resNomAsc.records).toMatchObject(resNomDesc.records.reverse())
@@ -1094,25 +1117,25 @@ describe('test search with filter', () => {
     const resDateAuditAsc = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, limit: 10, filter: { sort: 'date-audit-ASC' } })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 7 })
 
-    expect((resDateAuditDesc.records as WithMaxAuditDate[])[0].max_audit_date).toEqual('2023-09-07')
-    expect((resDateAuditDesc.records as WithMaxAuditDate[])[1].max_audit_date).toEqual('2022-05-01')
-    expect((resDateAuditDesc.records as WithMaxAuditDate[])[2].max_audit_date == null).toEqual(true)
-    expect((resDateAuditDesc.records as WithMaxAuditDate[])[2].nom).toEqual('Édouard')
-    expect((resDateAuditDesc.records as WithMaxAuditDate[])[3].nom).toEqual('Françoise')
-    expect((resDateAuditDesc.records as WithMaxAuditDate[])[4].nom).toEqual('Gregoire')
-    expect((resDateAuditDesc.records as WithMaxAuditDate[])[5].nom).toEqual('- Joël')
-    expect((resDateAuditDesc.records as WithMaxAuditDate[])[6].nom).toEqual('3Denise')
-    expect((resDateAuditDesc.records as WithMaxAuditDate[])[6].max_audit_date == null).toEqual(true)
+    expect((resDateAuditDesc.records as WithMaxAuditDate[])[0]!.max_audit_date).toEqual('2023-09-07')
+    expect((resDateAuditDesc.records as WithMaxAuditDate[])[1]!.max_audit_date).toEqual('2022-05-01')
+    expect((resDateAuditDesc.records as WithMaxAuditDate[])[2]!.max_audit_date == null).toEqual(true)
+    expect((resDateAuditDesc.records as WithMaxAuditDate[])[2]!.nom).toEqual('Édouard')
+    expect((resDateAuditDesc.records as WithMaxAuditDate[])[3]!.nom).toEqual('Françoise')
+    expect((resDateAuditDesc.records as WithMaxAuditDate[])[4]!.nom).toEqual('Gregoire')
+    expect((resDateAuditDesc.records as WithMaxAuditDate[])[5]!.nom).toEqual('- Joël')
+    expect((resDateAuditDesc.records as WithMaxAuditDate[])[6]!.nom).toEqual('3Denise')
+    expect((resDateAuditDesc.records as WithMaxAuditDate[])[6]!.max_audit_date == null).toEqual(true)
 
-    expect((resDateAuditAsc.records as WithMaxAuditDate[])[6].max_audit_date).toEqual('2023-09-07')
-    expect((resDateAuditAsc.records as WithMaxAuditDate[])[5].max_audit_date).toEqual('2022-05-01')
-    expect((resDateAuditAsc.records as WithMaxAuditDate[])[4].max_audit_date == null).toEqual(true)
-    expect((resDateAuditAsc.records as WithMaxAuditDate[])[0].max_audit_date == null).toEqual(true)
-    expect((resDateAuditAsc.records as WithMaxAuditDate[])[0].nom).toEqual('Édouard')
-    expect((resDateAuditAsc.records as WithMaxAuditDate[])[1].nom).toEqual('Françoise')
-    expect((resDateAuditAsc.records as WithMaxAuditDate[])[2].nom).toEqual('Gregoire')
-    expect((resDateAuditAsc.records as WithMaxAuditDate[])[3].nom).toEqual('- Joël')
-    expect((resDateAuditAsc.records as WithMaxAuditDate[])[4].nom).toEqual('3Denise')
+    expect((resDateAuditAsc.records as WithMaxAuditDate[])[6]!.max_audit_date).toEqual('2023-09-07')
+    expect((resDateAuditAsc.records as WithMaxAuditDate[])[5]!.max_audit_date).toEqual('2022-05-01')
+    expect((resDateAuditAsc.records as WithMaxAuditDate[])[4]!.max_audit_date == null).toEqual(true)
+    expect((resDateAuditAsc.records as WithMaxAuditDate[])[0]!.max_audit_date == null).toEqual(true)
+    expect((resDateAuditAsc.records as WithMaxAuditDate[])[0]!.nom).toEqual('Édouard')
+    expect((resDateAuditAsc.records as WithMaxAuditDate[])[1]!.nom).toEqual('Françoise')
+    expect((resDateAuditAsc.records as WithMaxAuditDate[])[2]!.nom).toEqual('Gregoire')
+    expect((resDateAuditAsc.records as WithMaxAuditDate[])[3]!.nom).toEqual('- Joël')
+    expect((resDateAuditAsc.records as WithMaxAuditDate[])[4]!.nom).toEqual('3Denise')
   })
 })
 
@@ -1197,14 +1220,14 @@ describe('control and un control', () => {
   })
 
   test('successfully control and uncontrol operator', async () => {
-    await markFeatureControlled(normalizedRecord.record_id, normalizedRecord.parcelles.features[0].id!, 1)
+    await markFeatureControlled(normalizedRecord.record_id, normalizedRecord.parcelles.features[0]!.id!, 1)
 
     let bddRecord = await getRecord(normalizedRecord.record_id, buildOcUser())
 
-    expect(bddRecord!.parcelles.features[0].properties.controlee).toEqual(true)
-    await markFeatureUncontrolled(normalizedRecord.record_id, normalizedRecord.parcelles.features[0].id!, 1)
+    expect(bddRecord!.parcelles.features[0]!.properties.controlee).toEqual(true)
+    await markFeatureUncontrolled(normalizedRecord.record_id, normalizedRecord.parcelles.features[0]!.id!, 1)
 
     bddRecord = await getRecord(normalizedRecord.record_id, buildOcUser())
-    expect(bddRecord!.parcelles.features[0].properties.controlee).toEqual(false)
+    expect(bddRecord!.parcelles.features[0]!.properties.controlee).toEqual(false)
   })
 })

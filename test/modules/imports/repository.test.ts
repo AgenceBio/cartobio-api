@@ -25,17 +25,17 @@ function recordOf (value: ParsedItem) {
 }
 
 async function insertJob (job: Partial<typeof parcellaireImport.$inferInsert> = {}): Promise<number> {
-  const [{ id }] = await db
+  const { id } = (await db
     .insert(parcellaireImport)
     .values({ organismeCertificateur: '1', ...job })
-    .returning({ id: parcellaireImport.id })
+    .returning({ id: parcellaireImport.id }))[0]!
 
   return id
 }
 
 async function findJob (id: number): Promise<typeof parcellaireImport.$inferSelect> {
   const [job] = await db.select().from(parcellaireImport).where(eq(parcellaireImport.id, id))
-  return job
+  return job!
 }
 
 describe('parseAPIParcellaire', () => {
@@ -62,7 +62,7 @@ describe('parseAPIParcellaire', () => {
         culture: [{
           codeCPF: '01.92',
           quantite: 25,
-          unite: '%'
+          unite: '%' as const
         }]
       }]
     }
@@ -180,7 +180,7 @@ describe('parseAPIParcellaire', () => {
         cultures: [{
           codeCPF: '01.21.12',
           quantite: 1,
-          unite: 'ha'
+          unite: 'ha' as const
         }]
       }]
     }
@@ -220,7 +220,7 @@ describe('parseAPIParcellaire', () => {
         cultures: [{
           codeCPF: '01.21.12',
           quantite: 1,
-          unite: 'ha'
+          unite: 'ha' as const
         }]
       }]
     }
@@ -261,7 +261,7 @@ describe('parseAPIParcellaire', () => {
         cultures: [{
           codeCPF: '01.21.12',
           quantite: 1,
-          unite: 'ha'
+          unite: 'ha' as const
         }]
       }]
     }
@@ -335,7 +335,7 @@ describe('parseAPIParcellaire', () => {
         culture: [{
           codeCPF: '01.92',
           quantite: 25,
-          unite: '%'
+          unite: '%' as const
         }]
       }]
     }
@@ -375,7 +375,7 @@ describe('parseAPIParcellaire', () => {
         culture: [{
           codeCPF: '01.92',
           quantite: 25,
-          unite: '%'
+          unite: '%' as const
         }]
       }]
     }
@@ -413,7 +413,7 @@ describe('parseAPIParcellaire', () => {
         id: '45742',
         etatProduction: 'AB',
         geom: '[[[4.874099,44.255949],[4.873961,44.255016],[4.873653,44.255001],[4.874099,44.255949]]]',
-        culture: [{ codeCPF: '01.92', quantite: 25, unite: '%' }]
+        culture: [{ codeCPF: '01.92', quantite: 25, unite: '%' as const }]
       }]
     }
 
@@ -473,7 +473,7 @@ describe('parseAPIParcellaire', () => {
         culture: [{
           codeCPF: 'ACT.Prod.Inc',
           quantite: 25,
-          unite: '%'
+          unite: '%' as const
         }]
       }]
     }

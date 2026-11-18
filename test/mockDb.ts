@@ -1,13 +1,6 @@
 import validator from 'validator'
-import pool, { db } from '../src/database/database.js'
-import type { Mock } from 'vitest'
+import { db } from '../src/database/database.js'
 import type { Client, QueryConfig } from 'pg'
-
-const client = pool as unknown as {
-  query: Mock
-  _connect: () => Promise<void>
-  _end: () => Promise<void>
-}
 
 const drizzleClient = db.$client as unknown as {
   _query: (text: string) => Promise<unknown>
@@ -73,39 +66,7 @@ vi.mock('../src/database/database.js', async () => {
   pgTypes.setTypeParser(pgTypes.builtins.DATE, (value) =>
     value === null ? null : new Date(value).toISOString().split('T')[0]
   )
-  const connectionString = config.get('databaseUrl')
   const testDatabaseName = config.get('testDatabaseName')
-
-  const url = new URL(connectionString)
-
-  // every app query will
-  // go through this client
-  const client = new pg.Client({
-    user: url.username,
-    password: url.password,
-    host: url.hostname,
-    port: url.port ? Number(url.port) : undefined,
-    database: testDatabaseName
-  })
-
-  // this mock will be return by the pool.connect()
-  const _clientQuery = vi.fn((...args: Parameters<typeof client.query>) => {
-    if (typeof args[0] === 'string' && args[0].startsWith('BEGIN')) {
-      return client.query.bind(client)('SAVEPOINT test')
-    }
-
-    if (typeof args[0] === 'string' && args[0].startsWith('ROLLBACK')) {
-      return client.query.bind(client)('ROLLBACK TO SAVEPOINT test')
-    }
-
-    if (typeof args[0] === 'string' && args[0].startsWith('COMMIT')) {
-      return client.query.bind(client)('RELEASE SAVEPOINT test')
-    }
-
-    return (client.query as (...a: unknown[]) => unknown).bind(client)(...args)
-  })
-
-  const _clientRelease = vi.fn()
 
   const { drizzle } = await import('drizzle-orm/node-postgres')
   const drizzleUrl = new URL(config.get('drizzleDatabaseUrl'))
@@ -118,19 +79,10 @@ vi.mock('../src/database/database.js', async () => {
     if (/^rollback$/i.test(text)) return 'ROLLBACK TO SAVEPOINT drizzle_test'
   }
 
+  const { firstRow } = await vi.importActual<typeof import('../src/database/database.js')>('../src/database/database.js')
+
   return {
-    default: {
-      query: vi.fn(client.query.bind(client)),
-      connect: vi.fn(async () => ({
-        query: _clientQuery,
-        release: _clientRelease
-      })),
-      end: vi.fn(async (): Promise<void> => {}),
-      _connect: client.connect.bind(client),
-      _end: client.end.bind(client),
-      _clientQuery: _clientQuery,
-      _clientRelease: _clientRelease
-    },
+    firstRow,
     db: drizzle({
       client: {
         query: (queryConfig: QueryConfig, values?: unknown[]) => {
@@ -147,20 +99,17 @@ vi.mock('../src/database/database.js', async () => {
 })
 
 beforeAll(async () => {
-  await Promise.all([client._connect(), drizzleClient._connect()])
+  await drizzleClient._connect()
 })
 
 beforeEach(async () => {
   await drizzleClient._query('BEGIN')
-  await client.query('BEGIN')
-  client.query.mockClear()
 })
 
 afterEach(async () => {
-  await client.query('ROLLBACK')
   await drizzleClient._query('ROLLBACK')
 })
 
 afterAll(async () => {
-  await Promise.all([client._end(), drizzleClient._end()])
+  await drizzleClient._end()
 })

@@ -1,7 +1,7 @@
 import { createInsertSchema, createUpdateSchema } from 'drizzle-orm/zod';
 import { z } from 'zod';
 import { annotationType, conversionNiveau } from '../schema/enums.js';
-import { parcelles, parcelleCultures } from '../schema/parcelles.js';
+import { parcelles, parcelleCultures, parcellesAnnotations } from '../schema/parcelles.js';
 import { emptyToNull, isoDate } from './helpers.js';
 
 export const annotationTypeEnumSchema = z.enum(annotationType.enumValues);
@@ -12,14 +12,18 @@ export const conversionNiveauEnumSchema = z.enum(conversionNiveau.enumValues);
 
 export type ConversionNiveau = z.infer<typeof conversionNiveauEnumSchema>;
 
-export const annotationCodes: Record<string, AnnotationType> = {
+export const annotationCodes = {
   downgraded: annotationTypeEnumSchema.enum.DOWNGRADED,
   state: annotationTypeEnumSchema.enum.METADATA_STATE,
   'reduction-conversion': annotationTypeEnumSchema.enum.REDUCED_CONVERSION_PERIOD,
   risky: annotationTypeEnumSchema.enum.RISKY,
   sampled: annotationTypeEnumSchema.enum.SAMPLED,
   surveyed: annotationTypeEnumSchema.enum.SURVEYED,
-};
+} as const satisfies Record<string, AnnotationType>;
+
+export type AnnotationCode = keyof typeof annotationCodes;
+
+export const isAnnotationCode = (code: string): code is AnnotationCode => Object.hasOwn(annotationCodes, code);
 
 export const createParcelleSchema = createInsertSchema(parcelles, {
   id: (schema) => schema.min(1).max(255),
@@ -36,11 +40,23 @@ export const createParcelleSchema = createInsertSchema(parcelles, {
   })
   .strict();
 
+export const createParcelleAttributesSchema = createParcelleSchema.pick({
+  recordId: true,
+  id: true,
+  commentaireOperateur: true,
+  auditeurNotesParcelles: true,
+  name: true,
+  numeroPacage: true,
+  codeCulturePac: true,
+  codePrecisionPac: true,
+  fromParcelles: true,
+});
+
 export const updateParcelleSchema = createUpdateSchema(parcelles, {
   surfaceHa: () => z.coerce.number().positive().max(1_000_000),
   engagementDate: () => isoDate,
-  numeroIlotPac: () => emptyToNull(z.number()),
-  numeroParcellesPac: () => emptyToNull(z.number()),
+  numeroIlotPac: () => emptyToNull(z.coerce.number().int().min(-32768).max(32767)),
+  numeroParcellesPac: () => emptyToNull(z.coerce.number().int().min(-32768).max(32767)),
 })
   .omit({
     id: true,
@@ -55,11 +71,13 @@ export const updateParcelleSchema = createUpdateSchema(parcelles, {
   });
 
 export const createParcelleCultureSchema = createInsertSchema(parcelleCultures, {
+  id: (schema) => schema.trim().min(1),
   cpf: (schema) => schema.trim().min(1).max(64),
-  surface: () => emptyToNull(z.coerce.number().positive()),
   dateSemis: () => isoDate,
   unit: () => emptyToNull(z.string().trim().max(20)),
   variete: () => emptyToNull(z.string().trim().max(255)),
-})
-  .omit({ id: true })
-  .strict();
+}).strict();
+
+export const createParcelleAnnotationSchema = createInsertSchema(parcellesAnnotations, {
+  id: z.uuid(),
+}).strict();

@@ -3,7 +3,9 @@
 import 'dotenv/config'
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
-import pg from 'pg'
+import { sql } from 'drizzle-orm'
+import { migrate } from 'drizzle-orm/node-postgres/migrator'
+import { db } from '../src/database/database.js'
 
 const envPath = resolve(process.cwd(), '.env')
 console.log(`.env : ${existsSync(envPath) ? envPath : 'introuvable'}`)
@@ -14,18 +16,20 @@ if (!targetUrl) throw new Error('TARGET_DATABASE_URL est obligatoire')
 const { hostname, port, pathname, username } = new URL(targetUrl)
 console.log(`Cible : ${username}@${hostname}:${port}${pathname}`)
 
-const client = new pg.Client({ connectionString: targetUrl })
-await client.connect()
 try {
-  await client.query('DROP SCHEMA IF EXISTS cartobio CASCADE')
-  await client.query('DROP SCHEMA IF EXISTS drizzle CASCADE')
+  await db.execute(sql`DROP SCHEMA IF EXISTS cartobio CASCADE`)
+  await db.execute(sql`DROP SCHEMA IF EXISTS drizzle CASCADE`)
 
-  const { rowCount } = await client.query(
-    "SELECT 1 FROM information_schema.schemata WHERE schema_name IN ('cartobio', 'drizzle')"
+  const { rowCount } = await db.execute(
+    sql`SELECT 1 FROM information_schema.schemata WHERE schema_name IN ('cartobio', 'drizzle')`
   )
   if (rowCount) throw new Error('Les schémas cartobio ou drizzle existent toujours après la suppression')
 
   console.log('Schémas cartobio et drizzle supprimés')
+
+  await migrate(db, { migrationsFolder: 'database/drizzle', migrationsTable: 'journal' })
+
+  console.log('Migrations drizzle appliquées')
 } finally {
-  await client.end()
+  await db.$client.end()
 }

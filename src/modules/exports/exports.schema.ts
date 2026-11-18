@@ -1,4 +1,4 @@
-import { exportParcellaireBodySchema, exportParcellaireResponseSchema, exportPdfErrorResponseSchema, exportPdfParamsSchema, exportPdfQuerySchema, exportPdfResponseSchema } from '@agencebio/cartobio-types'
+import { exportParcellaireBodySchema, exportParcellaireResponseSchema, exportPdfParamsSchema, exportPdfQuerySchema, exportPdfResponseSchema } from '@agencebio/cartobio-types'
 import { apiError, commonErrorResponses, describedResponse, mergeSchemas, operatorFromRecordId, protectedWithToken, TAGS, withSchema } from '../../shared/routes.js'
 import { enforceOperatorAccess } from '../../shared/middlewares.js'
 
@@ -13,7 +13,7 @@ export const exportPdfSchema = withSchema(mergeSchemas(protectedWithToken(), ope
     ...commonErrorResponses,
     200: exportPdfResponseSchema,
     204: describedResponse('Parcellaire trop volumineux (plus de 80 parcelles)'),
-    400: exportPdfErrorResponseSchema.meta({ description: 'Génération impossible' }),
+    400: apiError('Génération impossible : parcelle sans culture ou sans nom, ou parcellaire vide'),
     404: apiError('Parcellaire ou opérateur introuvable')
   }
 })

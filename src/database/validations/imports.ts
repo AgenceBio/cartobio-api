@@ -56,14 +56,19 @@ export const createImportPayloadSchema = createInsertSchema(parcellaireImportPay
   importId: (schema) => schema.int().positive(),
 }).strict();
 
+export const createImportPacSchema = createInsertSchema(importPac)
+  .pick({
+    numeroBio: true,
+    nbParcelles: true,
+    size: true,
+    record: true,
+    pacage: true,
+    siret: true,
+  })
+  .strict();
+
 export const updateImportPacSchema = createUpdateSchema(importPac)
   .pick({
     imported: true,
   })
   .strict();
-
-export type CreateImportJobInput = z.infer<typeof createImportJobSchema>;
-export type UpdateImportJobInput = z.infer<typeof updateImportJobSchema>;
-export type CreateImportLogInput = z.infer<typeof createImportLogSchema>;
-export type CreateImportPayloadInput = z.infer<typeof createImportPayloadSchema>;
-export type UpdateImportPacInput = z.infer<typeof updateImportPacSchema>;

@@ -7,20 +7,25 @@ import cliProgress from 'cli-progress'
 import getStream from 'get-stream'
 import gdal from 'gdal-async'
 import type { Feature } from 'geojson'
+import { sql } from 'drizzle-orm'
 
-import { withTransaction } from '../src/database/transaction.js'
+import { db } from '../src/database/database.js'
+import { importPac } from '../src/database/schema/index.js'
+import { createImportPacSchema } from '../src/database/validations/imports.js'
 import { surfaceForFeatureCollection } from '../src/shared/outputs/api.js'
 import { fromCodePacStrict } from '@agencebio/rosetta-cultures'
 import { unzipGeographicalContent, detectSrs, wgs84 } from '../src/shared/geo/gdal.js'
 import { getRandomFeatureId } from '../src/shared/outputs/features.js'
-import { CertificationState, EtatProduction } from '@agencebio/cartobio-types'
+import { CertificationState, EtatProduction, MetadataSource } from '@agencebio/cartobio-types'
 
-function parseCSV (text: string): Record<string, string>[] {
-  const [headerLine, ...lines] = text.trim().split('\n')
+type CorrespondanceRow = Record<string, string> & { PACAGE: string; SIRET: string; NUMEROBIO: string }
+
+function parseCSV (text: string): CorrespondanceRow[] {
+  const [headerLine = '', ...lines] = text.trim().split('\n')
   const headers = headerLine.split(';').map((h) => h.trim())
   return lines.map((line) => {
     const values = line.split(';').map((v) => v.trim())
-    return Object.fromEntries(headers.map((h, i) => [h, values[i]]))
+    return { PACAGE: '', SIRET: '', NUMEROBIO: '', ...Object.fromEntries(headers.map((h, i) => [h, values[i] ?? ''])) }
   })
 }
 
@@ -49,7 +54,9 @@ function groupByPACAGE (features: Iterable<gdal.Feature>): gdal.Feature[][] {
 
 /* main.js */
 
-if (process.argv.length < 3) {
+const [, , aspFile, csvFile] = process.argv
+
+if (aspFile === undefined || csvFile === undefined) {
   console.error(
     'Usage: node import-pac-correctif.js <fichier-zip-asp> <correspondance-correctif.csv>'
   )
@@ -57,9 +64,6 @@ if (process.argv.length < 3) {
 }
 
 (async (): Promise<void> => {
-  const aspFile = process.argv[2]
-  const csvFile = process.argv[3]
-
   const zipBuffer = await getStream.buffer(fs.createReadStream(aspFile))
   const { files, cleanup } = await unzipGeographicalContent(zipBuffer)
   const correspondance = parseCSV(fs.readFileSync(csvFile, 'utf8'))
@@ -73,7 +77,7 @@ if (process.argv.length < 3) {
   const warningsSiretVide: string[] = []
   const warningsNumeroBioVide: Array<{ siret: string; pacage: string }> = []
   try {
-    await withTransaction(async (client): Promise<void> => {
+    await db.transaction(async (tx): Promise<void> => {
       for await (const filepath of files) {
         const dataset = await gdal.openAsync(filepath)
 
@@ -83,7 +87,9 @@ if (process.argv.length < 3) {
           const tabCouplage: Array<{ siret: string; pacage: string; numeroBio: string; geom: gdal.Feature[] }> = []
           const group = groupByPACAGE(layer.features)
           for await (const featureGroup of group) {
-            const pacage = featureGroup[0].fields.get('PACAGE')
+            const [firstFeature] = featureGroup
+            if (!firstFeature) continue
+            const pacage = firstFeature.fields.get('PACAGE')
             const siretMapping = correspondance.find(
               (row) => row.PACAGE === pacage
             )
@@ -116,8 +122,8 @@ if (process.argv.length < 3) {
             })
           }
           if (tabCouplage.length > 0) {
-            for (let i = 0; i < tabCouplage.length; i++) {
-              const pacageFeatures = tabCouplage[i].geom
+            for (const couplage of tabCouplage) {
+              const pacageFeatures = couplage.geom
 
               const featureCollection = {
                 type: 'FeatureCollection',
@@ -155,40 +161,39 @@ if (process.argv.length < 3) {
                     NUMERO_P: NUM_PARCEL,
                     TYPE: CODE_CULT,
                     CODE_VAR: PRECISION,
-                    PACAGE: tabCouplage[i].pacage
+                    PACAGE: couplage.pacage
                   }
                 })
               }
 
               const record = {
                 parcelles: featureCollection,
-                numerobio: tabCouplage[i].numeroBio,
+                numerobio: couplage.numeroBio,
                 certification_state: CertificationState.OPERATOR_DRAFT,
                 version_name: 'Parcellaire déclaré PAC 2026',
                 metadata: {
-                  source: 'telepac',
+                  source: MetadataSource.TELEPAC,
                   campagne: '2026',
-                  pacage: tabCouplage[i].pacage,
+                  pacage: couplage.pacage,
                   warnings: '',
                   provenance: 'asp-2026'
                 }
               }
-              await client.query(
-                `
-              INSERT INTO import_pac_26 (numerobio, nb_parcelles, size, record, pacage, siret)
-              VALUES ($1, $2, $3, $4, $5, $6)
-              ON CONFLICT (numerobio, pacage, siret)
-              DO UPDATE SET nb_parcelles = $2, size = $3, record = $4, updatedAt = CURRENT_TIMESTAMP
-            `,
-                [
-                  tabCouplage[i].numeroBio,
-                  featureCollection.features.length,
-                  await surfaceForFeatureCollection(featureCollection),
-                  JSON.stringify(record),
-                  tabCouplage[i].pacage,
-                  tabCouplage[i].siret
-                ]
-              )
+              const values = createImportPacSchema.parse({
+                numeroBio: couplage.numeroBio,
+                nbParcelles: featureCollection.features.length,
+                size: await surfaceForFeatureCollection(featureCollection),
+                record,
+                pacage: couplage.pacage,
+                siret: couplage.siret
+              })
+              await tx
+                .insert(importPac)
+                .values(values)
+                .onConflictDoUpdate({
+                  target: [importPac.numeroBio, importPac.pacage, importPac.siret],
+                  set: { nbParcelles: values.nbParcelles, size: values.size, record: values.record, updatedAt: sql`CURRENT_TIMESTAMP` }
+                })
 
               imported++
               progress.increment()

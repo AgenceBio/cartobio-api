@@ -48,7 +48,7 @@
         "audit_date": "2023-03-30T00:00:00.000Z",
         "annee_reference_controle": 2025,
         "metadata": {
-            "source": "API Parcellaire",
+            "source": "API_PARCELLAIRE",
             "anneeAssolement": 2023
         }
     }

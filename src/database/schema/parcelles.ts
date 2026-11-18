@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
   date,
@@ -48,7 +49,8 @@ export const parcelles = cartobio.table(
       .defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
-      .defaultNow(),
+      .defaultNow()
+      .$onUpdate(() => sql`now()`),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (table) => [
@@ -98,7 +100,7 @@ export const parcellesAnnotations = cartobio.table(
       .notNull()
       .references(() => parcellaires.recordId, { onDelete: "cascade" }),
     typeAnnot: annotationType("type_annot").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     metadata: jsonb("metadata"),
   },
   (table) => [

@@ -16,20 +16,24 @@ import { LegalProjections, RegionBounds } from '@agencebio/cartobio-types'
 import { z } from 'zod'
 import type { FeatureCollection, Geometry, MultiPolygon } from 'geojson'
 import type { MultipartFile } from '@fastify/multipart'
+import { jsonString } from '../validation.js'
 
-const featurePropertiesSchema = z.looseObject({
+const emptyToUndefined = (value: unknown): unknown => value || undefined
+
+const featurePropertiesSchema = z.object({
   COMMUNE: z.string().regex(/^[0-9]{5}$/u).nullable().optional(),
   COMMUNE_LABEL: z.string().nullable().optional(),
-  cultures: z.array(z.looseObject({})).nullable().optional(),
+  cultures: z.preprocess(emptyToUndefined, jsonString(z.array(z.looseObject({}))).optional()),
   conversion_niveau: z.string().nullable().optional(),
-  engagement_date: z.looseObject({ year: z.int(), month: z.int(), day: z.int() }).nullable().optional(),
+  engagement_date: z.looseObject({ year: z.int(), month: z.int(), day: z.int() }).nullable().optional()
+    .transform((date) => date ? `${date.year}-${date.month}-${date.day}` : undefined),
   commentaires: z.string().nullable().optional(),
   auditeur_notes: z.string().nullable().optional(),
-  annotations: z.array(z.unknown()).nullable().optional(),
+  annotations: z.preprocess(emptyToUndefined, jsonString(z.array(z.unknown())).optional()),
   NOM: z.string().nullable().optional(),
   PACAGE: z.string().regex(/^([A-Z0-9]{8,9})|()$/u).nullable().optional(),
-  NUMERO_I: z.int().nullable().optional(),
-  NUMERO_P: z.int().nullable().optional(),
+  NUMERO_I: z.preprocess((value) => value ? Number(value) : undefined, z.int().optional()),
+  NUMERO_P: z.preprocess((value) => value ? Number(value) : undefined, z.int().optional()),
   cadastre: z.array(z.string()).nullable().optional()
 })
 
@@ -132,108 +136,89 @@ async function identifyFiles(file: Promise<MultipartFile | undefined>): Promise<
   throw new InvalidRequestApiError('Format de fichier non-reconnu.')
 }
 
-async function parseAnyGeographicalArchive(file: Promise<MultipartFile | undefined>) {
+async function parseAnyGeographicalArchive(file: Promise<MultipartFile | undefined>): Promise<FeatureCollection> {
   const { files, cleanup } = await identifyFiles(file)
   const featureCollection: FeatureCollection = {
     type: 'FeatureCollection',
     features: []
   }
 
-  if (!files.length) {
-    throw new InvalidRequestApiError('Format de fichier non-reconnu.')
-  }
-
-  for await (const filePathOrBuffer of files) {
-    let dataset
-
-    try {
-      dataset = await gdal.openAsync(filePathOrBuffer)
-    } catch (error) {
-      throw new InvalidRequestApiError('Format de fichier non-reconnu.', { cause: error })
+  try {
+    if (!files.length) {
+      throw new InvalidRequestApiError('Format de fichier non-reconnu.')
     }
 
-    for await (const layer of dataset.layers) {
-      if (layer.geomType && ![gdal.wkbPolygon, gdal.wkbMultiPolygon].includes(layer.geomType)) {
-        continue
+    for await (const filePathOrBuffer of files) {
+      let dataset
+
+      try {
+        dataset = await gdal.openAsync(filePathOrBuffer)
+      } catch (error) {
+        throw new InvalidRequestApiError('Format de fichier non-reconnu.', { cause: error })
       }
 
-      const srs = await detectSrs(layer)
-      const reprojectFn = new gdal.CoordinateTransformation(srs, wgs84)
-      for await (const feature of layer.features) {
-        const names = feature.fields.getNames()
-        const geometry = stripZFromGeometry(feature.getGeometry())
-        if (!geometry) {
-          await dataset.close()
-          await cleanup()
-          throw new InvalidRequestApiError('Le fichier contient une parcelle sans géométrie.')
-        }
-        await geometry.transformAsync(reprojectFn)
-        const id = names.includes('id') ? feature.fields.get('id') : getRandomFeatureId()
-        const properties = feature.fields.toObject()
+      try {
+        for await (const layer of dataset.layers) {
+          if (layer.geomType && ![gdal.wkbPolygon, gdal.wkbMultiPolygon].includes(layer.geomType)) {
+            continue
+          }
 
-
-        const { COMMUNE, COMMUNE_LABEL, cultures, conversion_niveau, engagement_date, commentaires, auditeur_notes, annotations, NOM, PACAGE, NUMERO_I, NUMERO_P, cadastre } = properties
-
-        const parsedProperties = {
-          COMMUNE,
-          COMMUNE_LABEL,
-          cultures: cultures ? JSON.parse(cultures) : undefined,
-          conversion_niveau,
-          engagement_date: engagement_date,
-          commentaires,
-          auditeur_notes,
-          annotations: annotations ? JSON.parse(annotations) : undefined,
-          NOM,
-          PACAGE,
-          NUMERO_I: NUMERO_I ? +NUMERO_I : undefined,
-          NUMERO_P: NUMERO_P ? +NUMERO_P : undefined,
-          cadastre
-        }
-
-        if (!featurePropertiesSchema.safeParse(parsedProperties).success) {
-          await dataset.close()
-          await cleanup()
-          throw new InvalidRequestApiError('Le fichier contient des propriétés invalides')
-        }
-
-        if (geometry.name === 'POLYGON') {
-          featureCollection.features.push({
-            type: 'Feature',
-            id,
-            geometry: geometry.toObject(),
-            properties: {
-              ...parsedProperties,
-              engagement_date: parsedProperties.engagement_date ? `${engagement_date.year}-${engagement_date.month}-${engagement_date.day}` : undefined,
-              id
+          const srs = await detectSrs(layer)
+          const reprojectFn = new gdal.CoordinateTransformation(srs, wgs84)
+          for await (const feature of layer.features) {
+            const names = feature.fields.getNames()
+            const geometry = stripZFromGeometry(feature.getGeometry())
+            if (!geometry) {
+              throw new InvalidRequestApiError('Le fichier contient une parcelle sans géométrie.')
             }
-          })
-          // some tools outputs features as single polygon
-          // and we don't deal with multipolygon because we want to distinguish each of them
-        } else if (geometry.name === 'MULTIPOLYGON') {
-          (geometry.toObject() as MultiPolygon).coordinates.forEach((coordinates): void => {
-            const id = getRandomFeatureId()
+            await geometry.transformAsync(reprojectFn)
+            const id = names.includes('id') ? feature.fields.get('id') : getRandomFeatureId()
+            const properties = feature.fields.toObject()
+            const parsedProperties = featurePropertiesSchema.safeParse(properties)
 
-            featureCollection.features.push({
-              type: 'Feature',
-              id,
-              geometry: {
-                type: 'Polygon',
-                coordinates
-              },
-              properties: {
-                ...properties,
-                id
-              }
-            })
-          })
+            if (!parsedProperties.success) {
+              throw new InvalidRequestApiError('Le fichier contient des propriétés invalides', { cause: parsedProperties.error })
+            }
+
+            if (geometry.name === 'POLYGON') {
+              featureCollection.features.push({
+                type: 'Feature',
+                id,
+                geometry: geometry.toObject(),
+                properties: {
+                  ...parsedProperties.data,
+                  id
+                }
+              })
+              // some tools outputs features as single polygon
+              // and we don't deal with multipolygon because we want to distinguish each of them
+            } else if (geometry.name === 'MULTIPOLYGON') {
+              (geometry.toObject() as MultiPolygon).coordinates.forEach((coordinates): void => {
+                const id = getRandomFeatureId()
+
+                featureCollection.features.push({
+                  type: 'Feature',
+                  id,
+                  geometry: {
+                    type: 'Polygon',
+                    coordinates
+                  },
+                  properties: {
+                    ...properties,
+                    id
+                  }
+                })
+              })
+            }
+          }
         }
+      } finally {
+        await dataset.close()
       }
     }
-
-    await dataset.close()
+  } finally {
+    await cleanup()
   }
-
-  await cleanup()
 
   return featureCollection
 }

@@ -1,7 +1,7 @@
-import { featureCollection } from '@turf/helpers'
 import { normalizeParcelle } from './features.js'
 import { EtatProduction } from '@agencebio/cartobio-types'
-import type { DBOperatorRecord, DBOperatorRecordWithParcelles, NormalizedRecord, NormalizedRecordSummary } from '@agencebio/cartobio-types'
+import type { NormalizedRecord, NormalizedRecordSummary } from '@agencebio/cartobio-types'
+import type { DBOperatorRecordWithParcelles, RecordSummaryRow } from '../parcellaires/parcellaires.types.js'
 
 
 /**
@@ -14,11 +14,11 @@ function normalizeRecord (record: DBOperatorRecordWithParcelles): NormalizedReco
   return {
     ...record,
     metadata: record?.metadata ?? {},
-    parcelles: featureCollection(features)
+    parcelles: { type: 'FeatureCollection', features }
   }
 }
 
-function normalizeRecordSummary (record: Omit<DBOperatorRecord, 'parcelles'> & { surface: number; parcelles: number }): NormalizedRecordSummary {
+function normalizeRecordSummary (record: RecordSummaryRow): NormalizedRecordSummary {
   return {
     ...record
   }

@@ -1,21 +1,7 @@
 import { randomInt, randomUUID } from 'crypto'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
-import { DATA_DIR } from '../paths.js'
-import { logger } from '../../config/logger.js'
-
-let communes: Array<{ code: string; nom: string; geometry: import('geojson').Polygon }> = []
-try {
-  communes = JSON.parse(
-    readFileSync(join(DATA_DIR, 'generated/communes.json'), 'utf8')
-  )
-} catch (error) {
-  logger.warn({ err: error }, 'Référentiel des communes introuvable')
-  // skip, this is probably the type package
-}
-
 import { fromCodePacStrict, fromCodeCpf } from '@agencebio/rosetta-cultures'
-import type { CartoBioFeature, CartoBioFeatureInput, DBParcelle } from '@agencebio/cartobio-types'
+import type { CartoBioFeature, CartoBioFeatureInput } from '@agencebio/cartobio-types'
+import type { DBParcelle } from '../parcellaires/parcellaires.types.js'
 
 const MAX_RANDOM_INT = Math.pow(2, 48)
 
@@ -86,7 +72,7 @@ function normalizeParcelle (parcelle: DBParcelle): CartoBioFeature {
     properties: {
       id: parcelle.id,
       COMMUNE: parcelle.commune ?? null,
-      COMMUNE_LABEL: communes.find(({ code }) => code === parcelle.commune)?.nom,
+      COMMUNE_LABEL: parcelle.commune_label ?? undefined,
       cultures: parcelle.cultures ?? null,
       conversion_niveau: parcelle.conversion_niveau ?? null,
       engagement_date: parcelle.engagement_date ?? null,
@@ -105,10 +91,10 @@ function normalizeParcelle (parcelle: DBParcelle): CartoBioFeature {
       etranger: parcelle.etranger === true,
       controlee: parcelle.controlee === true,
       historique: parcelle.historique_cultures?.filter((current, i, a) => {
-        if (i === 0) {
+        const previous = a[i - 1]
+        if (!previous) {
           return true
         }
-        const previous = a[i - 1]
         if (current.annee_controle !== previous.annee_controle) {
           return true
         }

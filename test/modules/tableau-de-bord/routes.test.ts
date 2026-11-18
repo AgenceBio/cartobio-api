@@ -57,26 +57,27 @@ describe('GET /api/v3/tdb-api/*', () => {
 
     expect(response.status).toEqual(200)
     expect(response.body).toEqual({ data: [], meta: { total: 0, page: 1, limit: 20 } })
-    expect(service.getTableauBilan).toHaveBeenCalledWith({ statuts: 'VALID' }, 999)
+    expect(service.getTableauBilan).toHaveBeenCalledWith({ statuts: ['VALID'] }, 999)
   })
 
   const emptyPage = { data: [], meta: { total: 0, page: 1, limit: 20 } }
 
   test.each([
-    ['/tableau-errors', service.getTableauErreurs, () => vi.mocked(service.getTableauErreurs).mockResolvedValueOnce(emptyPage), emptyPage],
-    ['/historique', service.getHistoriqueSpecificParcellaire, () => vi.mocked(service.getHistoriqueSpecificParcellaire).mockResolvedValueOnce([]), []],
-    ['/top-anomalies-grouped', service.getTopAnomaliesGrouped, () => vi.mocked(service.getTopAnomaliesGrouped).mockResolvedValueOnce([]), []],
-    ['/repet-ano', service.getRepetErreurs, () => vi.mocked(service.getRepetErreurs).mockResolvedValueOnce(emptyPage), emptyPage]
-  ])('%s renvoie directement le résultat du service', async (path, fn, mockResult, expected) => {
+    ['/tableau-errors', service.getTableauErreurs, () => vi.mocked(service.getTableauErreurs).mockResolvedValueOnce(emptyPage), emptyPage, {}],
+    ['/historique', service.getHistoriqueSpecificParcellaire, () => vi.mocked(service.getHistoriqueSpecificParcellaire).mockResolvedValueOnce([]), [], { numeroBio: '123' }],
+    ['/top-anomalies-grouped', service.getTopAnomaliesGrouped, () => vi.mocked(service.getTopAnomaliesGrouped).mockResolvedValueOnce([]), [], {}],
+    ['/repet-ano', service.getRepetErreurs, () => vi.mocked(service.getRepetErreurs).mockResolvedValueOnce(emptyPage), emptyPage, { from: '2026-01-01', to: '2026-01-31' }]
+  ])('%s renvoie directement le résultat du service', async (path, fn, mockResult, expected, query) => {
     mockResult()
 
     const response = await request(app.server)
       .get(`/api/v3/tdb-api${path}`)
+      .query(query)
       .set('Authorization', OC_TOKEN)
 
     expect(response.status).toEqual(200)
     expect(response.body).toEqual(expected)
-    expect(fn).toHaveBeenCalledWith({}, 999)
+    expect(fn).toHaveBeenCalledWith(query, 999)
   })
 
   test('enveloppe les top anomalies simples dans data', async () => {

@@ -5,7 +5,7 @@
 Elle est utilisée par [`cartobio-front`](https://github.com/agencebio/cartobio-front) et aux outils
 métiers des organismes de certification du bio en France.
 
-Cette API est réalisée en node avec [Fastify](https://fastify.dev/) et [swagger-ui](https://swagger.io/tools/swagger-ui/) entre autres et la base de données maintenue avec [db-migrate-pg](https://github.com/db-migrate/pg). Les données sont stockées dans une base [PostgreSQL](https://www.postgresql.org/) avec la cartouche spatiale [PostGIS](https://postgis.net/).
+Cette API est réalisée en node avec [Fastify](https://fastify.dev/) et [swagger-ui](https://swagger.io/tools/swagger-ui/) entre autres et l'ORM [Drizzle](https://orm.drizzle.team/) pour l'accès et les migrations de la base de données. Les données sont stockées dans une base [PostgreSQL](https://www.postgresql.org/) avec la cartouche spatiale [PostGIS](https://postgis.net/).
 
 - [Doc API parcellaire](docs/rfc/001-api-parcellaire.md)
 - [Doc API lecture](docs/rfc/002-api-lecture.md)
@@ -32,8 +32,11 @@ Créer un fichier `.env` inspiré de `.example.env`.
 Démarrer le serveur de données :
 
 ```sh
-docker compose -f docker/compose.yml up db --force-recreate
+docker compose -f docker/docker-compose.yml up db-18 --force-recreate
 ```
+
+Le service `db` (PostGIS 15) correspond à l'ancienne base. Il n'est utile que pour
+[migrer les données](#migration-des-données-depuis-lancienne-base).
 
 ### Application
 
@@ -89,17 +92,53 @@ Ouvrir :
 - http://localhost:8000/api/v2/test
 - http://localhost:8000/api/documentation/static/index.html
 
-💡 Le démarrage du serveur lance automatiquement les migrations du schéma de base de données avec [**db-migrate**](https://db-migrate.readthedocs.io/en/latest/). Se réferrer à sa documentation pour en savoir plus sur les commandes et les API de migration.
+### Base de données
 
-### Données de tests dans la base
+Le schéma est décrit avec Drizzle dans [`src/database/schema`](src/database/schema), dans le schéma PostgreSQL `cartobio`.
+Les migrations SQL générées sont dans [`database/drizzle`](database/drizzle).
+
+💡 `npm run dev` et `npm start` appliquent automatiquement les migrations et importent les régions, départements et communes.
 
 ```sh
-# Ajouter
-./node_modules/.bin/db-migrate up
+# Générer une migration après modification du schéma
+npm run db:generate -- nom-de-la-migration
 
-# Retirer
-./node_modules/.bin/db-migrate down
+# Appliquer les migrations
+npm run db:migrate
+
+# Importer régions, départements et communes (idempotent)
+npm run db:seed
+
+# Supprimer les schémas cartobio et drizzle puis rejouer les migrations
+npm run db:reset
 ```
+
+Les écritures en base passent par les validateurs zod de [`src/database/validations`](src/database/validations).
+
+### Migration des données depuis l'ancienne base
+
+Les migrations `db-migrate` de [`database/old_migrations`](database/old_migrations) sont conservées à titre d'historique :
+elles servent uniquement à amener une ancienne base à jour avant d'en copier les données.
+
+`SOURCE_DATABASE_URL` désigne l'ancienne base, `TARGET_DATABASE_URL` la nouvelle.
+
+```sh
+# 1. Mettre l'ancienne base à jour (si besoin)
+DATABASE_URL=$SOURCE_DATABASE_URL npm run db:migrate:legacy
+
+# 2. Créer le schéma de la nouvelle base
+npm run db:migrate
+
+# 3. Copier et transformer les données, dans une seule transaction
+npm run db:migrate:data
+# ou, pour vider la base cible avant la copie
+npm run db:migrate:data -- --reset
+
+# 4. Importer régions, départements et communes
+npm run db:seed
+```
+
+La copie refuse de s'exécuter si la base cible contient déjà des parcellaires (sauf avec `--reset`).
 
 ### Exécution des tests
 
@@ -165,7 +204,8 @@ L'application lit les variables définies dans un fichier `.env`.
 | `NODE_ENV`                                  | `dev`                                                                 | Environnement d'exécution de l'application (`dev`, `production`, `test`).                                                           |
 | `APP_ENVIRONMENT`                           | `development`                                                         | Environnement fonctionnel de l'application (`development`, `staging`, `production`, `test`).                                        |
 | `FRONTEND_URL`                              | `https://cartobio.agencebio.org`                                      | URL de l'application frontend.                                                                                                      |
-| `DATABASE_URL`                              | `postgresql://docker:docker@localhost:15432/gis`                      | URL de connexion à la base de données PostgreSQL/PostGIS.                                                                           |
+| `TARGET_DATABASE_URL`                       | `postgresql://docker:docker@localhost:25432/cartobio`                 | URL de connexion à la base de données PostgreSQL/PostGIS.                                                                           |
+| `SOURCE_DATABASE_URL`                       | ``                                                                    | URL de l'ancienne base, lue uniquement par `npm run db:migrate:data`.                                                               |
 | `CARTOBIO_JWT_SECRET`                       | ``                                                                    | Secret utilisé pour signer et vérifier les JSON Web Tokens (JWT).                                                                   |
 | `DOUANES_BASE_URL`                          | `http://bdd-cartobio/ws`                                              | URL de base du service web des Douanes.                                                                                             |
 | `DOUANES_SOCKS_PROXY`                       | ``                                                                    | Proxy SOCKS5 utilisé pour accéder aux services des Douanes.                                                                         |
@@ -213,7 +253,7 @@ docker run -i --rm postgres:15 psql -v ON_ERROR_STOP=1 -U postgres -h bdd-cartob
 
 ## Intégration des données des départements avec le demaine maritime
 
-Ces données sont utilisées lors du déclencheur (`update_communes`) d'ajout de commune à une parcelle afin de trouver la commune la plus proche pour les parcelles aquacoles et de marquer les parcelles frontalières comme `etranger`.
+Ces données (table `cartobio.territoires`) sont utilisées lors de l'ajout de commune à une parcelle afin de trouver la commune la plus proche pour les parcelles aquacoles et de marquer les parcelles frontalières comme `etranger`.
 Elles sont basées sur les géométries des [régions](https://etalab-datasets.geo.data.gouv.fr/contours-administratifs/latest/geojson/) modifiées via QGIS pour rajouter le domaine maritimes francais.
 
 ```sh
@@ -270,19 +310,9 @@ Les fichiers sont ensuite servient via la configuration dans `sites-available`:
 
 ## Autodétéction des communes
 
-Les communes sont ajoutées automatiquement pour un déclencheur en BDD
-
-Via la fonction :
-
-```sql
-update_communes()
-```
-
-Déclenchée par :
-
-```sql
-BEFORE INSERT OR UPDATE ON cartobio_parcelles
-```
+Quand une parcelle est créée ou que sa géométrie change sans commune renseignée, l'API choisit la commune active
+qui recouvre le plus la parcelle (ou la plus proche). Une parcelle hors des territoires est marquée `etranger`
+(voir `communeEtEtranger` dans [`parcellaires.utils.ts`](src/shared/parcellaires/parcellaires.utils.ts)).
 
 ## Cron
 

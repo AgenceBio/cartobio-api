@@ -6,8 +6,9 @@ import { fetchOperatorByNumeroBio } from '../clients/agence-bio.client.js'
 import { BadGatewayApiError, PreconditionFailedApiError, getErrorCode, getResponseStatusCode } from './errors.js'
 import { getRecords } from './parcellaires/parcellaires.service.js'
 import { isRevoked } from '../modules/auth/auth.service.js'
+import { userTokenSchema } from '../modules/auth/auth.tokens.js'
 import type { FastifyRequest, FastifyReply, onRequestHookHandler, preSerializationHookHandler } from 'fastify'
-import type { CartoBioOCUser, CartoBioUser, NormalizedRecord, OrganismeCertificateur } from '@agencebio/cartobio-types'
+import type { CartoBioUser, NormalizedRecord, OrganismeCertificateur } from '@agencebio/cartobio-types'
 import config from '../config/env.js'
 
 const apiVersion = config.get('version')
@@ -21,9 +22,6 @@ const tokenExpirationErrorCodes: string[] = [
   TokenError.codes.invalidSignature
 ]
 
-/**
- * @param params keys property on the token
- */
 function decodeUserToken ({ keys }: { keys: string[] }): onRequestHookHandler {
   const verifiers = keys.map(key => createVerifier({ key: async () => key, cache: true }))
 
@@ -45,9 +43,9 @@ function decodeUserToken ({ keys }: { keys: string[] }): onRequestHookHandler {
     // For example, a Bearer emitted by CartoBio could fail
     // whereas a Notification token via Public Key could be okay
     const { user, error } = await Promise
-      .allSettled(verifiers.map(fn => fn(token) as Promise<CartoBioOCUser>))
+      .allSettled(verifiers.map(async (fn): Promise<CartoBioUser> => userTokenSchema.parse(await fn(token)) as CartoBioUser))
       .then(results => ({
-        user: results.find((result): result is PromiseFulfilledResult<CartoBioOCUser> => result.status === 'fulfilled')?.value,
+        user: results.find((result): result is PromiseFulfilledResult<CartoBioUser> => result.status === 'fulfilled')?.value,
         error: results.find((result): result is PromiseRejectedResult => result.status === 'rejected')?.reason as TokenError | undefined
       }))
 
@@ -70,9 +68,6 @@ function decodeUserToken ({ keys }: { keys: string[] }): onRequestHookHandler {
   }
 }
 
-/**
- * @param names property keys which must be set on the request
- */
 function enforceAnyFastifyDecorator (names: Array<'user' | 'organismeCertificateur'> = []): onRequestHookHandler {
   return async function enforceAnyFastifyDecoratorMiddleware (request: FastifyRequest, reply: FastifyReply): Promise<void> {
     const isFound = names.some((decoratorName) => {
@@ -115,6 +110,7 @@ function verifyAgenceBioToken (): onRequestHookHandler {
 function enforceOperator ({ param }: { param: string }) {
   return async function enforceOperatorMiddleware (request: FastifyRequest): Promise<void> {
     const numeroBio = (request.params as Record<string, string>)[param]
+    if (numeroBio === undefined) throw new NotFoundApiError('Opérateur introuvable')
     const { user } = request
 
     try {
@@ -139,79 +135,95 @@ function enforceOperator ({ param }: { param: string }) {
 
 /**
  * Ensure a valid record can be fetched
- * @param options Function to call, with a given Request param as its first argument
  */
-function enforceRecord ({ queryFn, param }: { queryFn: (id: string, user?: CartoBioUser | null) => Promise<NormalizedRecord | null>; param: string }): (request: FastifyRequest) => Promise<void> {
-  return async function enforceRecordMiddleware (request: FastifyRequest): Promise<void> {
-    const id = (request.params as Record<string, string>)[param]
-    const record = await queryFn(id)
-    if (!record) {
-      throw new NotFoundApiError('Parcellaire introuvable')
-    }
+type RecordQuery = (id: string, user?: CartoBioUser | null) => Promise<NormalizedRecord | null>
 
-
-    if (request.headers['if-unmodified-since'] &&
-      new Date(request.headers['if-unmodified-since']).getTime() < new Date(new Date(record.updated_at).toUTCString()).getTime()) {
-      throw new PreconditionFailedApiError('Le contenu a été modifié depuis votre dernière requête.')
-    }
-
-    // Finally, assign the fetched record to forthcoming hooks
-    request.record = record
-  }
-}
-
-/**
- * Ensure a valid record can be fetched
- * @param options Function to call, with a given Request param as its first argument
- */
-function enforceRecordAndOperator ({ queryFn, param }: { queryFn: (id: string, user?: CartoBioUser | null) => Promise<NormalizedRecord | null>; param: string }): (request: FastifyRequest) => Promise<void> {
+function enforceRecordAndOperator ({ queryFn, param }: { queryFn: RecordQuery; param: string }): (request: FastifyRequest) => Promise<void> {
   return async function enforceRecordAndOperatorMiddleware (request: FastifyRequest): Promise<void> {
     const id = (request.params as Record<string, string>)[param]
-    const record = await queryFn(id, request.user)
-
-    if (!record) {
-      throw new NotFoundApiError('Parcellaire introuvable')
-    }
-
-    if (request.headers['if-unmodified-since'] &&
-      new Date(request.headers['if-unmodified-since']).getTime() < new Date(new Date(record.updated_at).toUTCString()).getTime()) {
-      throw new PreconditionFailedApiError('Le contenu a été modifié depuis votre dernière requête.')
-    }
-
-    // Finally, assign the fetched record to forthcoming hooks
-
-    const numeroBio = record.numerobio
-
-    try {
-      request.operator = await fetchOperatorByNumeroBio(numeroBio)
-    } catch (error) {
-      if (getResponseStatusCode(error) === 404) {
-        throw new NotFoundApiError('Opérateur introuvable')
-      }
-
-      throw error
-    }
-
-    // Record was created by another OC therefore, remove field current OC should not have access
-    if (request.operator && record && request.user?.organismeCertificateur && record.oc_id !== request.user.organismeCertificateur.id) {
-      record.audit_notes = null
-    }
-
-    // Un opérateur n'a pas le droit de voir les audit_notes qui lui sont attribues
-    if (request.operator && record && String(request.user?.mainGroup.id) === '4') {
-      record.audit_notes = null
-    }
-
-    request.record = record
+    if (id === undefined) throw new NotFoundApiError('Parcellaire introuvable')
+    await loadRecordAndOperator(request, id, queryFn)
   }
 }
+
+async function loadRecordAndOperator (request: FastifyRequest, id: string, queryFn: RecordQuery): Promise<void> {
+  const record = await queryFn(id, request.user)
+
+  if (!record) {
+    throw new NotFoundApiError('Parcellaire introuvable')
+  }
+
+  if (request.headers['if-unmodified-since'] &&
+    new Date(request.headers['if-unmodified-since']).getTime() < new Date(new Date(record.updated_at).toUTCString()).getTime()) {
+    throw new PreconditionFailedApiError('Le contenu a été modifié depuis votre dernière requête.')
+  }
+
+  // Finally, assign the fetched record to forthcoming hooks
+
+  const numeroBio = record.numerobio
+  const { user } = request
+
+  try {
+    if (user && String(user.mainGroup.id) === '4') {
+      const { operators } = await fetchUserOperators(user.id)
+      if (!operators.some(e => String(e.numeroBio) === String(numeroBio))) {
+        throw new ForbiddenApiError('Accès interdit')
+      }
+    }
+    request.operator = await fetchOperatorByNumeroBio(numeroBio)
+  } catch (error) {
+    if (getResponseStatusCode(error) === 404) {
+      throw new NotFoundApiError('Opérateur introuvable')
+    }
+
+    throw error
+  }
+
+  // Record was created by another OC therefore, remove field current OC should not have access
+  if (request.operator && record && request.user?.organismeCertificateur && record.oc_id !== request.user.organismeCertificateur.id) {
+    record.audit_notes = null
+  }
+
+  // Un opérateur n'a pas le droit de voir les audit_notes qui lui sont attribues
+  if (request.operator && record && String(request.user?.mainGroup.id) === '4') {
+    record.audit_notes = null
+  }
+
+  request.record = record
+}
+
+const operatorForbiddenRecordFields = ['audit_date', 'audit_notes', 'audit_demandes', 'certification_date_debut', 'certification_date_fin', 'mixite']
 
 function haveRightToUpdate () {
   return async function haveRightToUpdateAuditMiddleware (request: FastifyRequest): Promise<void> {
     const { user, record } = request
-    const patch = request.body as { properties?: { [s: string]: unknown } } & { [s: string]: unknown }
+    const patch = request.body as {
+      properties?: { [s: string]: unknown }
+      features?: Array<{ properties?: { [s: string]: unknown } }>
+      feature?: unknown
+      from?: unknown
+    } & { [s: string]: unknown }
 
     if (!user) return
+
+    const isOperator = String(user.mainGroup.id) === '4'
+
+    if (isOperator && patch && (
+      (patch.certification_state != null && patch.certification_state !== 'OPERATOR_DRAFT') ||
+      operatorForbiddenRecordFields.some((field) => patch[field] != null && patch[field] !== '')
+    )) {
+      throw new ForbiddenApiError("vous n'êtes pas autorisé·e à modifier les informations d'audit ou de certification.")
+    }
+
+    const isRestricted =
+      (isOperator && record?.certification_state !== 'OPERATOR_DRAFT') ||
+      (String(user.mainGroup.id) === '8' && record?.certification_state === 'CERTIFIED')
+
+    if (!isRestricted || !patch) return
+
+    if (patch.feature !== undefined || patch.from !== undefined) {
+      throw new ForbiddenApiError("vous n'êtes pas autorisé·e à ajouter ou remplacer des parcelles sur ce parcellaire.")
+    }
 
     const restrictedFields = ['NOM', 'commentaires', 'attente_pac']
 
@@ -223,20 +235,9 @@ function haveRightToUpdate () {
       })
     }
 
-    if (
-      String(user.mainGroup.id) === '4' &&
-      record?.certification_state !== 'OPERATOR_DRAFT' &&
-      patch?.properties
-    ) {
-      keepRestrictedFieldsOnly(patch.properties)
-    }
-
-    if (
-      String(user.mainGroup.id) === '8' &&
-      record?.certification_state === 'CERTIFIED' &&
-      patch?.properties
-    ) {
-      keepRestrictedFieldsOnly(patch.properties)
+    if (patch.properties) keepRestrictedFieldsOnly(patch.properties)
+    for (const feature of patch.features ?? []) {
+      if (feature.properties) keepRestrictedFieldsOnly(feature.properties)
     }
   }
 }
@@ -358,8 +359,8 @@ export {
   enforceAnyFastifyDecorator,
   enforceOperator,
   enforceOperatorAccess,
-  enforceRecord,
   enforceRecordAndOperator,
+  loadRecordAndOperator,
   verifyAgenceBioToken,
   checkCertification,
   enforceAdminRole,

@@ -8,25 +8,37 @@ import { fromCodeGeofolia } from '@agencebio/rosetta-cultures'
 import config from '../../../config/env.js'
 import { getRandomFeatureId } from '../../../shared/outputs/features.js'
 import { BadGatewayApiError, InvalidRequestApiError, getResponseStatusCode } from '../../../shared/errors.js'
+import type { FeatureCollection } from 'geojson'
+import { z } from 'zod'
+import { parseApiResponse } from '../../../clients/clients.utils.js'
+import { jsonString } from '../../../shared/validation.js'
 
 const { get, post } = gotModule.default
 const { toWgs84 } = reproject
 
-interface GeofoliaField {
-  Id: string
-  Name?: string
-  Area?: number
-  Geography?: string | null
-  MainPlotId?: string
-  SowingDate?: string | null
-  CityNumber?: string
-  IsletNum?: string
-  PlotKind: number
-  Comment?: string | null
-  RNCropCode: string
-  VarietyName?: string | null
-  Code?: string
-}
+const geofoliaFieldSchema = z.looseObject({
+  Id: z.string(),
+  Name: z.string().optional(),
+  Area: z.number().optional(),
+  Geography: z.string().nullish(),
+  MainPlotId: z.string().optional(),
+  SowingDate: z.string().nullish(),
+  CityNumber: z.string().optional(),
+  IsletNum: z.string().optional(),
+  PlotKind: z.number(),
+  Comment: z.string().nullish(),
+  RNCropCode: z.string(),
+  VarietyName: z.string().nullish(),
+  Code: z.string().optional()
+})
+
+type GeofoliaField = z.infer<typeof geofoliaFieldSchema>
+
+const geofoliaFileSchema = jsonString(z.looseObject({ Fields: z.array(geofoliaFieldSchema) }))
+
+const geofoliaTokenSchema = z.looseObject({ access_token: z.string() })
+
+const geofoliaDataOrdersSchema = z.array(z.looseObject({ id: z.string(), identificationCodes: z.array(z.string()) }))
 
 const IN_HECTARES = 10000
 const ONE_HOUR = 60 * 60 * 1000
@@ -39,12 +51,12 @@ const ONE_HOUR = 60 * 60 * 1000
  */
 const stripBOM = (string: string): string => string.charCodeAt(0) === 0xFEFF ? string.slice(1) : string
 
-const excludeFieldsWithoutMainGeometry = ({ Geography, PlotKind }: GeofoliaField) => !(!Geography && PlotKind === PLOT_KIND_PRIMARY)
+const excludeFieldsWithoutMainGeometry = ({ Geography, PlotKind }: GeofoliaField): boolean => !(!Geography && PlotKind === PLOT_KIND_PRIMARY)
 
 const PLOT_KIND_PRIMARY = 1
 const PLOT_KIND_SECONDARY = 2
 
-function cultureFromField (Field: GeofoliaField) {
+function cultureFromField (Field: GeofoliaField): { id: string; CPF: string | undefined; GF: string; date_semis?: string; variete?: string; surface?: number } {
   return {
     CPF: fromCodeGeofolia(Field.RNCropCode)?.code_cpf,
     GF: Field.RNCropCode,
@@ -55,7 +67,7 @@ function cultureFromField (Field: GeofoliaField) {
   }
 }
 
-function convertGeofoliaFieldsToGeoJSON (data: { Fields: GeofoliaField[] }) {
+function convertGeofoliaFieldsToGeoJSON (data: { Fields: GeofoliaField[] }): FeatureCollection {
   const fields = data.Fields.filter(excludeFieldsWithoutMainGeometry)
   const mainFields = fields.filter((field): field is GeofoliaField & { Geography: string } => Boolean(field.Geography) && field.PlotKind === PLOT_KIND_PRIMARY)
   const secondaryCultures = data.Fields.filter(({ PlotKind }) => PlotKind === PLOT_KIND_SECONDARY)
@@ -88,9 +100,6 @@ function convertGeofoliaFieldsToGeoJSON (data: { Fields: GeofoliaField[] }) {
   }))
 }
 
-/**
- * @returns A JWT Auth Token
- */
 function fetchAuthToken (): Promise<string> {
   return post(`${config.get('geofolia.oauth.tenant')}/oauth2/v2.0/token`, {
     prefixUrl: config.get('geofolia.oauth.host'),
@@ -101,19 +110,17 @@ function fetchAuthToken (): Promise<string> {
       scope: config.get('geofolia.api.scope')
     }
   })
-    .json<{ access_token: string }>()
-    .then(({ access_token: accessToken }) => accessToken)
+    .json()
+    .then((data) => parseApiResponse(geofoliaTokenSchema, data, 'l\'API Geofolia').access_token)
 }
 
 /**
  * Authenticate a user based on environment variables
  * It is a good idea to memoize it for a few hours to save on API calls
- *
- * @returns A JWT Auth Token
  */
 const auth = memo(() => fetchAuthToken(), { maxAge: 0.90 * ONE_HOUR })
 
-async function geofoliaTriggerDataOrder (numeroSiret: string, year: number) {
+async function geofoliaTriggerDataOrder (numeroSiret: string, year: number): Promise<unknown> {
   const token = await auth()
 
   return post('flow/api/v1/data-orders', {
@@ -132,10 +139,10 @@ async function geofoliaTriggerDataOrder (numeroSiret: string, year: number) {
   }).json()
 }
 
-async function geofoliaRequestDataOrder (numeroSiret: string) {
+async function geofoliaRequestDataOrder (numeroSiret: string): Promise<{ id: string; identificationCodes: string[] } | undefined> {
   const token = await auth()
 
-  const orders = await get('flow/api/v1/flow-attributes', {
+  const orders = parseApiResponse(geofoliaDataOrdersSchema, await get('flow/api/v1/flow-attributes', {
     prefixUrl: config.get('geofolia.api.host'),
     headers: {
       Authorization: `Bearer ${token}`,
@@ -144,12 +151,12 @@ async function geofoliaRequestDataOrder (numeroSiret: string) {
     searchParams: {
       serviceCode: config.get('geofolia.api.serviceCode')
     }
-  }).json<Array<{ id: string; identificationCodes: string[] }>>()
+  }).json(), 'l\'API Geofolia')
 
   return orders.find(({ identificationCodes }) => identificationCodes.includes(numeroSiret))
 }
 
-async function geofoliaLookup (numeroSiret: string, year: number) {
+async function geofoliaLookup (numeroSiret: string, year: number): Promise<boolean> {
   try {
     await geofoliaTriggerDataOrder(numeroSiret, year)
     return true
@@ -162,7 +169,7 @@ async function geofoliaLookup (numeroSiret: string, year: number) {
   }
 }
 
-async function geofoliaFetchDataOrder (order: { id: string }) {
+async function geofoliaFetchDataOrder (order: { id: string }): Promise<Buffer> {
   const token = await auth()
 
   return get(`flow/api/v1/flows/${order.id}`, {
@@ -177,7 +184,7 @@ async function geofoliaFetchDataOrder (order: { id: string }) {
   }).buffer()
 }
 
-async function geofoliaParcellaire (numeroSiret: string) {
+async function geofoliaParcellaire (numeroSiret: string): Promise<FeatureCollection | null> {
   const order = await geofoliaRequestDataOrder(numeroSiret)
 
   if (!order) {
@@ -189,7 +196,7 @@ async function geofoliaParcellaire (numeroSiret: string) {
   return parseGeofoliaArchive(archive)
 }
 
-async function parseGeofoliaArchive (buffer: Buffer) {
+async function parseGeofoliaArchive (buffer: Buffer): Promise<FeatureCollection> {
   const zip = new AdmZip(buffer)
   const FieldFileEntry = await zip.getEntry('Field.Json')
 
@@ -197,8 +204,9 @@ async function parseGeofoliaArchive (buffer: Buffer) {
 
   if (!FieldFileEntry) throw new InvalidRequestApiError('L\'archive Geofolia ne contient pas de fichier Field.Json.')
 
-  const parsedJSON = JSON.parse(stripBOM(FieldFileEntry.getData().toString('utf8')))
-  const geojson = convertGeofoliaFieldsToGeoJSON(parsedJSON)
+  const parsedJSON = geofoliaFileSchema.safeParse(stripBOM(FieldFileEntry.getData().toString('utf8')))
+  if (!parsedJSON.success) throw new InvalidRequestApiError('Le fichier Field.Json de l\'archive Geofolia est invalide.', { cause: parsedJSON.error })
+  const geojson = convertGeofoliaFieldsToGeoJSON(parsedJSON.data)
 
   return toWgs84(geojson, lambert93)
 }

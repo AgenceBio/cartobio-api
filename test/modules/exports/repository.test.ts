@@ -95,7 +95,7 @@ describe('Generation du PDF', () => {
     })
     const tmpParcelles = parcelles.map((p) => ({ ...p }))
 
-    tmpParcelles[0].cultures = [buildCulture({ CPF: '' })]
+    tmpParcelles[0]!.cultures = [buildCulture({ CPF: '' })]
     vi.mocked(utils.getAllParcelles)
       .mockResolvedValueOnce(tmpParcelles)
     const UUID = randomUUID()

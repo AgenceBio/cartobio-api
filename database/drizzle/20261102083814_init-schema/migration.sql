@@ -7,9 +7,10 @@ CREATE TYPE "cartobio"."import_job_etat" AS ENUM('UNKNOWN', 'UPDATED', 'CREATED'
 CREATE TYPE "cartobio"."import_job_result" AS ENUM('REJECTED', 'VALID', 'ERROR');--> statement-breakpoint
 CREATE TYPE "cartobio"."import_log_type" AS ENUM('warning', 'error');--> statement-breakpoint
 CREATE TYPE "cartobio"."import_status" AS ENUM('DONE', 'CREATED', 'ERROR', 'PENDING');--> statement-breakpoint
+CREATE TYPE "cartobio"."metadata_source" AS ENUM('TELEPAC', 'API_PARCELLAIRE', 'ANYGEO', 'GEOFOLIA', 'MES_PARCELLES', 'CVI', 'RPG', 'MANUEL', 'COPIE_VERSION', 'COPIE_CONFLIT');--> statement-breakpoint
 CREATE TYPE "cartobio"."mixite_type" AS ENUM('MIXTE', 'AB', 'ABCONV');--> statement-breakpoint
 CREATE TYPE "cartobio"."parcellaire_event_type" AS ENUM('CERTIFICATION_STATE_CHANGE', 'FEATURE_COLLECTION_CREATE', 'FEATURE_COLLECTION_DELETE', 'FEATURE_COLLECTION_UPDATE', 'FEATURE_CREATE', 'FEATURE_DELETE', 'FEATURE_UPDATE');--> statement-breakpoint
-CREATE TYPE "cartobio"."production_attestation_status" AS ENUM('generated', 'error');--> statement-breakpoint
+CREATE TYPE "cartobio"."production_attestation_status" AS ENUM('started', 'generated', 'error');--> statement-breakpoint
 CREATE TYPE "cartobio"."production_attestation_type" AS ENUM('complete', 'pac-details', 'pac-complet');--> statement-breakpoint
 CREATE TYPE "cartobio"."statut_import_geom" AS ENUM('ACCEPTE', 'CORRIGE', 'ACCEPTE_NON_CORRIGE');--> statement-breakpoint
 CREATE TABLE "cartobio"."organisme_certificateur" (
@@ -67,8 +68,10 @@ CREATE TABLE "cartobio"."parcellaires_evenements" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 	"record_id" uuid NOT NULL,
 	"type" "cartobio"."parcellaire_event_type" NOT NULL,
-	"certification_etat" "cartobio"."certification_type" NOT NULL,
+	"certification_etat" "cartobio"."certification_type",
 	"date" timestamp with time zone NOT NULL,
+	"description" text,
+	"metadata" jsonb,
 	"user_id" varchar(255),
 	"user_role" text,
 	"parcelles_id" text[]
@@ -76,24 +79,29 @@ CREATE TABLE "cartobio"."parcellaires_evenements" (
 --> statement-breakpoint
 CREATE TABLE "cartobio"."parcellaires_metadata" (
 	"record_id" uuid PRIMARY KEY,
-	"source" text,
-	"source_updated_at" timestamp with time zone NOT NULL,
+	"source" "cartobio"."metadata_source",
+	"source_updated_at" timestamp with time zone,
 	"provenance" text,
 	"campagne" smallint,
 	"numero_pacage" text,
-	"annee_assolement" smallint
+	"annee_assolement" smallint,
+	"copy_of" text,
+	"warnings" jsonb
 );
 --> statement-breakpoint
 CREATE TABLE "cartobio"."parcelle_cultures" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-	"record_id" uuid NOT NULL,
-	"parcelle_id" text NOT NULL,
+	"id" text,
+	"record_id" uuid,
+	"parcelle_id" text,
 	"cpf" varchar(64),
 	"code_culture_import" varchar(64),
 	"surface" numeric(12,4),
 	"unit" varchar(20),
 	"variete" varchar(255),
-	"date_semis" date
+	"date_semis" date,
+	"commentaire" text,
+	"position" smallint DEFAULT 0 NOT NULL,
+	CONSTRAINT "parcelle_cultures_pkey" PRIMARY KEY("record_id","parcelle_id","id")
 );
 --> statement-breakpoint
 CREATE TABLE "cartobio"."parcelles" (
@@ -124,11 +132,13 @@ CREATE TABLE "cartobio"."parcelles" (
 );
 --> statement-breakpoint
 CREATE TABLE "cartobio"."parcelles_annotations" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-	"parcelle_id" text NOT NULL,
-	"record_id" uuid NOT NULL,
+	"id" uuid DEFAULT gen_random_uuid(),
+	"parcelle_id" text,
+	"record_id" uuid,
 	"type_annot" "cartobio"."annotation_type" NOT NULL,
-	"created_at" date NOT NULL
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"metadata" jsonb,
+	CONSTRAINT "parcelles_annotations_pkey" PRIMARY KEY("record_id","parcelle_id","id")
 );
 --> statement-breakpoint
 CREATE TABLE "cartobio"."attestations_production" (
@@ -141,18 +151,18 @@ CREATE TABLE "cartobio"."attestations_production" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "cartobio"."parcellaires_consultes" (
-	"record_id" uuid,
+CREATE TABLE "cartobio"."operateurs_consultes" (
+	"numerobio" integer,
 	"user_id" varchar(255),
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "parcellaires_consultes_pkey" PRIMARY KEY("record_id","user_id")
+	CONSTRAINT "operateurs_consultes_pkey" PRIMARY KEY("numerobio","user_id")
 );
 --> statement-breakpoint
-CREATE TABLE "cartobio"."parcellaires_epingles" (
-	"record_id" uuid,
+CREATE TABLE "cartobio"."operateurs_epingles" (
+	"numerobio" integer,
 	"user_id" varchar(255),
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "parcellaires_epingles_pkey" PRIMARY KEY("record_id","user_id")
+	CONSTRAINT "operateurs_epingles_pkey" PRIMARY KEY("numerobio","user_id")
 );
 --> statement-breakpoint
 CREATE TABLE "cartobio"."parcelles_controles" (
@@ -168,17 +178,32 @@ CREATE TABLE "cartobio"."import_pac" (
 	"numerobio" varchar,
 	"pacage" varchar,
 	"siret" varchar(14),
-	"nb_parcelles" varchar(20),
-	"size" varchar,
+	"nb_parcelles" integer,
+	"size" numeric,
 	"record" jsonb,
 	"imported" boolean DEFAULT false NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "cartobio"."parcellaire_import" (
+	"id" integer PRIMARY KEY GENERATED BY DEFAULT AS IDENTITY (sequence name "cartobio"."parcellaire_import_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1),
+	"status" "cartobio"."import_status" DEFAULT 'CREATED'::"cartobio"."import_status" NOT NULL,
+	"organisme_certificateur" varchar(64) NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"started_at" timestamp with time zone,
+	"ended_at" timestamp with time zone,
+	"numerobio" varchar,
+	"numeroclient" varchar,
+	"audit_date" date,
+	"result_job" jsonb,
+	"statut_job" "cartobio"."import_job_result",
+	"etat" "cartobio"."import_job_etat" DEFAULT 'UNKNOWN'::"cartobio"."import_job_etat" NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "cartobio"."parcellaire_import_logs" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-	"import_id" varchar(64) NOT NULL,
+	"import_id" integer NOT NULL,
 	"type" "cartobio"."import_log_type" NOT NULL,
 	"message" varchar NOT NULL,
 	"numero_bio" varchar,
@@ -189,23 +214,8 @@ CREATE TABLE "cartobio"."parcellaire_import_logs" (
 --> statement-breakpoint
 CREATE TABLE "cartobio"."parcellaire_import_payload" (
 	"id" varchar PRIMARY KEY,
-	"import_id" varchar NOT NULL,
+	"import_id" integer NOT NULL,
 	"payload" jsonb
-);
---> statement-breakpoint
-CREATE TABLE "cartobio"."parcellaires_import" (
-	"id" varchar(64) PRIMARY KEY,
-	"status" "cartobio"."import_status" DEFAULT 'CREATED'::"cartobio"."import_status" NOT NULL,
-	"organisme_certificateur" varchar(64) NOT NULL,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"started_at" timestamp with time zone,
-	"ended_at" timestamp with time zone,
-	"numerobio" varchar,
-	"numeroclient" varchar,
-	"audit_date" timestamp,
-	"result_job" jsonb,
-	"statut_job" "cartobio"."import_job_result",
-	"etat" "cartobio"."import_job_etat" DEFAULT 'UNKNOWN'::"cartobio"."import_job_etat" NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "cartobio"."revoked_tokens" (
@@ -220,6 +230,7 @@ CREATE INDEX "regions_geometry_gix" ON "cartobio"."regions" USING gist ("geometr
 CREATE INDEX "territoires_geometry_gix" ON "cartobio"."territoires" USING gist ("geom");--> statement-breakpoint
 CREATE INDEX "parcellaires_numerobio_idx" ON "cartobio"."parcellaires" ("numerobio");--> statement-breakpoint
 CREATE INDEX "parcellaires_oc_id_idx" ON "cartobio"."parcellaires" ("oc_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "parcellaires_numerobio_audit_date_idx" ON "cartobio"."parcellaires" ("numerobio","audit_date") WHERE "deleted_at" IS NULL;--> statement-breakpoint
 CREATE INDEX "parcellaires_evenements_record_id_idx" ON "cartobio"."parcellaires_evenements" ("record_id");--> statement-breakpoint
 CREATE INDEX "parcelle_cultures_record_id_idx" ON "cartobio"."parcelle_cultures" ("record_id");--> statement-breakpoint
 CREATE INDEX "parcelle_cultures_parcelle_id_idx" ON "cartobio"."parcelle_cultures" ("parcelle_id");--> statement-breakpoint
@@ -230,6 +241,8 @@ CREATE INDEX "parcelles_geometry_gix" ON "cartobio"."parcelles" USING gist ("geo
 CREATE INDEX "parcelles_annotations_parcelle_id_idx" ON "cartobio"."parcelles_annotations" ("parcelle_id");--> statement-breakpoint
 CREATE INDEX "parcelles_annotations_record_id_idx" ON "cartobio"."parcelles_annotations" ("record_id");--> statement-breakpoint
 CREATE INDEX "attestations_production_record_id_idx" ON "cartobio"."attestations_production" ("record_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "attestations_production_record_id_type_idx" ON "cartobio"."attestations_production" ("record_id","type");--> statement-breakpoint
+CREATE UNIQUE INDEX "import_pac_numerobio_pacage_siret_idx" ON "cartobio"."import_pac" ("numerobio","pacage","siret");--> statement-breakpoint
 CREATE INDEX "parcellaire_import_logs_import_id_idx" ON "cartobio"."parcellaire_import_logs" ("import_id");--> statement-breakpoint
 CREATE INDEX "revoked_tokens_expires_at_idx" ON "cartobio"."revoked_tokens" ("expires_at");--> statement-breakpoint
 ALTER TABLE "cartobio"."departements" ADD CONSTRAINT "departements_code_region_regions_code_fkey" FOREIGN KEY ("code_region") REFERENCES "cartobio"."regions"("code");--> statement-breakpoint
@@ -243,9 +256,25 @@ ALTER TABLE "cartobio"."parcelles" ADD CONSTRAINT "parcelles_commune_communes_fi
 ALTER TABLE "cartobio"."parcelles_annotations" ADD CONSTRAINT "parcelles_annotations_record_id_parcellaires_record_id_fkey" FOREIGN KEY ("record_id") REFERENCES "cartobio"."parcellaires"("record_id") ON DELETE CASCADE;--> statement-breakpoint
 ALTER TABLE "cartobio"."parcelles_annotations" ADD CONSTRAINT "parcelles_annotations_parcelle_fkey" FOREIGN KEY ("record_id","parcelle_id") REFERENCES "cartobio"."parcelles"("record_id","id") ON DELETE CASCADE;--> statement-breakpoint
 ALTER TABLE "cartobio"."attestations_production" ADD CONSTRAINT "attestations_production_record_id_parcellaires_record_id_fkey" FOREIGN KEY ("record_id") REFERENCES "cartobio"."parcellaires"("record_id") ON DELETE CASCADE;--> statement-breakpoint
-ALTER TABLE "cartobio"."parcellaires_consultes" ADD CONSTRAINT "parcellaires_consultes_record_id_parcellaires_record_id_fkey" FOREIGN KEY ("record_id") REFERENCES "cartobio"."parcellaires"("record_id") ON DELETE CASCADE;--> statement-breakpoint
-ALTER TABLE "cartobio"."parcellaires_epingles" ADD CONSTRAINT "parcellaires_epingles_record_id_parcellaires_record_id_fkey" FOREIGN KEY ("record_id") REFERENCES "cartobio"."parcellaires"("record_id") ON DELETE CASCADE;--> statement-breakpoint
 ALTER TABLE "cartobio"."parcelles_controles" ADD CONSTRAINT "parcelles_controles_record_id_parcellaires_record_id_fkey" FOREIGN KEY ("record_id") REFERENCES "cartobio"."parcellaires"("record_id") ON DELETE CASCADE;--> statement-breakpoint
 ALTER TABLE "cartobio"."parcelles_controles" ADD CONSTRAINT "parcelles_controles_parcelle_fkey" FOREIGN KEY ("record_id","parcelle_id") REFERENCES "cartobio"."parcelles"("record_id","id") ON DELETE CASCADE;--> statement-breakpoint
-ALTER TABLE "cartobio"."parcellaire_import_logs" ADD CONSTRAINT "parcellaire_import_logs_import_id_parcellaires_import_id_fkey" FOREIGN KEY ("import_id") REFERENCES "cartobio"."parcellaires_import"("id") ON DELETE CASCADE;--> statement-breakpoint
-ALTER TABLE "cartobio"."parcellaire_import_payload" ADD CONSTRAINT "parcellaire_import_payload_QzYBWqSykZMj_fkey" FOREIGN KEY ("import_id") REFERENCES "cartobio"."parcellaires_import"("id") ON DELETE CASCADE;
+ALTER TABLE "cartobio"."parcellaire_import_logs" ADD CONSTRAINT "parcellaire_import_logs_import_id_parcellaire_import_id_fkey" FOREIGN KEY ("import_id") REFERENCES "cartobio"."parcellaire_import"("id") ON DELETE CASCADE;--> statement-breakpoint
+ALTER TABLE "cartobio"."parcellaire_import_payload" ADD CONSTRAINT "parcellaire_import_payload_import_id_parcellaire_import_id_fkey" FOREIGN KEY ("import_id") REFERENCES "cartobio"."parcellaire_import"("id") ON DELETE CASCADE;--> statement-breakpoint
+CREATE OR REPLACE FUNCTION "cartobio"."to_legal_projection"(geom geometry)
+RETURNS geometry AS $$
+BEGIN
+  RETURN ST_Transform(geom, COALESCE((
+    SELECT legal_projection
+    FROM (
+      VALUES
+        (2154, ST_MakeEnvelope(-5.1412, 41.334, 9.5597, 51.0888, 4326)),
+        (5490, ST_MakeEnvelope(-61.8098, 14.3947, -60.8106, 16.511, 4326)),
+        (2975, ST_MakeEnvelope(55.2166, -21.3891, 55.8366, -20.8721, 4326)),
+        (2972, ST_MakeEnvelope(-54.6023, 2.1111, -51.619, 5.7487, 4326)),
+        (4471, ST_MakeEnvelope(45.0185, -13.0001, 45.298, -12.6366, 4326))
+      ) AS t(legal_projection, region_bounds)
+    WHERE ST_Intersects(ST_Transform(geom, 4326), region_bounds)
+    LIMIT 1
+  ), 2154));
+END;
+$$ LANGUAGE plpgsql;

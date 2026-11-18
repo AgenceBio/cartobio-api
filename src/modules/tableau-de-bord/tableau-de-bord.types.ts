@@ -1,6 +1,6 @@
 import type { ImportJobEtat, ImportJobResult } from '../../database/validations/imports.js'
 
-export type OrdreTri = 'asc' | 'desc'
+type OrdreTri = 'asc' | 'desc'
 
 export type Numeric = string | number | null
 
@@ -8,7 +8,7 @@ export type StatutJob = ImportJobResult
 
 export type EtatJob = ImportJobEtat
 
-export type TypeStreak = 'envois' | 'refus'
+type TypeStreak = 'envois' | 'refus'
 
 export type DateRange = {
   from?: string
@@ -20,11 +20,11 @@ export type PaginationParams = DateRange & {
   page: number
   limit: number
   recherche?: string
-  statuts?: string[]
-  etats?: string[]
+  statuts?: StatutJob[]
+  etats?: EtatJob[]
   ordreDate?: OrdreTri
   codes?: string[]
-  type?: string
+  type?: TypeStreak
 }
 
 export type HistoriqueParams = {
@@ -42,7 +42,7 @@ export type ErrorDetail = {
   message: string | null
 }
 
-export type ErrorByCode = {
+type ErrorByCode = {
   code: string | null
   count: number | null
 }
@@ -55,7 +55,7 @@ export type PeriodeAnomalies = {
   errors: ErrorByCode[]
 }
 
-export type EnvoiSuspect = {
+type EnvoiSuspect = {
   jobId: number
   statut: string | null
   etat: string

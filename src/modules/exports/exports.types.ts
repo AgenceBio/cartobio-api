@@ -4,15 +4,13 @@ import type { parcellaires, parcelles } from '../../database/schema/index.js'
 type Parcellaire = typeof parcellaires.$inferSelect
 type Parcelle = typeof parcelles.$inferSelect
 
-export type ConversionNiveau = NonNullable<Parcelle['conversionNiveau']>
-
 export type AttestationProduction = {
   path: string
 }
 
 export type ArchiveOperator = {
   annee_reference_controle: number | string | null
-  numeroBio: string
+  numeroBio: string | number
 }
 
 export type ExportRow = {

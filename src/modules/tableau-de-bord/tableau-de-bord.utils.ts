@@ -20,10 +20,13 @@ function getStreaksSuspectes<T extends { statut: string | null }> (envois: T[]):
   let streakStart = 0
 
   for (let i = 1; i <= envois.length; i++) {
-    const typeDebut = getTypeEnvoi(envois[streakStart].statut)
+    const debut = envois[streakStart]
+    if (!debut) break
+    const typeDebut = getTypeEnvoi(debut.statut)
 
+    const suivant = envois[i]
     const sameType =
-      i < envois.length && getTypeEnvoi(envois[i].statut) === typeDebut && typeDebut !== null
+      suivant !== undefined && getTypeEnvoi(suivant.statut) === typeDebut && typeDebut !== null
 
     if (!sameType) {
       const streakLength = i - streakStart

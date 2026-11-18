@@ -21,9 +21,9 @@ async function getTableauBilan ({ from, to, page = '1', limit = '20', recherche,
     page: Number(page),
     limit: Number(limit),
     recherche,
-    statuts: statuts ? statuts.split(',').filter(Boolean) : undefined,
-    etats: etats ? etats.split(',').filter(Boolean) : undefined,
-    ordreDate: ordreDate === 'asc' ? 'asc' : 'desc',
+    statuts,
+    etats,
+    ordreDate: ordreDate ?? 'desc',
     organismeCertificateur
   })
 }
@@ -38,7 +38,6 @@ async function getHistoriqueSpecificParcellaire ({ numeroBio, numeroClient, audi
 }
 
 async function getTableauErreurs ({ from, to, page = '1', limit = '20', recherche, ordreDate, codes }: StatsQuery, organismeCertificateur?: number): Promise<TableauErreursResponse> {
-  const ordreDateValue = ordreDate === 'asc' || ordreDate === 'desc' ? ordreDate : undefined
   const codesValue = (
     Array.isArray(codes) ? codes : typeof codes === 'string' ? codes.split(',') : []
   )
@@ -51,7 +50,7 @@ async function getTableauErreurs ({ from, to, page = '1', limit = '20', recherch
     page: Number(page),
     limit: Number(limit),
     recherche,
-    ordreDate: ordreDateValue,
+    ordreDate,
     codes: codesValue.length ? codesValue : undefined,
     organismeCertificateur
   })
@@ -66,15 +65,13 @@ async function getTopAnomaliesGrouped ({ from, to }: StatsQuery, organismeCertif
 }
 
 async function getRepetErreurs ({ from, to, page = '1', limit = '10', recherche, type }: StatsQuery, organismeCertificateur?: number): Promise<RepetitionsResponse> {
-  const typeValue = type === 'envois' || type === 'refus' ? type : undefined
-
   return repository.getEnvoisSuspectsRepo({
     from,
     to,
     page: Number(page),
     limit: Number(limit),
     recherche,
-    type: typeValue,
+    type,
     organismeCertificateur
   })
 }

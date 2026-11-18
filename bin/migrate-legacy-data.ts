@@ -1,13 +1,10 @@
 #!/usr/bin/env node
 
 import 'dotenv/config'
-import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import pg from 'pg'
-import { drizzle } from 'drizzle-orm/node-postgres'
-import { migrate } from 'drizzle-orm/node-postgres/migrator'
-import { ROOT_DIR } from '../src/shared/paths.js'
-import { annotationCodes } from '../src/database/validations/parcelles.js'
+import { annotationCodes, isAnnotationCode } from '../src/database/validations/parcelles.js'
+import { eventTypes } from '../src/shared/parcellaires/parcellaires.utils.js'
 
 type Row = Record<string, unknown>
 
@@ -24,22 +21,10 @@ pg.types.setTypeParser(pg.types.builtins.TIMESTAMPTZ, raw)
 
 const BATCH_SIZE = 500
 
-const EVENT_TYPES: Record<string, string> = {
-  CertificationStateChange: 'CERTIFICATION_STATE_CHANGE',
-  FeatureCollectionCreation: 'FEATURE_COLLECTION_CREATE',
-  FeatureCollectionDeletion: 'FEATURE_COLLECTION_DELETE',
-  FeatureCollectionUpdate: 'FEATURE_COLLECTION_UPDATE',
-  FeatureCreation: 'FEATURE_CREATE',
-  FeatureDeletion: 'FEATURE_DELETE',
-  FeatureUpdate: 'FEATURE_UPDATE'
-}
-
 const geometry = (column: string): string =>
   `encode(ST_AsEWKB(ST_Multi(ST_CollectionExtract(ST_SetSRID(${column}, 4326), 3))), 'hex')`
 
-const RECORDS = `(
-  SELECT * FROM cartobio_operators
-  ) o`
+const RECORDS = 'cartobio_operators o'
 
 const PARCELLES = `(
   SELECT p.*,
@@ -71,10 +56,23 @@ const matches = (value: unknown, pattern: RegExp): string | null =>
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-const uniqueUuid = (value: unknown, seen: Set<string>): string => {
-  const id = matches(value, UUID) && !seen.has(String(value)) ? String(value) : randomUUID()
+const uniqueId = (value: unknown, seen: Set<string>, pattern = /^.+$/): string => {
+  const id = matches(String(value ?? ''), pattern) && !seen.has(String(value)) ? String(value) : randomUUID()
   seen.add(id)
   return id
+}
+
+const metadataSources: Record<string, string> = {
+  telepac: 'TELEPAC',
+  'api parcellaire': 'API_PARCELLAIRE',
+  anygeo: 'ANYGEO',
+  geofolia: 'GEOFOLIA',
+  mesparcelles: 'MES_PARCELLES',
+  cvi: 'CVI',
+  rpg: 'RPG',
+  manuel: 'MANUEL',
+  'copie de version existante': 'COPIE_VERSION',
+  'copie lors de la résolution de conflits': 'COPIE_CONFLIT'
 }
 
 const STEPS: Step[] = [
@@ -146,7 +144,7 @@ const STEPS: Step[] = [
         return null
       return {
         record_id: recordId,
-        source: meta.source,
+        source: metadataSources[String(meta.source ?? '').trim().toLowerCase()] ?? null,
         source_updated_at: meta.sourceLastUpdate,
         provenance: meta.provenance,
         campagne: matches(String(meta.campagne ?? ''), /^\d{4}$/),
@@ -162,7 +160,7 @@ const STEPS: Step[] = [
     extract: `SELECT record_id, coalesce(created_at, now()) AS created_at, audit_history FROM ${RECORDS}`,
     transform: ({ record_id: recordId, created_at: createdAt, audit_history: history }) =>
       ((history ?? []) as Row[]).map(cleanRow).flatMap((event) => {
-        const type = EVENT_TYPES[String(event.type)]
+        const type = eventTypes[String(event.type)]
         if (type === undefined) return []
         const user = (event.user ?? {}) as Row
         return {
@@ -213,7 +211,7 @@ const STEPS: Step[] = [
     transform: ({ record_id: recordId, id, cultures }) => {
       const seen = new Set<string>()
       return ((cultures ?? []) as Row[]).map(cleanRow).map((culture, position) => ({
-        id: culture.id,
+        id: uniqueId(culture.id, seen),
         record_id: recordId,
         parcelle_id: id,
         cpf: culture.CPF,
@@ -232,16 +230,19 @@ const STEPS: Step[] = [
     extract: `SELECT record_id, id, updated_at, annotations FROM ${PARCELLES}`,
     transform: ({ record_id: recordId, id, updated_at: updatedAt, annotations }) => {
       const seen = new Set<string>()
-      return ((annotations ?? []) as Row[])
-        .filter((annotation) => Object.hasOwn(annotationCodes, String(annotation.code)))
-        .map((annotation) => ({
-          id: uniqueUuid(annotation.id, seen),
+      return ((annotations ?? []) as Row[]).flatMap((annotation) => {
+        const code = String(annotation.code)
+        if (!isAnnotationCode(code)) return []
+
+        return [{
+          id: uniqueId(annotation.id, seen, UUID),
           record_id: recordId,
           parcelle_id: id,
-          type_annot: annotationCodes[String(annotation.code)],
+          type_annot: annotationCodes[code],
           created_at: annotation.date ?? updatedAt,
           metadata: annotation.metadata
-        }))
+        }]
+      })
     }
   },
   {
@@ -300,7 +301,12 @@ const STEPS: Step[] = [
         coalesce(updatedat::timestamptz, createdat::timestamptz, now()) AS updated_at
       FROM import_pac_26
     `,
-    transform: (pac) => ({ ...pac, siret: String(pac.siret ?? '').length <= 14 ? pac.siret : null })
+    transform: (pac) => ({
+      ...pac,
+      siret: String(pac.siret ?? '').length <= 14 ? pac.siret : null,
+      nb_parcelles: /^\d+$/.test(String(pac.nb_parcelles ?? '')) ? Number(pac.nb_parcelles) : null,
+      size: /^\d+(\.\d+)?$/.test(String(pac.size ?? '')) ? Number(pac.size) : null
+    })
   },
   {
     table: 'revoked_tokens',
@@ -317,8 +323,9 @@ function progress(table: string, done: number, total: number): void {
 }
 
 async function load(target: pg.Client, table: string, rows: Row[]): Promise<void> {
-  if (rows.length === 0) return
-  const columns = Object.keys(rows[0])
+  const [first] = rows
+  if (!first) return
+  const columns = Object.keys(first)
     .map((column) => `"${column}"`)
     .join(', ')
   await target.query(

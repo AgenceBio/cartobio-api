@@ -1,4 +1,5 @@
-import { boolean, date, index, integer, jsonb, timestamp, uuid, varchar } from 'drizzle-orm/pg-core'
+import { sql } from 'drizzle-orm'
+import { boolean, date, index, integer, jsonb, numeric, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core'
 import { cartobio } from './cartobio.js'
 import { importJobEtat, importJobResult, importLogType, importStatus } from './enums.js'
 
@@ -44,15 +45,19 @@ export const parcellaireImportPayload = cartobio.table('parcellaire_import_paylo
   payload: jsonb('payload')
 })
 
-export const importPac = cartobio.table('import_pac', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  numeroBio: varchar('numerobio'),
-  pacage: varchar('pacage'),
-  siret: varchar('siret', { length: 14 }),
-  nbParcelles: varchar('nb_parcelles', { length: 20 }),
-  size: varchar('size'),
-  record: jsonb('record'),
-  imported: boolean('imported').notNull().default(false),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
-})
+export const importPac = cartobio.table(
+  'import_pac',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    numeroBio: varchar('numerobio'),
+    pacage: varchar('pacage'),
+    siret: varchar('siret', { length: 14 }),
+    nbParcelles: integer('nb_parcelles'),
+    size: numeric('size', { mode: 'number' }),
+    record: jsonb('record'),
+    imported: boolean('imported').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow().$onUpdate(() => sql`now()`)
+  },
+  (table) => [uniqueIndex('import_pac_numerobio_pacage_siret_idx').on(table.numeroBio, table.pacage, table.siret)]
+)

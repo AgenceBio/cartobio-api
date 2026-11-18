@@ -1,7 +1,6 @@
 
-import { featureCollection } from '@turf/helpers'
-import pool from '../../database/database.js'
-import type { Geometry } from 'geojson'
+import { sql } from 'drizzle-orm'
+import { db, firstRow } from '../../database/database.js'
 import type { EtatProduction, NormalizedRecord, CartoBioFeature, CartoBioCulture, OutputApiRecord, OutputApiCulture, OutputApiParcelle } from '@agencebio/cartobio-types'
 
 function cultureToApi (culture: CartoBioCulture): OutputApiCulture {
@@ -14,12 +13,12 @@ function cultureToApi (culture: CartoBioCulture): OutputApiCulture {
   }
 }
 
-async function parcelleToApi (parcelle: CartoBioFeature): Promise<OutputApiParcelle> {
+function parcelleToApi (parcelle: CartoBioFeature, surface: number): OutputApiParcelle {
   return {
     ...parcelle,
     properties: {
       id: String(parcelle.id),
-      surface: await legalProjectionSurface(parcelle.geometry) / 10000,
+      surface: surface / 10000,
       commune: parcelle.properties.COMMUNE,
       cultures: parcelle.properties.cultures.map(cultureToApi),
       niveauConversion: parcelle.properties.conversion_niveau as EtatProduction,
@@ -36,10 +35,12 @@ async function parcelleToApi (parcelle: CartoBioFeature): Promise<OutputApiParce
     }
   }
 }
-async function recordToApi (record: NormalizedRecord): Promise<OutputApiRecord> {
-  const featuresPromises = record.parcelles.features.map(parcelleToApi)
-  const features = await Promise.all(featuresPromises)
-  return {
+
+async function recordsToApi (records: NormalizedRecord[]): Promise<OutputApiRecord[]> {
+  const surfaces = await legalProjectionSurfaces(records.flatMap((record) => record.parcelles.features.map((feature) => feature.geometry)))
+  let index = 0
+
+  return records.map((record) => ({
     numeroBio: record.numerobio,
     version_name: record.version_name,
     certification: {
@@ -51,42 +52,30 @@ async function recordToApi (record: NormalizedRecord): Promise<OutputApiRecord> 
       notesAudit: record.audit_notes,
       anneeReferenceControle: record.annee_reference_controle
     },
-    parcellaire: featureCollection(features)
-  }
+    parcellaire: { type: 'FeatureCollection', features: record.parcelles.features.map((feature) => parcelleToApi(feature, surfaces[index++] ?? 0)) }
+  }))
 }
 
-async function legalProjectionSurface (geometry: Geometry): Promise<number> {
-  const { rows } = await pool.query<{ surface: number }>(
-    /* sql */ `
-      SELECT ST_Area(to_legal_projection(ST_GeomFromGeoJSON($1))) AS surface;
-    `,
-    [JSON.stringify(geometry)]
-  )
-  return rows[0].surface
+async function recordToApi (record: NormalizedRecord): Promise<OutputApiRecord> {
+  return firstRow(await recordsToApi([record]))
 }
 
-async function surfaceForFeatureCollection (featureCollection: { features: Array<{ geometry?: Geometry | null }> }) {
-  let totalSurface = 0
+async function legalProjectionSurfaces (geometries: unknown[]): Promise<Array<number | null>> {
+  if (!geometries.length) return []
 
-  for (const feature of featureCollection.features) {
-    const geometry = feature.geometry
-
-    if (!geometry) continue
-
-    const { rows } = await pool.query(
-      /* sql */ `
-        SELECT ST_Area(to_legal_projection(ST_GeomFromGeoJSON($1))) AS surface;
-      `,
-      [JSON.stringify(geometry)]
-    )
-
-    const surface = rows[0]?.surface
-    if (surface) {
-      totalSurface += surface
-    }
-  }
-
-  return totalSurface
+  const { rows } = await db.execute<{ surface: number | null }>(sql`
+    SELECT CASE WHEN jsonb_typeof(g.value) = 'object'
+      THEN ST_Area(cartobio.to_legal_projection(ST_GeomFromGeoJSON(g.value)))
+    END AS surface
+    FROM jsonb_array_elements(${JSON.stringify(geometries)}::jsonb) WITH ORDINALITY AS g(value, ord)
+    ORDER BY g.ord
+  `)
+  return rows.map(({ surface }) => surface)
 }
 
-export { recordToApi, parcelleToApi, legalProjectionSurface, surfaceForFeatureCollection }
+async function surfaceForFeatureCollection (featureCollection: { features: Array<{ geometry?: unknown }> }): Promise<number> {
+  const surfaces = await legalProjectionSurfaces(featureCollection.features.map((feature) => feature.geometry ?? null))
+  return surfaces.reduce<number>((total, surface) => total + (surface || 0), 0)
+}
+
+export { recordToApi, recordsToApi, surfaceForFeatureCollection }

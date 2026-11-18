@@ -9,6 +9,19 @@ export const certificationType = cartobio.enum('certification_type', [
 
 export const mixiteType = cartobio.enum('mixite_type', ['MIXTE', 'AB', 'ABCONV']);
 
+export const metadataSource = cartobio.enum('metadata_source', [
+  'TELEPAC',
+  'API_PARCELLAIRE',
+  'ANYGEO',
+  'GEOFOLIA',
+  'MES_PARCELLES',
+  'CVI',
+  'RPG',
+  'MANUEL',
+  'COPIE_VERSION',
+  'COPIE_CONFLIT',
+]);
+
 export const conversionNiveau = cartobio.enum('conversion_niveau', [
   'AB',
   'AB?',

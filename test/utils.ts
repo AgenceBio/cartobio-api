@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm'
 import { db as drizzleDb } from '../src/database/database.js'
 import { ensureOrganismeCertificateur, insertEvent, upsertCultures, upsertMetadata } from '../src/shared/parcellaires/parcellaires.repository.js'
-import type { CartoBioCulture, HistoryEntry } from '@agencebio/cartobio-types'
+import type { CultureInput, HistoryEntry } from '@agencebio/cartobio-types'
 import * as schema from '../src/database/schema/index.js'
 import records from './fixtures/providers/records.json' with { type: 'json' }
 import parcelles from './fixtures/providers/parcelles.json' with { type: 'json' }
@@ -59,7 +59,7 @@ export async function loadRecordFixture (data: FixtureRecord[] = records, pinned
   await drizzleDb.delete(schema.parcelles)
   await drizzleDb.delete(schema.parcellaires)
   for (let i = 0; i < data.length; i++) {
-    const record = data[i]
+    const record = data[i]!
     await ensureOrganismeCertificateur(drizzleDb, record.oc_id as number | null, record.oc_label as string | null)
     await drizzleDb.insert(schema.parcellaires).values({
       recordId: record.record_id as string,
@@ -90,9 +90,9 @@ export async function loadRecordFixture (data: FixtureRecord[] = records, pinned
   }
 
   for (let i = 0; i < data.length; i++) {
-    const record = data[i]
+    const record = data[i]!
     for (let j = 0; j < parcelles.length; j++) {
-      const parcelle: (typeof parcelles)[number] & { commentaire?: string } = parcelles[j]
+      const parcelle: (typeof parcelles)[number] & { commentaire?: string } = parcelles[j]!
       const geometry = sql`ST_SetSRID(ST_GeomFromGeoJSON(${JSON.stringify(parcelle.geometry)}), 4326)`
       await drizzleDb.insert(schema.parcelles).values({
         recordId: record.record_id as string,
@@ -107,7 +107,7 @@ export async function loadRecordFixture (data: FixtureRecord[] = records, pinned
         numeroParcellesPac: parcelle.numero_parcelle_pac ? Number(parcelle.numero_parcelle_pac) : null,
         commentaireOperateur: parcelle.commentaire
       })
-      await upsertCultures(drizzleDb, record.record_id as string, parcelle.id, parcelle.cultures as unknown as CartoBioCulture[])
+      await upsertCultures(drizzleDb, record.record_id as string, parcelle.id, parcelle.cultures as unknown as CultureInput[])
     }
   }
 }

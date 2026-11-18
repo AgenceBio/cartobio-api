@@ -363,7 +363,7 @@ describe('GET /api/v2/audits/:recordId', () => {
     const expectedRecord = normalizeRecord(asDBRecordWithParcelles({ parcelles: asStoredParcelles(parcelles), ...record }))
 
     // we cleanup fixtures stuff
-    delete expectedRecord.oc_id
+    delete (expectedRecord as Partial<typeof expectedRecord>).oc_id
     delete (expectedRecord as Partial<typeof expectedRecord>).oc_label
     expectedRecord.parcelles.features.forEach((f) => {
       delete f.properties.createdAt
@@ -429,6 +429,30 @@ describe('GET /api/v2/audits/:recordId', () => {
       error: 'Unauthorized',
       message: "Accès refusé : vous n'êtes pas autorisé·e à accéder à ce contenu avec vos identifiants."
     })
+  })
+})
+
+describe('DELETE /api/v2/audits/:recordId', () => {
+  beforeEach(() => loadRecordFixture())
+
+  test('it refuses a non-matching user token and keeps the record', async () => {
+    vi.mocked(got.get).mockReset()
+    got.get.mockReturnValueOnce({
+      async json() {
+        return agencebioOperator
+      }
+    })
+
+    const response = await request(app.server)
+      .delete('/api/v2/audits/054f0d70-c3da-448f-823e-81fcf7c11112')
+      .set('Authorization', `Bearer ${OTHER_USER_DOC_AUTH_TOKEN}`)
+
+    expect(response.status).toEqual(401)
+    const [stored] = await drizzleDb
+      .select({ deletedAt: parcellaires.deletedAt })
+      .from(parcellaires)
+      .where(eq(parcellaires.recordId, '054f0d70-c3da-448f-823e-81fcf7c11112'))
+    expect(stored?.deletedAt).toBeNull()
   })
 })
 

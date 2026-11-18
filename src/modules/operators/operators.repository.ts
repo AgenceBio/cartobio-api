@@ -1,5 +1,5 @@
 import { and, desc, eq, inArray, isNull, max, sql } from 'drizzle-orm'
-import type { AgenceBioNormalizedOperator, AgenceBioNormalizedOperatorWithFilterData } from '@agencebio/cartobio-types'
+import type { AgenceBioNormalizedOperator } from '@agencebio/cartobio-types'
 import { db } from '../../database/database.js'
 import {
   importPac,
@@ -15,7 +15,7 @@ import { certificationEtatEnumSchema } from '../../database/validations/parcella
 import { recordMetadata } from '../../shared/parcellaires/parcellaires.utils.js'
 import type { SQL } from 'drizzle-orm'
 import { numerosBioEntiers } from './operators.utils.js'
-import type { DashboardStateRow, ImportPacRow, NumeroBio, OperatorRecordRow, OperatorWithRecordData } from './operators.types.js'
+import type { DashboardStateRow, ImportPacRow, NumeroBio, OperatorRecordRow, OperatorWithRecordData, AgenceBioNormalizedOperatorWithFilterData } from './operators.types.js'
 
 const dateReference = sql`COALESCE(${parcellaires.certificationDateDebut}, ${parcellaires.auditDate}, ${parcellaires.createdAt})`
 
@@ -63,7 +63,7 @@ async function getFilterData (operators: AgenceBioNormalizedOperator[], mixite =
         max_audit_date: max(parcellaires.auditDate).as('max_audit_date')
       })
       .from(parcellaires)
-      .where(and(inArray(parcellaires.numeroBio, ids), isNull(parcellaires.deletedAt)))
+      .where(and(sql`${parcellaires.numeroBio} = ANY(${sql.param(ids)}::int[])`, isNull(parcellaires.deletedAt)))
       .groupBy(parcellaires.numeroBio)
   )
 
@@ -75,7 +75,7 @@ async function getFilterData (operators: AgenceBioNormalizedOperator[], mixite =
       })
       .from(parcellaires)
       .where(and(
-        inArray(parcellaires.numeroBio, ids),
+        sql`${parcellaires.numeroBio} = ANY(${sql.param(ids)}::int[])`,
         eq(parcellaires.certificationEtat, certificationEtatEnumSchema.enum.CERTIFIED),
         isNull(parcellaires.deletedAt)
       ))
@@ -104,20 +104,21 @@ async function getFilterData (operators: AgenceBioNormalizedOperator[], mixite =
   const res: AgenceBioNormalizedOperatorWithFilterData[] = []
   let j = 0
 
-  for (let i = 0; i < operators.length; i++) {
-    if (j === rows.length || +operators[i].numeroBio !== +rows[j].numerobio) {
+  for (const operator of operators) {
+    const row = rows[j]
+    if (!row || +operator.numeroBio !== +row.numerobio) {
       res.push({
-        ...operators[i],
+        ...operator,
         metadata: {}
       })
 
       continue
     }
 
-    const { metadata, ...record } = rows[j]
+    const { metadata, ...record } = row
 
     res.push({
-      ...operators[i],
+      ...operator,
       metadata,
       ...record
     })
@@ -168,13 +169,13 @@ async function addRecordData (operateur: AgenceBioNormalizedOperator): Promise<O
       lastmixitestate: lastCertifiedParcelle?.lastmixitestate ?? null
     }))
 
-  if (matchingRows.length === 0) {
-    return { ...operateur, metadata: {} }
-  }
   matchingRows.sort((a, b) => {
     return +(a.certification_state === certificationEtatEnumSchema.enum.OPERATOR_DRAFT) - +(b.certification_state === certificationEtatEnumSchema.enum.OPERATOR_DRAFT)
   })
   const [primaryRecord, ...otherRecords] = matchingRows
+  if (!primaryRecord) {
+    return { ...operateur, metadata: {} }
+  }
   const { metadata, ...record } = primaryRecord
 
   return {
@@ -258,7 +259,7 @@ async function findDashboardStates(numeroBios: string[], anneeReferenceControle:
       eq(parcellaires.anneeReferenceControle, anneeReferenceControle),
       inArray(parcellaires.certificationEtat, [certificationEtatEnumSchema.enum.AUDITED, certificationEtatEnumSchema.enum.PENDING_CERTIFICATION, certificationEtatEnumSchema.enum.CERTIFIED])
     ))
-    .groupBy(certifie)
+    .groupBy(sql`1`)
 }
 export {
   pinOperator,

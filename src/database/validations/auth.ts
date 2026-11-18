@@ -1,5 +1,4 @@
 import { createInsertSchema } from 'drizzle-orm/zod';
-import { z } from 'zod';
 import { revokedTokens } from '../schema/auth.js';
 
 export const createRevokedTokenSchema = createInsertSchema(revokedTokens, {
@@ -10,5 +9,3 @@ export const createRevokedTokenSchema = createInsertSchema(revokedTokens, {
     expiresAt: true,
   })
   .strict();
-
-export type CreateRevokedTokenInput = z.infer<typeof createRevokedTokenSchema>;

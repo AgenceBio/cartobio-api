@@ -1,6 +1,9 @@
+import type { FastifyRequest } from 'fastify'
 import { addGeometryBodySchema, addGeometryResponseSchema, borderCutBodySchema, borderCutResponseSchema, geometryEqualsBodySchema, geometryEqualsResponseSchema, recordIdParamsSchema } from '@agencebio/cartobio-types'
+import type { GeometryEqualsBody } from '@agencebio/cartobio-types'
 import { apiError, commonErrorResponses, describedResponse, mergeSchemas, operatorFromRecordId, protectedWithToken, TAGS, withSchema } from '../../shared/routes.js'
-import { enforceOperatorAccess } from '../../shared/middlewares.js'
+import { enforceOperatorAccess, loadRecordAndOperator } from '../../shared/middlewares.js'
+import { getRecord } from '../../shared/parcellaires/parcellaires.service.js'
 
 export const borderCutSchema = withSchema(protectedWithToken(), {
   operationId: 'cutParcelleBorder',
@@ -15,13 +18,22 @@ export const borderCutSchema = withSchema(protectedWithToken(), {
   }
 })
 
-export const geometryEqualsSchema = withSchema(protectedWithToken(), {
+export const geometryEqualsSchema = withSchema(mergeSchemas(protectedWithToken(), {
+  preHandler: [
+    async (request: FastifyRequest): Promise<void> => loadRecordAndOperator(request, (request.body as GeometryEqualsBody).payload.old, getRecord),
+    enforceOperatorAccess()
+  ]
+}), {
   operationId: 'compareParcellaires',
   tags: [TAGS.GEOMETRIE],
   summary: 'Comparer les géométries de deux parcellaires',
   description: 'Identifie les parcelles ajoutées, supprimées ou modifiées entre le parcellaire le plus ancien et le plus récent.',
   body: geometryEqualsBodySchema,
-  response: { ...commonErrorResponses, 200: geometryEqualsResponseSchema.meta({ description: 'Résultat de la comparaison et différences en GeoJSON' }) }
+  response: {
+    ...commonErrorResponses,
+    200: geometryEqualsResponseSchema.meta({ description: 'Résultat de la comparaison et différences en GeoJSON' }),
+    404: apiError('Parcellaire ou opérateur introuvable')
+  }
 })
 
 export const addGeometrySchema = withSchema(mergeSchemas(protectedWithToken(), operatorFromRecordId, { preHandler: [enforceOperatorAccess()] }), {

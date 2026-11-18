@@ -21,13 +21,12 @@ jobs:
   build:
     services:
       postgres:
-        image: kartoza/postgis:15-3.4
+        image: postgis/postgis:18-3.6
         env:
-          ALLOW_IP_RANGE: "0.0.0.0/0" # we need that to allow 'api' to connect
           POSTGRES_USER: docker
-          POSTGRES_PASS: docker
-          DB_NAME: gis
-        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+          POSTGRES_PASSWORD: docker
+          POSTGRES_DB: cartobio
+        options: --health-cmd "pg_isready -U docker -d cartobio" --health-interval 10s --health-timeout 5s --health-retries 5
         ports:
           - 5432:5432
     runs-on: ubuntu-latest

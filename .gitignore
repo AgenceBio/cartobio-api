@@ -19,3 +19,6 @@ docs/types
 
 # build
 dist
+
+# PDF générés à la racine
+/*.pdf

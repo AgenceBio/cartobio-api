@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import {
   foreignKey,
   index,
@@ -29,7 +30,8 @@ export const attestationsProduction = cartobio.table(
       .defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
-      .defaultNow(),
+      .defaultNow()
+      .$onUpdate(() => sql`now()`),
   },
   (table) => [
     index('attestations_production_record_id_idx').on(table.recordId),

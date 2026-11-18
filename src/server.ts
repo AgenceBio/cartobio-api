@@ -1,12 +1,13 @@
 import { fileURLToPath } from 'node:url'
 import app from './app.js'
 import config from './config/env.js'
-import db from './database/database.js'
+import { sql } from 'drizzle-orm'
+import { db, firstRow } from './database/database.js'
 
 async function start(): Promise<void> {
   try {
-    const { rows } = await db.query('SHOW server_version;')
-    app.log.info(`Postgres connection established, v${rows[0].server_version}`)
+    const { rows } = await db.execute<{ server_version: string }>(sql`SHOW server_version`)
+    app.log.info(`Postgres connection established, v${firstRow(rows).server_version}`)
 
     await app.ready()
     app.swagger()

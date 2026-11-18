@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer'
 import config from '../../config/env.js'
 import path from 'path'
+import { MAIL_TEMPLATES_DIR } from '../../shared/paths.js'
 
 const configMail = config.get('mail.mailUrl')
 const transporter = nodemailer.createTransport({
@@ -16,7 +17,7 @@ const SIGNATURE_HTML = `
 
 const SIGNATURE_ATTACHMENT = {
   filename: 'signature.png',
-  path: path.join(import.meta.dirname, 'templates/assets/signature.png'),
+  path: path.join(MAIL_TEMPLATES_DIR, 'assets/signature.png'),
   cid: 'signature'
 }
 
@@ -28,7 +29,7 @@ async function sendMail (options: { to: string | string[]; subject: string; html
 
   attachments.push({
     filename: 'logo.png',
-    path: path.join(import.meta.dirname, 'templates/assets/banniere_agence_bio.png'),
+    path: path.join(MAIL_TEMPLATES_DIR, 'assets/banniere_agence_bio.png'),
     cid: 'logo'
   })
 
@@ -42,4 +43,4 @@ async function sendMail (options: { to: string | string[]; subject: string; html
   return info
 }
 
-export { transporter, sendMail }
+export { sendMail }

@@ -13,7 +13,7 @@ describe('getStreaksSuspectes', () => {
       { statut: 'VALID' }
     ])
 
-    expect([...result[0].envois]).toHaveLength(4)
+    expect([...result[0]!.envois]).toHaveLength(4)
   })
 
   it("n'identifie une série de quatre échecs, même si ERROR et VALID alternent", () => {
@@ -48,6 +48,6 @@ describe('getStreaksSuspectes', () => {
       { statut: 'ERROR' }
     ])
 
-    expect([...result[0].envois]).toHaveLength(4)
+    expect([...result[0]!.envois]).toHaveLength(4)
   })
 })

@@ -1,5 +1,6 @@
 import type { AddGeometryResponse, BorderCutResponse, GeometryEqualsBody, GeometryEqualsResponse } from '@agencebio/cartobio-types'
 import * as repository from './geometry.repository.js'
+import { InvalidRequestApiError } from '../../shared/errors.js'
 
 async function verifyGeometry (inputGeomGeoJSON: unknown, recordId: string, id: string | number = ''): Promise<AddGeometryResponse> {
   const conflicts = await repository.findGeometryConflicts(inputGeomGeoJSON, recordId, id)
@@ -31,7 +32,7 @@ async function calculateParcelBorder (geometry: unknown, distance: number, allBo
   }
 
   if (!startBorderPoint || !endBorderPoint) {
-    throw new Error('Les deux points sont requis')
+    throw new InvalidRequestApiError('Les deux points sont requis')
   }
 
   return repository.findParcelBorderBetweenPoints(geometry, distance, startBorderPoint, endBorderPoint, isInverted)

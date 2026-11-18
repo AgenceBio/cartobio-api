@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { and, asc, desc, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
-import { db } from '../../database/database.js'
+import { db, firstRow } from '../../database/database.js'
 import {
   organismeCertificateur,
   parcellaireImportLogs,
@@ -20,7 +20,7 @@ import {
   updateImportJobSchema
 } from '../../database/validations/imports.js'
 import type { ImportJobResult, ImportStatus } from '../../database/validations/imports.js'
-import type { DBOperatorRecord } from '@agencebio/cartobio-types'
+import type { DBOperatorRecord } from '../../shared/parcellaires/parcellaires.types.js'
 import { importJobColumns, operatorRecordColumns, operatorRecordConditions, payloadColumn } from './imports.utils.js'
 import type {
   ImportJobListRow,
@@ -31,7 +31,7 @@ import type {
 } from './imports.types.js'
 
 async function completeImportJob ({ result, jobId, statutJob = null }: { result: unknown; jobId: string | number; statutJob?: ImportJobResult | null }): Promise<number> {
-  const [{ id }] = await db
+  const { id } = firstRow(await db
     .update(parcellaireImport)
     .set({
       ...updateImportJobSchema.parse({
@@ -42,7 +42,7 @@ async function completeImportJob ({ result, jobId, statutJob = null }: { result:
       endedAt: sql`NOW()`
     })
     .where(eq(parcellaireImport.id, Number(jobId)))
-    .returning({ id: parcellaireImport.id })
+    .returning({ id: parcellaireImport.id }))
 
   return id
 }
@@ -60,10 +60,10 @@ async function insertImportLog (importId: string | number, { numeroBio, idParcel
 }
 
 async function createImportJob (organismeCertificateurId: number): Promise<number> {
-  const [{ id }] = await db
+  const { id } = firstRow(await db
     .insert(parcellaireImport)
     .values(createImportJobSchema.parse({ status: importStatusEnumSchema.enum.CREATED, organismeCertificateur: String(organismeCertificateurId) }))
-    .returning({ id: parcellaireImport.id })
+    .returning({ id: parcellaireImport.id }))
 
   return id
 }
@@ -75,7 +75,7 @@ async function insertPayload (jobId: string | number, payload: unknown): Promise
 async function updateImportJobRecordInfos (jobId: string | number, { numeroBio, numeroClient, auditDate }: ImportJobRecordInfos): Promise<void> {
   await db
     .update(parcellaireImport)
-    .set({ numeroBio, numeroClient, auditDate })
+    .set(updateImportJobSchema.parse({ numeroBio, numeroClient, auditDate }))
     .where(eq(parcellaireImport.id, Number(jobId)))
 }
 
@@ -166,11 +166,11 @@ async function findImportList ({ status, organismeCertificateur: organisme, from
     conditions.push(lte(parcellaireImport.createdAt, end))
   }
 
-  if (withRejected === 'true') {
+  if (withRejected) {
     conditions.push(eq(parcellaireImport.statutJob, importJobResultEnumSchema.enum.REJECTED))
   }
 
-  const includePayload = payload === 'true'
+  const includePayload = payload
   const where = and(...conditions)
 
   const query = db
@@ -194,9 +194,7 @@ async function findImportList ({ status, organismeCertificateur: organisme, from
   return { rows, total }
 }
 
-async function findImportById (id: string | number, organisme: number, payload?: string): Promise<ImportJobListRow | null> {
-  const includePayload = payload === 'true'
-
+async function findImportById (id: string | number, organisme: number, includePayload: boolean): Promise<ImportJobListRow | null> {
   const query = db
     .select({ ...importJobColumns, started_at: parcellaireImport.startedAt, payload: payloadColumn(includePayload) })
     .from(parcellaireImport)

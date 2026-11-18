@@ -1,22 +1,14 @@
-import type { PoolClient, QueryResult, QueryResultRow } from 'pg'
 import type { Mock } from 'vitest'
 import { randomUUID } from 'node:crypto'
 import { CertificationState } from '@agencebio/cartobio-types'
-import type { AgenceBioAdresses, AgenceBioNormalizedOperator, AgenceBioNotification, AgenceBioOperator, CartoBioCulture, CartoBioFeature, CartoBioFeatureProperties, CartoBioOCUser, CartoBioUser, DBOperatorRecordWithParcelles, DBParcelle, NormalizedRecord } from '@agencebio/cartobio-types'
+import type { AgenceBioNormalizedOperator, CartoBioCulture, CartoBioFeature, CartoBioFeatureProperties, CartoBioOCUser, CartoBioUser, NormalizedRecord } from '@agencebio/cartobio-types'
+import type { AgenceBioAdresses, AgenceBioNotification, AgenceBioOperator } from '../src/clients/agence-bio.types.js'
+import type { DBOperatorRecordWithParcelles, DBParcelle } from '../src/shared/parcellaires/parcellaires.types.js'
 import type { createOrUpdateOperatorRecord } from '../src/shared/parcellaires/parcellaires.service.js'
-import pool from '../src/database/database.js'
 import type { PdfParcelle } from '../src/modules/exports/exports.types.js'
 import type { Browser, Page } from 'puppeteer'
 import type { PDFDocument } from 'pdf-lib'
 import type { FastifyRequest } from 'fastify'
-
-export function mockedQuery () {
-  return pool.query as unknown as Mock<(...args: unknown[]) => Promise<QueryResult<QueryResultRow>>>
-}
-
-export function queryResult<R extends QueryResultRow> (rows: R[]): QueryResult<R> {
-  return { rows, rowCount: rows.length, command: 'SELECT', oid: 0, fields: [] }
-}
 
 export function buildOperator (overrides: Partial<AgenceBioNormalizedOperator> = {}): AgenceBioNormalizedOperator {
   return {
@@ -27,8 +19,8 @@ export function buildOperator (overrides: Partial<AgenceBioNormalizedOperator> =
     numeroBio: '99999',
     numeroPacage: null,
     email: '',
-    dateEngagement: new Date('2023-01-01'),
-    datePremierEngagement: new Date('2023-01-01'),
+    dateEngagement: new Date('2023-01-01').toISOString(),
+    datePremierEngagement: new Date('2023-01-01').toISOString(),
     organismeCertificateur: {},
     adressesOperateurs: [],
     codeCommune: '',
@@ -108,10 +100,6 @@ export const asDBRecordWithParcelles = (fixture: object) => fixture as DBOperato
 export const asNormalizedRecord = (fixture: object) => fixture as NormalizedRecord
 export const asAgenceBioOperator = (fixture: object) => fixture as AgenceBioOperator
 
-export const asMockedDatabase = (database: object) => database as { _clientRelease: Mock }
-
-export const asPoolClient = (database: object) => database as PoolClient
-
 export const asGotRequest = <T> (mock: Record<string, Mock>) => mock as unknown as T
 
 export function buildDBParcelle (overrides: Partial<DBParcelle> = {}): DBParcelle {
@@ -119,9 +107,28 @@ export function buildDBParcelle (overrides: Partial<DBParcelle> = {}): DBParcell
     record_id: randomUUID(),
     id: '1',
     geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]] },
+    commune: null,
+    commune_label: null,
     cultures: [],
     conversion_niveau: 'AB',
+    engagement_date: null,
+    commentaire: null,
+    auditeur_notes: null,
+    annotations: [],
+    created: '2023-01-01T00:00:00.000Z',
+    updated: '2023-01-01T00:00:00.000Z',
+    name: null,
+    numero_pacage: null,
+    numero_ilot_pac: null,
+    numero_parcelle_pac: null,
+    reference_cadastre: null,
+    code_culture_pac: null,
+    code_precision_pac: null,
     etranger: false,
+    statut_import_geom: null,
+    attente_pac: false,
+    from_parcelles: null,
+    deleted_at: null,
     ...overrides
   }
 }
@@ -157,9 +164,9 @@ export function buildAgenceBioOperator (overrides: Partial<AgenceBioOperator> = 
     lat: 0,
     long: 0,
     mandate: false,
-    dateMaj: new Date('2023-01-01'),
-    dateEngagement: new Date('2023-01-01'),
-    datePremierEngagement: new Date('2023-01-01'),
+    dateMaj: new Date('2023-01-01').toISOString(),
+    dateEngagement: new Date('2023-01-01').toISOString(),
+    datePremierEngagement: new Date('2023-01-01').toISOString(),
     codeNAF: '',
     reseauId: 0,
     departementId: 0,
@@ -185,7 +192,7 @@ export function buildAdresse (overrides: Partial<AgenceBioAdresses> = {}): Agenc
   }
 }
 
-export function buildFeature (overrides: Partial<CartoBioFeature> & { properties?: Partial<CartoBioFeatureProperties> } = {}): CartoBioFeature {
+export function buildFeature (overrides: Omit<Partial<CartoBioFeature>, 'properties'> & { properties?: Partial<CartoBioFeatureProperties> } = {}): CartoBioFeature {
   const { properties, ...feature } = overrides
   return {
     type: 'Feature',
@@ -193,8 +200,12 @@ export function buildFeature (overrides: Partial<CartoBioFeature> & { properties
     geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]] },
     ...feature,
     properties: {
+      id: feature.id ?? '1',
       cultures: [],
       conversion_niveau: 'AB',
+      etranger: false,
+      controlee: false,
+      attente_pac: false,
       ...properties
     }
   }
@@ -205,7 +216,13 @@ export function buildNormalizedRecord (overrides: Partial<NormalizedRecord> = {}
     record_id: randomUUID(),
     numerobio: '99999',
     version_name: 'Version de test',
-    annee_reference_controle: null,
+    annee_reference_controle: 2023,
+    audit_date: null,
+    certification_date_debut: null,
+    certification_date_fin: null,
+    oc_id: null,
+    audit_notes: null,
+    mixite: null,
     certification_state: CertificationState.OPERATOR_DRAFT,
     created_at: '2023-01-01T00:00:00.000Z',
     updated_at: '2023-01-01T00:00:00.000Z',

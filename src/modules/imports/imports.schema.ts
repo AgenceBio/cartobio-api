@@ -7,6 +7,7 @@ import {
   importNotFoundResponseSchema,
   importReportSchema,
   importSummarySchema,
+  inputApiRecordBodySchema,
   outputApiRecordSchema,
   apiErrorSchema,
   certificationParcellairesQuerySchema,
@@ -19,10 +20,13 @@ import {
   numeroBioParamsSchema
 } from '@agencebio/cartobio-types'
 import { z } from 'zod'
+import type { FastifySchema, FastifySchemaCompiler } from 'fastify'
 import { apiError, commonErrorResponses, describedResponse, mergeSchemas, protectedWithToken, operatorFromNumeroBio, TAGS, withSchema } from '../../shared/routes.js'
+import type { CartobioExtendedRouteShorthandOptions, ProtectedRoute } from '../../shared/routes.js'
+import { enforceOperatorAccess } from '../../shared/middlewares.js'
 
-const ocOrCartobio = () => protectedWithToken({ cartobio: true, oc: true })
-const operatorRoute = () => mergeSchemas(ocOrCartobio(), operatorFromNumeroBio)
+const ocOrCartobio = (): ProtectedRoute => protectedWithToken({ cartobio: true, oc: true })
+const operatorRoute = (): CartobioExtendedRouteShorthandOptions => mergeSchemas(ocOrCartobio(), operatorFromNumeroBio, { preHandler: [enforceOperatorAccess()] })
 
 const featureCollectionResponse = {
   ...commonErrorResponses,
@@ -90,18 +94,22 @@ export const evvSchema = withSchema(operatorRoute(), {
   }
 })
 
-export const certificationParcellesSchema = withSchema(protectedWithToken({ oc: true }), {
-  operationId: 'importParcellaires',
-  tags: [TAGS.API_PARCELLAIRE],
-  summary: 'Envoyer un parcellaire',
-  description: 'Valide le parcellaire reçu puis l\'enregistre de façon asynchrone. Suivre l\'avancement avec `GET /api/v3/import/jobs/{id}`.',
-  body: z.looseObject({}).meta({ description: 'Un parcellaire (`numeroBio`, `numeroClient`, `dateAudit`, `parcelles`…)' }),
-  response: {
-    ...commonErrorResponses,
-    202: importReportSchema.meta({ description: 'Le parcellaire est accepté, enregistrement en cours' }),
-    400: z.union([importReportSchema, apiErrorSchema]).meta({ description: 'Le parcellaire est refusé (bilan de l\'envoi), ou corps illisible (erreur)' })
-  }
-})
+export const certificationParcellesSchema = {
+  ...withSchema(protectedWithToken({ oc: true }), {
+    operationId: 'importParcellaires',
+    tags: [TAGS.API_PARCELLAIRE],
+    summary: 'Envoyer un parcellaire',
+    description: 'Valide le parcellaire reçu puis l\'enregistre de façon asynchrone. Suivre l\'avancement avec `GET /api/v3/import/jobs/{id}`.',
+    body: inputApiRecordBodySchema,
+    response: {
+      ...commonErrorResponses,
+      202: importReportSchema.meta({ description: 'Le parcellaire est accepté, enregistrement en cours' }),
+      400: z.union([importReportSchema, apiErrorSchema]).meta({ description: 'Le parcellaire est refusé (bilan de l\'envoi), ou corps illisible (erreur)' })
+    }
+  }),
+  validatorCompiler: (() => (data) => ({ value: data })) satisfies FastifySchemaCompiler<FastifySchema>,
+  bodyLimit: 50 * 1024 * 1024
+}
 
 export const importJobSchema = withSchema(protectedWithToken({ oc: true }), {
   operationId: 'getImportJob',
@@ -139,10 +147,6 @@ export const importDetailsSchema = withSchema(protectedWithToken({ oc: true }), 
     404: importNotFoundResponseSchema.meta({ description: 'Import introuvable pour cet OC' })
   }
 })
-// Décommenter avec les routes /parcellaire-imports/:id/logs et /payload
-// export const importLogsSchema = withSchema(protectedWithToken({ oc: true }), { params: importIdParamsSchema, querystring: importLogsQuerySchema })
-// export const importPayloadSchema = withSchema(protectedWithToken({ oc: true }), { params: importIdParamsSchema })
-
 export const certificationParcellairesSchema = withSchema(protectedWithToken({ oc: true }), {
   operationId: 'listOcParcellaires',
   tags: [TAGS.API_PARCELLAIRE],

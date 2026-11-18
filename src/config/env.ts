@@ -13,7 +13,6 @@ interface AppConfig {
   port: number
   host: string
   frontendUrl: string
-  databaseUrl: string
   drizzleDatabaseUrl: string
   testDatabaseName: string
   douanes: {
@@ -75,12 +74,6 @@ const config = convict<AppConfig>({
     default: 'https://cartobio.agencebio.org',
     format: 'url',
     env: 'FRONTEND_URL'
-  },
-  databaseUrl: {
-    sensitive: true,
-    default: 'postgresql://docker:docker@localhost:15432/gis',
-    format: 'pg-url',
-    env: 'DATABASE_URL'
   },
   drizzleDatabaseUrl: {
     sensitive: true,
@@ -230,7 +223,7 @@ const config = convict<AppConfig>({
   },
   attestationsProductions: {
     directory: {
-      default: '.',
+      default: './storage/pdf/',
       env: 'ATTESTATIONS_PRODUCTIONS_DIRECTORY'
     }
   },

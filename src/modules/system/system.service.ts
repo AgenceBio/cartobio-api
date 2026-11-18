@@ -11,5 +11,5 @@ function getUnavailableHealth (): HealthUnavailableResponse {
   return { status: 'ok', db: 'unreachable', uptime: process.uptime(), timestamp: Date.now() }
 }
 
-export const getVersion = () => config.get('version')
+export const getVersion = (): string => config.get('version')
 export { getHealth, getUnavailableHealth }

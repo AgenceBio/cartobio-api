@@ -5,7 +5,7 @@ import {
   getOperatorSchema, hideImportPacNotificationSchema, operatorImportPacSchema, operatorRecordsSchema, pinOperatorSchema, unpinOperatorSchema, userOperatorsSchema
 } from './operators.schema.js'
 import * as service from './operators.service.js'
-import { requireOperator, requireUser } from '../../shared/request.js'
+import { requireOcUser, requireOperator, requireUser } from '../../shared/request.js'
 import type { AgenceBioNormalizedOperatorWithPinnedStatus } from '@agencebio/cartobio-types'
 
 export default async function operatorRoutes (fastify: FastifyInstance): Promise<void> {
@@ -16,12 +16,12 @@ export default async function operatorRoutes (fastify: FastifyInstance): Promise
     certificationSearchSchema,
     async (request, reply) => {
       const { input, page, limit, filter } = request.body
-      const { id: ocId } = requireUser(request).organismeCertificateur
+      const user = requireOcUser(request)
 
       return reply.code(200).send(
         await service.searchControlBodyRecords({
-          ocId,
-          userId: requireUser(request).id,
+          ocId: user.organismeCertificateur.id,
+          userId: user.id,
           input,
           page,
           limit,
@@ -61,7 +61,7 @@ export default async function operatorRoutes (fastify: FastifyInstance): Promise
     '/api/v2/operators/dashboard',
     dashboardSchema,
     async (request, reply) => {
-      const user = requireUser(request)
+      const user = requireOcUser(request)
 
       return reply.code(200).send(await service.getOperatorsDashboard(user.id, user.organismeCertificateur.id))
     }
@@ -72,7 +72,7 @@ export default async function operatorRoutes (fastify: FastifyInstance): Promise
     dashboardSummarySchema,
     async (request, reply) => {
       const { departements, anneeReferenceControle } = request.body
-      const { id: ocId } = requireUser(request).organismeCertificateur
+      const { id: ocId } = requireOcUser(request).organismeCertificateur
 
       return reply
         .code(200)

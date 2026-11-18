@@ -35,8 +35,8 @@ export type ImportListFilters = {
   organismeCertificateur?: number
   from?: string
   to?: string
-  payload?: string
-  withRejected?: string
+  payload: boolean
+  withRejected: boolean
   page: number
   limit: number
 }

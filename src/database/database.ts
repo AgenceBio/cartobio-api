@@ -11,9 +11,10 @@ pgTypes.setTypeParser(
   (value) => value === null ? null : new Date(value).toISOString().split('T')[0]
 )
 
-// the exported variable will be shared across all imports
-const pool = new Pool({ connectionString: config.get('databaseUrl') })
-
 export const db = drizzle({ client: new Pool({ connectionString: config.get('drizzleDatabaseUrl') }) })
 
-export default pool
+export function firstRow<T> (rows: T[]): T {
+  const [row] = rows
+  if (row === undefined) throw new Error('La requête n\'a retourné aucune ligne')
+  return row
+}

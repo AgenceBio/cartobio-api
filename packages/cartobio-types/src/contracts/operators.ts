@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { mixiteSchema, opt, text, textOrNumber } from './helpers.js'
+import { CertificationState } from '../enums.js'
 import { dateTimeSchema } from './common.js'
 
 const numeroBioDescription = { description: 'Numéro bio de l\'opérateur (Agence Bio)', examples: ['12345'] }
@@ -11,7 +13,7 @@ export const numeroBioStringParamsSchema = z.object({
   numeroBio: z.string().meta(numeroBioDescription)
 })
 
-export const operatorFilterSchema = z.looseObject({
+export const operatorFilterSchema = z.object({
   departement: z.array(z.string()).nullable().optional().meta({ description: 'Codes de départements' }),
   engagement: z.array(z.string()).nullable().optional().meta({ description: 'Mixité du dernier parcellaire certifié' }),
   pinned: z.boolean().nullable().optional().meta({ description: 'Uniquement les opérateurs épinglés' }),
@@ -24,8 +26,8 @@ export const operatorFilterSchema = z.looseObject({
 
 export const certificationSearchBodySchema = z.object({
   input: z.string().meta({ description: 'Texte recherché (nom, numéro bio, numéro client, SIRET…)' }),
-  page: z.int().default(1).meta({ description: 'Numéro de page (à partir de 1)' }),
-  limit: z.int().default(7).meta({ description: 'Nombre d\'opérateurs par page' }),
+  page: z.int().min(1).default(1).meta({ description: 'Numéro de page (à partir de 1)' }),
+  limit: z.int().min(1).max(100).default(7).meta({ description: 'Nombre d\'opérateurs par page (100 maximum)' }),
   filter: operatorFilterSchema.optional()
 })
 
@@ -54,10 +56,6 @@ export const pinResponseSchema = z.object({
   epingle: z.boolean().meta({ description: 'Nouvel état d\'épinglage' })
 })
 
-const opt = <T extends z.ZodType>(schema: T, description: string) => schema.nullable().optional().meta({ description })
-const text = (description: string) => opt(z.string(), description)
-const textOrNumber = (description: string) => opt(z.union([z.string(), z.number()]), description)
-
 export const operatorNotificationSchema = z.looseObject({
   id: textOrNumber('Identifiant de la notification Agence Bio'),
   etatCertification: text('État de certification : `ENGAGEE`, `ENGAGEE FUTUR`, `ARRETEE`, `NON ENGAGEE`…'),
@@ -65,14 +63,14 @@ export const operatorNotificationSchema = z.looseObject({
   organismeCertificateurId: opt(z.number(), 'Identifiant de l\'OC de la notification'),
   organisme: text('Nom de l\'OC de la notification'),
   numeroClient: text('Numéro client de l\'opérateur chez l\'OC'),
-  dateDemarrage: opt(dateTimeSchema, 'Date de démarrage de l\'engagement'),
-  dateArret: opt(dateTimeSchema, 'Date d\'arrêt de l\'engagement'),
+  dateDemarrage: text('Date de démarrage de l\'engagement'),
+  dateArret: text('Date d\'arrêt de l\'engagement'),
   activites: opt(z.array(z.unknown()), 'Activités déclarées')
 })
 
 export const operatorSchema = z.looseObject({
-  id: textOrNumber('Identifiant Agence Bio de l\'opérateur'),
-  numeroBio: textOrNumber('Numéro bio'),
+  id: z.union([z.string(), z.number()]).meta({ description: 'Identifiant Agence Bio de l\'opérateur' }),
+  numeroBio: z.union([z.string(), z.number()]).meta({ description: 'Numéro bio' }),
   nom: text('Nom'),
   denominationCourante: text('Dénomination courante'),
   siret: text('SIRET'),
@@ -80,25 +78,25 @@ export const operatorSchema = z.looseObject({
   email: text('E-mail'),
   dateEngagement: opt(dateTimeSchema, 'Date d\'engagement en bio'),
   datePremierEngagement: opt(dateTimeSchema, 'Date du premier engagement en bio'),
-  organismeCertificateur: opt(z.looseObject({
+  organismeCertificateur: z.looseObject({
     id: opt(z.number(), 'Identifiant de l\'OC'),
     nom: text('Nom de l\'OC'),
     numeroClient: text('Numéro client chez l\'OC')
-  }), 'OC actuel, objet vide si aucun'),
-  adressesOperateurs: opt(z.array(z.looseObject({
+  }).meta({ description: 'OC actuel, objet vide si aucun' }),
+  adressesOperateurs: z.array(z.looseObject({
     lat: opt(z.number(), 'Latitude'),
     long: opt(z.number(), 'Longitude'),
     codeCommune: text('Code INSEE de la commune'),
     lieu: text('Adresse'),
     codePostal: text('Code postal'),
     ville: text('Ville')
-  })), 'Adresses actives'),
+  })).meta({ description: 'Adresses actives' }),
   codeCommune: text('Code INSEE de la première adresse'),
   departement: text('Département de la première adresse'),
   commune: text('Commune de la première adresse'),
   codePostal: text('Code postal de la première adresse'),
-  notifications: opt(operatorNotificationSchema, 'Notification d\'engagement retenue'),
-  isProduction: opt(z.boolean(), 'L\'opérateur a une activité de production')
+  notifications: operatorNotificationSchema.nullable().meta({ description: 'Notification d\'engagement retenue' }),
+  isProduction: z.boolean().meta({ description: 'L\'opérateur a une activité de production' })
 })
 
 export const pinnedOperatorSchema = operatorSchema.extend({
@@ -107,20 +105,20 @@ export const pinnedOperatorSchema = operatorSchema.extend({
 
 export const recordSummarySchema = z.looseObject({
   record_id: z.string().meta({ description: 'Identifiant du parcellaire' }),
-  numerobio: textOrNumber('Numéro bio'),
-  version_name: text('Nom de la version'),
-  certification_state: text('État : `OPERATOR_DRAFT`, `AUDITED`, `PENDING_CERTIFICATION` ou `CERTIFIED`'),
-  annee_reference_controle: opt(z.number(), 'Année de référence du contrôle'),
-  audit_date: opt(dateTimeSchema, 'Date d\'audit'),
-  certification_date_debut: opt(dateTimeSchema, 'Début de validité de la certification'),
-  certification_date_fin: opt(dateTimeSchema, 'Fin de validité de la certification'),
-  created_at: opt(dateTimeSchema, 'Date de création'),
-  updated_at: opt(dateTimeSchema, 'Date de dernière modification'),
-  oc_id: opt(z.number(), 'Identifiant de l\'OC ayant créé le parcellaire'),
-  mixite: text('Mixité du parcellaire : `AB`, `ABCONV` ou `MIXTE`'),
-  metadata: opt(z.unknown(), 'Métadonnées (source de l\'import…)'),
-  parcelles: textOrNumber('Nombre de parcelles'),
-  surface: opt(z.number(), 'Surface totale en m², en projection légale'),
+  numerobio: z.string().meta({ description: 'Numéro bio' }),
+  version_name: z.string().meta({ description: 'Nom de la version' }),
+  certification_state: z.enum(CertificationState).meta({ description: 'État du parcellaire' }),
+  annee_reference_controle: z.number().meta({ description: 'Année de référence du contrôle' }),
+  audit_date: z.string().nullable().meta({ description: 'Date d\'audit' }),
+  certification_date_debut: z.string().nullable().meta({ description: 'Début de validité de la certification' }),
+  certification_date_fin: z.string().nullable().meta({ description: 'Fin de validité de la certification' }),
+  created_at: z.string().meta({ description: 'Date de création' }),
+  updated_at: z.string().meta({ description: 'Date de dernière modification' }),
+  oc_id: z.number().nullable().meta({ description: 'Identifiant de l\'OC ayant créé le parcellaire' }),
+  mixite: mixiteSchema.nullable().meta({ description: 'Mixité du parcellaire' }),
+  metadata: z.record(z.string(), z.unknown()).meta({ description: 'Métadonnées (source de l\'import…)' }),
+  parcelles: z.union([z.string(), z.number()]).meta({ description: 'Nombre de parcelles' }),
+  surface: z.number().nullable().meta({ description: 'Surface totale en m², en projection légale' }),
   geojson: opt(z.unknown(), 'FeatureCollection simplifiée des parcelles')
 })
 
@@ -180,3 +178,8 @@ export type UserOperatorsQuery = z.infer<typeof userOperatorsQuerySchema>
 export type DashboardSummaryBody = z.infer<typeof dashboardSummaryBodySchema>
 export type DashboardSummaryResponse = z.infer<typeof dashboardSummaryResponseSchema>
 export type PinResponse = z.infer<typeof pinResponseSchema>
+export type AgenceBioNormalizedOperator = z.infer<typeof operatorSchema>
+export type OperatorAutocompleteResponse = z.infer<typeof operatorAutocompleteResponseSchema>
+export type AgenceBioNormalizedOperatorWithPinnedStatus = z.infer<typeof pinnedOperatorSchema>
+export type AgenceBioNormalizedOperatorWithRecord = z.infer<typeof operatorWithRecordSchema>
+export type NormalizedRecordSummary = z.infer<typeof recordSummarySchema>

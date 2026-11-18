@@ -4,11 +4,13 @@ import path from 'path'
 import puppeteer from 'puppeteer'
 import { fromCodeCpf } from '@agencebio/rosetta-cultures'
 import { ASSETS_DIR } from '../../shared/paths.js'
+import { escapeHtml } from '../../shared/html.js'
 import type { Page } from 'puppeteer'
 import type { PDFDocument } from 'pdf-lib'
 import type { AgenceBioNormalizedOperator } from '@agencebio/cartobio-types'
 import type { MapImagesOptions, OperatorMapImages, PdfParcelle, PdfRecord } from './exports.types.js'
 import { logger } from '../../config/logger.js'
+import config from '../../config/env.js'
 
 /**
  * Génère une image de carte pour un opérateur et ses parcelles
@@ -83,7 +85,15 @@ async function generateOperatorMapImages (parcelles: PdfParcelle[], page: Page, 
   }
 }
 
-async function createPdfContent (numeroBio: string, recordId: string, parcelles: Array<PdfParcelle>, currentOperator: AgenceBioNormalizedOperator & PdfRecord, pac: boolean): Promise<PDFDocument[]> {
+let pdfQueue: Promise<unknown> = Promise.resolve()
+
+function createPdfContent (numeroBio: string, recordId: string, parcelles: Array<PdfParcelle>, currentOperator: AgenceBioNormalizedOperator & PdfRecord, pac: boolean): Promise<PDFDocument[]> {
+  const run = pdfQueue.then(() => renderPdfContent(numeroBio, recordId, parcelles, currentOperator, pac))
+  pdfQueue = run.catch(() => undefined)
+  return run
+}
+
+async function renderPdfContent (numeroBio: string, recordId: string, parcelles: Array<PdfParcelle>, currentOperator: AgenceBioNormalizedOperator & PdfRecord, pac: boolean): Promise<PDFDocument[]> {
   const dateTraitement = new Date()
 
   const browser = await puppeteer.launch({
@@ -120,9 +130,9 @@ async function createPdfContent (numeroBio: string, recordId: string, parcelles:
     })
 
     const order = ['AB', 'C3', 'C2', 'C1', 'CONV', 'Non défini']
-    Object.keys(groupedParcels).forEach((niveau): void => {
-      const avecProps = groupedParcels[niveau].filter(p => p.nbilot && p.nbp)
-      const sansProps = groupedParcels[niveau].filter(p => !p.nbilot || !p.nbp)
+    Object.entries(groupedParcels).forEach(([niveau, parcels]): void => {
+      const avecProps = parcels.filter(p => p.nbilot && p.nbp)
+      const sansProps = parcels.filter(p => !p.nbilot || !p.nbp)
       avecProps.sort((a, b) => {
         if (a.nbilot !== b.nbilot) {
           return Number(a.nbilot) - Number(b.nbilot)
@@ -133,8 +143,10 @@ async function createPdfContent (numeroBio: string, recordId: string, parcelles:
         if (a.name && b.name) {
           return a.name.toLowerCase().localeCompare(b.name.toLowerCase())
         }
-        if (a.refcad && b.refcad && a.refcad.length > 0 && b.refcad.length > 0) {
-          return a.refcad[0].localeCompare(b.refcad[0])
+        const refcadA = a.refcad?.[0]
+        const refcadB = b.refcad?.[0]
+        if (refcadA !== undefined && refcadB !== undefined) {
+          return refcadA.localeCompare(refcadB)
         }
         if (a.name) return 1
         if (b.name) return -1
@@ -153,8 +165,8 @@ async function createPdfContent (numeroBio: string, recordId: string, parcelles:
 
     const groupTotals: Record<string, number> = {}
     let totalHA = 0
-    Object.keys(sortedGroupedParcels).forEach((groupKey): void => {
-      const groupSum = groupedParcels[groupKey].reduce(
+    Object.entries(sortedGroupedParcels).forEach(([groupKey, parcels]): void => {
+      const groupSum = parcels.reduce(
         (sum, parcel) => sum + (parcel.superficie_totale_ha || 0),
         0
       )
@@ -162,17 +174,17 @@ async function createPdfContent (numeroBio: string, recordId: string, parcelles:
       totalHA += groupSum
     })
 
-    const blocksHTML = Object.keys(sortedGroupedParcels).map(groupKey =>
-      sortedGroupedParcels[groupKey].map(item => {
+    const blocksHTML = Object.values(sortedGroupedParcels).map((parcels) =>
+      parcels.map(item => {
         const parcelle = result.parcelles.find(e => e.id === item.id)
         if (!parcelle) throw new Error(`Carte de la parcelle ${item.id} non générée`)
         const imgSrc = `data:image/png;base64,${parcelle.buffer}`
         const block = `
       <div class="block">
         <div class="container">
-            <h3 class="header">${item.name ? 'Parcelle ' + item.name : ''}${item.name && item.nbilot ? ' - ' : ''}${item.nbilot ? 'Ilot ' + item.nbilot + (item.nbp ? ' parcelle ' + item.nbp : '') : ''}${!item.name && !item.nbilot && item.refcad ? item.refcad.map((e) => formatRefCad(e)).join(' ; ') : ''}</h3>
+            <h3 class="header">${item.name ? 'Parcelle ' + escapeHtml(item.name) : ''}${item.name && item.nbilot ? ' - ' : ''}${item.nbilot ? 'Ilot ' + item.nbilot + (item.nbp ? ' parcelle ' + item.nbp : '') : ''}${!item.name && !item.nbilot && item.refcad ? item.refcad.map((e) => escapeHtml(formatRefCad(e))).join(' ; ') : ''}</h3>
             <div class="info">
-              <div class="info-block"><div class="title-grey">Commune (code commune) :</div> ${item.communename && item.communename !== 'inconnu' ? item.communename : '-'} (${item.commune ? item.commune : '-'}) ${item.communename === 'inconnu' ? '<em class="font-10">Commune inconnue</em>' : ''}</div>
+              <div class="info-block"><div class="title-grey">Commune (code commune) :</div> ${item.communename && item.communename !== 'inconnu' ? escapeHtml(item.communename) : '-'} (${item.commune ? escapeHtml(item.commune) : '-'}) ${item.communename === 'inconnu' ? '<em class="font-10">Commune inconnue</em>' : ''}</div>
             </div>
               <div class="info">
                 <div class="info-block"><div class="title-grey">Date d'engagement :</div> ${item.engagement_date ? formatDate(item.engagement_date) : '-'}</div>
@@ -190,7 +202,7 @@ async function createPdfContent (numeroBio: string, recordId: string, parcelles:
                       return `
                       <tr>
                         <td>${e.CPF ? ((fromCodeCpf(e.CPF)?.libelle_code_cpf) + (e.CPF === 'ACT.Prod.Inc' ? ' *' : '')) : '-'}</td>
-                        <td>${e.variete ? e.variete : '-'}</td>
+                        <td>${e.variete ? escapeHtml(e.variete) : '-'}</td>
                         <td>${e.date_semis ? formatDate(e.date_semis) : '-'}</td>
                         <td>${item.cultures.length === 1 && item.superficie_totale_ha ? item.superficie_totale_ha.toFixed(2).replace('.', ',') + ' ha' : e.surface ? Number(e.surface).toFixed(2).replace('.', ',') + ' ha' : '-'} </td>
                       </tr>
@@ -273,7 +285,7 @@ async function createPdfContent (numeroBio: string, recordId: string, parcelles:
     })
 
     await page.pdf({
-      path: `storage/pdf/${numeroBio}-${recordId}-${dateTraitement}-2.pdf`,
+      path: `${config.get('attestationsProductions.directory')}/${numeroBio}-${recordId}-${dateTraitement}-2.pdf`,
       format: 'A4',
       landscape: false,
       printBackground: true,
@@ -285,10 +297,9 @@ async function createPdfContent (numeroBio: string, recordId: string, parcelles:
       }
     })
 
-    // const imageAB = fs.readFileSync('assets/image-map/img/agencebio.png').toString('base64')
-    const imageRP = fs.readFileSync('assets/image-map/img/header.svg').toString('base64')
-    const imageBio = fs.readFileSync('assets/image-map/img/ab.png').toString('base64')
-    const imageFeuille = fs.readFileSync('assets/image-map/img/image.png').toString('base64')
+    const imageRP = fs.readFileSync(path.join(ASSETS_DIR, 'image-map/img/header.svg')).toString('base64')
+    const imageBio = fs.readFileSync(path.join(ASSETS_DIR, 'image-map/img/ab.png')).toString('base64')
+    const imageFeuille = fs.readFileSync(path.join(ASSETS_DIR, 'image-map/img/image.png')).toString('base64')
 
     const mimeType = 'image/png'
 
@@ -578,7 +589,7 @@ async function createPdfContent (numeroBio: string, recordId: string, parcelles:
       <div class="header-top">
         <div class="flex">
           <span class="name-operator">
-            ${currentOperator.nom ? currentOperator.nom : '-'}
+            ${currentOperator.nom ? escapeHtml(currentOperator.nom) : '-'}
           </span>
           <div class="badge">
             <svg
@@ -627,23 +638,23 @@ async function createPdfContent (numeroBio: string, recordId: string, parcelles:
               <div class="ligne-header">
                 <p>
                   <span class="title-header">Siret&nbsp;:</span>
-                  ${currentOperator.siret ? currentOperator.siret : '-'}
+                  ${currentOperator.siret ? escapeHtml(currentOperator.siret) : '-'}
                 </p>
                 <p>
                   <span class="title-header">Numéro pacage&nbsp;:</span>
-                  ${currentOperator.numeroPacage ?? currentOperator.numeros_pacage ?? '-'}
+                  ${escapeHtml(currentOperator.numeroPacage ?? currentOperator.numeros_pacage ?? '-')}
                 </p>
                 <p>
                   <span class="title-header">Adresse&nbsp;:</span>
-                  ${currentOperator.adressesOperateurs[0].lieu
-                  ? currentOperator.adressesOperateurs[0].lieu
+                  ${currentOperator.adressesOperateurs[0]?.lieu
+                  ? escapeHtml(currentOperator.adressesOperateurs[0]?.lieu)
                   : '-'}
                   <br />
-                  ${currentOperator.adressesOperateurs[0].codePostal
-                  ? currentOperator.adressesOperateurs[0].codePostal
+                  ${currentOperator.adressesOperateurs[0]?.codePostal
+                  ? escapeHtml(currentOperator.adressesOperateurs[0]?.codePostal)
                   : '-'}
-                  ${currentOperator.adressesOperateurs[0].ville
-                  ? currentOperator.adressesOperateurs[0].ville
+                  ${currentOperator.adressesOperateurs[0]?.ville
+                  ? escapeHtml(currentOperator.adressesOperateurs[0]?.ville)
                   : '-'}
                 </p>
               </div>
@@ -656,7 +667,7 @@ async function createPdfContent (numeroBio: string, recordId: string, parcelles:
                 </p>
                 <p>
                   <span class="title-header">Certifié par&nbsp;:</span>
-                  ${currentOperator.oc_label ? currentOperator.oc_label : '-'}
+                  ${currentOperator.oc_label ? escapeHtml(currentOperator.oc_label) : '-'}
                 </p>
                 <p>
                   <span class="title-header">Date d'audit&nbsp;:</span>
@@ -724,17 +735,17 @@ async function createPdfContent (numeroBio: string, recordId: string, parcelles:
           </tr>
         </thead>
         <tbody>
-          ${Object.keys(sortedGroupedParcels).map(groupKey => `
-          ${sortedGroupedParcels[groupKey].map(parcel => `
+          ${Object.entries(sortedGroupedParcels).map(([groupKey, parcels]) => `
+          ${parcels.map(parcel => `
           <tr class="global-ligne">
-            <td>${parcel.name || '-'}</td>
+            <td>${parcel.name ? escapeHtml(parcel.name) : '-'}</td>
             <td>
               ${parcel.nbilot
 ? `Ilot ${parcel.nbilot || '-'} - Parcelle
               ${parcel.nbp || ''}`
 : parcel.refcad
 ? parcel.refcad.map((e) =>
-              formatRefCad(e)).join(' ; ')
+              escapeHtml(formatRefCad(e))).join(' ; ')
 : '-'}
             </td>
             <td>
@@ -751,7 +762,7 @@ async function createPdfContent (numeroBio: string, recordId: string, parcelles:
 ? 'Conventionnel'
               : parcel.conversion_niveau || '-'}
             </td>
-            <td>${parcel.commune || '-'}</td>
+            <td>${parcel.commune ? escapeHtml(parcel.commune) : '-'}</td>
             <td class="text-right">
               ${(parcel.superficie_totale_ha || 0).toFixed(2).replace('.',
               ',')} ha
@@ -766,7 +777,7 @@ async function createPdfContent (numeroBio: string, recordId: string, parcelles:
             </td>
             <td class="text-right" colspan="2">Surface totale :</td>
             <td class="text-right">
-              ${groupTotals[groupKey].toFixed(2).replace('.', ',')} ha
+              ${(groupTotals[groupKey] ?? 0).toFixed(2).replace('.', ',')} ha
             </td>
           </tr>
           `).join('')}
@@ -828,7 +839,7 @@ async function createPdfContent (numeroBio: string, recordId: string, parcelles:
       document.body.style.fontFamily = 'Marianne, sans-serif'
     })
     await page.pdf({
-      path: `storage/pdf/${numeroBio}-${recordId}-${dateTraitement}-1.pdf`,
+      path: `${config.get('attestationsProductions.directory')}/${numeroBio}-${recordId}-${dateTraitement}-1.pdf`,
       format: 'A4',
       landscape: true,
       printBackground: true,
@@ -852,26 +863,26 @@ async function createPdfContent (numeroBio: string, recordId: string, parcelles:
     pdf.push(
       await mergeAndAddFooter(
         [
-          `storage/pdf/${numeroBio}-${recordId}-${dateTraitement}-1.pdf`,
-          `storage/pdf/${numeroBio}-${recordId}-${dateTraitement}-2.pdf`
+          `${config.get('attestationsProductions.directory')}/${numeroBio}-${recordId}-${dateTraitement}-1.pdf`,
+          `${config.get('attestationsProductions.directory')}/${numeroBio}-${recordId}-${dateTraitement}-2.pdf`
         ],
-        currentOperator.nom,
+        currentOperator.nom ?? '',
         false
       )
     )
 
     pdf.push(
       await mergeAndAddFooter(
-        [`storage/pdf/${numeroBio}-${recordId}-${dateTraitement}-1.pdf`],
-        currentOperator.nom,
+        [`${config.get('attestationsProductions.directory')}/${numeroBio}-${recordId}-${dateTraitement}-1.pdf`],
+        currentOperator.nom ?? '',
         true
       )
     )
   } else {
     pdf.push(
       await mergeAndAddFooter(
-        [`storage/pdf/${numeroBio}-${recordId}-${dateTraitement}-1.pdf`],
-        currentOperator.nom,
+        [`${config.get('attestationsProductions.directory')}/${numeroBio}-${recordId}-${dateTraitement}-1.pdf`],
+        currentOperator.nom ?? '',
         false
       )
     )

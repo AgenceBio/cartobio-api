@@ -1,25 +1,20 @@
-FROM node:24-alpine3.22
+FROM node:24-slim
 
-RUN apk add --update unzip gdal-dev cmake build-base python3
+ENV CHROME_BIN="/usr/bin/chromium" \
+    PUPPETEER_SKIP_DOWNLOAD="true" \
+    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD="true"
 
-ENV CHROME_BIN="/usr/bin/chromium-browser" \
-      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD="true"
-
-RUN apk add --no-cache \
-      chromium-swiftshader \
-      nss \
-      freetype \
-      harfbuzz \
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      chromium \
+      fonts-freefont-ttf \
       ca-certificates \
-      ttf-freefont \
-      nodejs \
-      yarn \
-      mesa-dri-gallium \
-      mesa-egl \
-      mesa-gl \
-      libx11-dev \
-      libxext-dev \
-      curl
+      curl \
+      unzip \
+      libgl1 \
+      libegl1 \
+      libgl1-mesa-dri \
+ && rm -rf /var/lib/apt/lists/*
 
 # Create app directory
 WORKDIR /usr/src/app
@@ -30,11 +25,10 @@ WORKDIR /usr/src/app
 COPY --chown=node:node package*.json ./
 COPY --chown=node:node packages/cartobio-types/package.json ./packages/cartobio-types/package.json
 
-# If building deps fails, the answer is: aim for pre-built binaries
+# gdal-async : on Debian (glibc), the pre-built binary is downloaded, no compilation needed
 # https://www.npmjs.com/package/gdal-async#user-content-unit-tested-platforms-with-pre-built-binaries
-# And until arm64 prebuilt images are provided, we branch out
-# https://github.com/mmomtchev/node-gdal-async/issues/30#issuecomment-1275888379
-RUN npm ci --build-from-source --shared_gdal
+# Note: no arm64 pre-built binary for Node 24 -> on arm64, add python3 make g++ above
+RUN npm ci
 
 # Bundle app source and compile TypeScript (dist/)
 COPY --chown=node:node tsconfig.base.json tsconfig.json tsconfig.build.json ./
@@ -47,16 +41,16 @@ RUN npm run build
 COPY --chown=node:node ./data ./data
 RUN npm run build:geo-data
 
-COPY --chown=node:node ./database/old_migrations ./database/old_migrations
+COPY --chown=node:node drizzle.config.ts ./
+COPY --chown=node:node ./database/drizzle ./database/drizzle
 COPY --chown=node:node ./assets ./assets
 COPY --chown=node:node ./storage/pdf ./storage/pdf/
 
-EXPOSE  8000
-ENV     NODE_ENV  production
-ENV     PORT      8000
-ENV     HOST      0.0.0.0
-
-ENV CHROMIUM_FLAGS="--disable-software-rasterizer --disable-dev-shm-usage"
+EXPOSE 8000
+ENV NODE_ENV=production \
+    PORT=8000 \
+    HOST=0.0.0.0 \
+    CHROMIUM_FLAGS="--disable-software-rasterizer --disable-dev-shm-usage"
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD curl -f http://localhost:8000/api/v3/health || exit 1

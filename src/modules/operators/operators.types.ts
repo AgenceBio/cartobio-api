@@ -1,4 +1,4 @@
-import type { AgenceBioNormalizedOperatorWithRecord } from '@agencebio/cartobio-types'
+import type { AgenceBioNormalizedOperator, AgenceBioNormalizedOperatorWithRecord } from '@agencebio/cartobio-types'
 import type { CertificationEtat } from '../../database/validations/parcellaires.js'
 
 export type NumeroBio = string | number
@@ -18,7 +18,7 @@ export type OperatorRecordRow = {
   user_role: string | null
 }
 
-export type OperatorRecordData = Omit<OperatorRecordRow, 'created_at' | 'updated_at'> & {
+type OperatorRecordData = Omit<OperatorRecordRow, 'created_at' | 'updated_at'> & {
   created_at: string
   updated_at: string
   lastcertifieddate: number | null
@@ -34,8 +34,8 @@ export type OperatorRecordWithUser<T> = Omit<T, 'user_id' | 'user_role'> & {
 }
 
 export type ImportPacRow = {
-  size: string | null
-  nb_parcelles: string | null
+  size: number | null
+  nb_parcelles: number | null
   pacage: string | null
   imported: boolean
   record: unknown
@@ -44,4 +44,15 @@ export type ImportPacRow = {
 export type DashboardStateRow = {
   certifie: boolean
   numerobios: string[]
+}
+
+export type AgenceBioNormalizedOperatorWithFilterData = AgenceBioNormalizedOperator & {
+  lastmixitestate?: string | null
+  states?: Array<{
+    certification_state: string
+    annee_reference_controle: number
+  }>
+  list_oc_id?: number[]
+  max_audit_date?: string | null
+  metadata?: Record<string, unknown>
 }

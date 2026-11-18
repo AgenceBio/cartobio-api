@@ -16,21 +16,41 @@ import { getRandomFeatureId } from '../../../shared/outputs/features.js'
 
 const { toWgs84 } = reproject
 
-type GmlLinearRing = { 'gml:LinearRing': { 'gml:coordinates': string } }
-type GmlPolygon = { 'gml:outerBoundaryIs': GmlLinearRing; 'gml:innerBoundaryIs'?: GmlLinearRing[] }
-interface TelepacXmlParcelle {
-  'descriptif-parcelle': {
-    '@_numero-parcelle': string
-    'agri-bio'?: { '@_conduite-bio'?: string }
-    'culture-principale': { 'code-culture': string; precision?: string }
-  }
-  geometrie: { 'gml:Polygon': GmlPolygon }
-}
-interface TelepacXmlIlot {
-  '@_numero-ilot': string
-  commune?: string
-  parcelles: { parcelle: TelepacXmlParcelle[] }
-}
+const gmlLinearRingSchema = z.looseObject({ 'gml:LinearRing': z.looseObject({ 'gml:coordinates': z.string() }) })
+
+const gmlPolygonSchema = z.looseObject({
+  'gml:outerBoundaryIs': gmlLinearRingSchema,
+  'gml:innerBoundaryIs': z.array(gmlLinearRingSchema).optional()
+})
+
+type GmlPolygon = z.infer<typeof gmlPolygonSchema>
+
+const telepacXmlParcelleSchema = z.looseObject({
+  'descriptif-parcelle': z.looseObject({
+    '@_numero-parcelle': z.string(),
+    'agri-bio': z.looseObject({ '@_conduite-bio': z.string().optional() }).optional(),
+    'culture-principale': z.looseObject({ 'code-culture': z.string(), precision: z.string().optional() })
+  }),
+  geometrie: z.looseObject({ 'gml:Polygon': gmlPolygonSchema })
+})
+
+const telepacXmlIlotSchema = z.looseObject({
+  '@_numero-ilot': z.string(),
+  commune: z.string().optional(),
+  parcelles: z.looseObject({ parcelle: z.array(telepacXmlParcelleSchema) })
+})
+
+const telepacXmlSchema = z.looseObject({
+  producteurs: z.looseObject({
+    producteur: z.looseObject({
+      '@_numero-pacage': z.string(),
+      rpg: z.looseObject({
+        ilot: z.array(telepacXmlIlotSchema).optional(),
+        ilots: z.looseObject({ ilot: z.array(telepacXmlIlotSchema) }).optional()
+      }).refine((rpg) => rpg.ilot ?? rpg.ilots, { message: 'Aucun îlot dans le fichier' })
+    })
+  })
+})
 
 const telepacPropertiesSchema = z.looseObject({
   AGRIBIO: z.int().min(0).max(1).optional(),
@@ -39,13 +59,14 @@ const telepacPropertiesSchema = z.looseObject({
   NUMERO_I: z.int(),
   NUMERO_P: z.int(),
   PACAGE: z.string().regex(/^[A-Z0-9]{8,9}$/u),
-  TYPE: z.string().regex(/^[A-Z0-9]{3}$/u)
+  TYPE: z.string().regex(/^[A-Z0-9]{3}$/u),
+  CODE_VAR: z.string().nullish()
 })
 
-const removeEmptyElements = (item: unknown) => item
+const removeEmptyElements = (item: unknown): unknown => item
 
 
-async function parseTelepacArchive (file: Promise<MultipartFile | undefined>) {
+async function parseTelepacArchive (file: Promise<MultipartFile | undefined>): Promise<FeatureCollection> {
   const data = await file
   if (!data) throw new InvalidRequestApiError('Aucun fichier transmis.')
   const stream = await FileType.stream(data.file)
@@ -72,70 +93,69 @@ async function fromShapefileArchive (stream: FileType.ReadableStreamWithFileType
     features: []
   }
 
-  if (!files.length) {
-    throw new InvalidRequestApiError('Il ne s\'agit pas d\'un fichier Telepac "Parcelles déclarées" ou "Parcelles instruites".')
-  }
-
-  // validateSchema(geojson.features)
-  for await (const filepath of files) {
-    const dataset = await gdal.openAsync(filepath)
-
-    for await (const layer of dataset.layers) {
-      const srs = await detectSrs(layer)
-      const reprojectFn = new gdal.CoordinateTransformation(srs, wgs84)
-
-      for await (const feature of layer.features) {
-        const names = feature.fields.getNames()
-        const geometry = feature.getGeometry()
-        if (!geometry) {
-          await dataset.close()
-          await cleanup()
-          throw new InvalidRequestApiError('Le fichier Telepac contient une parcelle sans géométrie.')
-        }
-        await geometry.transformAsync(reprojectFn)
-        const id = names.includes('id') ? feature.fields.get('id') : getRandomFeatureId()
-        const properties = feature.fields.toObject()
-
-        if (!telepacPropertiesSchema.safeParse(properties).success) {
-          await dataset.close()
-          await cleanup()
-
-          throw new InvalidRequestApiError('Il ne s\'agit pas d\'un fichier Telepac "Parcelles déclarées" ou "Parcelles instruites".')
-        }
-
-        const { AGRIBIO, CAMPAGNE, CODE_VAR, COMMUNE, NUMERO_I, NUMERO_P, PACAGE, TYPE } = properties
-
-        featureCollection.features.push({
-          type: 'Feature',
-          id,
-          geometry: geometry.toObject(),
-          properties: {
-            id,
-            BIO: AGRIBIO,
-            CAMPAGNE,
-            COMMUNE,
-            cultures: [
-              {
-                id: randomUUID(),
-                CPF: fromCodePacStrict(TYPE, CODE_VAR)?.code_cpf,
-                TYPE
-              }
-            ],
-            conversion_niveau: AGRIBIO === 1 ? EtatProduction.BIO : EtatProduction.NB,
-            NUMERO_I,
-            NUMERO_P,
-            PACAGE,
-            ...(TYPE ? { TYPE } : {}),
-            ...(CODE_VAR ? { CODE_VAR } : {})
-          }
-        })
-      }
+  try {
+    if (!files.length) {
+      throw new InvalidRequestApiError('Il ne s\'agit pas d\'un fichier Telepac "Parcelles déclarées" ou "Parcelles instruites".')
     }
 
-    await dataset.close()
-  }
+    // validateSchema(geojson.features)
+    for await (const filepath of files) {
+      const dataset = await gdal.openAsync(filepath)
 
-  await cleanup()
+      try {
+        for await (const layer of dataset.layers) {
+          const srs = await detectSrs(layer)
+          const reprojectFn = new gdal.CoordinateTransformation(srs, wgs84)
+
+          for await (const feature of layer.features) {
+            const names = feature.fields.getNames()
+            const geometry = feature.getGeometry()
+            if (!geometry) {
+              throw new InvalidRequestApiError('Le fichier Telepac contient une parcelle sans géométrie.')
+            }
+            await geometry.transformAsync(reprojectFn)
+            const id = names.includes('id') ? feature.fields.get('id') : getRandomFeatureId()
+            const properties = telepacPropertiesSchema.safeParse(feature.fields.toObject())
+
+            if (!properties.success) {
+              throw new InvalidRequestApiError('Il ne s\'agit pas d\'un fichier Telepac "Parcelles déclarées" ou "Parcelles instruites".', { cause: properties.error })
+            }
+
+            const { AGRIBIO, CAMPAGNE, CODE_VAR, COMMUNE, NUMERO_I, NUMERO_P, PACAGE, TYPE } = properties.data
+
+            featureCollection.features.push({
+              type: 'Feature',
+              id,
+              geometry: geometry.toObject(),
+              properties: {
+                id,
+                BIO: AGRIBIO,
+                CAMPAGNE,
+                COMMUNE,
+                cultures: [
+                  {
+                    id: randomUUID(),
+                    CPF: fromCodePacStrict(TYPE, CODE_VAR ?? undefined)?.code_cpf,
+                    TYPE
+                  }
+                ],
+                conversion_niveau: AGRIBIO === 1 ? EtatProduction.BIO : EtatProduction.NB,
+                NUMERO_I,
+                NUMERO_P,
+                PACAGE,
+                ...(TYPE ? { TYPE } : {}),
+                ...(CODE_VAR ? { CODE_VAR } : {})
+              }
+            })
+          }
+        }
+      } finally {
+        await dataset.close()
+      }
+    }
+  } finally {
+    await cleanup()
+  }
 
   return featureCollection
 }
@@ -147,7 +167,7 @@ function toGeoJSONCoordinates (gmlCoordinates: string): import('geojson').Positi
     // we split the single unit of X,Y into array pairs of [X, Y]
     .map(unit => unit.split(','))
     // turn them into floats
-    .map(([X, Y]) => [parseFloat(X), parseFloat(Y)])
+    .map(([X = '', Y = '']) => [parseFloat(X), parseFloat(Y)])
 }
 
 /**
@@ -172,14 +192,16 @@ function gmlGeometryToGeoJSONGeometry (gmlPolygon: GmlPolygon): import('geojson'
  * For now, it works only with Metropole projection
  */
 async function fromXMLFile (xmlContent: string): Promise<FeatureCollection> {
-  const xml = new XMLParser({
+  const parsed = telepacXmlSchema.safeParse(new XMLParser({
     ignoreAttributes: false,
     parseTagValue: false,
-    isArray: (name, jpath, isLeafNode, isAttribute) => ['ilot', 'parcelle', 'gml:innerBoundaryIs'].includes(name) && !isAttribute && !isLeafNode
-  }).parse(xmlContent)
+    isArray: (name, _jpath, isLeafNode, isAttribute) => ['ilot', 'parcelle', 'gml:innerBoundaryIs'].includes(name) && !isAttribute && !isLeafNode
+  }).parse(xmlContent))
+  if (!parsed.success) throw new InvalidRequestApiError('Le fichier Telepac XML est invalide.', { cause: parsed.error })
 
-  const PACAGE = xml.producteurs.producteur['@_numero-pacage']
-  const ilots: TelepacXmlIlot[] = xml.producteurs.producteur.rpg.ilot ?? xml.producteurs.producteur.rpg.ilots.ilot
+  const { producteur } = parsed.data.producteurs
+  const PACAGE = producteur['@_numero-pacage']
+  const ilots = producteur.rpg.ilot ?? producteur.rpg.ilots?.ilot ?? []
 
   const geojson = featureCollection(ilots.flatMap(ilot => {
     const { '@_numero-ilot': NUMERO_I, commune: COMMUNE } = ilot

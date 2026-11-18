@@ -1,21 +1,19 @@
 import { createInsertSchema, createUpdateSchema } from 'drizzle-orm/zod';
 import { z } from 'zod';
 import { certificationType } from '../schema/enums.js';
-import { parcellaires } from '../schema/parcellaires.js';
+import { parcellaires, parcellairesEvenements, parcellairesMetadata } from '../schema/parcellaires.js';
+import { emptyToNull } from './helpers.js';
 
 export const certificationEtatEnumSchema = z.enum(certificationType.enumValues);
 
 export type CertificationEtat = z.infer<typeof certificationEtatEnumSchema>;
 
-const emptyStringToNull = <T extends z.ZodTypeAny>(schema: T) =>
-  z.preprocess((value) => (value === '' ? null : value), schema.nullable());
-
 export const createParcellaireSchema = createInsertSchema(parcellaires, {
   numeroBio: (schema) => schema.int().positive(),
   anneeReferenceControle: (schema) => schema.int().min(2020).max(2100),
   versionNom: (schema) => schema.trim().min(1).max(255),
-  auditNotesCertif: () => emptyStringToNull(z.string().trim().max(10_000)),
-  auditDemandesOperateur: () => emptyStringToNull(z.string().trim().max(10_000)),
+  auditNotesCertif: () => emptyToNull(z.string().trim().max(10_000)),
+  auditDemandesOperateur: () => emptyToNull(z.string().trim().max(10_000)),
 })
   .omit({
     recordId: true,
@@ -27,8 +25,8 @@ export const createParcellaireSchema = createInsertSchema(parcellaires, {
 
 export const updateParcellaireSchema = createUpdateSchema(parcellaires, {
   numeroBio: (schema) => schema.int().positive(),
-  auditNotesCertif: () => emptyStringToNull(z.string().trim().max(10_000)),
-  auditDemandesOperateur: () => emptyStringToNull(z.string().trim().max(10_000)),
+  auditNotesCertif: () => emptyToNull(z.string().trim().max(10_000)),
+  auditDemandesOperateur: () => emptyToNull(z.string().trim().max(10_000)),
 })
   .omit({
     recordId: true,
@@ -41,5 +39,10 @@ export const updateParcellaireSchema = createUpdateSchema(parcellaires, {
     message: 'Au moins un champ doit être fourni.',
   });
 
-export type CreateParcellaireInput = z.infer<typeof createParcellaireSchema>;
-export type UpdateParcellaireInput = z.infer<typeof updateParcellaireSchema>;
+export const createParcellaireEvenementSchema = createInsertSchema(parcellairesEvenements)
+  .omit({
+    id: true,
+  })
+  .strict();
+
+export const createParcellaireMetadataSchema = createInsertSchema(parcellairesMetadata).strict();

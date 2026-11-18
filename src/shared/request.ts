@@ -1,10 +1,17 @@
 import type { FastifyRequest } from 'fastify'
-import type { AgenceBioNormalizedOperator, CartoBioOCUser, NormalizedRecord, OrganismeCertificateur } from '@agencebio/cartobio-types'
-import { NotFoundApiError, UnauthorizedApiError } from './errors.js'
+import type { AgenceBioNormalizedOperator, CartoBioOCUser, CartoBioUser, NormalizedRecord, OrganismeCertificateur } from '@agencebio/cartobio-types'
+import { ForbiddenApiError, NotFoundApiError, UnauthorizedApiError } from './errors.js'
 
-export function requireUser (request: FastifyRequest): CartoBioOCUser {
+export function requireUser (request: FastifyRequest): CartoBioUser {
   if (!request.user) throw new UnauthorizedApiError('un jeton d\'API est nécessaire pour accéder à ce contenu.')
   return request.user
+}
+
+export function requireOcUser (request: FastifyRequest): CartoBioOCUser {
+  const user = requireUser(request)
+  const { organismeCertificateur } = user
+  if (!organismeCertificateur) throw new ForbiddenApiError('Accès réservé aux organismes certificateurs')
+  return { ...user, organismeCertificateur }
 }
 
 export function requireOperator (request: FastifyRequest): AgenceBioNormalizedOperator {

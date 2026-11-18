@@ -31,6 +31,19 @@ const EventType = {
   FEATURE_UPDATE: 'FeatureUpdate'
 } as const
 
+const MetadataSource = {
+  TELEPAC: 'TELEPAC',
+  API_PARCELLAIRE: 'API_PARCELLAIRE',
+  ANYGEO: 'ANYGEO',
+  GEOFOLIA: 'GEOFOLIA',
+  MES_PARCELLES: 'MES_PARCELLES',
+  CVI: 'CVI',
+  RPG: 'RPG',
+  MANUEL: 'MANUEL',
+  COPIE_VERSION: 'COPIE_VERSION',
+  COPIE_CONFLIT: 'COPIE_CONFLIT'
+} as const
+
 const Area = {
   METROPOLE: 'metropole',
   ANTILLES: 'antilles',
@@ -76,6 +89,7 @@ export {
   CertificationState,
   EtatProduction,
   EventType,
+  MetadataSource,
   LegalProjections,
   RegionBounds,
   AttestationsProductionsStatus,
@@ -85,6 +99,7 @@ export {
 export type CertificationState = (typeof CertificationState)[keyof typeof CertificationState]
 export type EtatProduction = (typeof EtatProduction)[keyof typeof EtatProduction]
 export type EventType = (typeof EventType)[keyof typeof EventType]
+export type MetadataSource = (typeof MetadataSource)[keyof typeof MetadataSource]
 export type LegalProjections = (typeof LegalProjections)[keyof typeof LegalProjections]
 export type RegionBounds = (typeof RegionBounds)[keyof typeof RegionBounds]
 export type AttestationsProductionsStatus = (typeof AttestationsProductionsStatus)[keyof typeof AttestationsProductionsStatus]

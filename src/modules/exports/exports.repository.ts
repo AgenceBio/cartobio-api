@@ -10,13 +10,14 @@ import {
   parcelles
 } from '../../database/schema/index.js'
 import type { AttestationsProductionsStatus, AttestationsProductionsType, CartoBioCulture } from '@agencebio/cartobio-types'
+import { createAttestationProductionSchema } from '../../database/validations/activites.js'
 import { sansDateParDefaut, surfaceHa } from './exports.utils.js'
 import type { AttestationProduction, ExportRow, PdfParcelle, PdfRecord } from './exports.types.js'
 
 async function updateAttestationsProductions (recordId: string, status: AttestationsProductionsStatus, type: AttestationsProductionsType, path: string | null = null): Promise<void> {
   await db
     .insert(attestationsProduction)
-    .values({ recordId, type, status, path })
+    .values(createAttestationProductionSchema.parse({ recordId, type, status, path }))
     .onConflictDoUpdate({
       target: [attestationsProduction.recordId, attestationsProduction.type],
       set: { status, path, updatedAt: sql`CURRENT_TIMESTAMP` }

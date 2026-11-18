@@ -1,33 +1,114 @@
 import { z } from 'zod'
+import { text, textOrNumber } from './helpers.js'
+import { EtatProduction } from '../enums.js'
 import { bboxSchema, dateTimeSchema, outputGeometrySchema } from './common.js'
 
-const nullableString = (description: string) => z.string().nullable().optional().meta({ description })
-const stringOrNumber = (description: string) => z.union([z.string(), z.number()]).nullable().optional().meta({ description })
+const numberOrString = (description: string): z.ZodUnion<readonly [z.ZodNumber, z.ZodString]> => z.union([z.number(), z.string()]).meta({ description })
+
+export const inputApiCultureSchema = z.object({
+  codeCPF: z.string().meta({ description: 'Code CPF de la culture' }),
+  dateSemis: z.string().optional().meta({ description: 'Date de semis' }),
+  variete: z.string().optional().meta({ description: 'Variété' }),
+  quantite: numberOrString('Surface de la culture, dans l\'unité `unite`'),
+  unite: z.enum(['ha', '%']).optional().meta({ description: 'Unité de la surface' })
+})
+
+export const inputApiParcelleSchema = z.object({
+  id: numberOrString('Identifiant de la parcelle'),
+  dateEngagement: z.string().meta({ description: 'Date d\'engagement en bio' }),
+  etatProduction: z.enum(EtatProduction).meta({ description: 'Niveau de conversion' }),
+  numeroIlot: z.string().optional().meta({ description: 'Numéro d\'îlot PAC' }),
+  commune: z.string().optional().meta({ description: 'Code INSEE de la commune' }),
+  nom: z.string().optional().meta({ description: 'Nom de la parcelle' }),
+  numeroParcelle: z.string().optional().meta({ description: 'Numéro de parcelle PAC' }),
+  commentaire: z.string().optional().meta({ description: 'Notes de l\'auditeur sur la parcelle' }),
+  codeCulture: z.string().optional().meta({ description: 'Code culture PAC' }),
+  codePrecision: z.string().optional().meta({ description: 'Code précision PAC' }),
+  geom: z.string().meta({ description: 'Géométrie GeoJSON sérialisée' }),
+  culture: z.array(inputApiCultureSchema).meta({ description: 'Cultures (ancien nom de `cultures`)' }),
+  cultures: z.array(inputApiCultureSchema).optional().meta({ description: 'Cultures' }),
+  enAttentePac: z.union([z.boolean(), z.number()]).optional().meta({ description: 'Parcelle en attente de la déclaration PAC' })
+})
+
+export const inputApiRecordSchema = z.object({
+  numeroBio: numberOrString('Numéro bio de l\'opérateur'),
+  numeroClient: numberOrString('Numéro client de l\'opérateur chez l\'OC'),
+  anneeReferenceControle: z.number().meta({ description: 'Année de référence du contrôle' }),
+  anneeAssolement: z.number().meta({ description: 'Année de l\'assolement' }),
+  commentaire: z.string().optional().meta({ description: 'Notes de l\'audit' }),
+  dateAudit: z.string().meta({ description: 'Date d\'audit' }),
+  dateCertificationDebut: z.string().optional().meta({ description: 'Début de validité de la certification' }),
+  dateCertificationFin: z.string().optional().meta({ description: 'Fin de validité de la certification' }),
+  numeroPacage: numberOrString('Numéro PACAGE'),
+  parcelles: z.array(inputApiParcelleSchema).meta({ description: 'Parcelles' })
+})
+
+const optionalNumberOrString = z.union([z.number(), z.string()]).nullish()
+
+const optionalYear = z.preprocess((value) => value === '' ? null : value, z.coerce.number().int().nullish())
+
+export const inputApiCultureBodySchema = z.looseObject({
+  codeCPF: z.string().optional(),
+  dateSemis: z.string().optional(),
+  variete: z.string().optional(),
+  quantite: optionalNumberOrString,
+  unite: z.enum(['ha', '%']).optional()
+})
+
+export const inputApiParcelleBodySchema = z.looseObject({
+  id: optionalNumberOrString,
+  dateEngagement: z.string().nullish(),
+  etatProduction: z.string().nullish(),
+  numeroIlot: optionalNumberOrString,
+  commune: z.string().nullish(),
+  nom: z.string().nullish(),
+  numeroParcelle: optionalNumberOrString,
+  commentaire: z.string().nullish(),
+  codeCulture: z.string().nullish(),
+  codePrecision: z.string().nullish(),
+  geom: z.string().nullish(),
+  culture: z.array(inputApiCultureBodySchema).nullish(),
+  cultures: z.array(inputApiCultureBodySchema).nullish(),
+  enAttentePac: z.union([z.boolean(), z.number()]).nullish()
+})
+
+export const inputApiRecordBodySchema = z.looseObject({
+  numeroBio: optionalNumberOrString,
+  numeroClient: optionalNumberOrString,
+  anneeReferenceControle: optionalYear,
+  anneeAssolement: optionalYear,
+  commentaire: z.string().nullish(),
+  dateAudit: z.string().nullish(),
+  dateCertificationDebut: z.string().nullish(),
+  dateCertificationFin: z.string().nullish(),
+  numeroPacage: optionalNumberOrString,
+  parcelles: z.array(inputApiParcelleBodySchema)
+}).meta({ description: 'Un parcellaire (`numeroBio`, `numeroClient`, `dateAudit`, `parcelles`…). Les champs obligatoires sont contrôlés après réception et signalés dans `listeProblemes`.' })
 
 export const outputApiCultureSchema = z.looseObject({
   cpf: z.string().optional().meta({ description: 'Code CPF de la culture', examples: ['01.19.10.8'] }),
   surface: z.number().nullable().optional().meta({ description: 'Surface de la culture, dans l\'unité `unite`' }),
   unite: z.enum(['ha', '%']).optional().meta({ description: 'Unité de la surface' }),
-  variete: nullableString('Variété'),
-  dateSemis: nullableString('Date de semis')
+  variete: text('Variété'),
+  dateSemis: text('Date de semis')
 })
 
 export const outputApiFeaturePropertiesSchema = z.looseObject({
   id: z.string().meta({ description: 'Identifiant de la parcelle' }),
   surface: z.number().meta({ description: 'Surface en hectares, calculée en projection légale' }),
-  commune: nullableString('Code INSEE de la commune'),
+  commune: text('Code INSEE de la commune'),
   cultures: z.array(outputApiCultureSchema),
   niveauConversion: z.string().nullable().optional().meta({ description: 'Niveau de conversion : `CONV`, `AB?`, `C1`, `C2`, `C3` ou `AB`' }),
   dateEngagement: dateTimeSchema.nullable().optional().meta({ description: 'Date d\'engagement en bio' }),
-  commentaire: nullableString('Notes de l\'auditeur sur la parcelle'),
+  commentaire: text('Notes de l\'auditeur sur la parcelle'),
   annotations: z.array(z.unknown()).nullable().optional().meta({ description: 'Annotations de l\'auditeur' }),
   dateAjout: dateTimeSchema.nullable().optional().meta({ description: 'Date de création de la parcelle' }),
   dateMiseAJour: dateTimeSchema.nullable().optional().meta({ description: 'Date de dernière modification de la parcelle' }),
-  nom: nullableString('Nom de la parcelle'),
-  numeroPacage: stringOrNumber('Numéro PACAGE'),
-  numeroIlotPAC: stringOrNumber('Numéro d\'îlot PAC'),
-  numeroParcellePAC: stringOrNumber('Numéro de parcelle PAC'),
-  referenceCadastrale: nullableString('Références cadastrales, séparées par des espaces')
+  nom: text('Nom de la parcelle'),
+  numeroPacage: textOrNumber('Numéro PACAGE'),
+  numeroIlotPAC: textOrNumber('Numéro d\'îlot PAC'),
+  numeroParcellePAC: textOrNumber('Numéro de parcelle PAC'),
+  referenceCadastrale: text('Références cadastrales, séparées par des espaces')
 })
 
 export const outputApiParcelleSchema = z.object({
@@ -43,8 +124,8 @@ export const outputApiCertificationSchema = z.looseObject({
   dateAudit: dateTimeSchema.nullable().optional().meta({ description: 'Date d\'audit' }),
   dateDebut: dateTimeSchema.nullable().optional().meta({ description: 'Début de validité de la certification' }),
   dateFin: dateTimeSchema.nullable().optional().meta({ description: 'Fin de validité de la certification' }),
-  demandesAudit: nullableString('Demandes formulées lors de l\'audit'),
-  notesAudit: nullableString('Notes de l\'audit'),
+  demandesAudit: text('Demandes formulées lors de l\'audit'),
+  notesAudit: text('Notes de l\'audit'),
   anneeReferenceControle: z.number().nullable().optional().meta({ description: 'Année de référence du contrôle' })
 })
 
@@ -131,6 +212,14 @@ export const importNotFoundResponseSchema = z.object({
 })
 
 export type OutputApiRecordResponse = z.infer<typeof outputApiRecordSchema>
+export type OutputApiRecord = z.infer<typeof outputApiRecordSchema>
+export type OutputApiParcelle = z.infer<typeof outputApiParcelleSchema>
+export type OutputApiCulture = z.infer<typeof outputApiCultureSchema>
+export type InputApiRecord = z.infer<typeof inputApiRecordSchema>
+export type InputApiRecordBody = z.infer<typeof inputApiRecordBodySchema>
+export type InputApiParcelleBody = z.infer<typeof inputApiParcelleBodySchema>
+export type InputApiParcelle = z.infer<typeof inputApiParcelleSchema>
+export type InputApiCulture = z.infer<typeof inputApiCultureSchema>
 export type ImportReport = z.infer<typeof importReportSchema>
 export type ImportJobStatusResponse = z.infer<typeof importJobStatusResponseSchema>
 export type ImportSummary = z.infer<typeof importSummarySchema>

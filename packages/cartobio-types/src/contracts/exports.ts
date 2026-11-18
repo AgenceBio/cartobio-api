@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { booleanQuery, opt, text, textOrNumber } from './helpers.js'
 import { dateTimeSchema } from './common.js'
 import { operatorFilterSchema } from './operators.js'
 
@@ -8,9 +9,9 @@ export const exportPdfParamsSchema = z.object({
 })
 
 export const exportPdfQuerySchema = z.object({
-  force_refresh: z.string().optional().meta({ description: 'Régénère l\'attestation même si une version valide existe (`true` / `false`)' }),
-  pac: z.string().optional().meta({ description: 'Attestation limitée aux parcelles PAC, numéros d\'îlot et de parcelle (`true` / `false`)' }),
-  zip: z.string().optional().meta({ description: 'Archive zip des attestations PAC détaillée et complète (`true` / `false`)' })
+  force_refresh: booleanQuery('Régénère l\'attestation même si une version valide existe'),
+  pac: booleanQuery('Attestation limitée aux parcelles PAC, numéros d\'îlot et de parcelle'),
+  zip: booleanQuery('Archive zip des attestations PAC détaillée et complète')
 })
 
 export const exportParcellaireBodySchema = z.object({
@@ -19,10 +20,6 @@ export const exportParcellaireBodySchema = z.object({
     filterForSearch: operatorFilterSchema
   })
 })
-
-const opt = <T extends z.ZodType>(schema: T, description: string) => schema.nullable().optional().meta({ description })
-const text = (description: string) => opt(z.string(), description)
-const textOrNumber = (description: string) => opt(z.union([z.string(), z.number()]), description)
 
 export const exportParcellaireRowSchema = z.looseObject({
   record_id: z.string().meta({ description: 'Identifiant du parcellaire' }),

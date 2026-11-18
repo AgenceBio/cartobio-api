@@ -1,4 +1,4 @@
-import { decodeUserToken, enforceAdminRole, enforceRecord, enforceRecordAndOperator, enforceOperator, verifyAgenceBioToken, enforceAnyFastifyDecorator, compareOperatorOutputAndToken, checkCertification, haveRightToUpdate } from './middlewares.js'
+import { decodeUserToken, enforceAdminRole, enforceRecordAndOperator, enforceOperator, verifyAgenceBioToken, enforceAnyFastifyDecorator, compareOperatorOutputAndToken, checkCertification, haveRightToUpdate } from './middlewares.js'
 import { getRecord } from './parcellaires/parcellaires.service.js'
 import config from '../config/env.js'
 import merge from 'deepmerge'
@@ -8,6 +8,16 @@ import type { RouteShorthandOptions, FastifySchema, FastifyRequest, FastifyReply
 
 export interface CartobioExtendedRouteShorthandOptions extends RouteShorthandOptions {
   schema?: FastifySchema
+}
+
+export type WithSchema<B extends CartobioExtendedRouteShorthandOptions, S extends FastifySchema> = Omit<B, 'schema'> & {
+  schema: Omit<NonNullable<B['schema']>, keyof S> & S
+}
+
+export type ProtectedRoute = {
+  schema: { security: Array<Record<string, string[]>> }
+  onRequest: Array<onRequestHookHandler | ((request: FastifyRequest, reply: FastifyReply) => Promise<void>)>
+  preSerialization: preSerializationHookHandler[]
 }
 
 /**
@@ -38,19 +48,17 @@ function mergeSchemas (...schemas: CartobioExtendedRouteShorthandOptions[]): Car
 }
 
 
-function withSchema<B extends CartobioExtendedRouteShorthandOptions, S extends FastifySchema> (base: B, schema: S) {
-  return { ...base, schema: { ...base.schema, ...schema } } as Omit<B, 'schema'> & {
-    schema: Omit<NonNullable<B['schema']>, keyof S> & S
-  }
+function withSchema<B extends CartobioExtendedRouteShorthandOptions, S extends FastifySchema> (base: B, schema: S): WithSchema<B, S> {
+  return { ...base, schema: { ...base.schema, ...schema } } as WithSchema<B, S>
 }
 
 
-function describedResponse (description: string) {
+function describedResponse (description: string): z.ZodUnknown {
   return z.unknown().meta({ description })
 }
 
 
-function apiError (description: string) {
+function apiError (description: string): typeof apiErrorSchema {
   return apiErrorSchema.meta({ description })
 }
 
@@ -92,13 +100,9 @@ const hiddenSchema: CartobioExtendedRouteShorthandOptions = {
 /**
  * Use to protect a route with one or more authentication methods
  */
-function protectedWithToken ({ oc = false, cartobio = true, admin = false } = {}) {
+function protectedWithToken ({ oc = false, cartobio = true, admin = false } = {}): ProtectedRoute {
   const requiredDecorators: Array<'user' | 'organismeCertificateur'> = []
-  const root: {
-    schema: { security: Array<Record<string, string[]>> }
-    onRequest: Array<onRequestHookHandler | ((request: FastifyRequest, reply: FastifyReply) => Promise<void>)>
-    preSerialization: preSerializationHookHandler[]
-  } = {
+  const root: ProtectedRoute = {
     schema: { security: [] },
     onRequest: [],
     preSerialization: []
@@ -186,16 +190,6 @@ const operatorFromRecordId: CartobioExtendedRouteShorthandOptions = {
   ]
 }
 
-const routeWithRecordId: CartobioExtendedRouteShorthandOptions = {
-  schema: {
-    params: auditParamsSchema
-  },
-
-  preValidation: [
-    enforceRecord({ queryFn: getRecord, param: 'recordId' })
-  ]
-}
-
 export {
   mergeSchemas,
   withSchema,
@@ -208,6 +202,5 @@ export {
   checkCertificationStatus,
   protectedWithToken,
   operatorFromNumeroBio,
-  operatorFromRecordId,
-  routeWithRecordId
+  operatorFromRecordId
 }

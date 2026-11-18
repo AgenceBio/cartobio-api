@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const emptyToNull = <T extends z.ZodTypeAny>(schema: T) =>
+export const emptyToNull = <T extends z.ZodTypeAny>(schema: T): z.ZodPreprocess<z.ZodNullable<T>, unknown> =>
   z.preprocess((value) => (value === "" ? null : value), schema.nullable());
 
 export const isoDate = emptyToNull(

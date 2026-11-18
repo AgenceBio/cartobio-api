@@ -15,9 +15,9 @@ services:
     volumes:
     - "../.env:/usr/src/app/.env:ro"
     environment:
-      DATABASE_URL: postgresql://docker:docker@db:5432/gis
+      TARGET_DATABASE_URL: postgresql://docker:docker@db-18:5432/cartobio
     depends_on:
-    - db
+    - db-18
     ports:
     - 8000:8000
     networks:

@@ -73,6 +73,7 @@ async function findGeometryEquals (input: { old: string; new: string }): Promise
   const records = await db
     .select({
       recordId: parcellaires.recordId,
+      numeroBio: parcellaires.numeroBio,
       auditDate: parcellaires.auditDate,
       anneeReferenceControle: parcellaires.anneeReferenceControle,
       createdAt: parcellaires.createdAt
@@ -83,7 +84,7 @@ async function findGeometryEquals (input: { old: string; new: string }): Promise
   const r1 = records.find(({ recordId }) => recordId === input.old)
   const r2 = records.find(({ recordId }) => recordId === input.new)
 
-  if (!r1 || !r2) return []
+  if (!r1 || !r2 || r1.numeroBio !== r2.numeroBio) return []
 
   const comparisonResult = compareParcellaires(r1, r2)
   const [oldRecordId, newRecordId] = comparisonResult === 'r1_old_r2_new'

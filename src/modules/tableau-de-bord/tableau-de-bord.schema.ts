@@ -1,5 +1,5 @@
 import { generalKpiResponseSchema, historiqueResponseSchema, repetitionsResponseSchema, statsQuerySchema, tableauBilanResponseSchema, tableauErreursResponseSchema, topAnomaliesGroupedResponseSchema, topAnomaliesResponseSchema } from '@agencebio/cartobio-types'
-import { commonErrorResponses, protectedWithToken, TAGS, withSchema } from '../../shared/routes.js'
+import { apiError, commonErrorResponses, protectedWithToken, TAGS, withSchema } from '../../shared/routes.js'
 import type { CartobioExtendedRouteShorthandOptions } from '../../shared/routes.js'
 
 const tableauDeBordRoute = (): CartobioExtendedRouteShorthandOptions => protectedWithToken({ oc: true, cartobio: true })
@@ -37,8 +37,14 @@ export const historiqueSchema = withSchema(tableauDeBordRoute(), {
   tags: [TAGS.SUIVI_API_PARCELLAIRE],
   summary: 'Historique des envois d\'un parcellaire',
   description: 'Parcellaire identifié par le numéro bio ou le numéro client, et la date d\'audit.',
-  querystring: statsQuerySchema.pick({ numeroBio: true, numeroClient: true, auditDate: true }),
-  response: { ...commonErrorResponses, 200: historiqueResponseSchema.meta({ description: 'Envois successifs du parcellaire' }) }
+  querystring: statsQuerySchema
+    .pick({ numeroBio: true, numeroClient: true, auditDate: true })
+    .refine(({ numeroBio, numeroClient }) => numeroBio || numeroClient, { message: 'Le numéro bio ou le numéro client est obligatoire' }),
+  response: {
+    ...commonErrorResponses,
+    200: historiqueResponseSchema.meta({ description: 'Envois successifs du parcellaire' }),
+    400: apiError('Ni numéro bio ni numéro client')
+  }
 })
 
 export const topAnomaliesSchema = withSchema(tableauDeBordRoute(), {
@@ -63,6 +69,10 @@ export const repetitionsSchema = withSchema(tableauDeBordRoute(), {
   tags: [TAGS.SUIVI_API_PARCELLAIRE],
   summary: 'Envois répétés suspects',
   description: 'Parcellaires ayant au moins 4 envois consécutifs de même issue (tous acceptés ou tous refusés).',
-  querystring: statsQuerySchema.pick({ ...paginationRecherche, type: true }),
-  response: { ...commonErrorResponses, 200: repetitionsResponseSchema.meta({ description: 'Page d\'alertes, une par série' }) }
+  querystring: statsQuerySchema.pick({ ...paginationRecherche, type: true }).required({ from: true, to: true }),
+  response: {
+    ...commonErrorResponses,
+    200: repetitionsResponseSchema.meta({ description: 'Page d\'alertes, une par série' }),
+    400: apiError('Période `from` / `to` absente')
+  }
 })

@@ -6,8 +6,16 @@ export function fromGeoJSON (geometry: unknown): SQL {
   return sql`ST_GeomFromGeoJSON(${JSON.stringify(geometry)})`
 }
 
-export function asGeoJSON (geometry: SQLWrapper): SQL<Geometry | null> {
-  return sql<Geometry | null>`ST_AsGeoJSON(${geometry})::json`
+export function wgs84FromGeoJSON (geometry: unknown): SQL {
+  return sql`ST_SetSRID(${fromGeoJSON(geometry)}, 4326)`
+}
+
+export function areaHa (geometry: SQLWrapper): SQL {
+  return sql`round((ST_Area(${geometry}::geography) / 10000)::numeric, 4)`
+}
+
+export function asGeoJSON<T extends Geometry = Geometry> (geometry: SQLWrapper): SQL<T | null> {
+  return sql<T | null>`ST_AsGeoJSON(${geometry})::json`
 }
 
 export function webMercator (geometry: SQLWrapper): SQL {

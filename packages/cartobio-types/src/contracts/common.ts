@@ -6,6 +6,22 @@ export const recordIdParamsSchema = z.object({
   recordId: recordIdSchema
 })
 
+const isExistingDay = (value: string): boolean => {
+  const day = value.slice(0, 10)
+  const date = new Date(`${day}T00:00:00Z`)
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === day && !Number.isNaN(Date.parse(value))
+}
+
+export const isoDateStringSchema = z.string()
+  .regex(/^\d{4}-\d{2}-\d{2}([T ][\d:.]+(Z|[+-]\d{2}:?\d{2})?)?$/)
+  .refine(isExistingDay, { message: 'Date invalide' })
+
+export const optionalIsoDateQuerySchema = z.preprocess((value) => value === '' ? undefined : value, isoDateStringSchema.optional())
+
+export const integerStringSchema = z.string().regex(/^\d+$/)
+
+export const pageStringSchema = z.string().regex(/^[1-9]\d*$/)
+
 export const dateTimeSchema = z.union([z.date(), z.string()]).meta({ description: 'Date au format ISO 8601' })
 
 export const bboxSchema = z.array(z.number()).optional().meta({ description: 'Emprise GeoJSON' })

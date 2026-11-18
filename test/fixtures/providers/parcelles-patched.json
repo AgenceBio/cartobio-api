@@ -14,6 +14,7 @@
       ]
     },
     "commune": "26108",
+    "commune_label": "Crest",
     "conversion_niveau": "AB",
     "engagement_date": "2015-01-01",
     "numero_ilot_pac": "1",
@@ -49,6 +50,7 @@
       ]
     },
     "commune": "26108",
+    "commune_label": "Crest",
     "cultures": [
       { "id": "5910f110-96cb-4557-957c-fb77cae8695f", "CPF": "01.21.12" }
     ],
@@ -109,6 +111,7 @@
       ]
     },
     "commune": "26113",
+    "commune_label": "Die",
     "cultures": [{ "id": 1, "CPF": "01.19.10.8" }],
     "historique_cultures": [
       {

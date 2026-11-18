@@ -34,8 +34,8 @@ describe('dashboard service', () => {
       page: '2',
       limit: '50',
       recherche: 'bio-42',
-      statuts: 'VALID,REJECTED,',
-      etats: 'DONE,ERROR'
+      statuts: ['VALID', 'REJECTED'],
+      etats: ['CREATED', 'UPDATED']
     }, 999)
 
     expect(mockedRepo.getTableauBilanRepo).toHaveBeenCalledWith({
@@ -46,7 +46,7 @@ describe('dashboard service', () => {
       ordreDate: 'desc',
       recherche: 'bio-42',
       statuts: ['VALID', 'REJECTED'],
-      etats: ['DONE', 'ERROR'],
+      etats: ['CREATED', 'UPDATED'],
       organismeCertificateur: 999
     })
     expect(result).toEqual(data)

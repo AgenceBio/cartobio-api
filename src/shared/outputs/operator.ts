@@ -1,4 +1,6 @@
-import type { AgenceBioOperator, AgenceBioNotification, AgenceBioNormalizedOperator, AgenceBioNormalizedOperatorWithFilterData } from '@agencebio/cartobio-types'
+import type { AgenceBioNormalizedOperator } from '@agencebio/cartobio-types'
+import type { AgenceBioOperator, AgenceBioNotification } from '../../clients/agence-bio.types.js'
+import type { AgenceBioNormalizedOperatorWithFilterData } from '../../modules/operators/operators.types.js'
 
 function sortRecord (a: AgenceBioNormalizedOperatorWithFilterData, b: AgenceBioNormalizedOperatorWithFilterData, sortKey?: string | null): number {
   switch (sortKey) {
@@ -42,15 +44,17 @@ function sortRecord (a: AgenceBioNormalizedOperatorWithFilterData, b: AgenceBioN
   } else if (a.nom != null && b.nom == null) {
     res = -1
   } else {
-    const aIsAlphabetical = a.nom.localeCompare('a') >= 0
-    const bIsAlphabetical = b.nom.localeCompare('a') >= 0
+    const aNom = a.nom ?? ''
+    const bNom = b.nom ?? ''
+    const aIsAlphabetical = aNom.localeCompare('a') >= 0
+    const bIsAlphabetical = bNom.localeCompare('a') >= 0
 
     if (!aIsAlphabetical && bIsAlphabetical) {
       res = 1
     } else if (aIsAlphabetical && !bIsAlphabetical) {
       res = -1
     } else {
-      res = a.nom.localeCompare(b.nom)
+      res = aNom.localeCompare(bNom)
     }
   }
   if (sortKey === 'nom-DESC') {
@@ -73,6 +77,7 @@ function formatPacage (numeroPacage: null | string | number): string | null {
 function normalizeOperator (operator: AgenceBioOperator): AgenceBioNormalizedOperator {
   const { id, nom, denominationCourante, siret, numeroBio, numeroPacage, notifications, email, dateEngagement, datePremierEngagement, adressesOperateurs = [] } = operator
   const currentNotifications = notifications ? getNotification(notifications) : null
+  const adresses = adressesOperateurs ?? []
   let organismeCertificateur = {}
   if (currentNotifications && currentNotifications.organismeCertificateurId) {
     organismeCertificateur = {
@@ -88,16 +93,16 @@ function normalizeOperator (operator: AgenceBioOperator): AgenceBioNormalizedOpe
     denominationCourante,
     siret,
     numeroBio,
-    numeroPacage: formatPacage(numeroPacage),
+    numeroPacage: formatPacage(numeroPacage ?? null),
     email,
     dateEngagement,
     datePremierEngagement,
     organismeCertificateur,
-    adressesOperateurs: adressesOperateurs.filter(({ active }) => active).map(({ lat, long, codeCommune, lieu, codePostal, ville }) => ({ lat, long, codeCommune, lieu, codePostal, ville })),
-    codeCommune: adressesOperateurs[0]?.codeCommune ?? null,
-    departement: adressesOperateurs[0]?.codeCommune?.slice(0, -3) ?? null,
-    commune: adressesOperateurs[0]?.ville ?? null,
-    codePostal: adressesOperateurs[0]?.codePostal ?? null,
+    adressesOperateurs: adresses.filter(({ active }) => active).map(({ lat, long, codeCommune, lieu, codePostal, ville }) => ({ lat, long, codeCommune, lieu, codePostal, ville })),
+    codeCommune: adresses[0]?.codeCommune ?? null,
+    departement: adresses[0]?.codeCommune?.slice(0, -3) ?? null,
+    commune: adresses[0]?.ville ?? null,
+    codePostal: adresses[0]?.codePostal ?? null,
     notifications: currentNotifications,
     isProduction: !notifications || notifications.some((n) => !n.activites || n.activites.some(({ id }) => id === 1))
   }
@@ -146,9 +151,7 @@ function getNotification (notifications: AgenceBioNotification[]): AgenceBioNoti
       groupedNotifications[key].push(n)
     })
 
-    Object.keys(groupedNotifications).forEach((key): void => {
-      const group = groupedNotifications[key]
-
+    Object.values(groupedNotifications).forEach((group): void => {
       group.sort((a, b) => {
         if (a.etatCertification === b.etatCertification) {
           if (a.etatCertification === 'ENGAGEE' || a.etatCertification === 'NON ENGAGEE') {
@@ -162,9 +165,10 @@ function getNotification (notifications: AgenceBioNotification[]): AgenceBioNoti
         return 0
       })
     })
-    return Object.values(groupedNotifications).flat()[0]
+    return Object.values(groupedNotifications).flat()[0] ?? null
   } else if (withOldOC.length > 0) {
-    const lastNotification = withOldOC.sort((a, b) => new Date(b.changementDate ?? '').getTime() - new Date(a.changementDate ?? '').getTime())[0]
+    const [lastNotification] = withOldOC.sort((a, b) => new Date(b.changementDate ?? '').getTime() - new Date(a.changementDate ?? '').getTime())
+    if (!lastNotification) return null
     lastNotification.certification_state = 'ARRETEE'
     return lastNotification
   } else return null

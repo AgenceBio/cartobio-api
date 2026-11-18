@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
-import pool from '../src/database/database.js'
-import { withTransaction } from '../src/database/transaction.js'
+import { and, count, isNotNull, lt, sql } from 'drizzle-orm'
+import { db, firstRow } from '../src/database/database.js'
+import { parcellaires, revokedTokens } from '../src/database/schema/index.js'
 
 /**
  * Script de nettoyage des parcellaires supprimés depuis plus de 6 mois
@@ -14,19 +15,17 @@ async function clearRecords (): Promise<void> {
     process.exit(0)
   }
   const dryRun = process.argv[2] === '--dry-run'
+  const expiredRecords = and(
+    isNotNull(parcellaires.deletedAt),
+    lt(parcellaires.deletedAt, sql`NOW() - interval '6 months'`)
+  )
 
   try {
-    const countDeletedRecords = await withTransaction(async (client): Promise<number> => {
-      const queryRes = await client.query(
-        /* sql */`
-          SELECT count(record.record_id)::int as count
-          FROM cartobio_operators record
-          WHERE record.deleted_at IS NOT NULL
-            AND record.deleted_at < (NOW() - interval ' 6 months')
-          `
-      )
-
-      const countRecords: number = queryRes.rows[0].count
+    const countDeletedRecords = await db.transaction(async (tx): Promise<number> => {
+      const { count: countRecords } = firstRow(await tx
+        .select({ count: count(parcellaires.recordId) })
+        .from(parcellaires)
+        .where(expiredRecords))
 
       if (countRecords === 0) {
         console.log('Aucun parcellaire a supprimer')
@@ -39,24 +38,24 @@ async function clearRecords (): Promise<void> {
         return 0
       }
 
-      const deleteRes = await client.query(
-        /* sql */`
-          DELETE
-          FROM cartobio_operators record
-          WHERE record.deleted_at IS NOT NULL
-            AND record.deleted_at < (NOW() - interval ' 6 months')
-          `
-      )
+      const deleteRes = await tx
+        .delete(parcellaires)
+        .where(expiredRecords)
 
       return deleteRes.rowCount ?? 0
     })
 
     console.log(countDeletedRecords, 'parcellaires supprimés')
+
+    if (!dryRun) {
+      const { rowCount } = await db.delete(revokedTokens).where(lt(revokedTokens.expiresAt, sql`NOW()`))
+      console.log(rowCount, 'jetons révoqués expirés supprimés')
+    }
   } catch (error) {
     console.error(error)
     process.exitCode = 1
   } finally {
-    await pool.end()
+    await db.$client.end()
   }
 }
 

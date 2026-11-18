@@ -33,8 +33,6 @@ const EventTypeRules: Array<(event: { eventType: EventType; record: NormalizedRe
 
 /**
  * Determine if a new HistoryEntry should be created
- * @param params.record the previous state of operator record
- * @returns true if a new HistoryEntry should be created
  */
 function shouldCreateHistoryEvent ({ record, eventType }: { record: NormalizedRecord; eventType: EventType }): boolean {
   return EventTypeRules.some(rule => rule({ record, eventType }))

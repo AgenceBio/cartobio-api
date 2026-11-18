@@ -6,6 +6,7 @@
     "lib": ["es2023"],
     "types": [],
     "strict": true,
+    "noUncheckedIndexedAccess": true,
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,

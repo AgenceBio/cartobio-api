@@ -22,6 +22,7 @@ import authRoutes from './modules/auth/auth.routes.js'
 import authExternalRoutes from './modules/auth/auth.external.routes.js'
 import geometryRoutes from './modules/geometry/geometry.routes.js'
 import tableauDeBordRoutes from './modules/tableau-de-bord/tableau-de-bord.routes.js'
+import referentielRoutes from './modules/referentiel/referentiel.routes.js'
 
 config.validate({ allowed: 'strict' })
 
@@ -118,6 +119,7 @@ app.register(exportsRoutes)
 app.register(authRoutes, { stateCache, sign })
 app.register(authExternalRoutes, { stateCache, sign })
 app.register(geometryRoutes)
+app.register(referentielRoutes)
 app.register(tableauDeBordRoutes, { prefix: '/api/v3/tdb-api' })
 
 export default app

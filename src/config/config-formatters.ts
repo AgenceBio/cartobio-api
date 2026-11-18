@@ -2,8 +2,8 @@ import validator from 'validator'
 
 const { isURL, isJWT, isIP, isUUID } = validator
 
-const coerce = (x: unknown) => String(x)
-const coerceMultiline = (x: unknown) => String(x).replace(/\\n/g, '\n')
+const coerce = (x: unknown): string => String(x)
+const coerceMultiline = (x: unknown): string => String(x).replace(/\\n/g, '\n')
 
 export default {
   ipaddress: {
