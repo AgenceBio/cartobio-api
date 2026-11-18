@@ -1,17 +1,18 @@
 import {
+  foreignKey,
   index,
-  pgTable,
   primaryKey,
   text,
   timestamp,
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
+import { cartobio } from "./cartobio.js";
 import { parcellaires } from './parcellaires.js';
 import { parcelles } from './parcelles.js';
 import { productionAttestationStatus, productionAttestationType } from './enums.js';
 
-export const attestationsProduction = pgTable(
+export const attestationsProduction = cartobio.table(
   'attestations_production',
   {
     id: uuid('id').primaryKey().defaultRandom(),
@@ -33,7 +34,7 @@ export const attestationsProduction = pgTable(
   ],
 );
 
-export const parcellairesConsultes = pgTable(
+export const parcellairesConsultes = cartobio.table(
   'parcellaires_consultes',
   {
     recordId: uuid('record_id')
@@ -47,7 +48,7 @@ export const parcellairesConsultes = pgTable(
   (table) => [primaryKey({ columns: [table.recordId, table.userId] })],
 );
 
-export const parcellairesEpingles = pgTable(
+export const parcellairesEpingles = cartobio.table(
   'parcellaires_epingles',
   {
     recordId: uuid('record_id')
@@ -61,15 +62,13 @@ export const parcellairesEpingles = pgTable(
   (table) => [primaryKey({ columns: [table.recordId, table.userId] })],
 );
 
-export const parcellesControles = pgTable(
+export const parcellesControles = cartobio.table(
   'parcelles_controles',
   {
     recordId: uuid('record_id')
       .notNull()
       .references(() => parcellaires.recordId, { onDelete: 'cascade' }),
-    parcelleId: text('parcelle_id')
-      .notNull()
-      .references(() => parcelles.id, { onDelete: 'cascade' }),
+    parcelleId: text('parcelle_id').notNull(),
     userId: varchar('user_id', { length: 255 }).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
@@ -77,5 +76,10 @@ export const parcellesControles = pgTable(
   },
   (table) => [
     primaryKey({ columns: [table.recordId, table.parcelleId, table.userId] }),
+    foreignKey({
+      name: 'parcelles_controles_parcelle_fkey',
+      columns: [table.recordId, table.parcelleId],
+      foreignColumns: [parcelles.recordId, parcelles.id],
+    }).onDelete('cascade'),
   ],
 );

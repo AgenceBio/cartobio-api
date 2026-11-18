@@ -1,5 +1,6 @@
 volumes:
   geo-db-data:
+  db-18-data:
 
 services:
   api:
@@ -36,6 +37,22 @@ services:
       POSTGRES_PASS: docker
     ports:
     - 15432:5432
+    networks:
+    - internal
+
+  db-18:
+    image: postgis/postgis:18-3.6
+    volumes:
+      - db-18-data:/var/lib/postgresql
+    restart: on-failure
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U docker -d cartobio"]
+    environment:
+      POSTGRES_USER: docker
+      POSTGRES_PASSWORD: docker
+      POSTGRES_DB: cartobio
+    ports:
+    - 25432:5432
     networks:
     - internal
 

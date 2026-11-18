@@ -2,14 +2,14 @@ import {
   boolean,
   index,
   jsonb,
-  pgTable,
   timestamp,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
+import { cartobio } from "./cartobio.js";
 import { importJobEtat, importJobResult, importLogType, importStatus } from "./enums.js";
 
-export const parcellairesImport = pgTable("parcellaires_import", {
+export const parcellairesImport = cartobio.table("parcellaires_import", {
   id: varchar("id", { length: 64 }).primaryKey(),
   status: importStatus("status").notNull().default("CREATED"),
   organismeCertificateur: varchar("organisme_certificateur", {
@@ -28,7 +28,7 @@ export const parcellairesImport = pgTable("parcellaires_import", {
   etat: importJobEtat("etat").notNull().default("UNKNOWN"),
 });
 
-export const parcellaireImportLogs = pgTable(
+export const parcellaireImportLogs = cartobio.table(
   "parcellaire_import_logs",
   {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -37,7 +37,7 @@ export const parcellaireImportLogs = pgTable(
       .references(() => parcellairesImport.id, { onDelete: "cascade" }),
     type: importLogType("type").notNull(),
     message: varchar("message").notNull(),
-    numeroBio: varchar("numero_bio").notNull(),
+    numeroBio: varchar("numero_bio"),
     parcelleId: varchar("parcelle_id"),
     parcelleName: varchar("parcelle_name"),
     code: varchar("code", { length: 100 }).notNull(),
@@ -45,7 +45,7 @@ export const parcellaireImportLogs = pgTable(
   (table) => [index("parcellaire_import_logs_import_id_idx").on(table.importId)]
 );
 
-export const parcellaireImportPayload = pgTable("parcellaire_import_payload", {
+export const parcellaireImportPayload = cartobio.table("parcellaire_import_payload", {
   id: varchar("id").primaryKey(),
   importId: varchar("import_id")
     .notNull()
@@ -53,7 +53,7 @@ export const parcellaireImportPayload = pgTable("parcellaire_import_payload", {
   payload: jsonb("payload"),
 });
 
-export const importPac = pgTable("import_pac", {
+export const importPac = cartobio.table("import_pac", {
   id: uuid("id").primaryKey().defaultRandom(),
   numeroBio: varchar("numerobio"),
   pacage: varchar("pacage"),

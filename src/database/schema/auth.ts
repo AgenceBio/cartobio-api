@@ -1,6 +1,7 @@
-import { index, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { index, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { cartobio } from "./cartobio.js";
 
-export const revokedTokens = pgTable(
+export const revokedTokens = cartobio.table(
   "revoked_tokens",
   {
     tokenHash: varchar("token_hash").primaryKey(),

@@ -1,15 +1,15 @@
-import { pgEnum } from 'drizzle-orm/pg-core';
+import { cartobio } from "./cartobio.js";
 
-export const certificationType = pgEnum('certification_type', [
+export const certificationType = cartobio.enum('certification_type', [
   'OPERATOR_DRAFT',
   'AUDITED',
   'PENDING_CERTIFICATION',
   'CERTIFIED',
 ]);
 
-export const mixiteType = pgEnum('mixite_type', ['MIXTE', 'AB', 'ABCONV']);
+export const mixiteType = cartobio.enum('mixite_type', ['MIXTE', 'AB', 'ABCONV']);
 
-export const conversionNiveau = pgEnum('conversion_niveau', [
+export const conversionNiveau = cartobio.enum('conversion_niveau', [
   'AB',
   'AB?',
   'C1',
@@ -18,7 +18,7 @@ export const conversionNiveau = pgEnum('conversion_niveau', [
   'CONV',
 ]);
 
-export const annotationType = pgEnum('annotation_type', [
+export const annotationType = cartobio.enum('annotation_type', [
   'DOWNGRADED',
   'METADATA_STATE',
   'REDUCED_CONVERSION_PERIOD',
@@ -27,7 +27,7 @@ export const annotationType = pgEnum('annotation_type', [
   'SURVEYED',
 ]);
 
-export const parcellaireEventType = pgEnum('parcellaire_event_type', [
+export const parcellaireEventType = cartobio.enum('parcellaire_event_type', [
   'CERTIFICATION_STATE_CHANGE',
   'FEATURE_COLLECTION_CREATE',
   'FEATURE_COLLECTION_DELETE',
@@ -37,27 +37,27 @@ export const parcellaireEventType = pgEnum('parcellaire_event_type', [
   'FEATURE_UPDATE',
 ]);
 
-export const statutImportGeom = pgEnum('statut_import_geom', [
+export const statutImportGeom = cartobio.enum('statut_import_geom', [
   'ACCEPTE',
   'CORRIGE',
   'ACCEPTE_NON_CORRIGE',
 ]);
 
-export const importStatus = pgEnum('import_status', ['DONE', 'CREATED', 'ERROR', 'PENDING']);
+export const importStatus = cartobio.enum('import_status', ['DONE', 'CREATED', 'ERROR', 'PENDING']);
 
-export const importLogType = pgEnum('import_log_type', ['warning', 'error']);
+export const importLogType = cartobio.enum('import_log_type', ['warning', 'error']);
 
-export const importJobResult = pgEnum('import_job_result', ['REJECTED', 'VALID', 'ERROR']);
+export const importJobResult = cartobio.enum('import_job_result', ['REJECTED', 'VALID', 'ERROR']);
 
-export const importJobEtat = pgEnum('import_job_etat', ['UNKNOWN', 'UPDATED', 'CREATED']);
+export const importJobEtat = cartobio.enum('import_job_etat', ['UNKNOWN', 'UPDATED', 'CREATED']);
 
-export const productionAttestationType = pgEnum('production_attestation_type', [
+export const productionAttestationType = cartobio.enum('production_attestation_type', [
   'complete',
   'pac-details',
   'pac-complet',
 ]);
 
-export const productionAttestationStatus = pgEnum('production_attestation_status', [
+export const productionAttestationStatus = cartobio.enum('production_attestation_status', [
   'generated',
   'error',
 ]);
