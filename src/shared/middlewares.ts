@@ -1,6 +1,6 @@
 import { createVerifier, TokenError } from 'fast-jwt'
 import type { FastifyRequest, FastifyReply, onRequestHookHandler, preSerializationHookHandler } from 'fastify'
-import { CertificationState } from '@agencebio/cartobio-types'
+import { CertificationState, recordIdSchema } from '@agencebio/cartobio-types'
 import type {
   AgenceBioNormalizedOperator,
   CartoBioUser,
@@ -19,8 +19,8 @@ import {
   getResponseStatusCode
 } from './errors.js'
 import { hasRecordForOc } from './parcellaires/parcellaires.repository.js'
-import { isAllowedCertificationTransition } from './parcellaires/parcellaires.utils.js'
 import { maskOcAgents } from './outputs/history.js'
+import { redactAuditNotes } from './outputs/record.js'
 import { getCachedUserProfile, isRevoked } from '../modules/auth/auth.service.js'
 import { userTokenSchema } from '../modules/auth/auth.tokens.js'
 import {
@@ -207,6 +207,7 @@ function wasModifiedSince(updatedAt: string | Date, ifUnmodifiedSince: string | 
 }
 
 async function loadRecordAndOperator(request: FastifyRequest, id: string, queryFn: RecordQuery): Promise<void> {
+  if (!recordIdSchema.safeParse(id).success) throw new NotFoundApiError('Parcellaire introuvable')
   const record = await queryFn(id, request.user)
   if (!record) throw new NotFoundApiError('Parcellaire introuvable')
 
@@ -244,11 +245,7 @@ function touchesAuditFields(patch: RecordPatch): boolean {
   )
 }
 
-function assertCertificationTransition(
-  user: CartoBioUser,
-  record: NormalizedRecord | null | undefined,
-  patch: RecordPatch | undefined
-): void {
+function assertCertificationRole(user: CartoBioUser, patch: RecordPatch | undefined): void {
   if (isAdmin(user) || !patch) return
 
   const hasCertificationDates = [patch.certification_date_debut, patch.certification_date_fin].some(
@@ -261,13 +258,7 @@ function assertCertificationTransition(
   const nextState = patch.certification_state
   if (nextState == null) return
 
-  const currentState = record?.certification_state
-  const isAllowedTransition = currentState
-    ? isAllowedCertificationTransition(currentState, String(nextState))
-    : nextState !== CertificationState.CERTIFIED
-  const hasRequiredRole = requiredRoleByState.get(nextState)?.(user) ?? true
-
-  if (!isAllowedTransition || !hasRequiredRole) {
+  if (!(requiredRoleByState.get(nextState)?.(user) ?? true)) {
     throw new ForbiddenApiError("ce changement d'état de certification n'est pas autorisé.")
   }
 }
@@ -355,7 +346,7 @@ function haveRightToUpdate(): RequestHook {
       throw new ForbiddenApiError("vous n'êtes pas autorisé·e à modifier les informations d'audit ou de certification.")
     }
 
-    assertCertificationTransition(user, record, patch)
+    assertCertificationRole(user, patch)
 
     if (patch) assertOcOnlyProperties(request, user, record, patch)
 
@@ -410,20 +401,6 @@ function checkCertification(request: FastifyRequest): void {
   }
 }
 
-function redactAuditNotes(record: NormalizedRecord): NormalizedRecord {
-  record.audit_notes = null
-  record.audit_demandes = null
-  record.parcelles = {
-    ...record.parcelles,
-    features: record.parcelles.features.map((feature) => {
-      feature.properties.auditeur_notes = null
-      feature.properties.annotations = []
-      return feature
-    })
-  }
-  return record
-}
-
 function compareOperatorOutputAndToken(
   accessor: (request: FastifyRequest) => OrganismeCertificateur | null | undefined
 ): preSerializationHookHandler {
@@ -465,6 +442,5 @@ export {
   getRequestOc,
   haveRightToUpdate,
   loadRecordAndOperator,
-  redactAuditNotes,
   verifyAgenceBioToken
 }

@@ -4,6 +4,8 @@ import { db, firstRow } from '../../database/database.js'
 import { parcellaireImportLogs, parcellaireImportPayload, parcellaireImport } from '../../database/schema/index.js'
 import { importJobResultEnumSchema, importStatusEnumSchema } from '../../database/validations/imports.js'
 import { getStreaksSuspectes } from './tableau-de-bord.utils.js'
+import { toIsoDateTime } from '@agencebio/cartobio-types'
+import { isoDay, isoTimestamp } from '../../shared/parcellaires/parcellaires.utils.js'
 import type {
   GeneralKpiResponse,
   HistoriqueResponse,
@@ -24,11 +26,11 @@ import type {
   PeriodeAnomalies
 } from './tableau-de-bord.types.js'
 
-function organismeCondition(organismeCertificateur?: number): SQL {
+function organismeCondition(organismeCertificateur: number): SQL {
   return eq(parcellaireImport.organismeCertificateur, String(organismeCertificateur))
 }
 
-function periodConditions({ from, to }: DateRange): SQL[] {
+function periodConditions({ from, to }: Pick<DateRange, 'from' | 'to'>): SQL[] {
   const conditions: SQL[] = []
 
   if (from) {
@@ -161,10 +163,10 @@ async function getTableauBilanRepo({
         jobId: parcellaireImport.id,
         numeroClient: parcellaireImport.numeroClient,
         numeroBio: parcellaireImport.numeroBio,
-        auditDate: parcellaireImport.auditDate,
+        auditDate: isoDay(parcellaireImport.auditDate),
         statut: parcellaireImport.statutJob,
         etat: parcellaireImport.etat,
-        createdAt: parcellaireImport.createdAt
+        createdAt: isoTimestamp(parcellaireImport.createdAt)
       })
       .from(parcellaireImport)
       .where(where)
@@ -226,8 +228,8 @@ async function getTableauErreursRepo({
         etat: parcellaireImport.etat,
         numeroBio: parcellaireImport.numeroBio,
         numeroClient: parcellaireImport.numeroClient,
-        auditDate: parcellaireImport.auditDate,
-        createdAt: parcellaireImport.createdAt
+        auditDate: isoDay(parcellaireImport.auditDate),
+        createdAt: isoTimestamp(parcellaireImport.createdAt)
       })
       .from(parcellaireImport)
       .where(where)
@@ -264,7 +266,7 @@ async function getHistoriqueSpecificParcellaireRepo({
       jobId: parcellaireImport.id,
       statut: parcellaireImport.statutJob,
       etat: parcellaireImport.etat,
-      createdAt: parcellaireImport.createdAt
+      createdAt: isoTimestamp(parcellaireImport.createdAt)
     })
     .from(parcellaireImport)
     .where(
@@ -343,7 +345,7 @@ async function getTopAnomaliesRepo({
     .groupBy(period, parcellaireImportLogs.code)
     .orderBy(period, desc(count()))
 
-  return rows
+  return rows.map((row) => ({ ...row, period: toIsoDateTime(row.period) }))
 }
 
 async function getTopAnomaliesGroupedRepo({
@@ -426,13 +428,13 @@ async function getTopAnomaliesGroupedRepo({
   const periods = new Map<string, PeriodeAnomalies>()
 
   for (const row of rows) {
-    const key = new Date(row.period).toISOString()
+    const key = toIsoDateTime(new Date(row.period))
 
     let currentPeriod = periods.get(key)
 
     if (!currentPeriod) {
       currentPeriod = {
-        period: row.period,
+        period: key,
         accepted: row.accepted,
         refused: row.refused,
         errorCount: 0,
@@ -468,10 +470,10 @@ async function getEnvoisSuspectsRepo({
       jobId: parcellaireImport.id,
       numeroBio: parcellaireImport.numeroBio,
       numeroClient: parcellaireImport.numeroClient,
-      auditDate: parcellaireImport.auditDate,
+      auditDate: isoDay(parcellaireImport.auditDate),
       statut: parcellaireImport.statutJob,
       etat: parcellaireImport.etat,
-      createdAt: parcellaireImport.createdAt
+      createdAt: isoTimestamp(parcellaireImport.createdAt)
     })
     .from(parcellaireImport)
     .where(

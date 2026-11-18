@@ -1,3 +1,4 @@
+import { toIsoDateTime } from '@agencebio/cartobio-types'
 import {
   getTableauErreursRepo,
   getTopAnomaliesGroupedRepo,
@@ -66,7 +67,7 @@ describe('dashboard repository', () => {
           numeroBio: 'BIO-7',
           numeroClient: 'CLIENT-7',
           auditDate: '2026-01-02',
-          createdAt,
+          createdAt: toIsoDateTime(createdAt),
           details: [
             {
               numeroBio: 'BIO-7',
@@ -92,8 +93,8 @@ describe('dashboard repository', () => {
   })
 
   it('retourne immédiatement une liste vide si la période des anomalies est incomplète', async () => {
-    await expect(getTopAnomaliesRepo({ from: '2026-01-01' })).resolves.toEqual([])
-    await expect(getTopAnomaliesGroupedRepo({ to: '2026-01-31' })).resolves.toEqual([])
+    await expect(getTopAnomaliesRepo({ from: '2026-01-01', organismeCertificateur })).resolves.toEqual([])
+    await expect(getTopAnomaliesGroupedRepo({ to: '2026-01-31', organismeCertificateur })).resolves.toEqual([])
   })
 
   it('agrège les anomalies groupées par période et conserve les périodes vides', async () => {
@@ -110,7 +111,7 @@ describe('dashboard repository', () => {
 
     expect(result).toEqual([
       {
-        period: new Date('2026-01-01T00:00:00.000Z'),
+        period: '2026-01-01T00:00:00.000Z',
         accepted: 2,
         refused: 1,
         errorCount: 4,
@@ -120,7 +121,7 @@ describe('dashboard repository', () => {
         ]
       },
       {
-        period: new Date('2026-01-02T00:00:00.000Z'),
+        period: '2026-01-02T00:00:00.000Z',
         accepted: 0,
         refused: 0,
         errorCount: 0,

@@ -26,7 +26,21 @@ export const integerStringSchema = z.string().regex(/^\d+$/)
 
 export const pageStringSchema = z.string().regex(/^[1-9]\d*$/)
 
-export const dateTimeSchema = z.union([z.date(), z.string()]).meta({ description: 'Date au format ISO 8601' })
+export const isoDateTimeSchema = z.iso
+  .datetime()
+  .brand<'IsoDateTime'>()
+  .meta({ description: 'Horodatage ISO 8601 en UTC', examples: ['2026-03-10T10:00:00.000Z'] })
+
+export const isoDateSchema = z.iso
+  .date()
+  .brand<'IsoDate'>()
+  .meta({ description: 'Date ISO 8601 (jour)', examples: ['2026-03-10'] })
+
+export type IsoDateTime = z.infer<typeof isoDateTimeSchema>
+export type IsoDate = z.infer<typeof isoDateSchema>
+
+export const toIsoDateTime = (date: Date): IsoDateTime => isoDateTimeSchema.parse(date.toISOString())
+export const toIsoDate = (value: string): IsoDate => isoDateSchema.parse(value)
 
 export const bboxSchema = z.array(z.number()).optional().meta({ description: 'Emprise GeoJSON' })
 

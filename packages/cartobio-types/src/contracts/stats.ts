@@ -1,6 +1,15 @@
 import { z } from 'zod'
-import { opt, optionalString, text } from './helpers.js'
-import { dateTimeSchema, integerStringSchema, optionalIsoDateQuerySchema, pageStringSchema } from './common.js'
+import { ImportJobEtat, ImportJobResult } from '../enums.js'
+import { optionalString } from './helpers.js'
+import {
+  integerStringSchema,
+  isoDateSchema,
+  isoDateTimeSchema,
+  optionalIsoDateQuerySchema,
+  pageStringSchema
+} from './common.js'
+
+export const STATS_MAX_LIMIT = 100
 
 const csvListSchema = z.string().transform((value) => value.split(',').filter(Boolean))
 
@@ -9,9 +18,9 @@ export const statsQuerySchema = z.object({
   to: optionalIsoDateQuerySchema.meta({ description: "Date de fin d'envoi (ISO 8601)" }),
   page: pageStringSchema.optional().meta({ description: 'Numéro de page, à partir de 1' }),
   limit: integerStringSchema
-    .refine((limit) => Number(limit) <= 100)
+    .refine((limit) => Number(limit) <= STATS_MAX_LIMIT)
     .optional()
-    .meta({ description: 'Nombre de lignes par page (défaut 20, 100 maximum)' }),
+    .meta({ description: `Nombre de lignes par page (défaut 20, ${STATS_MAX_LIMIT} maximum)` }),
   numeroBio: optionalString("Numéro bio de l'opérateur"),
   numeroClient: optionalString("Numéro client de l'opérateur chez l'OC"),
   auditDate: optionalIsoDateQuerySchema.meta({ description: "Date d'audit du parcellaire (YYYY-MM-DD)" }),
@@ -35,7 +44,9 @@ export const statsQuerySchema = z.object({
     .meta({ description: "Tri par date d'envoi : `asc` ou `desc` (défaut `desc`)" })
 })
 
-const count = (description: string): z.ZodOptional<z.ZodNullable<z.ZodNumber>> => opt(z.number(), description)
+const count = (description: string): z.ZodNumber => z.number().meta({ description })
+const nullableText = (description: string): z.ZodNullable<z.ZodString> => z.string().nullable().meta({ description })
+const requiredText = (description: string): z.ZodString => z.string().meta({ description })
 
 const statsMetaSchema = z.object({
   total: z.number().meta({ description: 'Nombre total de lignes' }),
@@ -44,24 +55,27 @@ const statsMetaSchema = z.object({
 })
 
 export const importErrorDetailSchema = z.looseObject({
-  numeroBio: text('Numéro bio du parcellaire concerné'),
-  parcelleId: text('Identifiant de la parcelle concernée'),
-  parcelleName: text('Nom de la parcelle concernée'),
-  code: text("Code de l'anomalie"),
-  message: text("Message de l'anomalie")
+  numeroBio: nullableText('Numéro bio du parcellaire concerné'),
+  parcelleId: nullableText('Identifiant de la parcelle concernée'),
+  parcelleName: nullableText('Nom de la parcelle concernée'),
+  code: requiredText("Code de l'anomalie (voir `ImportLogCode`)"),
+  message: requiredText("Message de l'anomalie")
 })
 
 const envoiSchema = z.looseObject({
   jobId: z.number().meta({ description: "Identifiant du job d'import" }),
-  statut: text('Résultat du job : `VALID`, `REJECTED` ou `ERROR`'),
-  etat: text('Effet sur le parcellaire : `CREATED`, `UPDATED` ou `UNKNOWN`'),
-  createdAt: opt(dateTimeSchema, "Date de l'envoi")
+  statut: z
+    .enum(ImportJobResult)
+    .nullable()
+    .meta({ description: 'Résultat du job : `VALID`, `REJECTED` ou `ERROR`, `null` tant que le job est en cours' }),
+  etat: z.enum(ImportJobEtat).meta({ description: 'Effet sur le parcellaire : `CREATED`, `UPDATED` ou `UNKNOWN`' }),
+  createdAt: isoDateTimeSchema.meta({ description: "Date de l'envoi" })
 })
 
 const parcellaireKeySchema = {
-  numeroBio: text('Numéro bio'),
-  numeroClient: text("Numéro client chez l'OC"),
-  auditDate: opt(dateTimeSchema, "Date d'audit")
+  numeroBio: nullableText('Numéro bio'),
+  numeroClient: nullableText("Numéro client chez l'OC"),
+  auditDate: isoDateSchema.nullable().meta({ description: "Date d'audit" })
 }
 
 export const generalKpiResponseSchema = z.object({
@@ -71,7 +85,7 @@ export const generalKpiResponseSchema = z.object({
     totalRejetes: z.number().meta({ description: "Nombre d'objets refusés" }),
     anomaliePlusFrequente: z
       .looseObject({
-        code: text("Code de l'anomalie"),
+        code: requiredText("Code de l'anomalie"),
         count: count("Nombre d'occurrences")
       })
       .nullable()
@@ -99,8 +113,8 @@ export const historiqueResponseSchema = z.array(
 export const topAnomaliesResponseSchema = z.object({
   data: z.array(
     z.looseObject({
-      period: opt(dateTimeSchema, 'Début de la période (jour ou semaine)'),
-      code: text("Code de l'anomalie"),
+      period: isoDateTimeSchema.meta({ description: 'Début de la période (jour ou semaine)' }),
+      code: requiredText("Code de l'anomalie"),
       count: count("Nombre d'occurrences")
     })
   )
@@ -108,13 +122,13 @@ export const topAnomaliesResponseSchema = z.object({
 
 export const topAnomaliesGroupedResponseSchema = z.array(
   z.looseObject({
-    period: opt(dateTimeSchema, 'Début de la période (jour ou semaine)'),
+    period: isoDateTimeSchema.meta({ description: 'Début de la période (jour ou semaine)' }),
     accepted: count('Objets acceptés sur la période'),
     refused: count('Objets refusés sur la période'),
     errorCount: z.number().meta({ description: "Nombre total d'anomalies sur la période" }),
     errors: z.array(
       z.looseObject({
-        code: text("Code de l'anomalie"),
+        code: requiredText("Code de l'anomalie"),
         count: count("Nombre d'occurrences")
       })
     )
@@ -135,6 +149,8 @@ export const repetitionsResponseSchema = z.object({
 })
 
 export type StatsQuery = z.infer<typeof statsQuerySchema>
+export type StatsQueryInput = z.input<typeof statsQuerySchema>
+export type ImportErrorDetail = z.infer<typeof importErrorDetailSchema>
 export type GeneralKpiResponse = z.infer<typeof generalKpiResponseSchema>
 export type TableauBilanResponse = z.infer<typeof tableauBilanResponseSchema>
 export type TableauErreursResponse = z.infer<typeof tableauErreursResponseSchema>

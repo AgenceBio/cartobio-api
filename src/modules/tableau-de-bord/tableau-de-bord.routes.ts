@@ -10,9 +10,12 @@ import {
   topAnomaliesSchema
 } from './tableau-de-bord.schema.js'
 import * as service from './tableau-de-bord.service.js'
+import { ForbiddenApiError } from '../../shared/errors.js'
 
-function getOrganismeCertificateurId(request: FastifyRequest): number | undefined {
-  return request.organismeCertificateur?.id ?? request.user?.organismeCertificateur?.id
+function getOrganismeCertificateurId(request: FastifyRequest): number {
+  const id = request.organismeCertificateur?.id ?? request.user?.organismeCertificateur?.id
+  if (id === undefined) throw new ForbiddenApiError('Accès réservé aux organismes certificateurs')
+  return id
 }
 
 export default async function tableauDeBordRoutes(fastify: FastifyInstance): Promise<void> {

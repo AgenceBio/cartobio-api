@@ -1,5 +1,6 @@
 import { createInsertSchema, createUpdateSchema } from 'drizzle-orm/zod'
 import { z } from 'zod'
+import { ImportLogCode } from '@agencebio/cartobio-types'
 import { importJobEtat, importJobResult, importStatus } from '../schema/enums.js'
 import { importPac, parcellaireImportLogs, parcellaireImportPayload, parcellaireImport } from '../schema/imports.js'
 import { emptyToNull, isoDate } from './helpers.js'
@@ -44,7 +45,7 @@ export const updateImportJobSchema = createUpdateSchema(parcellaireImport, {
 
 export const createImportLogSchema = createInsertSchema(parcellaireImportLogs, {
   importId: (schema) => schema.int().positive(),
-  code: (schema) => schema.trim().min(1)
+  code: () => z.enum(ImportLogCode)
 })
   .omit({
     id: true

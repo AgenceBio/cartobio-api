@@ -27,8 +27,8 @@ import { ForbiddenApiError, InvalidRequestApiError, getErrorCode } from '../erro
 import { getRandomFeatureId, populateWithMultipleCultures } from '../outputs/features.js'
 import { normalizeRecord, normalizeRecordSummary } from '../outputs/record.js'
 import { getHistoryUser } from '../../modules/auth/auth.service.js'
-import { isAllowedCertificationTransition, setHistoryUsers } from './parcellaires.utils.js'
-import { isAdmin } from '../../modules/auth/auth.utils.js'
+import { setHistoryUsers } from './parcellaires.utils.js'
+import { isAdmin, isOperatorUser } from '../../modules/auth/auth.utils.js'
 
 /**
  * Create a new record unless we find a dangling one with the same numeroBio and audit date, in which case we update it
@@ -58,7 +58,7 @@ async function createOrUpdateOperatorRecord(
       let certificationState = record.certification_state || CertificationState.OPERATOR_DRAFT
       if (context?.user && !isAdmin(context.user) && previousCertificationState) {
         certificationState = record.certification_state ?? (previousCertificationState as CertificationState)
-        if (!isAllowedCertificationTransition(previousCertificationState, certificationState)) {
+        if (isOperatorUser(context.user) && certificationState !== previousCertificationState) {
           throw new ForbiddenApiError("ce changement d'état de certification n'est pas autorisé.")
         }
       }
@@ -121,7 +121,7 @@ async function createOrUpdateOperatorRecord(
     })
 
     if (shouldNotifyCertification) {
-      await notifyCertificationComplete(operator)
+      void notifyCertificationComplete(operator)
     }
 
     return withHistoryUsers({ ...operator, parcelles })

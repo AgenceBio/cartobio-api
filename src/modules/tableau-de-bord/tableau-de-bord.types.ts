@@ -1,3 +1,4 @@
+import type { ImportErrorDetail, IsoDate, IsoDateTime } from '@agencebio/cartobio-types'
 import type { ImportJobEtat, ImportJobResult } from '../../database/validations/imports.js'
 
 type OrdreTri = 'asc' | 'desc'
@@ -13,7 +14,7 @@ type TypeStreak = 'envois' | 'refus'
 export type DateRange = {
   from?: string
   to?: string
-  organismeCertificateur?: number
+  organismeCertificateur: number
 }
 
 export type PaginationParams = DateRange & {
@@ -31,42 +32,36 @@ export type HistoriqueParams = {
   numeroBio?: string
   numeroClient?: string
   auditDate?: string
-  organismeCertificateur?: number
+  organismeCertificateur: number
 }
 
-export type ErrorDetail = {
-  numeroBio: string | null
-  parcelleId: string | null
-  parcelleName: string | null
-  code: string | null
-  message: string | null
-}
+export type ErrorDetail = ImportErrorDetail
 
 type ErrorByCode = {
-  code: string | null
-  count: number | null
+  code: string
+  count: number
 }
 
 export type PeriodeAnomalies = {
-  period: Date
-  accepted: number | null
-  refused: number | null
+  period: IsoDateTime
+  accepted: number
+  refused: number
   errorCount: number
   errors: ErrorByCode[]
 }
 
 type EnvoiSuspect = {
   jobId: number
-  statut: string | null
-  etat: string
-  createdAt: Date
+  statut: StatutJob | null
+  etat: EtatJob
+  createdAt: IsoDateTime
   erreurs: ErrorDetail[]
 }
 
 export type GroupeEnvois = {
   numeroBio: string | null
   numeroClient: string | null
-  auditDate: string | null
+  auditDate: IsoDate | null
   envois: EnvoiSuspect[]
 }
 

@@ -1,4 +1,5 @@
 import * as repository from './tableau-de-bord.repository.js'
+import { InvalidRequestApiError } from '../../shared/errors.js'
 import type {
   GeneralKpiResponse,
   HistoriqueResponse,
@@ -12,14 +13,14 @@ import type {
 
 async function getGeneralKpi(
   { from, to }: StatsQuery,
-  organismeCertificateur?: number
+  organismeCertificateur: number
 ): Promise<GeneralKpiResponse['data']> {
   return repository.getGeneralKpi({ from, to, organismeCertificateur })
 }
 
 async function getTableauBilan(
   { from, to, page = '1', limit = '20', recherche, statuts, etats, ordreDate }: StatsQuery,
-  organismeCertificateur?: number
+  organismeCertificateur: number
 ): Promise<TableauBilanResponse> {
   return repository.getTableauBilanRepo({
     from,
@@ -36,8 +37,11 @@ async function getTableauBilan(
 
 async function getHistoriqueSpecificParcellaire(
   { numeroBio, numeroClient, auditDate }: StatsQuery,
-  organismeCertificateur?: number
+  organismeCertificateur: number
 ): Promise<HistoriqueResponse> {
+  if (!numeroBio && !numeroClient && !auditDate) {
+    throw new InvalidRequestApiError('Au moins un critère est requis : numeroBio, numeroClient ou auditDate.')
+  }
   return repository.getHistoriqueSpecificParcellaireRepo({
     numeroBio,
     numeroClient,
@@ -48,7 +52,7 @@ async function getHistoriqueSpecificParcellaire(
 
 async function getTableauErreurs(
   { from, to, page = '1', limit = '20', recherche, ordreDate, codes }: StatsQuery,
-  organismeCertificateur?: number
+  organismeCertificateur: number
 ): Promise<TableauErreursResponse> {
   const codesValue = (Array.isArray(codes) ? codes : typeof codes === 'string' ? codes.split(',') : [])
     .map((code) => String(code).trim())
@@ -68,22 +72,25 @@ async function getTableauErreurs(
 
 async function getTopAnomalies(
   { from, to }: StatsQuery,
-  organismeCertificateur?: number
+  organismeCertificateur: number
 ): Promise<TopAnomaliesResponse['data']> {
   return repository.getTopAnomaliesRepo({ from, to, organismeCertificateur })
 }
 
 async function getTopAnomaliesGrouped(
   { from, to }: StatsQuery,
-  organismeCertificateur?: number
+  organismeCertificateur: number
 ): Promise<TopAnomaliesGroupedResponse> {
   return repository.getTopAnomaliesGroupedRepo({ from, to, organismeCertificateur })
 }
 
 async function getRepetErreurs(
   { from, to, page = '1', limit = '10', recherche, type }: StatsQuery,
-  organismeCertificateur?: number
+  organismeCertificateur: number
 ): Promise<RepetitionsResponse> {
+  if (!from || !to) {
+    throw new InvalidRequestApiError('La période (from et to) est obligatoire.')
+  }
   return repository.getEnvoisSuspectsRepo({
     from,
     to,

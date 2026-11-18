@@ -1,3 +1,4 @@
+import { toIsoDateTime } from '@agencebio/cartobio-types'
 import request from 'supertest'
 import { createSigner } from 'fast-jwt'
 import app from '../../../src/app.js'
@@ -124,7 +125,7 @@ describe('GET /api/v3/tdb-api/*', () => {
   })
 
   test('enveloppe les top anomalies simples dans data', async () => {
-    const data = [{ period: new Date('2026-01-01'), code: 'E1', count: 2 }]
+    const data = [{ period: toIsoDateTime(new Date('2026-01-01')), code: 'E1', count: 2 }]
     vi.mocked(service.getTopAnomalies).mockResolvedValueOnce(data)
 
     const response = await request(app.server)

@@ -82,7 +82,7 @@ if (ocId === undefined) {
           record.numerobio,
           record.record_id
         )
-        process.exit(0)
+        process.exit(1)
       }
 
       await hideImport(parcelle.numerobio)

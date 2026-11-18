@@ -54,8 +54,7 @@ export const borderCutResponseSchema = z.object({
 export const geometryEqualsResponseSchema = z.array(
   z.object({
     comparison_result: z
-      .string()
-      .nullable()
+      .enum(['r1_old_r2_new', 'r2_old_r1_new'])
       .meta({ description: 'Ordre chronologique des deux parcellaires comparés' }),
     geojson: z
       .object({

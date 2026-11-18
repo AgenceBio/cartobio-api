@@ -39,7 +39,7 @@ RUN npm run build
 
 # Build geo data files
 COPY --chown=node:node ./data ./data
-RUN npm run build:geo-data
+RUN npm run build:geo-data && npm prune --omit=dev
 
 COPY --chown=node:node drizzle.config.ts ./
 COPY --chown=node:node ./database/drizzle ./database/drizzle

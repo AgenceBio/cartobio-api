@@ -68,17 +68,14 @@ function readFirstSheetRows(filePath: string): Array<Record<string, string | und
 
   const operators = await fetchCustomersByOc(+ocId)
 
-  const [firstOperator] = operators
-  if (!firstOperator) {
+  const operatorOfOc = operators.find(
+    ({ organismeCertificateur }) => 'id' in organismeCertificateur && organismeCertificateur.id === +ocId
+  )
+  if (!operatorOfOc) {
     console.warn("Aucun numerobio pour l'oc", ocId)
     process.exit(0)
   }
-  const oc = firstOperator.organismeCertificateur as OrganismeCertificateur
-
-  if (oc.id !== +ocId) {
-    console.warn('Id invalide lors de la récupération des parcellaires', oc)
-    process.exit(1)
-  }
+  const oc = operatorOfOc.organismeCertificateur as OrganismeCertificateur
 
   const operatorBioNumbers = new Set(operators.map((o) => o.numeroBio.toString()))
 

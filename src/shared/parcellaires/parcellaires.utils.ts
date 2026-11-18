@@ -1,7 +1,8 @@
 import { and, eq, sql } from 'drizzle-orm'
 import type { SQL, SQLWrapper } from 'drizzle-orm'
 import type { PgInsertValue } from 'drizzle-orm/pg-core'
-import { CertificationState, EventType } from '@agencebio/cartobio-types'
+import { EventType } from '@agencebio/cartobio-types'
+import type { IsoDate, IsoDateTime } from '@agencebio/cartobio-types'
 import type { Polygon } from 'geojson'
 import type {
   CartoBioAnnotation,
@@ -200,8 +201,12 @@ function withoutNullKeys(object: SQL): SQL {
   return sql`(SELECT COALESCE(jsonb_object_agg(key, value), '{}'::jsonb) FROM jsonb_each(${object}) WHERE jsonb_typeof(value) <> 'null')`
 }
 
-function isoTimestamp(timestamp: SQLWrapper): SQL<string> {
-  return sql<string>`to_char(${timestamp} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`
+export function isoTimestamp(timestamp: SQLWrapper): SQL<IsoDateTime> {
+  return sql<IsoDateTime>`to_char(${timestamp} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`
+}
+
+export function isoDay(date: SQLWrapper): SQL<IsoDate | null> {
+  return sql<IsoDate | null>`to_char(${date}, 'YYYY-MM-DD')`
 }
 
 export const recordMetadata: SQL<Record<string, unknown>> = sql<
@@ -247,14 +252,14 @@ export const recordColumns = {
   numerobio: sql<string>`${parcellaires.numeroBio}::text`,
   version_name: parcellaires.versionNom,
   annee_reference_controle: parcellaires.anneeReferenceControle,
-  certification_date_debut: parcellaires.certificationDateDebut,
-  certification_date_fin: parcellaires.certificationDateFin,
+  certification_date_debut: isoDay(parcellaires.certificationDateDebut),
+  certification_date_fin: isoDay(parcellaires.certificationDateFin),
   certification_state: parcellaires.certificationEtat,
   created_at: isoTimestamp(parcellaires.createdAt),
   updated_at: isoTimestamp(parcellaires.updatedAt),
   oc_id: sql<number | null>`${parcellaires.ocId}::int`,
   metadata: recordMetadata,
-  audit_date: parcellaires.auditDate,
+  audit_date: isoDay(parcellaires.auditDate),
   audit_history: auditHistory,
   audit_notes: parcellaires.auditNotesCertif,
   audit_demandes: parcellaires.auditDemandesOperateur,
@@ -310,7 +315,7 @@ export const parcelleColumns = {
   >`(SELECT ${communes.nom} FROM ${communes} WHERE ${communes.fid} = ${parcelles.commune})`,
   cultures: culturesJson(parcelles.recordId, parcelles.id),
   conversion_niveau: parcelles.conversionNiveau,
-  engagement_date: parcelles.engagementDate,
+  engagement_date: isoDay(parcelles.engagementDate),
   commentaire: parcelles.commentaireOperateur,
   auditeur_notes: parcelles.auditeurNotesParcelles,
   annotations: annotationsJson(parcelles.recordId, parcelles.id),
@@ -328,15 +333,4 @@ export const parcelleColumns = {
   attente_pac: parcelles.attentePac,
   from_parcelles: parcelles.fromParcelles,
   deleted_at: parcelles.deletedAt
-}
-
-const allowedCertificationTransitions: Record<CertificationState, string[]> = {
-  [CertificationState.OPERATOR_DRAFT]: [CertificationState.AUDITED, CertificationState.PENDING_CERTIFICATION],
-  [CertificationState.AUDITED]: [CertificationState.PENDING_CERTIFICATION],
-  [CertificationState.PENDING_CERTIFICATION]: [CertificationState.CERTIFIED],
-  [CertificationState.CERTIFIED]: []
-}
-
-export function isAllowedCertificationTransition(from: string, to: string): boolean {
-  return from === to || (allowedCertificationTransitions[from as CertificationState] ?? []).includes(to)
 }

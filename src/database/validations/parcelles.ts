@@ -31,7 +31,7 @@ export const createParcelleSchema = createInsertSchema(parcelles, {
   engagementDate: () => isoDate,
   commentaireOperateur: () => emptyToNull(z.string().trim().max(10_000)),
   auditeurNotesParcelles: () => emptyToNull(z.string().trim().max(10_000)),
-  name: () => emptyToNull(z.string().trim().max(255))
+  name: () => emptyToNull(z.string().trim().max(1000))
 })
   .omit({
     createdAt: true,

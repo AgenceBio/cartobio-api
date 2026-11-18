@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { text, textOrNumber } from './helpers.js'
 import { EtatProduction } from '../enums.js'
-import { bboxSchema, dateTimeSchema, outputGeometrySchema } from './common.js'
+import { bboxSchema, isoDateSchema, isoDateTimeSchema, outputGeometrySchema } from './common.js'
 
 const numberOrString = (description: string): z.ZodUnion<readonly [z.ZodNumber, z.ZodString]> =>
   z.union([z.number(), z.string()]).meta({ description })
@@ -115,11 +115,11 @@ export const outputApiFeaturePropertiesSchema = z.looseObject({
     .nullable()
     .optional()
     .meta({ description: 'Niveau de conversion : `CONV`, `AB?`, `C1`, `C2`, `C3` ou `AB`' }),
-  dateEngagement: dateTimeSchema.nullable().optional().meta({ description: "Date d'engagement en bio" }),
+  dateEngagement: isoDateSchema.nullable().optional().meta({ description: "Date d'engagement en bio" }),
   commentaire: text("Notes de l'auditeur sur la parcelle"),
   annotations: z.array(z.unknown()).nullable().optional().meta({ description: "Annotations de l'auditeur" }),
-  dateAjout: dateTimeSchema.nullable().optional().meta({ description: 'Date de création de la parcelle' }),
-  dateMiseAJour: dateTimeSchema
+  dateAjout: isoDateTimeSchema.nullable().optional().meta({ description: 'Date de création de la parcelle' }),
+  dateMiseAJour: isoDateTimeSchema
     .nullable()
     .optional()
     .meta({ description: 'Date de dernière modification de la parcelle' }),
@@ -143,9 +143,9 @@ export const outputApiCertificationSchema = z.looseObject({
     .string()
     .optional()
     .meta({ description: 'État du parcellaire : `OPERATOR_DRAFT`, `AUDITED`, `PENDING_CERTIFICATION` ou `CERTIFIED`' }),
-  dateAudit: dateTimeSchema.nullable().optional().meta({ description: "Date d'audit" }),
-  dateDebut: dateTimeSchema.nullable().optional().meta({ description: 'Début de validité de la certification' }),
-  dateFin: dateTimeSchema.nullable().optional().meta({ description: 'Fin de validité de la certification' }),
+  dateAudit: isoDateSchema.nullable().optional().meta({ description: "Date d'audit" }),
+  dateDebut: isoDateSchema.nullable().optional().meta({ description: 'Début de validité de la certification' }),
+  dateFin: isoDateSchema.nullable().optional().meta({ description: 'Fin de validité de la certification' }),
   demandesAudit: text("Demandes formulées lors de l'audit"),
   notesAudit: text("Notes de l'audit"),
   anneeReferenceControle: z.number().nullable().optional().meta({ description: 'Année de référence du contrôle' })
@@ -200,13 +200,13 @@ const importStatusSchema = z.enum(['CREATED', 'PENDING', 'DONE', 'ERROR']).meta(
 
 export const importJobStatusResponseSchema = z.looseObject({
   status: importStatusSchema,
-  created: dateTimeSchema.optional().meta({ description: "Date de création, tant que le job n'est pas terminé" }),
+  created: isoDateTimeSchema.optional().meta({ description: "Date de création, tant que le job n'est pas terminé" }),
   numeroBio: z.string().nullable().optional().meta({ description: 'Numéro bio du premier parcellaire reçu' }),
   numeroClient: z.string().nullable().optional().meta({ description: 'Numéro client du premier parcellaire reçu' }),
-  auditDate: dateTimeSchema.nullable().optional().meta({ description: "Date d'audit du premier parcellaire reçu" }),
+  auditDate: isoDateSchema.nullable().optional().meta({ description: "Date d'audit du premier parcellaire reçu" }),
   result: z.unknown().optional().meta({ description: 'Résultat du job, une fois terminé' }),
   error: z.unknown().optional().meta({ description: "Erreur du job, en cas d'échec" }),
-  ended: dateTimeSchema.nullable().optional().meta({ description: 'Date de fin du job' })
+  ended: isoDateTimeSchema.nullable().optional().meta({ description: 'Date de fin du job' })
 })
 
 export const importJobNotFoundResponseSchema = z.object({
@@ -217,11 +217,11 @@ export const importJobNotFoundResponseSchema = z.object({
 export const importSummarySchema = z.looseObject({
   jobId: z.number().optional().meta({ description: 'Identifiant du job' }),
   status: importStatusSchema,
-  createdAt: dateTimeSchema.meta({ description: 'Date de réception' }),
-  endedAt: dateTimeSchema.nullable().meta({ description: 'Date de fin du traitement' }),
+  createdAt: isoDateTimeSchema.meta({ description: 'Date de réception' }),
+  endedAt: isoDateTimeSchema.nullable().meta({ description: 'Date de fin du traitement' }),
   numeroBio: z.string().nullable().meta({ description: 'Numéro bio du premier parcellaire reçu' }),
   numeroClient: z.string().nullable().meta({ description: 'Numéro client du premier parcellaire reçu' }),
-  auditDate: dateTimeSchema.nullable().meta({ description: "Date d'audit du premier parcellaire reçu" }),
+  auditDate: isoDateSchema.nullable().meta({ description: "Date d'audit du premier parcellaire reçu" }),
   result: z.unknown().meta({ description: 'Résultat du traitement' }),
   payload: z.unknown().meta({ description: 'Corps JSON envoyé (`id`, `payload`), si `withPayload=true`' })
 })
@@ -252,3 +252,7 @@ export type InputApiCulture = z.infer<typeof inputApiCultureSchema>
 export type ImportReport = z.infer<typeof importReportSchema>
 export type ImportJobStatusResponse = z.infer<typeof importJobStatusResponseSchema>
 export type ImportSummary = z.infer<typeof importSummarySchema>
+export type CertificationParcellairesResponse = z.infer<typeof certificationParcellairesResponseSchema>
+export type ImportJobNotFoundResponse = z.infer<typeof importJobNotFoundResponseSchema>
+export type ImportListResponse = z.infer<typeof importListResponseSchema>
+export type ImportNotFoundResponse = z.infer<typeof importNotFoundResponseSchema>

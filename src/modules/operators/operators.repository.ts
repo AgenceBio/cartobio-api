@@ -1,4 +1,5 @@
 import { and, desc, eq, inArray, isNull, max, sql } from 'drizzle-orm'
+import { toIsoDateTime } from '@agencebio/cartobio-types'
 import type { AgenceBioNormalizedOperator } from '@agencebio/cartobio-types'
 import { db } from '../../database/database.js'
 import {
@@ -12,7 +13,7 @@ import {
 import { createOperateurConsulteSchema, createOperateurEpingleSchema } from '../../database/validations/activites.js'
 import { updateImportPacSchema } from '../../database/validations/imports.js'
 import { certificationEtatEnumSchema } from '../../database/validations/parcellaires.js'
-import { recordMetadata } from '../../shared/parcellaires/parcellaires.utils.js'
+import { isoDay, recordMetadata } from '../../shared/parcellaires/parcellaires.utils.js'
 import type { SQL } from 'drizzle-orm'
 import { numerosBioEntiers } from './operators.utils.js'
 import type {
@@ -28,8 +29,8 @@ const dateReference = sql`COALESCE(${parcellaires.certificationDateDebut}, ${par
 
 const recordFields = {
   certification_state: parcellaires.certificationEtat,
-  audit_date: parcellaires.auditDate,
-  certification_date_debut: parcellaires.certificationDateDebut,
+  audit_date: isoDay(parcellaires.auditDate),
+  certification_date_debut: isoDay(parcellaires.certificationDateDebut),
   created_at: parcellaires.createdAt,
   numerobio: sql<string>`${parcellaires.numeroBio}::text`,
   metadata: recordMetadata,
@@ -57,7 +58,6 @@ async function getFilterData(
   operators: AgenceBioNormalizedOperator[],
   mixite = false
 ): Promise<AgenceBioNormalizedOperatorWithFilterData[]> {
-  operators = operators.sort((a, b) => +a.numeroBio - +b.numeroBio)
   const ids = numerosBioEntiers(operators.map(({ numeroBio }) => numeroBio))
 
   if (ids.length === 0) {
@@ -117,31 +117,17 @@ async function getFilterData(
         .from(allParcellaire)
         .orderBy(sql`${allParcellaire.numerobio}::bigint ASC`)
 
-  const res: AgenceBioNormalizedOperatorWithFilterData[] = []
-  let j = 0
+  const rowsByNumeroBio = new Map(rows.map((row) => [Number(row.numerobio), row]))
 
-  for (const operator of operators) {
-    const row = rows[j]
-    if (!row || +operator.numeroBio !== +row.numerobio) {
-      res.push({
-        ...operator,
-        metadata: {}
-      })
+  return operators
+    .toSorted((a, b) => +a.numeroBio - +b.numeroBio)
+    .map((operator) => {
+      const row = rowsByNumeroBio.get(Number(operator.numeroBio))
+      if (!row) return { ...operator, metadata: {} }
 
-      continue
-    }
-
-    const { metadata, ...record } = row
-
-    res.push({
-      ...operator,
-      metadata,
-      ...record
+      const { metadata, ...record } = row
+      return { ...operator, metadata, ...record }
     })
-    j++
-  }
-
-  return res
 }
 
 async function addRecordData(operateur: AgenceBioNormalizedOperator): Promise<OperatorWithRecordData> {
@@ -186,8 +172,8 @@ async function addRecordData(operateur: AgenceBioNormalizedOperator): Promise<Op
     .filter((row, index, all) => all.findIndex(({ record_id: recordId }) => recordId === row.record_id) === index)
     .map((row) => ({
       ...row,
-      created_at: row.created_at.toISOString(),
-      updated_at: row.updated_at.toISOString(),
+      created_at: toIsoDateTime(row.created_at),
+      updated_at: toIsoDateTime(row.updated_at),
       lastcertifieddate: lastCertifiedParcelle?.lastcertifieddate ?? null,
       lastmixitestate: lastCertifiedParcelle?.lastmixitestate ?? null
     }))

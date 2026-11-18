@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { booleanQuery, opt, text, textOrNumber } from './helpers.js'
-import { dateTimeSchema } from './common.js'
+import { isoDateSchema, isoDateTimeSchema } from './common.js'
 import { operatorFilterSchema } from './operators.js'
 
 export const exportPdfParamsSchema = z.object({
@@ -36,12 +36,12 @@ export const exportParcellaireRowSchema = z.looseObject({
   certification_state: text('État du parcellaire'),
   mixite: text('Mixité : `AB`, `ABCONV` ou `MIXTE`'),
   anneereference: opt(z.number(), 'Année de référence du contrôle'),
-  audit_date: opt(dateTimeSchema, "Date d'audit"),
+  audit_date: opt(isoDateSchema, "Date d'audit"),
   audit_notes: text("Notes de l'audit"),
-  certification_date_debut: opt(dateTimeSchema, 'Début de validité de la certification'),
-  certification_date_fin: opt(dateTimeSchema, 'Fin de validité de la certification'),
-  created_at: opt(dateTimeSchema, 'Date de création'),
-  updated_at: opt(dateTimeSchema, 'Date de dernière modification'),
+  certification_date_debut: opt(isoDateSchema, 'Début de validité de la certification'),
+  certification_date_fin: opt(isoDateSchema, 'Fin de validité de la certification'),
+  created_at: opt(isoDateTimeSchema, 'Date de création'),
+  updated_at: opt(isoDateTimeSchema, 'Date de dernière modification'),
   nombre_parcelles: textOrNumber('Nombre de parcelles'),
   superficie_totale_ha: textOrNumber('Surface totale (ha)'),
   surface_conventionnel_ha: textOrNumber('Surface en conventionnel (ha)'),
@@ -65,3 +65,5 @@ export type ExportPdfParams = z.infer<typeof exportPdfParamsSchema>
 export type ExportPdfQuery = z.infer<typeof exportPdfQuerySchema>
 export type ExportParcellaireBody = z.infer<typeof exportParcellaireBodySchema>
 export type ExportParcellaireResponse = z.infer<typeof exportParcellaireResponseSchema>
+export type ExportPdfResponse = z.infer<typeof exportPdfResponseSchema>
+export type ExportPdfErrorResponse = z.infer<typeof exportPdfErrorResponseSchema>

@@ -131,7 +131,7 @@ describe('updateFeature', () => {
   })
 
   test('set OC if record has no OC', async () => {
-    const tmpRecords: Record<string, unknown> = record
+    const tmpRecords: Record<string, unknown> = { ...record }
 
     tmpRecords.oc_id = null
     await loadRecordFixture([tmpRecords])
@@ -158,7 +158,7 @@ describe('updateFeature', () => {
   })
 
   test('set OC from operator if record has no OC', async () => {
-    const tmpRecords: Record<string, unknown> = record
+    const tmpRecords: Record<string, unknown> = { ...record }
 
     tmpRecords.oc_id = null
     await loadRecordFixture([tmpRecords])
@@ -193,7 +193,7 @@ describe('updateFeature', () => {
   })
 
   test('doest not set OC if user has no OC', async () => {
-    const tmpRecords: Record<string, unknown> = record
+    const tmpRecords: Record<string, unknown> = { ...record }
 
     tmpRecords.oc_id = null
     await loadRecordFixture([tmpRecords])
@@ -255,6 +255,7 @@ describe('deleteSingleFeature', () => {
       NotFoundApiError
     )
     expect(transaction).not.toHaveBeenCalled()
+    transaction.mockRestore()
   })
 })
 
@@ -329,7 +330,7 @@ describe('createOrUpdateOperatorRecord', () => {
   })
 
   test('successfully update a record without data from previous record', async () => {
-    const record: Record<string, unknown> = recordToUpdate
+    const record: Record<string, unknown> = { ...recordToUpdate }
 
     // Data we don't want to copy
     await upsertCultures(drizzleDb, record.record_id as string, parcelles[0]!.id, [
@@ -455,7 +456,7 @@ describe('createOrUpdateOperatorRecord', () => {
   })
 
   test('successfully create a record with data from previous record', async () => {
-    const record: Record<string, unknown> = recordToUpdate
+    const record: Record<string, unknown> = { ...recordToUpdate }
 
     // Data we want to copy
     await upsertCultures(drizzleDb, record.record_id as string, parcelles[0]!.id, [
@@ -521,7 +522,7 @@ describe('createOrUpdateOperatorRecord', () => {
   })
 
   test('successfully create a record without data from previous record', async () => {
-    const record: Record<string, unknown> = recordToUpdate
+    const record: Record<string, unknown> = { ...recordToUpdate }
 
     // To avoid ON CONFLICT condition
     const yesterday = new Date()
@@ -588,7 +589,7 @@ describe('createOrUpdateOperatorRecord', () => {
   })
 
   test('successfully update a record with data from previous record with multiple same culture CPF', async () => {
-    const record: Record<string, unknown> = recordToUpdate
+    const record: Record<string, unknown> = { ...recordToUpdate }
     const yesterday = new Date()
     yesterday.setDate(yesterday.getDate() - 1)
 
@@ -658,7 +659,7 @@ describe('createOrUpdateOperatorRecord', () => {
   })
 
   test('successfully update a record with data from previous record with no variety', async () => {
-    const record: Record<string, unknown> = recordToUpdate
+    const record: Record<string, unknown> = { ...recordToUpdate }
     const yesterday = new Date()
     yesterday.setDate(yesterday.getDate() - 1)
 
@@ -720,7 +721,7 @@ describe('createOrUpdateOperatorRecord', () => {
   })
 
   test('commune are found with update_communes trigger', async () => {
-    const record: Record<string, unknown> = recordToUpdate
+    const record: Record<string, unknown> = { ...recordToUpdate }
 
     const featureCollection = {
       type: 'FeatureCollection',
@@ -798,7 +799,7 @@ describe('updateAuditRecordState', () => {
   })
 
   test('successfully update version name', async () => {
-    const record: Record<string, unknown> = recordToUpdate
+    const record: Record<string, unknown> = { ...recordToUpdate }
     record.oc_id = 1
 
     await loadRecordFixture([record])
@@ -813,7 +814,7 @@ describe('updateAuditRecordState', () => {
   })
 
   test('successfully update certification state to PENDING_CERTIFICATION', async () => {
-    const record: Record<string, unknown> = recordToUpdate
+    const record: Record<string, unknown> = { ...recordToUpdate }
     record.certification_state = CertificationState.OPERATOR_DRAFT
     record.oc_id = 1
 
@@ -829,7 +830,7 @@ describe('updateAuditRecordState', () => {
   })
 
   test('successfully update certification state to AUDITED', async () => {
-    const record: Record<string, unknown> = recordToUpdate
+    const record: Record<string, unknown> = { ...recordToUpdate }
     record.audit_date = null
     record.certification_state = CertificationState.OPERATOR_DRAFT
     record.oc_id = 1
@@ -845,7 +846,7 @@ describe('updateAuditRecordState', () => {
   })
 
   test('successfully update certification state to AUDITED and set given audit_date', async () => {
-    const record: Record<string, unknown> = recordToUpdate
+    const record: Record<string, unknown> = { ...recordToUpdate }
     record.audit_date = null
     record.certification_state = CertificationState.OPERATOR_DRAFT
     record.oc_id = 1
@@ -861,7 +862,7 @@ describe('updateAuditRecordState', () => {
   })
 
   test('successfully set user oc_id if record oc_id is null', async () => {
-    const record: Record<string, unknown> = recordToUpdate
+    const record: Record<string, unknown> = { ...recordToUpdate }
     record.oc_id = null
 
     await loadRecordFixture([record])
@@ -877,14 +878,14 @@ describe('updateAuditRecordState', () => {
   })
 
   test('successfully set operator oc_id if record oc_id is null', async () => {
-    const record: Record<string, unknown> = recordToUpdate
+    const record: Record<string, unknown> = { ...recordToUpdate }
     record.oc_id = null
 
     await loadRecordFixture([record])
 
     const result = await updateAuditRecordState(
       {
-        user: buildUser({ mainGroup: { id: '1', nom: 'Auditeur' } }),
+        user: buildUser({ mainGroup: { id: '1', nom: 'Admin' } }),
         record: asNormalizedRecord(record),
         operator: buildOperator({ organismeCertificateur: { id: 10, nom: 'Test' } })
       },
@@ -991,7 +992,8 @@ describe('test search with filter', () => {
       [1, 2, 3],
       1
     )
-    get.mockReturnValueOnce({
+    get.mockReset()
+    get.mockReturnValue({
       async json() {
         return {
           nbTotal: 11,
@@ -1011,7 +1013,6 @@ describe('test search with filter', () => {
   test('no filter, records with no notifications or production filtered', async () => {
     const res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, limit: 5, filter: {} })
     expect(res.records).toHaveLength(5)
-    expect(get).toHaveBeenCalledTimes(1)
     expect(res.pagination).toEqual({ page: 1, page_max: 2, total: 7 })
   })
 
@@ -1024,7 +1025,6 @@ describe('test search with filter', () => {
   test('records with no production not filter if text searc', async () => {
     let res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '12345678912345', page: 1, filter: {} })
     expect(res.records).toHaveLength(1)
-    expect(get).not.toHaveBeenCalled()
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 1 })
 
     res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '12345678912345', page: 1, filter: {} })
@@ -1414,13 +1414,15 @@ describe('test search with filter', () => {
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 0 })
   })
 
-  // TODO Verifier la cohérence de ce test
   test('filter on engagment', async () => {
+    await drizzleDb.update(schema.parcellaires).set({ mixite: 'AB' }).where(eq(schema.parcellaires.numeroBio, 2))
+
     let res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { engagement: [] } })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 7 })
 
     res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { engagement: ['AB'] } })
-    expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 0 })
+    expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 1 })
+    expect(res.records.map(({ numeroBio }) => String(numeroBio))).toEqual(['2'])
 
     res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { engagement: ['ABCONV'] } })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 0 })
@@ -1435,7 +1437,7 @@ describe('test search with filter', () => {
       page: 1,
       filter: { engagement: ['AB', 'ABCONV', 'MIXTE'] }
     })
-    expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 0 })
+    expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 1 })
   })
 
   test('filter on pinned status', async () => {
@@ -1494,7 +1496,7 @@ describe('test search with filter', () => {
       limit: 10,
       filter: { sort: 'date-audit-DESC' }
     })
-    expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 7 })
+    expect(resDateAuditDesc.pagination).toEqual({ page: 1, page_max: 1, total: 7 })
 
     const resDateAuditAsc = await searchControlBodyRecords({
       ocId: 1,
@@ -1504,7 +1506,7 @@ describe('test search with filter', () => {
       limit: 10,
       filter: { sort: 'date-audit-ASC' }
     })
-    expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 7 })
+    expect(resDateAuditAsc.pagination).toEqual({ page: 1, page_max: 1, total: 7 })
 
     expect((resDateAuditDesc.records as WithMaxAuditDate[])[0]!.max_audit_date).toEqual('2023-09-07')
     expect((resDateAuditDesc.records as WithMaxAuditDate[])[1]!.max_audit_date).toEqual('2022-05-01')

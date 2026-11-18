@@ -14,7 +14,7 @@ describe('parsePacDetailsFromComment', () => {
 
   test('detect Ilot et Parcelle from compact naming', async () => {
     expect(parsePacDetailsFromComment('ilot-15-2')).toEqual({ numeroIlot: '15', numeroParcelle: '2' })
-    expect(parsePacDetailsFromComment('ilot-15-2')).toEqual({ numeroIlot: '15', numeroParcelle: '2' })
+    expect(parsePacDetailsFromComment('ILOT-15-2')).toEqual({ numeroIlot: '15', numeroParcelle: '2' })
   })
 
   test('assume nothing', async () => {
@@ -36,9 +36,12 @@ describe('fetch function', () => {
         return agencebioOperator
       }
     })
-    await fetchOperatorByNumeroBio('1')
+    const operator = await fetchOperatorByNumeroBio('1')
 
     expect(get).toHaveBeenCalledTimes(1)
+    expect(get.mock.calls[0]![0]).toMatch(/\/api\/operateur\/1$/)
+    expect(operator.numeroBio).toBe(String(agencebioOperator.numeroBio))
+    expect(operator.nom).toBe(agencebioOperator.nom)
   })
 
   test('fetch with memoization', async () => {
@@ -47,9 +50,9 @@ describe('fetch function', () => {
         return { nbTotal: 1, operateurs: [agencebioOperator] }
       }
     })
-    await fetchCustomersByOc(1)
-    await fetchCustomersByOc(1)
-    await fetchCustomersByOc(1)
+    await fetchCustomersByOc(101)
+    await fetchCustomersByOc(101)
+    await fetchCustomersByOc(101)
 
     expect(get).toHaveBeenCalledTimes(1)
   })
@@ -60,22 +63,37 @@ describe('fetch function', () => {
         return { nbTotal: 1, operateurs: [agencebioOperator] }
       }
     })
-    await fetchCustomersByOc(1)
-    await fetchCustomersByOc(2)
-    await fetchCustomersByOc(3)
+    await fetchCustomersByOc(201)
+    await fetchCustomersByOc(202)
+    await fetchCustomersByOc(203)
 
-    expect(get).toHaveBeenCalledTimes(2)
+    expect(get).toHaveBeenCalledTimes(3)
+    expect(get.mock.calls.map(([url]) => url)).toEqual([
+      expect.stringMatching(/\/api\/oc\/201\/operateurs$/),
+      expect.stringMatching(/\/api\/oc\/202\/operateurs$/),
+      expect.stringMatching(/\/api\/oc\/203\/operateurs$/)
+    ])
   })
 
   test('fetch paginated', async () => {
-    get.mockReturnValue({
-      async json() {
-        return { nbTotal: 14500, operateurs: [agencebioOperator] }
-      }
-    })
-    await fetchCustomersByOc(4)
-    await fetchCustomersByOc(4)
+    get
+      .mockReturnValueOnce({
+        async json() {
+          return { nbTotal: 14500, operateurs: [agencebioOperator] }
+        }
+      })
+      .mockReturnValueOnce({
+        async json() {
+          return { nbTotal: 14500, operateurs: [{ ...agencebioOperator, id: 2, numeroBio: '88888' }] }
+        }
+      })
+    const operators = await fetchCustomersByOc(301)
+    await fetchCustomersByOc(301)
 
     expect(get).toHaveBeenCalledTimes(2)
+    expect(get.mock.calls[0]![1].searchParams).toMatchObject({ limit: 10000 })
+    expect(get.mock.calls[0]![1].searchParams).not.toHaveProperty('page')
+    expect(get.mock.calls[1]![1].searchParams).toMatchObject({ limit: 10000, page: 2 })
+    expect(operators.map(({ numeroBio }) => String(numeroBio))).toEqual([String(agencebioOperator.numeroBio), '88888'])
   })
 })

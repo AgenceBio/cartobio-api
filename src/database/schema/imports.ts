@@ -14,22 +14,26 @@ import {
 import { cartobio } from './cartobio.js'
 import { importJobEtat, importJobResult, importLogType, importStatus } from './enums.js'
 
-export const parcellaireImport = cartobio.table('parcellaire_import', {
-  id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
-  status: importStatus('status').notNull().default('CREATED'),
-  organismeCertificateur: varchar('organisme_certificateur', {
-    length: 64
-  }).notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  startedAt: timestamp('started_at', { withTimezone: true }),
-  endedAt: timestamp('ended_at', { withTimezone: true }),
-  numeroBio: varchar('numerobio'),
-  numeroClient: varchar('numeroclient'),
-  auditDate: date('audit_date'),
-  resultJob: jsonb('result_job'),
-  statutJob: importJobResult('statut_job'),
-  etat: importJobEtat('etat').notNull().default('UNKNOWN')
-})
+export const parcellaireImport = cartobio.table(
+  'parcellaire_import',
+  {
+    id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
+    status: importStatus('status').notNull().default('CREATED'),
+    organismeCertificateur: varchar('organisme_certificateur', {
+      length: 64
+    }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    startedAt: timestamp('started_at', { withTimezone: true }),
+    endedAt: timestamp('ended_at', { withTimezone: true }),
+    numeroBio: varchar('numerobio'),
+    numeroClient: varchar('numeroclient'),
+    auditDate: date('audit_date'),
+    resultJob: jsonb('result_job'),
+    statutJob: importJobResult('statut_job'),
+    etat: importJobEtat('etat').notNull().default('UNKNOWN')
+  },
+  (table) => [index('parcellaire_import_organisme_created_at_idx').on(table.organismeCertificateur, table.createdAt)]
+)
 
 export const parcellaireImportLogs = cartobio.table(
   'parcellaire_import_logs',
@@ -48,13 +52,17 @@ export const parcellaireImportLogs = cartobio.table(
   (table) => [index('parcellaire_import_logs_import_id_idx').on(table.importId)]
 )
 
-export const parcellaireImportPayload = cartobio.table('parcellaire_import_payload', {
-  id: varchar('id').primaryKey(),
-  importId: integer('import_id')
-    .notNull()
-    .references(() => parcellaireImport.id, { onDelete: 'cascade' }),
-  payload: jsonb('payload')
-})
+export const parcellaireImportPayload = cartobio.table(
+  'parcellaire_import_payload',
+  {
+    id: varchar('id').primaryKey(),
+    importId: integer('import_id')
+      .notNull()
+      .references(() => parcellaireImport.id, { onDelete: 'cascade' }),
+    payload: jsonb('payload')
+  },
+  (table) => [index('parcellaire_import_payload_import_id_idx').on(table.importId)]
+)
 
 export const importPac = cartobio.table(
   'import_pac',

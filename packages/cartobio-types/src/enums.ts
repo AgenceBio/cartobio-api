@@ -44,6 +44,42 @@ const MetadataSource = {
   COPIE_CONFLIT: 'COPIE_CONFLIT'
 } as const
 
+const ImportLogCode = {
+  INVALID_FORMAT: 'INVALID_FORMAT',
+  UNKNOWN_NUMERO_BIO: 'UNKNOWN_NUMERO_BIO',
+  NOT_PRODUCTION: 'NOT_PRODUCTION',
+  NO_OC: 'NO_OC',
+  OC_MISMATCH: 'OC_MISMATCH',
+  INVALID_DATE_CERTIFICATION_DEBUT: 'INVALID_DATE_CERTIFICATION_DEBUT',
+  INVALID_DATE_CERTIFICATION_FIN: 'INVALID_DATE_CERTIFICATION_FIN',
+  MISSING_CERTIFICATION_DATES: 'MISSING_CERTIFICATION_DATES',
+  INVALID_DATE_AUDIT: 'INVALID_DATE_AUDIT',
+  INVALID_ETAT_PRODUCTION: 'INVALID_ETAT_PRODUCTION',
+  MISSING_DATE_ENGAGEMENT: 'MISSING_DATE_ENGAGEMENT',
+  INVALID_DATE_ENGAGEMENT: 'INVALID_DATE_ENGAGEMENT',
+  MISSING_CULTURES: 'MISSING_CULTURES',
+  INVALID_CPF: 'INVALID_CPF',
+  INVALID_GEOM: 'INVALID_GEOM',
+  MISSING_GEOM: 'MISSING_GEOM',
+  DB_ERROR: 'DB_ERROR',
+  GEOM_OUT_OF_BOUNDS: 'GEOM_OUT_OF_BOUNDS',
+  GEOM_CORRECTED: 'GEOM_CORRECTED',
+  GEOM_INVALID_NOT_CORRECTED: 'GEOM_INVALID_NOT_CORRECTED',
+  PAC_PENDING_WITH_ILOT: 'PAC_PENDING_WITH_ILOT'
+} as const
+
+const ImportJobResult = {
+  VALID: 'VALID',
+  REJECTED: 'REJECTED',
+  ERROR: 'ERROR'
+} as const
+
+const ImportJobEtat = {
+  CREATED: 'CREATED',
+  UPDATED: 'UPDATED',
+  UNKNOWN: 'UNKNOWN'
+} as const
+
 const Area = {
   METROPOLE: 'metropole',
   ANTILLES: 'antilles',
@@ -91,6 +127,9 @@ export {
   EtatProduction,
   EventType,
   MetadataSource,
+  ImportLogCode,
+  ImportJobResult,
+  ImportJobEtat,
   LegalProjections,
   RegionBounds,
   AttestationsProductionsStatus,
@@ -101,6 +140,9 @@ export type CertificationState = (typeof CertificationState)[keyof typeof Certif
 export type EtatProduction = (typeof EtatProduction)[keyof typeof EtatProduction]
 export type EventType = (typeof EventType)[keyof typeof EventType]
 export type MetadataSource = (typeof MetadataSource)[keyof typeof MetadataSource]
+export type ImportLogCode = (typeof ImportLogCode)[keyof typeof ImportLogCode]
+export type ImportJobResult = (typeof ImportJobResult)[keyof typeof ImportJobResult]
+export type ImportJobEtat = (typeof ImportJobEtat)[keyof typeof ImportJobEtat]
 export type LegalProjections = (typeof LegalProjections)[keyof typeof LegalProjections]
 export type RegionBounds = (typeof RegionBounds)[keyof typeof RegionBounds]
 export type AttestationsProductionsStatus =

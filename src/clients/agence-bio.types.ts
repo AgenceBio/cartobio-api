@@ -28,9 +28,7 @@ export const agenceBioNotificationSchema = z.looseObject({
  * This is what we output
  */
 export const agenceBioAdresseGeoSchema = z.looseObject({
-  codeCommune: z.string().nullish(),
-  lat: z.number().nullish(),
-  long: z.number().nullish()
+  codeCommune: z.string().nullish()
 })
 
 /**
@@ -39,7 +37,6 @@ export const agenceBioAdresseGeoSchema = z.looseObject({
 export const agenceBioAdressesSchema = agenceBioAdresseGeoSchema.extend({
   active: z.boolean().nullish(),
   lieu: z.string().nullish(),
-  dates: z.string().nullish(),
   codePostal: z.string().nullish(),
   ville: z.string().nullish()
 })
@@ -52,34 +49,17 @@ export const agenceBioOperatorSchema = z.looseObject({
   nom: z.string().nullish(),
   denominationCourante: z.string().nullish(),
   siret: z.string().nullish(),
-  echeanceSiret: z.string().nullish(),
-  flag: z.string().nullish(),
   numeroBio: z.union([z.string(), z.number()]).transform(String),
-  echangeSiret: z.string().nullish(),
-  email: z.string().nullish(),
-  gerant: z.string().nullish(),
-  telephone: z.string().nullish(),
-  telephoneCommerciale: z.string().nullish(),
-  numeroPacage: z.string().nullish(),
-  dateFinConversion: z.string().nullish(),
-  lat: z.number().nullish(),
-  long: z.number().nullish(),
-  mandate: z.boolean().nullish(),
-  dateMaj: z.string().nullish(),
+  numeroPacage: z.union([z.string(), z.number()]).transform(String).nullish(),
   dateEngagement: z.string().nullish(),
   datePremierEngagement: z.string().nullish(),
-  codeNAF: z.string().nullish(),
-  reseauId: z.number().nullish(),
-  departementId: z.number().nullish(),
-  photo: z.array(z.unknown()).nullish(),
-  sitesWeb: z.array(z.string()).nullish(),
   notifications: z.array(agenceBioNotificationSchema).nullish(),
   adressesOperateurs: z.array(agenceBioAdressesSchema).nullish()
 })
 
 export const agenceBioOperateursPageSchema = z.looseObject({
   nbTotal: z.number(),
-  operateurs: z.array(agenceBioOperatorSchema)
+  operateurs: z.array(z.unknown())
 })
 
 export const agenceBioOperatorEmailsSchema = z.looseObject({

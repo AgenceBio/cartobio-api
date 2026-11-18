@@ -5,12 +5,13 @@ import { join } from 'node:path'
 import { sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import { db } from '../src/database/database.js'
-import { communes, departements, regions } from '../src/database/schema/geographie.js'
+import { communes, departements, regions, territoires } from '../src/database/schema/geographie.js'
 import { fromGeoJSON } from '../src/database/postgis.js'
 import {
   createCommuneSchema,
   createDepartementSchema,
   createRegionSchema,
+  createTerritoireSchema,
   updateCommuneSchema
 } from '../src/database/validations/geographie.js'
 import { DATA_DIR } from '../src/shared/paths.js'
@@ -33,7 +34,8 @@ async function byBatch<T extends Zone>(zones: T[], upsert: (batch: T[]) => Promi
 
 try {
   await db.transaction(async (tx) => {
-    await byBatch(await readZones('reference/regions.json'), (batch) =>
+    const zonesRegions = await readZones('reference/regions.json')
+    await byBatch(zonesRegions, (batch) =>
       tx
         .insert(regions)
         .values(
@@ -43,6 +45,18 @@ try {
           }))
         )
         .onConflictDoUpdate({ target: regions.code, set: { nom: sql`excluded.nom`, geometry: sql`excluded.geometry` } })
+    )
+
+    await byBatch(zonesRegions, (batch) =>
+      tx
+        .insert(territoires)
+        .values(
+          batch.map(({ code, geometry }) => ({
+            ...createTerritoireSchema.parse({ fid: `region-${code}` }),
+            geometry: multiPolygon(geometry)
+          }))
+        )
+        .onConflictDoUpdate({ target: territoires.fid, set: { geometry: sql`excluded.geom` } })
     )
 
     const located: Array<Zone & { codeRegion: string }> = []
@@ -88,7 +102,7 @@ try {
           })
     )
   })
-  console.log('Régions, départements et communes importés')
+  console.log('Régions, territoires, départements et communes importés')
 } finally {
   await db.$client.end()
 }

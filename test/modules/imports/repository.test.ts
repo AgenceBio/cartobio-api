@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm'
+import { toIsoDateTime } from '@agencebio/cartobio-types'
 import { db } from '../../../src/database/database.js'
-import { parcellaireImport } from '../../../src/database/schema/index.js'
+import { parcellaireImport, parcellaires } from '../../../src/database/schema/index.js'
 import {
   parseAPIParcellaire,
   getCurrentStatusJobs,
@@ -105,7 +106,9 @@ describe('parseAPIParcellaire', () => {
       parcelles: []
     }
 
-    vi.mocked(mockFetchOperatorByNumeroBio).mockRejectedValueOnce(new Error('Numéro bio inconnu'))
+    vi.mocked(mockFetchOperatorByNumeroBio).mockRejectedValueOnce(
+      Object.assign(new Error('Numéro bio inconnu'), { response: { statusCode: 404 } })
+    )
 
     const result = await parseAPIParcellaire(recordWithUnknownBio, { organismeCertificateur })
 
@@ -195,7 +198,7 @@ describe('parseAPIParcellaire', () => {
           dateEngagement: '2010-05-14',
           etatProduction: 'AB',
           geom: '[[[6.2708156467808749,47.590451080690947],[6.27081300234578,47.590451955729122]',
-          cultures: [
+          culture: [
             {
               codeCPF: '01.21.12',
               quantite: 1,
@@ -241,7 +244,7 @@ describe('parseAPIParcellaire', () => {
           dateEngagement: '2010-05-14',
           etatProduction: 'AB',
           geom: '[[[null,47.590451],[6.270813,47.590451],[6.270813,47.590452],[null,47.590452],[null,47.590451]]]',
-          cultures: [
+          culture: [
             {
               codeCPF: '01.21.12',
               quantite: 1,
@@ -288,7 +291,7 @@ describe('parseAPIParcellaire', () => {
           dateEngagement: '2010-05-14',
           etatProduction: 'AB',
           geom: '[[[1e309,47.590451],[6.270813,47.590451],[6.270813,47.590452],[1e309,47.590452],[1e309,47.590451]]]',
-          cultures: [
+          culture: [
             {
               codeCPF: '01.21.12',
               quantite: 1,
@@ -452,7 +455,7 @@ describe('parseAPIParcellaire', () => {
     })
   })
 
-  test('accepte un payload contenant un seul objet', async () => {
+  test("accepte une parcelle AB sans date d'engagement ni numéro PACAGE", async () => {
     const organismeCertificateur = { id: 1, nom: 'Ecocert France' }
     const record = {
       numeroBio: '99999',
@@ -478,7 +481,9 @@ describe('parseAPIParcellaire', () => {
     )
 
     const result = await parseAPIParcellaire(record, { organismeCertificateur })
+    expect(result.errors).toBeUndefined()
     expect(recordOf(result).numerobio).toBe('99999')
+    expect(recordOf(result).parcelles.features).toHaveLength(1)
   })
 
   test('retourne toutes les erreurs d’une même parcelle', async () => {
@@ -574,6 +579,12 @@ describe('getCurrentStatusJobs', () => {
     })
   })
 
+  test("ne retourne pas le job d'un autre organisme certificateur", async () => {
+    const id = await insertJob({ status: 'DONE', resultJob: { ok: true }, endedAt: new Date() })
+
+    expect(await getCurrentStatusJobs(id, 2)).toEqual({ status: 'error', error: "Aucun job n'a cet id" })
+  })
+
   test('retourne un job en statut DONE', async () => {
     const mockDate = new Date()
     const id = await insertJob({
@@ -584,7 +595,7 @@ describe('getCurrentStatusJobs', () => {
 
     const result = await getCurrentStatusJobs(id, 1)
 
-    expect(result).toMatchObject({ status: 'DONE', result: { ok: true }, ended: mockDate })
+    expect(result).toMatchObject({ status: 'DONE', result: { ok: true }, ended: toIsoDateTime(mockDate) })
   })
 
   test('retourne un job en statut PENDING', async () => {
@@ -596,7 +607,7 @@ describe('getCurrentStatusJobs', () => {
 
     const result = await getCurrentStatusJobs(id, 1)
 
-    expect(result).toMatchObject({ status: 'PENDING', created: mockDate })
+    expect(result).toMatchObject({ status: 'PENDING', created: toIsoDateTime(mockDate) })
   })
 
   test('retourne un job en statut ERROR', async () => {
@@ -609,7 +620,7 @@ describe('getCurrentStatusJobs', () => {
 
     const result = await getCurrentStatusJobs(id, 1)
 
-    expect(result).toMatchObject({ status: 'ERROR', error: 'Something went wrong', ended: mockDate })
+    expect(result).toMatchObject({ status: 'ERROR', error: 'Something went wrong', ended: toIsoDateTime(mockDate) })
   })
 })
 
@@ -674,5 +685,46 @@ describe('updateStatus', () => {
       auditDate: '2026-09-01',
       etat: 'CREATED'
     })
+  })
+
+  test('considère comme une mise à jour un renvoi pour un parcellaire existant', async () => {
+    await db.insert(parcellaires).values({
+      numeroBio: 12345,
+      certificationEtat: 'AUDITED',
+      versionNom: 'v1',
+      auditDate: '2026-09-01',
+      anneeReferenceControle: 2026
+    })
+    const id = await insertJob()
+
+    await updateStatus(id, { numeroBio: '12345', numeroClient: 'CLIENT-1', dateAudit: '2026-09-01' })
+
+    expect(await findJob(id)).toMatchObject({ etat: 'UPDATED' })
+  })
+
+  test("considère comme une création un parcellaire existant à une autre date d'audit", async () => {
+    await db.insert(parcellaires).values({
+      numeroBio: 12345,
+      certificationEtat: 'AUDITED',
+      versionNom: 'v1',
+      auditDate: '2025-09-01',
+      anneeReferenceControle: 2025
+    })
+    const id = await insertJob()
+
+    await updateStatus(id, { numeroBio: '12345', numeroClient: 'CLIENT-1', dateAudit: '2026-09-01' })
+
+    expect(await findJob(id)).toMatchObject({ etat: 'CREATED' })
+  })
+
+  test("laisse l'état inconnu quand une information manque ou que la date est invalide", async () => {
+    const sansClient = await insertJob()
+    const dateInvalide = await insertJob()
+
+    await updateStatus(sansClient, { numeroBio: '12345', dateAudit: '2026-09-01' })
+    await updateStatus(dateInvalide, { numeroBio: '12345', numeroClient: 'CLIENT-1', dateAudit: 'pas une date' })
+
+    expect(await findJob(sansClient)).toMatchObject({ etat: 'UNKNOWN', numeroClient: null })
+    expect(await findJob(dateInvalide)).toMatchObject({ etat: 'UNKNOWN', auditDate: null })
   })
 })

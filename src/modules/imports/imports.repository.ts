@@ -1,3 +1,4 @@
+import type { ImportLogCode } from '@agencebio/cartobio-types'
 import { randomUUID } from 'node:crypto'
 import { and, asc, desc, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
@@ -21,6 +22,7 @@ import {
 } from '../../database/validations/imports.js'
 import type { ImportJobResult, ImportStatus } from '../../database/validations/imports.js'
 import type { DBOperatorRecord } from '../../shared/parcellaires/parcellaires.types.js'
+import { isoDay } from '../../shared/parcellaires/parcellaires.utils.js'
 import { importJobColumns, operatorRecordColumns, operatorRecordConditions, payloadColumn } from './imports.utils.js'
 import type {
   ImportJobListRow,
@@ -71,7 +73,7 @@ async function insertImportLog(
     idParcelle?: string | number | null
     nomParcelle?: string | null
     type: 'warning' | 'error'
-    code: string
+    code: ImportLogCode
     message: string
   }
 ): Promise<void> {
@@ -123,7 +125,7 @@ async function updateImportJobEtat(
       ? (await db.$count(
           parcellaires,
           and(
-            sql`${parcellaires.numeroBio}::text = ${numeroBio}`,
+            /^\d+$/.test(numeroBio) ? eq(parcellaires.numeroBio, Number(numeroBio)) : sql`false`,
             eq(parcellaires.auditDate, auditDate),
             isNull(parcellaires.deletedAt)
           )
@@ -195,7 +197,7 @@ async function findImportJob(id: string | number, organisme: number): Promise<Im
       status: parcellaireImport.status,
       numerobio: parcellaireImport.numeroBio,
       numeroclient: parcellaireImport.numeroClient,
-      audit_date: parcellaireImport.auditDate,
+      audit_date: isoDay(parcellaireImport.auditDate),
       result_job: parcellaireImport.resultJob,
       ended_at: parcellaireImport.endedAt,
       created_at: parcellaireImport.createdAt

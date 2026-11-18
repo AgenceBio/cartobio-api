@@ -1,6 +1,12 @@
 import type { Polygon } from 'geojson'
 import type { SelectResultFields } from 'drizzle-orm/query-builders/select.types'
-import type { CartoBioFeatureCollectionInput, CartoBioHistoriqueCulture, RecordInfos } from '@agencebio/cartobio-types'
+import type {
+  CartoBioFeatureCollectionInput,
+  CartoBioHistoriqueCulture,
+  IsoDate,
+  IsoDateTime,
+  RecordInfos
+} from '@agencebio/cartobio-types'
 import type { parcelleColumns, recordColumns } from './parcellaires.utils.js'
 
 export type GeometryAnalysis = {
@@ -21,7 +27,11 @@ export type DBOperatorRecord = DBRecord & { parcelles?: DBParcelle[] }
 
 export type DBOperatorRecordWithParcelles = DBRecord & { parcelles: DBParcelle[] }
 
-export type RecordInput = Partial<RecordInfos> & { parcelles: CartoBioFeatureCollectionInput }
+type PlainDate<V> = V extends IsoDate | IsoDateTime ? string : V
+
+export type RecordInput = Partial<{ [K in keyof RecordInfos]: PlainDate<RecordInfos[K]> }> & {
+  parcelles: CartoBioFeatureCollectionInput
+}
 
 export type PreviousParcelle = Pick<DBParcelle, 'id' | 'cultures' | 'conversion_niveau' | 'engagement_date' | 'name'>
 

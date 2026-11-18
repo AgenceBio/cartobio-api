@@ -197,7 +197,7 @@ const config = convict<AppConfig>({
       sensitive: true,
       default: '',
       env: 'NOTIFICATIONS_AB_SERVICE_TOKEN',
-      format: 'uuid'
+      format: 'service-token'
     },
     sso: {
       host: {

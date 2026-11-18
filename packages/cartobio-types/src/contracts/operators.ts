@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { mixiteSchema, opt, text, textOrNumber } from './helpers.js'
 import { CertificationState } from '../enums.js'
-import { dateTimeSchema } from './common.js'
+import { isoDateSchema } from './common.js'
 
 const numeroBioDescription = { description: "Numéro bio de l'opérateur (Agence Bio)", examples: ['12345'] }
 
@@ -95,8 +95,8 @@ export const operatorSchema = z.looseObject({
   denominationCourante: text('Dénomination courante'),
   siret: text('SIRET'),
   numeroPacage: text('Numéro PACAGE sur 9 chiffres'),
-  dateEngagement: opt(dateTimeSchema, "Date d'engagement en bio"),
-  datePremierEngagement: opt(dateTimeSchema, 'Date du premier engagement en bio'),
+  dateEngagement: text("Date d'engagement en bio, telle que fournie par l'Agence Bio"),
+  datePremierEngagement: text("Date du premier engagement en bio, telle que fournie par l'Agence Bio"),
   organismeCertificateur: z
     .looseObject({
       id: opt(z.number(), "Identifiant de l'OC"),
@@ -148,7 +148,7 @@ export const recordSummarySchema = z.looseObject({
 export const operatorWithRecordSchema = operatorSchema.extend({
   record_id: text('Identifiant du parcellaire retenu'),
   certification_state: text('État du parcellaire retenu'),
-  audit_date: opt(dateTimeSchema, "Date d'audit du parcellaire retenu"),
+  audit_date: opt(isoDateSchema, "Date d'audit du parcellaire retenu"),
   annee_reference_controle: opt(z.number(), 'Année de référence du contrôle du parcellaire retenu'),
   metadata: opt(z.unknown(), 'Métadonnées du parcellaire retenu'),
   otherParcellaire: opt(z.array(z.unknown()), 'Autres parcellaires en cours')
@@ -211,3 +211,8 @@ export type OperatorAutocompleteResponse = z.infer<typeof operatorAutocompleteRe
 export type AgenceBioNormalizedOperatorWithPinnedStatus = z.infer<typeof pinnedOperatorSchema>
 export type AgenceBioNormalizedOperatorWithRecord = z.infer<typeof operatorWithRecordSchema>
 export type NormalizedRecordSummary = z.infer<typeof recordSummarySchema>
+export type OperatorSearchResponse = z.infer<typeof operatorSearchResponseSchema>
+export type UserOperatorsResponse = z.infer<typeof userOperatorsResponseSchema>
+export type OperatorsDashboardResponse = z.infer<typeof operatorsDashboardResponseSchema>
+export type OperatorRecordsResponse = z.infer<typeof operatorRecordsResponseSchema>
+export type OperatorImportPacResponse = z.infer<typeof operatorImportPacResponseSchema>

@@ -16,7 +16,7 @@ export default defineConfig({
     fileParallelism: false,
     coverage: {
       provider: 'v8',
-      include: ['src/**'],
+      include: ['src/**/*.ts'],
       reporter: ['html', 'text-summary', 'lcovonly']
     }
   }

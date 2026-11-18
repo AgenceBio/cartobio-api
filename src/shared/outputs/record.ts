@@ -37,4 +37,18 @@ function normalizeEtatProduction(
   return etat
 }
 
-export { normalizeRecord, normalizeRecordSummary, normalizeEtatProduction }
+function redactAuditNotes(record: NormalizedRecord): NormalizedRecord {
+  record.audit_notes = null
+  record.audit_demandes = null
+  record.parcelles = {
+    ...record.parcelles,
+    features: record.parcelles.features.map((feature) => {
+      feature.properties.auditeur_notes = null
+      feature.properties.annotations = []
+      return feature
+    })
+  }
+  return record
+}
+
+export { normalizeRecord, normalizeRecordSummary, normalizeEtatProduction, redactAuditNotes }

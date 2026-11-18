@@ -9,9 +9,8 @@ import type {
   NormalizedRecord
 } from '@agencebio/cartobio-types'
 import type { DBOperatorRecordWithParcelles } from '../../shared/parcellaires/parcellaires.types.js'
-import { normalizeRecord } from '../../shared/outputs/record.js'
 import { maskOcAgents } from '../../shared/outputs/history.js'
-import { redactAuditNotes } from '../../shared/middlewares.js'
+import { normalizeRecord, redactAuditNotes } from '../../shared/outputs/record.js'
 import { parcellaires, parcelles } from '../../database/schema/index.js'
 import { InvalidRequestApiError, PreconditionFailedApiError } from '../../shared/errors.js'
 import { parcelleUpdateSet } from '../../shared/parcellaires/parcellaires.utils.js'

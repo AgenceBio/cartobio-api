@@ -93,21 +93,44 @@ describe('normalizeOperator()', () => {
     })
   })
 
-  it('should ignore a notification without organismeCertificateur', () => {
-    const operator = { ...baseOperator, notifications: [buildNotification({ id: 1, activites: [] })] }
+  it('should take the organismeCertificateur of the prioritary notification', () => {
+    const operator = {
+      ...baseOperator,
+      notifications: [
+        buildNotification({
+          id: 1,
+          etatCertification: 'SUSPENDUE',
+          organismeCertificateurId: 2,
+          organisme: 'Autre OC'
+        }),
+        buildNotification({
+          id: 2,
+          etatCertification: 'ENGAGEE',
+          organismeCertificateurId: 999,
+          organisme: 'FR-BIO-999',
+          numeroClient: 'CLIENT-1'
+        })
+      ]
+    }
 
     expect(normalizeOperator(operator)).toMatchObject({
-      id: 1,
-      numeroBio: '34857',
-      codeCommune: '42210',
-      numeroPacage: null,
-      organismeCertificateur: {},
-      adressesOperateurs: [
-        {
-          codeCommune: '42210'
-        }
-      ]
+      organismeCertificateur: { id: 999, nom: 'FR-BIO-999', numeroClient: 'CLIENT-1' },
+      notifications: { etatCertification: 'ENGAGEE', organismeCertificateurId: 999, numeroClient: 'CLIENT-1' }
     })
+  })
+
+  it('should ignore a notification without organismeCertificateur', () => {
+    const operator = {
+      ...baseOperator,
+      notifications: [
+        buildNotification({ id: 1, etatCertification: 'ENGAGEE', organismeCertificateurId: null, organisme: 'OC' })
+      ]
+    }
+
+    const normalized = normalizeOperator(operator)
+
+    expect(normalized.organismeCertificateur).toEqual({})
+    expect(normalized.notifications).toMatchObject({ etatCertification: 'ENGAGEE', organismeCertificateurId: null })
   })
 
   it('should assume no organismeCertificateur otherwise (not super usual)', () => {
@@ -117,6 +140,8 @@ describe('normalizeOperator()', () => {
       codeCommune: '42210',
       numeroPacage: null,
       organismeCertificateur: {},
+      notifications: null,
+      isProduction: true,
       adressesOperateurs: [
         {
           codeCommune: '42210'
@@ -195,12 +220,9 @@ describe('applyOperatorTextSearch()', () => {
     expect(applyOperatorTextSearch(operator, '')).toEqual(true)
     expect(applyOperatorTextSearch(operator, 'test')).toEqual(true)
     expect(applyOperatorTextSearch(operator, 'Opérateur test')).toEqual(true)
-    expect(applyOperatorTextSearch(operator, 'test')).toEqual(true)
     expect(applyOperatorTextSearch(operator, '34857')).toEqual(true)
     expect(applyOperatorTextSearch(operator, '34')).toEqual(true)
-    expect(applyOperatorTextSearch(operator, 'Opérateur test')).toEqual(true)
     expect(applyOperatorTextSearch(operator, '123')).toEqual(true)
     expect(applyOperatorTextSearch(operator, '123456')).toEqual(true)
-    expect(applyOperatorTextSearch(operator, '34')).toEqual(true)
   })
 })

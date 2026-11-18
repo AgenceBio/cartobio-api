@@ -1,4 +1,4 @@
-import type { CartoBioCulture } from '@agencebio/cartobio-types'
+import type { CartoBioCulture, IsoDate, IsoDateTime } from '@agencebio/cartobio-types'
 import type { parcellaires, parcelles } from '../../database/schema/index.js'
 
 type Parcellaire = typeof parcellaires.$inferSelect
@@ -20,15 +20,15 @@ export type ExportRow = {
   source: string | null
   provenance: string | null
   campagne: string | null
-  created_at: Date
-  updated_at: Date
+  created_at: IsoDateTime
+  updated_at: IsoDateTime
   mixite: Parcellaire['mixite']
   anneereference: number
   certification_state: Parcellaire['certificationEtat']
-  audit_date: string | null
+  audit_date: IsoDate | null
   audit_notes: string | null
-  certification_date_debut: string | null
-  certification_date_fin: string | null
+  certification_date_debut: IsoDate | null
+  certification_date_fin: IsoDate | null
   nombre_parcelles: number
   superficie_totale_ha: number
   surface_conventionnel_ha: number
@@ -46,7 +46,6 @@ export type PdfRecord = {
   oc_label: string | null
   certification_date_debut: string | null
   certification_date_fin: string | null
-  numeros_pacage: string | null
 }
 
 export type PdfParcelle = {

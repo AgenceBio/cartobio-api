@@ -56,3 +56,5 @@ export type AgenceBioUserGroup = z.infer<typeof userGroupSchema>
 export type OrganismeCertificateur = z.infer<typeof organismeCertificateurSchema>
 export type CartoBioUser = z.infer<typeof cartobioUserSchema>
 export type CartoBioOCUser = CartoBioUser & { organismeCertificateur: OrganismeCertificateur }
+export type VerifyResponse = z.infer<typeof verifyResponseSchema>
+export type ExchangeTokenResponse = z.infer<typeof exchangeTokenResponseSchema>

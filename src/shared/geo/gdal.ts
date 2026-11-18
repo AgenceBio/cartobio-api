@@ -54,7 +54,7 @@ interface FileAnalysisResult {
   cleanup: () => Promise<unknown>
 }
 
-const MAX_UNZIPPED_SIZE = 200 * 1024 * 1024
+export const MAX_UNZIPPED_SIZE = 200 * 1024 * 1024
 
 export const GEO_DRIVERS = ['ESRI Shapefile', 'GeoJSON', 'KML', 'GPKG']
 
@@ -192,7 +192,12 @@ async function parseAnyGeographicalArchive(file: Promise<MultipartFile | undefin
 
       try {
         for await (const layer of dataset.layers) {
-          if (layer.geomType && ![gdal.wkbPolygon, gdal.wkbMultiPolygon].includes(layer.geomType)) {
+          if (
+            layer.geomType &&
+            ![gdal.wkbPolygon, gdal.wkbMultiPolygon, gdal.wkbPolygon25D, gdal.wkbMultiPolygon25D].includes(
+              layer.geomType
+            )
+          ) {
             continue
           }
 
@@ -301,7 +306,7 @@ function stripZFromGeometry(geometry: gdal.Geometry | null): gdal.Geometry | nul
       return cleanedMultiPoint
     }
 
-    case 'MULTILINE': {
+    case 'MULTILINESTRING': {
       const collection = geometry as gdal.GeometryCollection
       const cleanedMultiLine = new gdal.MultiLineString()
       for (let i = 0; i < collection.children.count(); i++) {

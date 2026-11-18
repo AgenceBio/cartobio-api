@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, isNull, ne, or, sql } from 'drizzle-orm'
+import { and, asc, eq, gt, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm'
 import { db } from '../../database/database.js'
 import {
   attestationsProduction,
@@ -16,6 +16,7 @@ import type {
 } from '@agencebio/cartobio-types'
 import { createAttestationProductionSchema } from '../../database/validations/activites.js'
 import { sansDateParDefaut, surfaceHa } from './exports.utils.js'
+import { isoDay, isoTimestamp } from '../../shared/parcellaires/parcellaires.utils.js'
 import type { AttestationProduction, ExportRow, PdfParcelle, PdfRecord } from './exports.types.js'
 
 async function updateAttestationsProductions(
@@ -57,7 +58,12 @@ async function failInterruptedAttestationsProductions(): Promise<number> {
   const { rowCount } = await db
     .update(attestationsProduction)
     .set({ status: 'error', updatedAt: sql`CURRENT_TIMESTAMP` })
-    .where(eq(attestationsProduction.status, 'started'))
+    .where(
+      and(
+        eq(attestationsProduction.status, 'started'),
+        lt(attestationsProduction.updatedAt, sql`CURRENT_TIMESTAMP - interval '1 hour'`)
+      )
+    )
   return rowCount ?? 0
 }
 
@@ -66,13 +72,6 @@ async function deleteAttestationsProductions(recordId: string): Promise<void> {
 }
 
 async function findPdfRecord(recordId: string): Promise<PdfRecord | null> {
-  const numerosPacage = db
-    .select({
-      numerosPacage: sql`STRING_AGG(DISTINCT ${parcelles.numeroPacage}, ', ' ORDER BY ${parcelles.numeroPacage})`
-    })
-    .from(parcelles)
-    .where(and(eq(parcelles.recordId, parcellaires.recordId), isNull(parcelles.deletedAt)))
-
   const [record] = await db
     .select({
       version_name: parcellaires.versionNom,
@@ -81,8 +80,7 @@ async function findPdfRecord(recordId: string): Promise<PdfRecord | null> {
       mixite: parcellaires.mixite,
       oc_label: organismeCertificateur.label,
       certification_date_debut: parcellaires.certificationDateDebut,
-      certification_date_fin: parcellaires.certificationDateFin,
-      numeros_pacage: sql<string | null>`(${numerosPacage})`
+      certification_date_fin: parcellaires.certificationDateFin
     })
     .from(parcellaires)
     .leftJoin(organismeCertificateur, eq(organismeCertificateur.id, parcellaires.ocId))
@@ -100,15 +98,15 @@ async function findExportRows(ocId: number, numeroBios: number[]): Promise<Expor
       source: parcellairesMetadata.source,
       provenance: parcellairesMetadata.provenance,
       campagne: sql<string | null>`${parcellairesMetadata.campagne}::text`,
-      created_at: parcellaires.createdAt,
-      updated_at: parcellaires.updatedAt,
+      created_at: isoTimestamp(parcellaires.createdAt),
+      updated_at: isoTimestamp(parcellaires.updatedAt),
       mixite: parcellaires.mixite,
       anneereference: parcellaires.anneeReferenceControle,
       certification_state: parcellaires.certificationEtat,
-      audit_date: sansDateParDefaut(parcellaires.auditDate),
+      audit_date: isoDay(sansDateParDefaut(parcellaires.auditDate)),
       audit_notes: parcellaires.auditNotesCertif,
-      certification_date_debut: sansDateParDefaut(parcellaires.certificationDateDebut),
-      certification_date_fin: sansDateParDefaut(parcellaires.certificationDateFin),
+      certification_date_debut: isoDay(sansDateParDefaut(parcellaires.certificationDateDebut)),
+      certification_date_fin: isoDay(sansDateParDefaut(parcellaires.certificationDateFin)),
       nombre_parcelles: sql`COUNT(${parcelles.id})`.mapWith(Number),
       superficie_totale_ha: surfaceHa(),
       surface_conventionnel_ha: surfaceHa('CONV'),

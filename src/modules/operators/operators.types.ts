@@ -1,12 +1,17 @@
-import type { AgenceBioNormalizedOperator, AgenceBioNormalizedOperatorWithRecord } from '@agencebio/cartobio-types'
+import type {
+  AgenceBioNormalizedOperator,
+  AgenceBioNormalizedOperatorWithRecord,
+  IsoDate,
+  IsoDateTime
+} from '@agencebio/cartobio-types'
 import type { CertificationEtat } from '../../database/validations/parcellaires.js'
 
 export type NumeroBio = string | number
 
 export type OperatorRecordRow = {
   certification_state: CertificationEtat
-  audit_date: string | null
-  certification_date_debut: string | null
+  audit_date: IsoDate | null
+  certification_date_debut: IsoDate | null
   created_at: Date
   numerobio: string
   metadata: Record<string, unknown>
@@ -19,8 +24,8 @@ export type OperatorRecordRow = {
 }
 
 type OperatorRecordData = Omit<OperatorRecordRow, 'created_at' | 'updated_at'> & {
-  created_at: string
-  updated_at: string
+  created_at: IsoDateTime
+  updated_at: IsoDateTime
   lastcertifieddate: number | null
   lastmixitestate: string | null
 }

@@ -95,7 +95,10 @@ beforeAll(async () => {
   return app.ready()
 })
 afterAll(() => app.close())
-afterEach(() => vi.clearAllMocks())
+afterEach(() => {
+  vi.clearAllMocks()
+  for (const mock of [got.get, got.post, got.__mocks.get, got.__mocks.post]) mock.mockReset()
+})
 
 describe('GET /', () => {
   test('responds with a 404', async () => {
@@ -430,6 +433,12 @@ describe('GET /api/v2/audits/:recordId', () => {
   })
 
   test('it fails with a non-matching user token', async () => {
+    got.get.mockReturnValueOnce({
+      async json() {
+        return agencebioOperator
+      }
+    })
+
     const response = await request(app.server)
       .get('/api/v2/audits/054f0d70-c3da-448f-823e-81fcf7c11112')
       .set('Authorization', `Bearer ${OTHER_USER_DOC_AUTH_TOKEN}`)
@@ -595,6 +604,16 @@ describe('HEAD/GET /api/v2/import/geofolia/:numeroBio', () => {
   const postMock = vi.mocked(got.post)
   const archive = fs.readFileSync('test/fixtures/geofolia-parcelles.zip')
   const expectation = geofoliaParcelles
+  const mockGeofoliaPost = (...responses: unknown[]) => {
+    postMock.mockImplementation(((url: string) =>
+      url.endsWith('/oauth2/v2.0/token')
+        ? {
+            async json() {
+              return { access_token: 'test-token' }
+            }
+          }
+        : responses.shift()) as never)
+  }
 
   describe('HEAD /api/v2/import/geofolia/:numeroBio', () => {
     beforeEach(() => loadRecordFixture())
@@ -622,15 +641,7 @@ describe('HEAD/GET /api/v2/import/geofolia/:numeroBio', () => {
         }
       })
 
-      // fake Geofolia token request
-      postMock.mockReturnValueOnce({
-        async json() {
-          return { access_token: 'test-token' }
-        }
-      })
-
-      // fail reaching Geofolia
-      postMock.mockReturnValueOnce({
+      mockGeofoliaPost({
         async json() {
           throw new HTTPError({
             statusCode: 500
@@ -655,14 +666,7 @@ describe('HEAD/GET /api/v2/import/geofolia/:numeroBio', () => {
         }
       })
 
-      // fake Geofolia token request
-      postMock.mockReturnValueOnce({
-        async json() {
-          return { access_token: 'test-token' }
-        }
-      })
-
-      postMock.mockReturnValueOnce({
+      mockGeofoliaPost({
         async json() {
           return []
         }
@@ -685,8 +689,7 @@ describe('HEAD/GET /api/v2/import/geofolia/:numeroBio', () => {
         }
       })
 
-      // we skip the token as it is memoised
-      postMock.mockReturnValueOnce({
+      mockGeofoliaPost({
         async json() {
           const response = { statusCode: 404, statusMessage: 'Not Found' }
           const error = new HTTPError(response)
@@ -706,7 +709,10 @@ describe('HEAD/GET /api/v2/import/geofolia/:numeroBio', () => {
   })
 
   describe('GET /api/v2/import/geofolia/:numeroBio', () => {
-    beforeEach(() => loadRecordFixture())
+    beforeEach(async () => {
+      await loadRecordFixture()
+      mockGeofoliaPost()
+    })
     afterEach(() => {
       getMock.mockReset()
       postMock.mockReset()
@@ -735,7 +741,6 @@ describe('HEAD/GET /api/v2/import/geofolia/:numeroBio', () => {
         }
       })
 
-      // we skip the token as it is memoised
       getMock.mockReturnValueOnce({
         async json() {
           return [
@@ -771,7 +776,6 @@ describe('HEAD/GET /api/v2/import/geofolia/:numeroBio', () => {
         }
       })
 
-      // we skip the token as it is memoised
       getMock.mockReturnValueOnce({
         async json() {
           return []
@@ -950,6 +954,17 @@ describe('GET /api/v2/certification/search', () => {
         })
     })
 
+    test('search without match', async () => {
+      const response = await request(app.server)
+        .post('/api/v2/certification/search')
+        .type('json')
+        .send({ input: 'aucun opérateur ne porte ce nom' })
+        .set('Authorization', USER_DOC_AUTH_HEADER)
+
+      expect(response.status).toBe(200)
+      expect(response.body).toMatchObject({ pagination: { total: 0, page: 1, page_max: 1 }, records: [] })
+    })
+
     test('search nom', () => {
       return request(app.server)
         .post('/api/v2/certification/search')
@@ -1081,6 +1096,7 @@ describe('PATCH /api/v2/audits/:recordId/parcelles', () => {
     expect(response.status).toBe(200)
     expect(response.body.audit_history).toHaveLength(2)
     expect(transaction).toHaveBeenCalled()
+    transaction.mockRestore()
     expect(response.body.parcelles).toMatchObject(expectDeepCloseTo(patchedRecordExpectation.parcelles))
   })
 
@@ -1297,9 +1313,7 @@ describe('GET /api/v2/certification/parcellaires', () => {
   test("it should only return this oc's parcellaire", async () => {
     await drizzleDb.insert(organismeCertificateur).values({ id: '1', label: 'OC 1' }).onConflictDoNothing()
     await drizzleDb.update(parcellaires).set({ ocId: '1' }).where(eq(parcellaires.numeroBio, 99999))
-    const res = await request(app.server)
-      .get('/api/v2/certification/parcellaires')
-      .set('Authorization', OTHER_OC_AUTH_TOKEN)
+    const res = await request(app.server).get('/api/v2/certification/parcellaires').set('Authorization', fakeOcToken)
 
     expect(res.status).toBe(200)
     expect(res.body.data).toHaveLength(expectedResult.length - 1)
@@ -1350,7 +1364,7 @@ describe('POST /api/v2/certification/parcelles', () => {
     })
   })
 
-  test('returns 200 when all records are valid', async () => {
+  test('returns 202 when all records are valid', async () => {
     vi.mocked(collectValidationResultMocked).mockResolvedValue({
       errors: [],
       validItem: {

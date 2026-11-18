@@ -14,6 +14,7 @@ import type { FeatureCollection } from 'geojson'
 import { z } from 'zod'
 import { parseApiResponse } from '../../../clients/clients.utils.js'
 import { jsonString } from '../../../shared/validation.js'
+import { MAX_UNZIPPED_SIZE } from '../../../shared/geo/gdal.js'
 
 const { get, post } = got
 const { toWgs84 } = reproject
@@ -225,13 +226,21 @@ async function geofoliaParcellaire(numeroSiret: string): Promise<FeatureCollecti
 }
 
 async function parseGeofoliaArchive(buffer: Buffer): Promise<FeatureCollection> {
-  const zip = new AdmZip(buffer)
-  const FieldFileEntry = await zip.getEntry('Field.Json')
+  let zip
+  try {
+    zip = new AdmZip(buffer)
+  } catch (error) {
+    throw new InvalidRequestApiError("L'archive Geofolia ne peut pas être lue.", { cause: error })
+  }
+  const FieldFileEntry = zip.getEntry('Field.Json')
 
   const lambert93 =
     '+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs'
 
   if (!FieldFileEntry) throw new InvalidRequestApiError("L'archive Geofolia ne contient pas de fichier Field.Json.")
+  if (FieldFileEntry.header.size > MAX_UNZIPPED_SIZE) {
+    throw new InvalidRequestApiError("L'archive Geofolia décompressée est trop volumineuse.")
+  }
 
   const parsedJSON = geofoliaFileSchema.safeParse(stripBOM(FieldFileEntry.getData().toString('utf8')))
   if (!parsedJSON.success)

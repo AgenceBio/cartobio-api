@@ -369,6 +369,32 @@ async function run(source: pg.Client, target: pg.Client, step: Step): Promise<Ro
   return { table: step.table, lues: read, écrites: written, durée: `${((Date.now() - start) / 1000).toFixed(1)} s` }
 }
 
+async function lossReport(source: pg.Client): Promise<Row[]> {
+  const checks: Array<[string, string]> = [
+    [
+      'parcelles sans id ou sans polygone (ignorées)',
+      "p.id = '' OR p.geometry IS NULL OR ST_IsEmpty(ST_CollectionExtract(p.geometry, 3))"
+    ],
+    [
+      'parcelles multi-polygones (plus grand polygone conservé)',
+      'ST_NumGeometries(ST_CollectionExtract(p.geometry, 3)) > 1'
+    ],
+    ["numéros d'îlot PAC invalides (mis à NULL)", "nullif(p.numero_ilot_pac::text, '') !~ '^\\d{1,4}$'"],
+    ['numéros de parcelle PAC invalides (mis à NULL)', "nullif(p.numero_parcelle_pac::text, '') !~ '^\\d{1,4}$'"],
+    ['numéros PACAGE invalides (mis à NULL)', "nullif(p.numero_pacage::text, '') !~ '^\\d{1,9}$'"]
+  ]
+  return Promise.all(
+    checks.map(async ([perte, condition]) => {
+      const {
+        rows: [{ total }]
+      } = await source.query(
+        `SELECT count(*)::int AS total FROM cartobio_parcelles p JOIN ${RECORDS} USING (record_id) WHERE ${condition}`
+      )
+      return { perte, lignes: total }
+    })
+  )
+}
+
 async function main(): Promise<void> {
   const sourceUrl = process.env.SOURCE_DATABASE_URL
   const targetUrl = process.env.TARGET_DATABASE_URL
@@ -389,6 +415,7 @@ async function main(): Promise<void> {
     console.log('Copie des données…')
     await source.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY')
     await target.query('BEGIN')
+    console.table(await lossReport(source))
     const report: Row[] = []
     for (const step of STEPS) report.push(await run(source, target, step))
     await target.query(

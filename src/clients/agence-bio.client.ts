@@ -18,7 +18,7 @@ import type {
   AgenceBioOperatorEmails,
   AgenceBioNotification
 } from './agence-bio.types.js'
-import { parseApiResponse } from './clients.utils.js'
+import { parseApiList, parseApiResponse } from './clients.utils.js'
 import { HTTP_TIMEOUT } from './clients.utils.js'
 import { z } from 'zod'
 const Origin = config.get('notifications.origin')
@@ -52,7 +52,7 @@ async function _getOperatorsByOc({ oc }: { oc: number }): Promise<AgenceBioNorma
   )
 
   if (data.nbTotal === data.operateurs.length) {
-    return data.operateurs.map(normalizeOperator)
+    return parseApiList(agenceBioOperatorSchema, data.operateurs, "l'API Agence Bio").map(normalizeOperator)
   }
 
   const requests: Promise<AgenceBioOperateursPage>[] = []
@@ -77,7 +77,7 @@ async function _getOperatorsByOc({ oc }: { oc: number }): Promise<AgenceBioNorma
       allData = allData.concat(res.operateurs)
     })
 
-    return allData.map(normalizeOperator)
+    return parseApiList(agenceBioOperatorSchema, allData, "l'API Agence Bio").map(normalizeOperator)
   })
 }
 
@@ -100,17 +100,17 @@ async function _getOperatorsForAdmin({ input = '' }: { input?: string }): Promis
 
   const fetchAllPages = async (baseParams: SearchParams): Promise<AgenceBioOperator[]> => {
     const data = await fetchPage(baseParams)
-    if (data.nbTotal === data.operateurs.length) {
-      return data.operateurs
-    }
-
     const requests: Promise<AgenceBioOperateursPage>[] = []
     for (let page = 1; page * limit < data.nbTotal; page++) {
       requests.push(fetchPage({ ...baseParams, page: page + 1 }))
     }
 
     const results = await Promise.all(requests)
-    return results.reduce((all, res) => all.concat(res.operateurs), data.operateurs)
+    return parseApiList(
+      agenceBioOperatorSchema,
+      results.reduce((all, res) => all.concat(res.operateurs), data.operateurs),
+      "l'API Agence Bio"
+    )
   }
 
   const isInteger = input !== '' && Number.isInteger(Number(input))
@@ -151,9 +151,13 @@ const getOperatorsForAdmin = memo(_getOperatorsForAdmin, {
  * Returns operators for a given user
  */
 async function fetchUserOperators(userId: number): Promise<{ operators: AgenceBioNormalizedOperator[] }> {
-  const data = parseApiResponse(
-    z.array(agenceBioOperatorSchema),
-    await get(endpoint(`/api/utilisateur/${encodeURIComponent(userId)}/operateurs`), requestOptions).json(),
+  const data = parseApiList(
+    agenceBioOperatorSchema,
+    parseApiResponse(
+      z.array(z.unknown()),
+      await get(endpoint(`/api/utilisateur/${encodeURIComponent(userId)}/operateurs`), requestOptions).json(),
+      "l'API Agence Bio"
+    ),
     "l'API Agence Bio"
   )
 

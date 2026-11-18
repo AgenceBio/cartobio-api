@@ -95,7 +95,7 @@ async function updateAuditRecordState(
   try {
     rows = await repository.updateAuditRecord(record.record_id, changes, historyEntry, ifUnmodifiedSince)
     if (state === CertificationState.CERTIFIED && record.certification_state !== CertificationState.CERTIFIED) {
-      await cartobio.notifyCertificationComplete(record)
+      void cartobio.notifyCertificationComplete(record)
     }
   } catch (error) {
     if (getErrorCode(error) === '23505')

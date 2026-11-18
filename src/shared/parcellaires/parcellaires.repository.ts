@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { and, asc, desc, eq, exists, inArray, isNull, notExists, notInArray, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import type { SQL } from 'drizzle-orm'
+import { z } from 'zod'
 import type { Polygon } from 'geojson'
 
 import { db, firstRow } from '../../database/database.js'
@@ -19,18 +20,14 @@ import {
   territoires
 } from '../../database/schema/index.js'
 import type { CertificationState } from '@agencebio/cartobio-types'
-import type {
-  HistoryEntry,
-  CartoBioFeatureInput,
-  CartoBioHistoriqueCulture,
-  RecordInfos
-} from '@agencebio/cartobio-types'
+import type { HistoryEntry, CartoBioFeatureInput, CartoBioHistoriqueCulture } from '@agencebio/cartobio-types'
 import type {
   DBOperatorRecord,
   DBOperatorRecordWithParcelles,
   DBParcelle,
   GeometryAnalysis,
   PreviousParcelle,
+  RecordInput,
   RecordSummaryRow
 } from './parcellaires.types.js'
 import { MissingGeometryApiError } from '../errors.js'
@@ -233,7 +230,7 @@ async function upsertParcellesAnnotations(
 
       return [
         createParcelleAnnotationSchema.parse({
-          id: typeof annotation.id === 'string' ? annotation.id : randomUUID(),
+          id: z.uuid().safeParse(annotation.id).success ? String(annotation.id) : randomUUID(),
           recordId,
           parcelleId,
           typeAnnot: annotationCodes[code],
@@ -499,7 +496,7 @@ async function findRecord(recordId: string, tx: NodePgDatabase = db): Promise<DB
 
 async function upsertOperator(
   tx: NodePgDatabase,
-  record: Partial<RecordInfos>,
+  record: RecordInput,
   certificationState: CertificationState,
   historyEntry: HistoryEntry
 ): Promise<DBOperatorRecord> {
@@ -814,6 +811,7 @@ async function analyzeGeometries(
         ord,
         commune_code,
         original,
+        valid,
         CASE
           WHEN ST_GeometryType(valid) = 'ST_MultiPolygon' THEN (
             SELECT ST_GeometryN(valid, n)
@@ -830,9 +828,11 @@ async function analyzeGeometries(
         ord,
         commune_code,
         original,
+        valid,
         fixed,
         CASE
           WHEN ST_IsValid(original) THEN 'ACCEPTE'
+          WHEN fixed IS NULL OR ST_IsEmpty(fixed) THEN 'UNCORRECTABLE'
           WHEN ST_GeometryType(fixed) NOT IN ('ST_Polygon', 'ST_MultiPolygon') THEN 'UNCORRECTABLE'
           WHEN ABS(ST_Area(original, true) - ST_Area(fixed, true)) / 10000 >= 1
             OR ABS((ST_Area(original, true) - ST_Area(fixed, true)) / NULLIF(ST_Area(original, true) / 100, 0)) >= 1 THEN 'ACCEPTENONCORRIGE'
@@ -845,8 +845,8 @@ async function analyzeGeometries(
         ord,
         commune_code,
         statut,
-        fixed,
-        CASE WHEN statut = 'CORRIGE' THEN fixed ELSE original END AS parcelle_geom
+        valid,
+        fixed
       FROM statut
     ),
     located AS MATERIALIZED (
@@ -854,10 +854,10 @@ async function analyzeGeometries(
         ord,
         commune_code,
         statut,
+        valid,
         fixed,
-        parcelle_geom,
         CASE WHEN statut = 'UNCORRECTABLE' THEN NULL ELSE NOT EXISTS(
-          SELECT 1 FROM ${territoires} WHERE ST_Intersects(parcelle_geom, ${territoires.geometry})
+          SELECT 1 FROM ${territoires} WHERE ST_Intersects(valid, ${territoires.geometry})
         ) END AS etranger
       FROM chosen
     )
@@ -867,8 +867,8 @@ async function analyzeGeometries(
       CASE WHEN statut = 'CORRIGE' THEN ST_AsGeoJSON(fixed)::json END AS geometry,
       CASE WHEN statut = 'UNCORRECTABLE' OR etranger THEN NULL ELSE COALESCE(
         (SELECT ${communes.fid} FROM ${communes} WHERE ${communes.fid} = commune_code AND ${communes.active}
-          AND (ST_Within(${communes.geometry}, parcelle_geom) OR ST_Intersects(${communes.geometry}, parcelle_geom)) LIMIT 1),
-        ${communeLaPlusProche(sql`parcelle_geom`)}
+          AND (ST_Within(${communes.geometry}, valid) OR ST_Intersects(${communes.geometry}, valid)) LIMIT 1),
+        ${communeLaPlusProche(sql`valid`)}
       ) END AS commune
     FROM located
     ORDER BY ord

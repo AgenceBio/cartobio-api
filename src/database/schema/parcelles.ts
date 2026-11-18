@@ -53,7 +53,6 @@ export const parcelles = cartobio.table(
   },
   (table) => [
     primaryKey({ columns: [table.recordId, table.id] }),
-    index('parcelles_record_id_idx').on(table.recordId),
     index('parcelles_commune_idx').on(table.commune),
     index('parcelles_geometry_gix').using('gist', table.geometry)
   ]
@@ -83,7 +82,6 @@ export const parcelleCultures = cartobio.table(
       columns: [table.recordId, table.parcelleId],
       foreignColumns: [parcelles.recordId, parcelles.id]
     }).onDelete('cascade'),
-    index('parcelle_cultures_record_id_idx').on(table.recordId),
     index('parcelle_cultures_parcelle_id_idx').on(table.parcelleId),
     index('parcelle_cultures_cpf_idx').on(table.cpf)
   ]
@@ -108,7 +106,6 @@ export const parcellesAnnotations = cartobio.table(
       columns: [table.recordId, table.parcelleId],
       foreignColumns: [parcelles.recordId, parcelles.id]
     }).onDelete('cascade'),
-    index('parcelles_annotations_parcelle_id_idx').on(table.parcelleId),
-    index('parcelles_annotations_record_id_idx').on(table.recordId)
+    index('parcelles_annotations_parcelle_id_idx').on(table.parcelleId)
   ]
 )

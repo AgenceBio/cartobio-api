@@ -110,3 +110,4 @@ export type GeofoliaQuery = z.infer<typeof geofoliaQuerySchema>
 export type EvvParams = z.infer<typeof evvParamsSchema>
 export type ImportListQuery = z.infer<typeof importListQuerySchema>
 export type CertificationParcellairesQuery = z.infer<typeof certificationParcellairesQuerySchema>
+export type ImportedFeatureCollection = z.infer<typeof importedFeatureCollectionSchema>

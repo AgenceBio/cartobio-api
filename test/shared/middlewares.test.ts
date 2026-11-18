@@ -250,24 +250,24 @@ describe('haveRightToUpdate() : transitions de certification_state', () => {
     organismeCertificateur: { id: 1, nom: 'OC' }
   }
 
-  test('OC : retour de PENDING_CERTIFICATION à AUDITED → refusé', async () => {
+  test('OC : retour de PENDING_CERTIFICATION à AUDITED → autorisé', async () => {
     await expect(
       haveRightToUpdateAuditMiddleware({
         user: ocUser,
         record: { certification_state: 'PENDING_CERTIFICATION' },
         body: { certification_state: 'AUDITED' }
       })
-    ).rejects.toThrow(ForbiddenApiError)
+    ).resolves.toBeUndefined()
   })
 
-  test('OC : AUDITED directement à CERTIFIED → refusé', async () => {
+  test('OC : AUDITED directement à CERTIFIED → autorisé', async () => {
     await expect(
       haveRightToUpdateAuditMiddleware({
         user: ocUser,
         record: { certification_state: 'AUDITED' },
         body: { certification_state: 'CERTIFIED' }
       })
-    ).rejects.toThrow(ForbiddenApiError)
+    ).resolves.toBeUndefined()
   })
 
   test('OC : OPERATOR_DRAFT à PENDING_CERTIFICATION → autorisé', async () => {
@@ -280,10 +280,10 @@ describe('haveRightToUpdate() : transitions de certification_state', () => {
     ).resolves.toBeUndefined()
   })
 
-  test('OC : création directe en CERTIFIED → refusé', async () => {
+  test('OC : création directe en CERTIFIED → autorisé', async () => {
     await expect(
       haveRightToUpdateAuditMiddleware({ user: ocUser, record: undefined, body: { certification_state: 'CERTIFIED' } })
-    ).rejects.toThrow(ForbiddenApiError)
+    ).resolves.toBeUndefined()
   })
 
   test('admin : retour en arrière → autorisé', async () => {
@@ -402,6 +402,7 @@ describe('enforceOperator()', () => {
 describe('enforceRecordAndOperator()', () => {
   const operator = buildOperator({ numeroBio: '99999', organismeCertificateur: { id: 1 } })
   const queryFn = vi.fn()
+  const RECORD_ID = '00000000-0000-4000-8000-000000000000'
   const hook = enforceRecordAndOperator({ queryFn, param: 'recordId' })
 
   beforeEach(() => {
@@ -413,7 +414,7 @@ describe('enforceRecordAndOperator()', () => {
     queryFn.mockResolvedValue(null)
 
     await expect(
-      hook(asFastifyRequest({ params: { recordId: 'x' }, headers: {}, user: buildOcUser() }))
+      hook(asFastifyRequest({ params: { recordId: RECORD_ID }, headers: {}, user: buildOcUser() }))
     ).rejects.toThrow(NotFoundApiError)
   })
 
@@ -421,14 +422,14 @@ describe('enforceRecordAndOperator()', () => {
     const user = buildOcUser()
     queryFn.mockResolvedValue(buildNormalizedRecord())
 
-    await hook(asFastifyRequest({ params: { recordId: 'x' }, headers: {}, user }))
+    await hook(asFastifyRequest({ params: { recordId: RECORD_ID }, headers: {}, user }))
 
-    expect(queryFn).toHaveBeenCalledWith('x', user)
+    expect(queryFn).toHaveBeenCalledWith(RECORD_ID, user)
   })
 
   test('OC owning the record → keeps audit_notes', async () => {
     queryFn.mockResolvedValue(buildNormalizedRecord({ oc_id: 1, audit_notes: 'notes' }))
-    const request = asFastifyRequest({ params: { recordId: 'x' }, headers: {}, user: buildOcUser() })
+    const request = asFastifyRequest({ params: { recordId: RECORD_ID }, headers: {}, user: buildOcUser() })
 
     await hook(request)
 
@@ -438,7 +439,7 @@ describe('enforceRecordAndOperator()', () => {
 
   test('OC not owning the record → audit_notes removed', async () => {
     queryFn.mockResolvedValue(buildNormalizedRecord({ oc_id: 2, audit_notes: 'notes' }))
-    const request = asFastifyRequest({ params: { recordId: 'x' }, headers: {}, user: buildOcUser() })
+    const request = asFastifyRequest({ params: { recordId: RECORD_ID }, headers: {}, user: buildOcUser() })
 
     await hook(request)
 
@@ -448,7 +449,7 @@ describe('enforceRecordAndOperator()', () => {
   test('operator user (group 4) → audit_notes removed', async () => {
     queryFn.mockResolvedValue(buildNormalizedRecord({ oc_id: 1, audit_notes: 'notes' }))
     vi.mocked(fetchUserOperators).mockResolvedValue({ operators: [{ numeroBio: 99999 }] } as never)
-    const request = asFastifyRequest({ params: { recordId: 'x' }, headers: {}, user: buildUser() })
+    const request = asFastifyRequest({ params: { recordId: RECORD_ID }, headers: {}, user: buildUser() })
 
     await hook(request)
 
@@ -460,7 +461,7 @@ describe('enforceRecordAndOperator()', () => {
     vi.mocked(fetchOperatorByNumeroBio).mockRejectedValue(notFound)
 
     await expect(
-      hook(asFastifyRequest({ params: { recordId: 'x' }, headers: {}, user: buildOcUser() }))
+      hook(asFastifyRequest({ params: { recordId: RECORD_ID }, headers: {}, user: buildOcUser() }))
     ).rejects.toThrow(NotFoundApiError)
   })
 })

@@ -1,3 +1,4 @@
+import { toIsoDateTime } from '@agencebio/cartobio-types'
 import * as repository from '../../../src/modules/tableau-de-bord/tableau-de-bord.repository.js'
 import {
   getGeneralKpi,
@@ -61,7 +62,7 @@ describe('dashboard service', () => {
       meta: { total: 0, page: 1, limit: 20 }
     })
 
-    await getTableauBilan({})
+    await getTableauBilan({}, 999)
 
     expect(mockedRepo.getTableauBilanRepo).toHaveBeenCalledWith({
       from: undefined,
@@ -71,7 +72,8 @@ describe('dashboard service', () => {
       ordreDate: 'desc',
       recherche: undefined,
       statuts: undefined,
-      etats: undefined
+      etats: undefined,
+      organismeCertificateur: 999
     })
   })
 
@@ -84,11 +86,12 @@ describe('dashboard service', () => {
     }
     mockedRepo.getGeneralKpi.mockResolvedValue(kpi)
 
-    const result = await getGeneralKpi({ from: '2026-01-01', to: '2026-01-31' })
+    const result = await getGeneralKpi({ from: '2026-01-01', to: '2026-01-31' }, 999)
 
     expect(mockedRepo.getGeneralKpi).toHaveBeenCalledWith({
       from: '2026-01-01',
-      to: '2026-01-31'
+      to: '2026-01-31',
+      organismeCertificateur: 999
     })
     expect(result).toEqual(kpi)
   })
@@ -97,14 +100,15 @@ describe('dashboard service', () => {
     const data = { data: [], meta: { total: 0, page: 1, limit: 20 } }
     mockedRepo.getTableauErreursRepo.mockResolvedValue(data)
 
-    const result = await getTableauErreurs({ from: '2026-02-01', recherche: 'ABC' })
+    const result = await getTableauErreurs({ from: '2026-02-01', recherche: 'ABC' }, 999)
 
     expect(mockedRepo.getTableauErreursRepo).toHaveBeenCalledWith({
       from: '2026-02-01',
       to: undefined,
       page: 1,
       limit: 20,
-      recherche: 'ABC'
+      recherche: 'ABC',
+      organismeCertificateur: 999
     })
     expect(result).toEqual(data)
   })
@@ -112,29 +116,34 @@ describe('dashboard service', () => {
   it('transmet les critères de l’historique parcellaire', async () => {
     mockedRepo.getHistoriqueSpecificParcellaireRepo.mockResolvedValue([])
 
-    const result = await getHistoriqueSpecificParcellaire({
-      numeroBio: 'BIO-1',
-      numeroClient: 'CLIENT-1',
-      auditDate: '2026-03-01'
-    })
+    const result = await getHistoriqueSpecificParcellaire(
+      {
+        numeroBio: 'BIO-1',
+        numeroClient: 'CLIENT-1',
+        auditDate: '2026-03-01'
+      },
+      999
+    )
 
     expect(mockedRepo.getHistoriqueSpecificParcellaireRepo).toHaveBeenCalledWith({
       numeroBio: 'BIO-1',
       numeroClient: 'CLIENT-1',
-      auditDate: '2026-03-01'
+      auditDate: '2026-03-01',
+      organismeCertificateur: 999
     })
     expect(result).toEqual([])
   })
 
   it('transmet la période des top anomalies', async () => {
-    const data = [{ period: new Date('2026-01-01'), code: 'E1', count: 2 }]
+    const data = [{ period: toIsoDateTime(new Date('2026-01-01')), code: 'E1', count: 2 }]
     mockedRepo.getTopAnomaliesRepo.mockResolvedValue(data)
 
-    const result = await getTopAnomalies({ from: '2026-01-01', to: '2026-01-07' })
+    const result = await getTopAnomalies({ from: '2026-01-01', to: '2026-01-07' }, 999)
 
     expect(mockedRepo.getTopAnomaliesRepo).toHaveBeenCalledWith({
       from: '2026-01-01',
-      to: '2026-01-07'
+      to: '2026-01-07',
+      organismeCertificateur: 999
     })
     expect(result).toEqual(data)
   })

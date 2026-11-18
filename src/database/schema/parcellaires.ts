@@ -20,10 +20,7 @@ export const parcellaires = cartobio.table(
     versionNom: text('version_nom').notNull(),
     mixite: mixiteType('mixite'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
-      .notNull()
-      .defaultNow()
-      .$onUpdate(() => sql`now()`),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
     dateDerniereNotif: timestamp('date_derniere_notif', { withTimezone: true }),
     deletedAt: timestamp('deleted_at', { withTimezone: true })
   },
@@ -66,5 +63,5 @@ export const parcellairesEvenements = cartobio.table(
     userRole: text('user_role'),
     parcellesId: text('parcelles_id').array()
   },
-  (table) => [index('parcellaires_evenements_record_id_idx').on(table.recordId)]
+  (table) => [index('parcellaires_evenements_record_id_date_idx').on(table.recordId, table.date)]
 )

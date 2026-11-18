@@ -1,7 +1,8 @@
+import type { GeometryEqualsResponse } from '@agencebio/cartobio-types'
 import type { FeatureCollection, Geometry } from 'geojson'
 import type { parcellaires, parcelles } from '../../database/schema/index.js'
 
-export type ComparisonResult = 'r1_old_r2_new' | 'r2_old_r1_new'
+export type ComparisonResult = GeometryEqualsResponse[number]['comparison_result']
 
 export type GeometryConflictStatus = 'inclusion' | 'overlap' | 'ok'
 

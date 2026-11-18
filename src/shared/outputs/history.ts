@@ -1,4 +1,4 @@
-import { CertificationState, EventType } from '@agencebio/cartobio-types'
+import { CertificationState, EventType, toIsoDateTime } from '@agencebio/cartobio-types'
 import type { CartoBioUser, NormalizedRecord, HistoryEntry } from '@agencebio/cartobio-types'
 import { isAdmin } from '../../modules/auth/auth.utils.js'
 
@@ -70,7 +70,7 @@ function createNewEvent(
       type: eventType,
       ...event,
       ...(features ? { featureIds: collectFeatureIdsFromPayload(features) } : {}),
-      date: (date || new Date()).toISOString(),
+      date: toIsoDateTime(date || new Date()),
       ...(user ? { user } : {})
     }
   }

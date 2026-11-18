@@ -189,7 +189,7 @@ function getNotification(notifications: AgenceBioNotification[]): AgenceBioNotif
           if (a.etatCertification === 'ARRETEE') {
             return (
               new Date(b.dateArret || b.dateDemarrage || '').getTime() -
-              new Date(b.dateArret || b.dateDemarrage || '').getTime()
+              new Date(a.dateArret || a.dateDemarrage || '').getTime()
             )
           }
           return new Date(b.createdAt ?? '').getTime() - new Date(a.createdAt ?? '').getTime()

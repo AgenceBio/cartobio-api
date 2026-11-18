@@ -1,11 +1,11 @@
-import type { ImportSummary } from '@agencebio/cartobio-types'
+import type { ImportSummary, IsoDate } from '@agencebio/cartobio-types'
 import type { ImportStatus } from '../../database/validations/imports.js'
 
 export type ImportJobRow = {
   status: ImportStatus
   numerobio: string | null
   numeroclient: string | null
-  audit_date: string | null
+  audit_date: IsoDate | null
   result_job: unknown
   ended_at: Date | null
   created_at: Date
@@ -19,7 +19,7 @@ export type ImportJobListRow = {
   ended_at: Date | null
   numerobio: string | null
   numeroclient: string | null
-  audit_date: string | null
+  audit_date: IsoDate | null
   result_job: unknown
   payload: { id: string; payload: unknown } | null
 }

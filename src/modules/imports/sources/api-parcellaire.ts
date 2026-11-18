@@ -6,7 +6,9 @@ import { fromCodeCpf } from '@agencebio/rosetta-cultures'
 import {
   CertificationState,
   EtatProduction,
+  ImportLogCode,
   inputApiRecordBodySchema,
+  toIsoDateTime,
   MetadataSource,
   RegionBounds
 } from '@agencebio/cartobio-types'
@@ -32,47 +34,12 @@ import type { ImportJobListRow } from '../imports.types.js'
 import { importJobResultEnumSchema, importStatusEnumSchema } from '../../../database/validations/imports.js'
 import type { ImportStatus } from '../../../database/validations/imports.js'
 import { logger } from '../../../config/logger.js'
+import { BadGatewayApiError, getResponseStatusCode } from '../../../shared/errors.js'
 
-/**
- * Enumération des codes de log pour les imports parcellaires.
- * Permet de requêter et filtrer les logs par type d'erreur ou d'avertissement.
- */
-const ImportLogType = {
-  // Errors - validation basique
-  MISSING_NUMERO_BIO: 'MISSING_NUMERO_BIO',
-  MISSING_NUMERO_CLIENT: 'MISSING_NUMERO_CLIENT',
-  INVALID_FORMAT: 'INVALID_FORMAT',
-  // Errors - opérateur
-  UNKNOWN_NUMERO_BIO: 'UNKNOWN_NUMERO_BIO',
-  NOT_PRODUCTION: 'NOT_PRODUCTION',
-  NO_OC: 'NO_OC',
-  OC_MISMATCH: 'OC_MISMATCH',
-  // Errors - dates du record
-  INVALID_DATE_CERTIFICATION_DEBUT: 'INVALID_DATE_CERTIFICATION_DEBUT',
-  INVALID_DATE_CERTIFICATION_FIN: 'INVALID_DATE_CERTIFICATION_FIN',
-  MISSING_CERTIFICATION_DATES: 'MISSING_CERTIFICATION_DATES',
-  INVALID_DATE_AUDIT: 'INVALID_DATE_AUDIT',
-  // Errors - parcelle
-  INVALID_ETAT_PRODUCTION: 'INVALID_ETAT_PRODUCTION',
-  MISSING_DATE_ENGAGEMENT: 'MISSING_DATE_ENGAGEMENT',
-  INVALID_DATE_ENGAGEMENT: 'INVALID_DATE_ENGAGEMENT',
-  MISSING_CULTURES: 'MISSING_CULTURES',
-  INVALID_CPF: 'INVALID_CPF',
-  INVALID_GEOM: 'INVALID_GEOM',
-  // Errors - BDD
-  DB_ERROR: 'DB_ERROR',
-  // Warnings
-  MISSING_GEOM: 'MISSING_GEOM',
-  GEOM_OUT_OF_BOUNDS: 'GEOM_OUT_OF_BOUNDS',
-  GEOM_CORRECTED: 'GEOM_CORRECTED',
-  GEOM_INVALID_NOT_CORRECTED: 'GEOM_INVALID_NOT_CORRECTED',
-  PAC_PENDING_WITH_ILOT: 'PAC_PENDING_WITH_ILOT'
-}
-
-type ImportWarning = { numeroBio: string; message: string; code: string }
+type ImportWarning = { numeroBio: string; message: string; code: ImportLogCode }
 type ImportJobStatusResult = ImportJobStatusResponse | { status: 'error'; error: string }
 type ValidItem = { record: RecordInput & Pick<RecordInfos, 'numerobio'>; numeroBio: string; warnings: ImportWarning[] }
-type RecordError = { message: string; code: string }
+type RecordError = { message: string; code: ImportLogCode }
 type FeatureError = RecordError & { idParcelle?: string | number | null; nomParcelle?: string | null }
 type ErrorItem = FeatureError & { numeroBio?: string }
 type ParsedRecord =
@@ -95,7 +62,7 @@ function formatParcelleName(parcelle: InputApiParcelleBody): string {
 /**
  * Créer une erreur pour une feature.
  */
-function buildFeatureError(parcelle: InputApiParcelleBody, message: string, code: string): FeatureError {
+function buildFeatureError(parcelle: InputApiParcelleBody, message: string, code: ImportLogCode): FeatureError {
   return {
     code,
     message,
@@ -117,19 +84,19 @@ async function parseAPIParcellaire(
   if (operator == null) {
     recordErrors.push({
       message: 'Numéro bio inconnu du portail de notification',
-      code: ImportLogType.UNKNOWN_NUMERO_BIO
+      code: ImportLogCode.UNKNOWN_NUMERO_BIO
     })
   } else {
     if (!operator.isProduction) {
       recordErrors.push({
         message: 'Numéro bio sans notification liée à une activité de production',
-        code: ImportLogType.NOT_PRODUCTION
+        code: ImportLogCode.NOT_PRODUCTION
       })
     }
-    if (!operator.organismeCertificateur) {
+    if (!Object.hasOwn(operator.organismeCertificateur, 'id')) {
       recordErrors.push({
         message: 'Aucun organisme certificateur pour ce numéro bio.',
-        code: ImportLogType.NO_OC
+        code: ImportLogCode.NO_OC
       })
     } else if (
       operator.organismeCertificateur.id !== organismeCertificateur.id ||
@@ -138,7 +105,7 @@ async function parseAPIParcellaire(
     ) {
       recordErrors.push({
         message: 'Numéro client différent',
-        code: ImportLogType.OC_MISMATCH
+        code: ImportLogCode.OC_MISMATCH
       })
     }
   }
@@ -146,28 +113,28 @@ async function parseAPIParcellaire(
   if (record.dateCertificationDebut && isNaN(Date.parse(record.dateCertificationDebut))) {
     recordErrors.push({
       message: 'champ dateCertificationDebut incorrect',
-      code: ImportLogType.INVALID_DATE_CERTIFICATION_DEBUT
+      code: ImportLogCode.INVALID_DATE_CERTIFICATION_DEBUT
     })
   }
 
   if (record.dateCertificationFin && isNaN(Date.parse(record.dateCertificationFin))) {
     recordErrors.push({
       message: 'champ dateCertificationFin incorrect',
-      code: ImportLogType.INVALID_DATE_CERTIFICATION_FIN
+      code: ImportLogCode.INVALID_DATE_CERTIFICATION_FIN
     })
   }
 
   if (!record.dateCertificationDebut || !record.dateCertificationFin) {
     recordErrors.push({
       message: 'Opérateur certifié sans dates de certification renseignées',
-      code: ImportLogType.MISSING_CERTIFICATION_DATES
+      code: ImportLogCode.MISSING_CERTIFICATION_DATES
     })
   }
 
   if (isNaN(Date.parse(record.dateAudit ?? ''))) {
     recordErrors.push({
       message: 'champ dateAudit incorrect',
-      code: ImportLogType.INVALID_DATE_AUDIT
+      code: ImportLogCode.INVALID_DATE_AUDIT
     })
   }
 
@@ -190,7 +157,7 @@ async function parseAPIParcellaire(
         parcelleWarnings.push({
           numeroBio: String(record.numeroBio),
           message: `Parcelle ${id ?? ''} acceptée mais ne peut être en attente PAC car un ilôt PAC est renseigné`,
-          code: ImportLogType.PAC_PENDING_WITH_ILOT
+          code: ImportLogCode.PAC_PENDING_WITH_ILOT
         })
       }
 
@@ -208,14 +175,14 @@ async function parseAPIParcellaire(
             buildFeatureError(
               parcelle,
               "Champ date d'engagement obligatoire lorsque que la parcelle est en conversion",
-              ImportLogType.MISSING_DATE_ENGAGEMENT
+              ImportLogCode.MISSING_DATE_ENGAGEMENT
             )
           )
         }
       } catch (error) {
         logger.warn({ err: error }, 'champ etatProduction incorrect')
         featureErrors.push(
-          buildFeatureError(parcelle, 'champ etatProduction incorrect', ImportLogType.INVALID_ETAT_PRODUCTION)
+          buildFeatureError(parcelle, 'champ etatProduction incorrect', ImportLogCode.INVALID_ETAT_PRODUCTION)
         )
       }
       const properties: FeaturePropertiesInput = {
@@ -243,18 +210,18 @@ async function parseAPIParcellaire(
 
       if (parcelle.dateEngagement && !Date.parse(parcelle.dateEngagement)) {
         featureErrors.push(
-          buildFeatureError(parcelle, 'champ dateEngagement incorrect', ImportLogType.INVALID_DATE_ENGAGEMENT)
+          buildFeatureError(parcelle, 'champ dateEngagement incorrect', ImportLogCode.INVALID_DATE_ENGAGEMENT)
         )
       }
       if (!cultures?.length) {
-        featureErrors.push(buildFeatureError(parcelle, 'cultures absentes', ImportLogType.MISSING_CULTURES))
+        featureErrors.push(buildFeatureError(parcelle, 'cultures absentes', ImportLogCode.MISSING_CULTURES))
       }
 
       const invalidCodes = (cultures ?? []).filter((c) => !fromCodeCpf(c.codeCPF ?? '')).map((c) => c.codeCPF)
 
       if (invalidCodes.length > 0) {
         featureErrors.push(
-          buildFeatureError(parcelle, `cultures inconnues: ${invalidCodes.join(', ')}`, ImportLogType.INVALID_CPF)
+          buildFeatureError(parcelle, `cultures inconnues: ${invalidCodes.join(', ')}`, ImportLogCode.INVALID_CPF)
         )
       }
 
@@ -264,7 +231,7 @@ async function parseAPIParcellaire(
         parcelleWarnings.push({
           numeroBio: String(record.numeroBio),
           message: `Parcelle ${id ?? ''} n'a pas de géométrie`,
-          code: ImportLogType.MISSING_GEOM
+          code: ImportLogCode.MISSING_GEOM
         })
         const featureSansGeometrie: CartoBioFeatureInput = { type: 'Feature', id, geometry: null, properties }
         return featureSansGeometrie
@@ -288,7 +255,7 @@ async function parseAPIParcellaire(
         )
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
-        featureErrors.push(buildFeatureError(parcelle, 'champ geom incorrect : ' + message, ImportLogType.INVALID_GEOM))
+        featureErrors.push(buildFeatureError(parcelle, 'champ geom incorrect : ' + message, ImportLogCode.INVALID_GEOM))
         return null
       }
 
@@ -298,7 +265,7 @@ async function parseAPIParcellaire(
         resPolygon = polygon(coordinates, properties, { id })
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
-        featureErrors.push(buildFeatureError(parcelle, 'champ geom incorrect : ' + message, ImportLogType.INVALID_GEOM))
+        featureErrors.push(buildFeatureError(parcelle, 'champ geom incorrect : ' + message, ImportLogCode.INVALID_GEOM))
       }
 
       if (!resPolygon) {
@@ -316,7 +283,7 @@ async function parseAPIParcellaire(
       parcelleWarnings.push({
         numeroBio: String(record.numeroBio),
         message: `Parcelle ${id ?? ''} en dehors des régions autorisées`,
-        code: ImportLogType.GEOM_OUT_OF_BOUNDS
+        code: ImportLogCode.GEOM_OUT_OF_BOUNDS
       })
       return resPolygon
     })
@@ -369,7 +336,7 @@ async function collectValidationResult(
     await repository.insertPayload(jobId, payload)
     return {
       errors: parsed.error.issues.map((issue) => ({
-        code: ImportLogType.INVALID_FORMAT,
+        code: ImportLogCode.INVALID_FORMAT,
         message: `${issue.path.length ? `champ ${issue.path.join('.')} incorrect` : 'corps de la requête incorrect'} : ${issue.message}`
       })),
       validItem: null
@@ -403,13 +370,13 @@ async function parcellaireValidItemToDb(
   jobId: number
 ): Promise<{
   count: number
-  errors: Array<{ numeroBio?: string; code: string; message: string }>
+  errors: Array<{ numeroBio?: string; code: ImportLogCode; message: string }>
   warning: Array<[string, ImportWarning[]]>
   numeroBioValid: Array<{ numeroBio: string; nbParcelles: number }>
   numeroBioError: Array<string | undefined>
 }> {
   const count = 1
-  const dbErrors: Array<{ numeroBio?: string; code: string; message: string }> = []
+  const dbErrors: Array<{ numeroBio?: string; code: ImportLogCode; message: string }> = []
   const warning: Array<[string, ImportWarning[]]> = []
   const numeroBioError: Array<string | undefined> = []
   const numeroBioValid: Array<{ numeroBio: string; nbParcelles: number }> = []
@@ -435,7 +402,7 @@ async function parcellaireValidItemToDb(
       correctionWarnings.push({
         numeroBio,
         message: `Ces parcelles ont été corrigées : ${parcellesCorrigees.join(', ')}`,
-        code: ImportLogType.GEOM_CORRECTED
+        code: ImportLogCode.GEOM_CORRECTED
       })
     }
 
@@ -443,7 +410,7 @@ async function parcellaireValidItemToDb(
       correctionWarnings.push({
         numeroBio,
         message: `Ces parcelles n'ont pas été corrigées mais sont invalides : ${parcellesNonCorrigees.join(', ')}`,
-        code: ImportLogType.GEOM_INVALID_NOT_CORRECTED
+        code: ImportLogCode.GEOM_INVALID_NOT_CORRECTED
       })
     }
 
@@ -461,7 +428,7 @@ async function parcellaireValidItemToDb(
       dbErrors.push({
         numeroBio: record.numerobio,
         message: apiError.message || 'Erreur de validation lors de l’import.',
-        code: apiError.code === 'MISSING_GEOMETRY' ? ImportLogType.MISSING_GEOM : ImportLogType.DB_ERROR
+        code: apiError.code === 'MISSING_GEOMETRY' ? ImportLogCode.MISSING_GEOM : ImportLogCode.DB_ERROR
       })
       numeroBioError.push(record.numerobio)
     } else {
@@ -545,7 +512,7 @@ async function getCurrentStatusJobs(
   }
 
   if (job.status === importStatusEnumSchema.enum.PENDING || job.status === importStatusEnumSchema.enum.CREATED) {
-    return { status: job.status, created: job.created_at }
+    return { status: job.status, created: toIsoDateTime(job.created_at) }
   }
 
   if (job.status === importStatusEnumSchema.enum.DONE) {
@@ -555,7 +522,7 @@ async function getCurrentStatusJobs(
       numeroClient: job.numeroclient,
       auditDate: job.audit_date,
       result: job.result_job,
-      ended: job.ended_at
+      ended: job.ended_at ? toIsoDateTime(job.ended_at) : null
     }
   }
 
@@ -563,7 +530,7 @@ async function getCurrentStatusJobs(
     return {
       status: job.status,
       error: job.result_job,
-      ended: job.ended_at
+      ended: job.ended_at ? toIsoDateTime(job.ended_at) : null
     }
   }
   return { status: 'error', error: `Statut inconnu : ${job.status}` }
@@ -585,6 +552,13 @@ async function updateImportJobStatus(
  * fait uniquement l'insert en base et collecte les warnings post-insert.
  * Appelé en fire-and-forget après la réponse au client.
  */
+async function failImportJob(jobId: number, error: unknown): Promise<void> {
+  await repository.failImportJob(jobId, {
+    name: error instanceof Error ? error.name : String(error),
+    message: error instanceof Error ? error.message : String(error)
+  })
+}
+
 async function processFullJob(jobId: number, validItem: ValidItem): Promise<void> {
   await updateImportJobStatus(jobId, importStatusEnumSchema.enum.PENDING)
   try {
@@ -595,10 +569,7 @@ async function processFullJob(jobId: number, validItem: ValidItem): Promise<void
     )
   } catch (error) {
     logger.error({ err: error }, `Traitement du job d'import ${jobId} en échec`)
-    const message = error instanceof Error ? error.message : String(error)
-    const name = error instanceof Error ? error.name : String(error)
-
-    await repository.failImportJob(jobId, { name, message })
+    await failImportJob(jobId, error)
   }
 }
 
@@ -609,6 +580,9 @@ async function fetchOperator(numeroBio: string): Promise<AgenceBioNormalizedOper
   try {
     return await fetchOperatorByNumeroBio(numeroBio)
   } catch (error) {
+    if (getResponseStatusCode(error) !== 404) {
+      throw new BadGatewayApiError("Le portail de l'Agence Bio n'a pas pu être contacté.", { cause: error })
+    }
     logger.error({ err: error }, `Opérateur ${numeroBio} introuvable`)
     return null
   }
@@ -689,8 +663,8 @@ function normalizeJobReturn(row: ImportJobListRow): ImportSummary {
   return {
     jobId: row.jobid,
     status: row.status,
-    createdAt: row.created_at,
-    endedAt: row.ended_at,
+    createdAt: toIsoDateTime(row.created_at),
+    endedAt: row.ended_at ? toIsoDateTime(row.ended_at) : null,
     numeroBio: row.numerobio,
     numeroClient: row.numeroclient,
     auditDate: row.audit_date,
@@ -704,6 +678,7 @@ export {
   collectValidationResult,
   updateImportJobStatus,
   createImportJob,
+  failImportJob,
   processFullJob,
   updateStatus,
   getCurrentStatusJobs,

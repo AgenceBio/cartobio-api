@@ -44,7 +44,15 @@ vi.mock('../../../src/modules/exports/exports.repository.js', () => ({
 
 describe('Generation du PDF', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    for (const mock of [
+      utils.getAllParcelles,
+      generatePdfContent.createPdfContent,
+      repository.updateAttestationsProductions,
+      repository.findValidAttestationProduction,
+      repository.findPdfRecord
+    ]) {
+      vi.mocked(mock).mockReset()
+    }
     vi.spyOn(config, 'get').mockReturnValue('/tmp')
   })
 
@@ -62,16 +70,7 @@ describe('Generation du PDF', () => {
     })
     vi.mocked(utils.getAllParcelles).mockResolvedValueOnce([])
     const UUID = randomUUID()
-    let hasTrown = false
-    try {
-      const gen = exportPdf.generatePDF('123', UUID)
-      await gen.next()
-    } catch (e) {
-      console.error(e)
-      hasTrown = true
-    }
-
-    expect(hasTrown).toEqual(true)
+    await expect(exportPdf.generatePDF('123', UUID).next()).rejects.toThrow("Aucune parcelle trouvée pour l'opérateur")
 
     expect(repository.findValidAttestationProduction).toHaveBeenNthCalledWith(
       1,
@@ -112,16 +111,9 @@ describe('Generation du PDF', () => {
     tmpParcelles[0]!.cultures = [buildCulture({ CPF: '' })]
     vi.mocked(utils.getAllParcelles).mockResolvedValueOnce(tmpParcelles)
     const UUID = randomUUID()
-    let hasTrown = false
-    try {
-      const gen = exportPdf.generatePDF('123', UUID)
-      await gen.next()
-    } catch (e) {
-      console.error(e)
-      hasTrown = true
-    }
-
-    expect(hasTrown).toEqual(true)
+    await expect(exportPdf.generatePDF('123', UUID).next()).rejects.toThrow(
+      "Culture manquante, impossible de générer l'attestation du parcellaire"
+    )
 
     expect(repository.findValidAttestationProduction).toHaveBeenNthCalledWith(
       1,
@@ -163,18 +155,14 @@ describe('Generation du PDF', () => {
       throw new Error('TEST')
     })
     const UUID = randomUUID()
-    let hasTrown = false
     const gen = exportPdf.generatePDF('123', UUID)
 
-    try {
-      await gen.next()
-      await gen.next()
-    } catch (e) {
-      console.error(e)
-      hasTrown = true
-    }
-
-    expect(hasTrown).toEqual(true)
+    await expect(gen.next().then(() => gen.next())).rejects.toThrow(
+      expect.objectContaining({
+        message: "Une erreur s'est produite, impossible de générer l'attestation du parcellaire",
+        cause: expect.objectContaining({ message: 'TEST' })
+      }) as Error
+    )
 
     expect(repository.findValidAttestationProduction).toHaveBeenNthCalledWith(
       1,

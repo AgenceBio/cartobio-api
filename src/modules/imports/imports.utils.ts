@@ -6,7 +6,7 @@ import {
   parcellaires,
   parcellaireImport
 } from '../../database/schema/index.js'
-import { recordColumns } from '../../shared/parcellaires/parcellaires.utils.js'
+import { isoDay, recordColumns } from '../../shared/parcellaires/parcellaires.utils.js'
 import type { ImportJobListRow, OperatorRecordFilters } from './imports.types.js'
 import config from '../../config/env.js'
 
@@ -17,7 +17,7 @@ export const importJobColumns = {
   ended_at: parcellaireImport.endedAt,
   numerobio: parcellaireImport.numeroBio,
   numeroclient: parcellaireImport.numeroClient,
-  audit_date: parcellaireImport.auditDate,
+  audit_date: isoDay(parcellaireImport.auditDate),
   result_job: parcellaireImport.resultJob
 }
 

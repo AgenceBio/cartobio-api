@@ -1,6 +1,6 @@
 import type { Mock } from 'vitest'
 import { randomUUID } from 'node:crypto'
-import { CertificationState } from '@agencebio/cartobio-types'
+import { CertificationState, toIsoDateTime } from '@agencebio/cartobio-types'
 import type {
   AgenceBioNormalizedOperator,
   CartoBioCulture,
@@ -147,8 +147,8 @@ export function buildDBParcelle(overrides: Partial<DBParcelle> = {}): DBParcelle
     commentaire: null,
     auditeur_notes: null,
     annotations: [],
-    created: '2023-01-01T00:00:00.000Z',
-    updated: '2023-01-01T00:00:00.000Z',
+    created: toIsoDateTime(new Date('2023-01-01T00:00:00.000Z')),
+    updated: toIsoDateTime(new Date('2023-01-01T00:00:00.000Z')),
     name: null,
     numero_pacage: null,
     numero_ilot_pac: null,
@@ -269,8 +269,8 @@ export function buildNormalizedRecord(overrides: Partial<NormalizedRecord> = {})
     audit_notes: null,
     mixite: null,
     certification_state: CertificationState.OPERATOR_DRAFT,
-    created_at: '2023-01-01T00:00:00.000Z',
-    updated_at: '2023-01-01T00:00:00.000Z',
+    created_at: toIsoDateTime(new Date('2023-01-01T00:00:00.000Z')),
+    updated_at: toIsoDateTime(new Date('2023-01-01T00:00:00.000Z')),
     oc_label: null,
     metadata: {},
     audit_history: [],

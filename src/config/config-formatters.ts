@@ -9,6 +9,9 @@ const check =
   (x: string | null): void => {
     if (x !== null && x !== '' && !isValid(x)) throw new Error(`doit être au format ${name}`)
   }
+const requiredInProduction = (x: string | null): void => {
+  if (process.env.NODE_ENV === 'production' && !x) throw new Error('est obligatoire en production')
+}
 const coerceMultiline = (x: unknown): string => String(x).replace(/\\n/g, '\n')
 
 export default {
@@ -26,7 +29,17 @@ export default {
   },
   'pub-key': {
     coerce: coerceMultiline,
-    validate: check('pub-key', (x) => /^-----BEGIN PUBLIC KEY-----[\s\S]+-----END PUBLIC KEY-----\s*$/.test(x))
+    validate: (x: string | null): void => {
+      requiredInProduction(x)
+      check('pub-key', (value) => /^-----BEGIN PUBLIC KEY-----[\s\S]+-----END PUBLIC KEY-----\s*$/.test(value))(x)
+    }
+  },
+  'service-token': {
+    coerce,
+    validate: (x: string | null): void => {
+      requiredInProduction(x)
+      check('uuid', (value) => isUUID(value))(x)
+    }
   },
   'jwt-secret': {
     coerce,

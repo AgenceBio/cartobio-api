@@ -94,29 +94,20 @@ async function generateOperatorMapImages(
   }
 }
 
-let pdfQueue: Promise<unknown> = Promise.resolve()
-
-function createPdfContent(
+async function createPdfContent(
   numeroBio: string,
   recordId: string,
   parcelles: Array<PdfParcelle>,
   currentOperator: AgenceBioNormalizedOperator & PdfRecord,
   pac: boolean
 ): Promise<PDFDocument[]> {
-  const run = pdfQueue.then(async () => {
-    const tmpPrefix = path.join(
-      config.get('attestationsProductions.directory'),
-      `${numeroBio}-${recordId}-${Date.now()}`
-    )
-    const tmpPdf = (index: number): string => `${tmpPrefix}-${index}.pdf`
-    try {
-      return await renderPdfContent(parcelles, currentOperator, pac, tmpPdf)
-    } finally {
-      await Promise.all([1, 2].map((index) => fs.promises.rm(tmpPdf(index), { force: true })))
-    }
-  })
-  pdfQueue = run.catch(() => undefined)
-  return run
+  const tmpPrefix = path.join(config.get('attestationsProductions.directory'), `${numeroBio}-${recordId}-${Date.now()}`)
+  const tmpPdf = (index: number): string => `${tmpPrefix}-${index}.pdf`
+  try {
+    return await renderPdfContent(parcelles, currentOperator, pac, tmpPdf)
+  } finally {
+    await Promise.all([1, 2].map((index) => fs.promises.rm(tmpPdf(index), { force: true })))
+  }
 }
 
 async function renderPdfContent(
@@ -225,7 +216,7 @@ async function renderPdfContent(
                       .map((e) => {
                         return `
                       <tr>
-                        <td>${e.CPF ? fromCodeCpf(e.CPF)?.libelle_code_cpf + (e.CPF === 'ACT.Prod.Inc' ? ' *' : '') : '-'}</td>
+                        <td>${e.CPF ? escapeHtml(fromCodeCpf(e.CPF)?.libelle_code_cpf ?? e.CPF) + (e.CPF === 'ACT.Prod.Inc' ? ' *' : '') : '-'}</td>
                         <td>${e.variete ? escapeHtml(e.variete) : '-'}</td>
                         <td>${e.date_semis ? formatDate(e.date_semis) : '-'}</td>
                         <td>${item.cultures.length === 1 && item.superficie_totale_ha ? item.superficie_totale_ha.toFixed(2).replace('.', ',') + ' ha' : e.surface ? Number(e.surface).toFixed(2).replace('.', ',') + ' ha' : '-'} </td>
@@ -664,7 +655,7 @@ async function renderPdfContent(
                 </p>
                 <p>
                   <span class="title-header">Numéro pacage&nbsp;:</span>
-                  ${escapeHtml(currentOperator.numeroPacage ?? currentOperator.numeros_pacage ?? '-')}
+                  ${escapeHtml(currentOperator.numeroPacage ?? '-')}
                 </p>
                 <p>
                   <span class="title-header">Adresse&nbsp;:</span>
@@ -781,7 +772,9 @@ async function renderPdfContent(
               ${
                 (parcel.cultures || [])
                   .map(
-                    (c) => (c.CPF ? fromCodeCpf(c.CPF)?.libelle_code_cpf : '-') + (c.CPF === 'ACT.Prod.Inc' ? ' *' : '')
+                    (c) =>
+                      (c.CPF ? escapeHtml(fromCodeCpf(c.CPF)?.libelle_code_cpf ?? c.CPF) : '-') +
+                      (c.CPF === 'ACT.Prod.Inc' ? ' *' : '')
                   )
                   .join(', ') || ''
               }

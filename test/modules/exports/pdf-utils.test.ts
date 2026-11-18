@@ -10,10 +10,9 @@ import {
   mergeAndAddFooter
 } from '../../../src/modules/exports/pdf-utils.js'
 import fs from 'fs'
-import path from 'path'
 import pdflib from 'pdf-lib'
 import { findPdfParcelles } from '../../../src/modules/exports/exports.repository.js'
-import type { MapDrawOptions, PdfParcelle } from '../../../src/modules/exports/exports.types.js'
+import type { MapDrawOptions } from '../../../src/modules/exports/exports.types.js'
 import { asBrowser, asPage, asPdfDocument, buildPdfParcelle } from '../../factories.js'
 
 vi.mock('../../../src/modules/exports/exports.repository.js', () => ({
@@ -21,11 +20,18 @@ vi.mock('../../../src/modules/exports/exports.repository.js', () => ({
 }))
 
 describe('getOptimalZoom', () => {
-  test('calcul le zoom optimal', () => {
-    const zoom = getOptimalZoom(100, 50, 800, 600)
-    expect(typeof zoom).toBe('number')
-    expect(zoom).toBeGreaterThanOrEqual(0)
-    expect(zoom).toBeLessThanOrEqual(20)
+  test('calcule le zoom optimal selon l’axe le plus contraignant', () => {
+    expect(getOptimalZoom(100, 50, 800, 600)).toBe(1)
+    expect(getOptimalZoom(0.01, 0.01, 800, 600)).toBe(14)
+    expect(getOptimalZoom(0.02, 0.001, 800, 600)).toBe(14)
+  })
+
+  test('gagne un niveau de zoom quand la fenêtre double de taille', () => {
+    expect(getOptimalZoom(0.01, 0.01, 1600, 1200)).toBe(getOptimalZoom(0.01, 0.01, 800, 600) + 1)
+  })
+
+  test('plafonne le zoom à 20 pour une emprise nulle', () => {
+    expect(getOptimalZoom(0, 0, 800, 600)).toBe(20)
   })
 })
 
@@ -78,10 +84,13 @@ describe('launchStyleTab', () => {
       newPage: vi.fn().mockResolvedValue(pageMock)
     }
 
-    path.resolve = vi.fn().mockImplementation((...args) => args.join('/'))
     vi.spyOn(fs, 'readFile').mockImplementation(((_: unknown, __: unknown, cb: (error: null, data: string) => void) => {
       cb(null, JSON.stringify({ version: 8, sources: {}, layers: [] }))
     }) as unknown as typeof fs.readFile)
+  })
+
+  afterEach(() => {
+    vi.mocked(fs.readFile).mockRestore()
   })
 
   it('devrait charger la page avec le style', async () => {
@@ -223,13 +232,13 @@ vi.spyOn(fs, 'unlinkSync').mockImplementation(() => {})
 describe('mergeAndAddFooter', () => {
   let mockMergedPdf: Record<string, Mock>
   let mockLoadedPdf: Record<string, Mock>
-  let mockPage: Record<string, Mock>
+  let firstPage: Record<string, Mock>
+  let secondPage: Record<string, Mock>
 
   beforeEach(() => {
-    mockPage = {
-      getSize: vi.fn(() => ({ width: 100 })),
-      drawText: vi.fn()
-    }
+    vi.mocked(fs.unlinkSync).mockClear()
+    firstPage = { getSize: vi.fn(() => ({ width: 100 })), drawText: vi.fn() }
+    secondPage = { getSize: vi.fn(() => ({ width: 100 })), drawText: vi.fn() }
 
     mockLoadedPdf = {
       getPageIndices: vi.fn(() => [0])
@@ -237,7 +246,7 @@ describe('mergeAndAddFooter', () => {
 
     mockMergedPdf = {
       addPage: vi.fn(),
-      copyPages: vi.fn().mockResolvedValue([mockPage])
+      copyPages: vi.fn().mockResolvedValueOnce([firstPage]).mockResolvedValueOnce([secondPage])
     }
     vi.mocked(pdflib.PDFDocument.create).mockResolvedValue(asPdfDocument(mockMergedPdf))
     vi.mocked(pdflib.PDFDocument.load).mockResolvedValue(asPdfDocument(mockLoadedPdf))
@@ -251,12 +260,21 @@ describe('mergeAndAddFooter', () => {
 
     expect(pdflib.PDFDocument.load).toHaveBeenCalledTimes(2)
     expect(mockMergedPdf.copyPages).toHaveBeenCalledTimes(2)
-    expect(mockMergedPdf.addPage).toHaveBeenCalledTimes(2)
-    expect(mockPage.drawText).toHaveBeenCalledWith('2', expect.objectContaining({ x: expect.any(Number), y: 20 }))
-    expect(mockPage.drawText).toHaveBeenCalledWith('TestName', expect.objectContaining({ x: 38, y: 20 }))
+    expect(mockMergedPdf.addPage!.mock.calls).toEqual([[firstPage], [secondPage]])
+    expect(firstPage.drawText).not.toHaveBeenCalled()
+    expect(secondPage.drawText!.mock.calls).toEqual([
+      ['2', { x: 62, y: 20, size: 9 }],
+      ['TestName', { x: 38, y: 20, size: 9 }]
+    ])
     expect(fs.unlinkSync).toHaveBeenCalledWith('doc1.pdf')
     expect(fs.unlinkSync).toHaveBeenCalledWith('doc2.pdf')
-    expect(result).toEqual(mockMergedPdf)
+    expect(result).toBe(mockMergedPdf)
+  })
+
+  it('conserve les fichiers sources si la suppression n’est pas demandée', async () => {
+    await mergeAndAddFooter(['doc1.pdf', 'doc2.pdf'], 'TestName', false)
+
+    expect(fs.unlinkSync).not.toHaveBeenCalled()
   })
 })
 
@@ -265,47 +283,25 @@ describe('getAllParcelles', () => {
     vi.clearAllMocks()
   })
 
-  it('retourne les parcelles avec le geojson parsé', async () => {
-    const mockRow = {
-      id: 'p1',
-      name: 'Parcelle 1',
-      geojson:
-        '{"type":"Polygon","coordinates":[[[4.979616538,47.353725228],[4.974457803,47.347718045],[4.979777749,47.346188835],[4.985742536,47.350994775],[4.979616538,47.353725228]]]}',
-      minX: 0,
-      minY: 0,
-      maxX: 1,
-      maxY: 1,
-      centerX: 0.5,
-      centerY: 0.5,
-      superficie_totale_ha: 1.23,
-      cultures: null,
-      conversion_niveau: null,
-      commune: '12345',
-      communename: 'Ma commune',
-      created: '2023-01-01',
-      auditeur_notes: null,
-      engagement_date: null,
-      nbilot: '42',
-      nbp: '123',
-      refcad: 'AB001'
-    }
-    vi.mocked(findPdfParcelles).mockResolvedValueOnce([mockRow as unknown as PdfParcelle])
-    const result = await getAllParcelles('some-record-id')
+  it('retourne les parcelles du repository sans les transformer', async () => {
+    const parcelles = [buildPdfParcelle({ id: 'p1' })]
+    vi.mocked(findPdfParcelles).mockResolvedValueOnce(parcelles)
+
+    expect(await getAllParcelles('some-record-id')).toBe(parcelles)
     expect(findPdfParcelles).toHaveBeenCalledWith('some-record-id', false)
-    expect(result).toHaveLength(1)
-    expect(result[0]).toMatchObject({
-      id: 'p1',
-      geojson:
-        '{"type":"Polygon","coordinates":[[[4.979616538,47.353725228],[4.974457803,47.347718045],[4.979777749,47.346188835],[4.985742536,47.350994775],[4.979616538,47.353725228]]]}',
-      name: 'Parcelle 1',
-      superficie_totale_ha: 1.23
-    })
+  })
+
+  it('transmet le filtre PAC', async () => {
+    vi.mocked(findPdfParcelles).mockResolvedValueOnce([])
+
+    await getAllParcelles('some-record-id', true)
+
+    expect(findPdfParcelles).toHaveBeenCalledWith('some-record-id', true)
   })
 
   it("propage l'erreur de la base", async () => {
     vi.mocked(findPdfParcelles).mockRejectedValueOnce(new Error('DB down'))
 
     await expect(getAllParcelles('fail-id')).rejects.toThrow('DB down')
-    expect(findPdfParcelles).toHaveBeenCalled()
   })
 })

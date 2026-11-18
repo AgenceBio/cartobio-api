@@ -21,7 +21,7 @@ import {
   UnauthorizedApiError
 } from '../../shared/errors.js'
 import { requireOperator, requireOrganismeCertificateur } from '../../shared/request.js'
-import { redactAuditNotes } from '../../shared/middlewares.js'
+import { redactAuditNotes } from '../../shared/outputs/record.js'
 import { pageUrl } from './imports.utils.js'
 import * as service from './imports.service.js'
 import { isOperatorUser } from '../auth/auth.utils.js'
@@ -97,7 +97,12 @@ export default async function importRoutes(fastify: FastifyInstance): Promise<vo
     const organismeCertificateur = requireOrganismeCertificateur(request)
     const jobId = await service.createImportJob(organismeCertificateur.id)
 
-    const { errors, validItem } = await service.collectValidationResult(request.body, { organismeCertificateur }, jobId)
+    const { errors, validItem } = await service
+      .collectValidationResult(request.body, { organismeCertificateur }, jobId)
+      .catch(async (error: unknown) => {
+        await service.failImportJob(jobId, error)
+        throw error
+      })
 
     if (!validItem) {
       const listeProblemes = errors.map(({ numeroBio, message, code, idParcelle, nomParcelle }) => ({
