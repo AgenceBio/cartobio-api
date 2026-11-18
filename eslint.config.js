@@ -1,14 +1,15 @@
-const { defineConfig, globalIgnores } = require("eslint/config");
-const js = require("@eslint/js");
-const globals = require("globals");
-const tseslint = require("typescript-eslint");
-const jest = require("eslint-plugin-jest");
+import { defineConfig, globalIgnores } from 'eslint/config'
+import js from '@eslint/js'
+import globals from 'globals'
+import tseslint from 'typescript-eslint'
+import eslintConfigPrettier from 'eslint-config-prettier/flat'
 
-module.exports = defineConfig([
+export default defineConfig([
   globalIgnores([
-    "**/*.d.ts",
-    "database/old_migrations/**/*.js",
-    "src/db/index.ts",
+    '**/*.d.ts',
+    '**/dist/**',
+    'coverage/**',
+    'database/old_migrations/**/*.js'
   ]),
 
   js.configs.recommended,
@@ -16,25 +17,32 @@ module.exports = defineConfig([
   ...tseslint.configs.recommended,
 
   {
-    plugins: {
-      jest,
-    },
-
     languageOptions: {
       globals: {
-        ...globals.node,
-        ...globals.jest,
+        ...globals.node
       },
-      ecmaVersion: 2023,
+      ecmaVersion: 2023
     },
 
     rules: {
-      "vue/multi-word-component-names": "off",
-      "@typescript-eslint/no-var-requires": "off",
-      "@typescript-eslint/ban-ts-comment": "off",
-      "@typescript-eslint/no-require-imports": "off",
-      // TODO : Trop agressif pour l'instant
-      "no-useless-assignment": "off",
-    },
+      '@typescript-eslint/ban-ts-comment': 'error',
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/no-non-null-assertion': 'error',
+      'no-useless-assignment': 'off'
+    }
   },
-]);
+
+  {
+    files: ['test/**/*.ts', '__mocks__/**/*.ts'],
+    languageOptions: {
+      globals: {
+        ...globals.vitest
+      }
+    },
+    rules: {
+      '@typescript-eslint/no-non-null-assertion': 'off'
+    }
+  },
+
+  eslintConfigPrettier
+])

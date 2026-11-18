@@ -1,0 +1,35 @@
+{
+  "name": "@agencebio/cartobio-types",
+  "version": "2.0.0",
+  "description": "Types partagés pour cartobio",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AgenceBio/cartobio-api.git",
+    "directory": "packages/cartobio-types"
+  },
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "npm run clean && tsc -p tsconfig.json",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@types/geojson": "7946.0.16"
+  },
+  "peerDependencies": {
+    "zod": "^4.0.0"
+  }
+}

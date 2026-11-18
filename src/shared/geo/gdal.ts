@@ -1,0 +1,324 @@
+import gdal from 'gdal-async'
+import getStream from 'get-stream'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { extname, join } from 'node:path'
+import { tmpdir } from 'node:os'
+import reproject from 'reproject'
+const { toWgs84 } = reproject
+import bboxPolygon from '@turf/bbox-polygon'
+import polygonInPolygon from '@turf/boolean-intersects'
+import pointInPolygon from '@turf/boolean-point-in-polygon'
+import AdmZip from 'adm-zip'
+import FileType from 'file-type'
+import { getRandomFeatureId } from '../outputs/features.js'
+import { InvalidRequestApiError } from '../errors.js'
+import { LegalProjections, RegionBounds } from '@agencebio/cartobio-types'
+import { z } from 'zod'
+import type { FeatureCollection, Geometry, MultiPolygon } from 'geojson'
+import type { MultipartFile } from '@fastify/multipart'
+
+const featurePropertiesSchema = z.looseObject({
+  COMMUNE: z.string().regex(/^[0-9]{5}$/u).nullable().optional(),
+  COMMUNE_LABEL: z.string().nullable().optional(),
+  cultures: z.array(z.looseObject({})).nullable().optional(),
+  conversion_niveau: z.string().nullable().optional(),
+  engagement_date: z.looseObject({ year: z.int(), month: z.int(), day: z.int() }).nullable().optional(),
+  commentaires: z.string().nullable().optional(),
+  auditeur_notes: z.string().nullable().optional(),
+  annotations: z.array(z.unknown()).nullable().optional(),
+  NOM: z.string().nullable().optional(),
+  PACAGE: z.string().regex(/^([A-Z0-9]{8,9})|()$/u).nullable().optional(),
+  NUMERO_I: z.int().nullable().optional(),
+  NUMERO_P: z.int().nullable().optional(),
+  cadastre: z.array(z.string()).nullable().optional()
+})
+
+
+interface FileAnalysisResult {
+  path: string | null
+  files: string[] | Buffer[]
+  cleanup: () => Promise<unknown>
+}
+
+const wgs84 = gdal.SpatialReference.fromProj4('+init=epsg:4326')
+
+async function detectSrs(layer: gdal.Layer): Promise<gdal.SpatialReference> {
+  if (layer.srs) {
+    return layer.srs
+  }
+
+  const firstGeometry = (await layer.features.firstAsync())?.getGeometry()
+  if (!firstGeometry) throw new InvalidRequestApiError('Impossible de déterminer la projection : la première parcelle n\'a pas de géométrie.')
+  const geometry: Geometry = firstGeometry.toObject()
+
+  // iterate over the various regions/projections to guess which one it is
+  for await (const [code, bbox] of Object.entries(RegionBounds)) {
+    const projection = LegalProjections[code as keyof typeof LegalProjections]
+    const regionGeometry = bboxPolygon([bbox[0], bbox[1], bbox[2], bbox[3]])
+
+    if (
+      (geometry.type === 'Point' && pointInPolygon(toWgs84(geometry, projection), regionGeometry)) ||
+      ((geometry.type === 'Polygon' || geometry.type === 'MultiPolygon') && polygonInPolygon(toWgs84(geometry, projection), regionGeometry))
+    ) {
+      return gdal.SpatialReference.fromProj4(projection)
+    }
+  }
+
+  return wgs84
+}
+
+/**
+ * Unzip geographical files into a temporary directory
+ */
+async function unzipGeographicalContent(buffer: Buffer): Promise<FileAnalysisResult> {
+  let zip
+
+  try {
+    zip = new AdmZip(buffer)
+  } catch (error) {
+    throw new InvalidRequestApiError('L\'archive ZIP ne peut pas être lue. Provient-elle d\'une source de donnée authentique ?', { cause: error })
+  }
+
+  const entries = zip.getEntries().filter(entry => /(.sh[xp]|.dbf|.kml|.geojson|.gpkg)$/.test(entry.entryName) && !entry.name.startsWith('.'))
+  const toDir = await mkdtemp(join(tmpdir(), 'cartobio-anygeo-'))
+
+  // extracts geo files but keep only the root .shp (.shx will be read as a companion file anyway)
+  const files = entries.map(entry => {
+    zip.extractEntryTo(entry, toDir, false, true, false)
+    return join(toDir, entry.name)
+  }).filter(filename => ['.dbf', '.shx'].includes(extname(filename)) === false)
+
+  return {
+    path: toDir,
+    files,
+    cleanup: async (): Promise<void> => rm(toDir, { recursive: true })
+  }
+}
+
+/**
+ * We deal with 3 scenarios:
+ *
+ * - files are not part of a Zip archive: Gdal can process them directly
+ * - a file (single format) is located within a Zip file: Gdal can process them as a buffer
+ * - a file (multi format, like Shapefile) is located within a Zip file: Gdal can process them only as extracted files
+ */
+async function identifyFiles(file: Promise<MultipartFile | undefined>): Promise<FileAnalysisResult> {
+  const data = await file
+  if (!data) throw new InvalidRequestApiError('Aucun fichier transmis.')
+  const stream = await FileType.stream(data.file)
+
+  if (stream.fileType?.mime === 'application/zip') {
+    return unzipGeographicalContent(await getStream.buffer(stream))
+  }
+
+  if (['application/x-sqlite3', undefined, 'application/xml'].includes(stream.fileType?.mime)) {
+    const buffer = await getStream.buffer(stream)
+
+    if (stream.fileType?.mime === 'application/xml') {
+      const xmlContent = buffer.toString('utf-8')
+      const kmlNamespacePattern = /<kml[^>]*xmlns\s*=\s*["']([^"']*)opengis\.net\/kml[^"']*["'][^>]*>/i
+
+      if (!kmlNamespacePattern.test(xmlContent)) {
+        throw new InvalidRequestApiError('Format de fichier non-reconnu.')
+      }
+    }
+    return {
+      path: null,
+      files: [buffer],
+      cleanup: async (): Promise<void> => { }
+    }
+  }
+
+  throw new InvalidRequestApiError('Format de fichier non-reconnu.')
+}
+
+async function parseAnyGeographicalArchive(file: Promise<MultipartFile | undefined>) {
+  const { files, cleanup } = await identifyFiles(file)
+  const featureCollection: FeatureCollection = {
+    type: 'FeatureCollection',
+    features: []
+  }
+
+  if (!files.length) {
+    throw new InvalidRequestApiError('Format de fichier non-reconnu.')
+  }
+
+  for await (const filePathOrBuffer of files) {
+    let dataset
+
+    try {
+      dataset = await gdal.openAsync(filePathOrBuffer)
+    } catch (error) {
+      throw new InvalidRequestApiError('Format de fichier non-reconnu.', { cause: error })
+    }
+
+    for await (const layer of dataset.layers) {
+      if (layer.geomType && ![gdal.wkbPolygon, gdal.wkbMultiPolygon].includes(layer.geomType)) {
+        continue
+      }
+
+      const srs = await detectSrs(layer)
+      const reprojectFn = new gdal.CoordinateTransformation(srs, wgs84)
+      for await (const feature of layer.features) {
+        const names = feature.fields.getNames()
+        const geometry = stripZFromGeometry(feature.getGeometry())
+        if (!geometry) {
+          await dataset.close()
+          await cleanup()
+          throw new InvalidRequestApiError('Le fichier contient une parcelle sans géométrie.')
+        }
+        await geometry.transformAsync(reprojectFn)
+        const id = names.includes('id') ? feature.fields.get('id') : getRandomFeatureId()
+        const properties = feature.fields.toObject()
+
+
+        const { COMMUNE, COMMUNE_LABEL, cultures, conversion_niveau, engagement_date, commentaires, auditeur_notes, annotations, NOM, PACAGE, NUMERO_I, NUMERO_P, cadastre } = properties
+
+        const parsedProperties = {
+          COMMUNE,
+          COMMUNE_LABEL,
+          cultures: cultures ? JSON.parse(cultures) : undefined,
+          conversion_niveau,
+          engagement_date: engagement_date,
+          commentaires,
+          auditeur_notes,
+          annotations: annotations ? JSON.parse(annotations) : undefined,
+          NOM,
+          PACAGE,
+          NUMERO_I: NUMERO_I ? +NUMERO_I : undefined,
+          NUMERO_P: NUMERO_P ? +NUMERO_P : undefined,
+          cadastre
+        }
+
+        if (!featurePropertiesSchema.safeParse(parsedProperties).success) {
+          await dataset.close()
+          await cleanup()
+          throw new InvalidRequestApiError('Le fichier contient des propriétés invalides')
+        }
+
+        if (geometry.name === 'POLYGON') {
+          featureCollection.features.push({
+            type: 'Feature',
+            id,
+            geometry: geometry.toObject(),
+            properties: {
+              ...parsedProperties,
+              engagement_date: parsedProperties.engagement_date ? `${engagement_date.year}-${engagement_date.month}-${engagement_date.day}` : undefined,
+              id
+            }
+          })
+          // some tools outputs features as single polygon
+          // and we don't deal with multipolygon because we want to distinguish each of them
+        } else if (geometry.name === 'MULTIPOLYGON') {
+          (geometry.toObject() as MultiPolygon).coordinates.forEach((coordinates): void => {
+            const id = getRandomFeatureId()
+
+            featureCollection.features.push({
+              type: 'Feature',
+              id,
+              geometry: {
+                type: 'Polygon',
+                coordinates
+              },
+              properties: {
+                ...properties,
+                id
+              }
+            })
+          })
+        }
+      }
+    }
+
+    await dataset.close()
+  }
+
+  await cleanup()
+
+  return featureCollection
+}
+
+function stripZFromGeometry(geometry: gdal.Geometry | null): gdal.Geometry | null {
+  if (!geometry) return null
+  switch (geometry.name) {
+    case 'LINESTRING': {
+      const line = geometry as gdal.LineString
+      const cleanedLine = new gdal.LineString()
+      for (let i = 0; i < line.points.count(); i++) {
+        const pt = line.points.get(i)
+        if (!isNaN(pt.x) && !isNaN(pt.y)) {
+          cleanedLine.points.add({ x: pt.x, y: pt.y })
+        }
+      }
+      return cleanedLine
+    }
+
+    case 'POLYGON': {
+      const polygon = geometry as gdal.Polygon
+      const cleanedPolygon = new gdal.Polygon()
+      for (let i = 0; i < polygon.rings.count(); i++) {
+        const oldRing = polygon.rings.get(i)
+        const newRing = new gdal.LinearRing()
+        for (let j = 0; j < oldRing.points.count(); j++) {
+          const pt = oldRing.points.get(j)
+          if (!isNaN(pt.x) && !isNaN(pt.y)) {
+            newRing.points.add({ x: pt.x, y: pt.y })
+          }
+        }
+        cleanedPolygon.rings.add(newRing)
+      }
+      return cleanedPolygon
+    }
+    case 'MULTIPOINT': {
+      const collection = geometry as gdal.GeometryCollection
+      const cleanedMultiPoint = new gdal.MultiPoint()
+      for (let i = 0; i < collection.children.count(); i++) {
+        const cleanedChild = stripZFromGeometry(collection.children.get(i))
+        if (cleanedChild) {
+          cleanedMultiPoint.children.add(cleanedChild)
+        }
+      }
+      return cleanedMultiPoint
+    }
+
+    case 'MULTILINE': {
+      const collection = geometry as gdal.GeometryCollection
+      const cleanedMultiLine = new gdal.MultiLineString()
+      for (let i = 0; i < collection.children.count(); i++) {
+        const cleanedChild = stripZFromGeometry(collection.children.get(i))
+        if (cleanedChild) {
+          cleanedMultiLine.children.add(cleanedChild)
+        }
+      }
+      return cleanedMultiLine
+    }
+    case 'MULTIPOLYGON': {
+      const collection = geometry as gdal.GeometryCollection
+      const cleanedMultiPolygon = new gdal.MultiPolygon()
+      for (let i = 0; i < collection.children.count(); i++) {
+        const cleanedChild = stripZFromGeometry(collection.children.get(i))
+        if (cleanedChild) {
+          cleanedMultiPolygon.children.add(cleanedChild)
+        }
+      }
+      return cleanedMultiPolygon
+    }
+
+    case 'GEOMETRYCOLLECTION': {
+      const collection = geometry as gdal.GeometryCollection
+      const cleanedCollection = new gdal.GeometryCollection()
+      for (let i = 0; i < collection.children.count(); i++) {
+        const cleanedChild = stripZFromGeometry(collection.children.get(i))
+        if (cleanedChild) {
+          cleanedCollection.children.add(cleanedChild)
+        }
+      }
+      return cleanedCollection
+    }
+
+    default:
+      return geometry.clone()
+  }
+}
+
+export { detectSrs, parseAnyGeographicalArchive, unzipGeographicalContent, wgs84 }

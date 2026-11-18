@@ -7,8 +7,6 @@ métiers des organismes de certification du bio en France.
 
 Cette API est réalisée en node avec [Fastify](https://fastify.dev/) et [swagger-ui](https://swagger.io/tools/swagger-ui/) entre autres et la base de données maintenue avec [db-migrate-pg](https://github.com/db-migrate/pg). Les données sont stockées dans une base [PostgreSQL](https://www.postgresql.org/) avec la cartouche spatiale [PostGIS](https://postgis.net/).
 
-Les erreurs sont centralisées avec [Sentry](https://github.com/getsentry/sentry).
-
 - [Doc API parcellaire](docs/rfc/001-api-parcellaire.md)
 - [Doc API lecture](docs/rfc/002-api-lecture.md)
 
@@ -52,11 +50,38 @@ npm install
 Démarrer :
 
 ```sh
-npm start
+# En développement (TypeScript exécuté à la volée, rechargement automatique)
+npm run dev
 
-# Ou en rechargeant automatiquement
-npm run watch
+# Ou en mode production : compilation dans dist/ puis démarrage
+npm run build
+npm start
 ```
+
+Le code est écrit en TypeScript (modules ESM). Les types partagés avec le front
+sont dans le workspace [`packages/cartobio-types`](packages/cartobio-types)
+(publié sur npm sous le nom `@agencebio/cartobio-types`).
+
+La documentation OpenAPI 3.1 est générée à partir des schémas zod.
+
+Vérifier les types et le lint :
+
+```sh
+npm run typecheck
+npm run lint
+```
+
+Les scripts npm sont regroupés par préfixe :
+
+| Préfixe | Usage |
+|---|---|
+| `build`, `build:*` | compilation (`dist/`), types partagés, fonds géographiques |
+| `start`, `dev` | démarrage en production / en développement |
+| `lint`, `format`, `typecheck` | qualité du code |
+| `test`, `test:*` | tests |
+| `db:*` | migrations de base de données |
+| `cron:*` | tâches planifiées (crontab des serveurs) |
+| `job:*` | scripts ponctuels (imports PAC, création d'imports de parcellaires) |
 
 Ouvrir :
 
@@ -78,10 +103,13 @@ Ouvrir :
 
 ### Exécution des tests
 
-Les test utilisent [Jest](https://jestjs.io/docs/en/getting-started) et [supertest](https://github.com/visionmedia/supertest#readme) pour leur organisation et pour lancer les appels HTTP.
+Les test utilisent [Vitest](https://vitest.dev/) et [supertest](https://github.com/visionmedia/supertest#readme) pour leur organisation et pour lancer les appels HTTP.
 
 ```sh
 npm test
+
+# En continu
+npm run test:watch
 ```
 
 ## Déploiement
@@ -149,8 +177,6 @@ L'application lit les variables définies dans un fichier `.env`.
 | `GEOFOLIA_OAUTH_TENANT`                     | ``                                                                    | Identifiant du tenant Microsoft Entra ID.                                                                                           |
 | `GEOFOLIA_OAUTH_CLIENT_ID`                  | ``                                                                    | Identifiant du client OAuth Geofolia.                                                                                               |
 | `GEOFOLIA_OAUTH_CLIENT_SECRET`              | ``                                                                    | Secret du client OAuth Geofolia.                                                                                                    |
-| `REPORT_ERRORS`                             | `false` (hors production)                                             | Active ou désactive le reporting des erreurs vers Sentry. En production, la valeur dépend également de la présence de `SENTRY_DSN`. |
-| `SENTRY_DSN`                                | ``                                                                    | DSN Sentry utilisé pour le suivi des erreurs applicatives.                                                                          |
 | `NOTIFICATIONS_AB_ENDPOINT`                 | `https://back.agencebio.org`                                          | Point d'accès au service de notifications de l'Agence Bio.                                                                          |
 | `NOTIFICATIONS_AB_ORIGIN`                   | ``                                                                    | Valeur de l'en-tête `Origin` envoyée au service de notifications.                                                                   |
 | `NOTIFICATIONS_AB_PUBLIC_KEY`               | ``                                                                    | Clé publique utilisée pour vérifier les notifications de l'Agence Bio.                                                              |
@@ -215,6 +241,11 @@ ogr2ogr -f PostgreSQL \
 
 Les fonds de carte sont servis statiquement, et générés à l'aide de l'outil en ligne de commande [tippecanoe] :
 
+<details>
+<summary><b>Fonds de carte RPG (non utilisé)</b></summary>
+
+### Génération des fonds de carte RPG (qui ne sont plus utilisé dans le projet)
+
 ```sh
 # Décompresser tous les fichiers ZIP départementaux dans un même dossier,
 # de telle sorte à ce que tous les fichiers .dbf .prj .shp .shx soient dans un même dossier.
@@ -224,6 +255,29 @@ for f in *.zip; do unzip "$f"; done
 ogr2ogr -t_srs EPSG:3857 -nln rpg rpg.gpkg .
 ogr2ogr rpg.geojson rpg.gpkg
 tippecanoe -Z10 -z14 --extend-zooms-if-still-dropping --no-tile-compression --simplify-only-low-zooms --drop-densest-as-needed --output-to-directory rpg-202x --projection EPSG:3857 --name "RPG 202x" --layer "rpg202x" --exclude NUM_ILOT --exclude NUM_PARCEL --exclude PACAGE --force rpg.geojson
+```
+
+</details>
+
+### Génération des fonds de carte Cartobio
+
+Récuperer le fichier "France entière - gpkg - { année }" sur [data.gouv](https://www.data.gouv.fr/datasets/parcelles-certifiees-en-agriculture-biologique-sur-cartobio)
+
+```sh
+ogr2ogr -f "gpkg" -s_srs EPSG:4326 -t_srs EPSG:3857 cartobio-parcelles-2025.gpkg cartobio-parcelles-2025-france-4326.gpkg
+
+ogr2ogr cartobio-parcelles-2025.json cartobio-parcelles-2025.gpkg
+
+tippecanoe -Z10 -z14 --extend-zooms-if-still-dropping --no-tile-compression --simplify-only-low-zooms --drop-densest-as-needed --output-to-directory cartobio-parcelles-2025 --projection EPSG:3857 --name "Cartobio parcelles 2025" --layer "catobio-parcelles-2025" --force cartobio-parcelles-2025.json
+```
+
+Les fichiers sont ensuite servient via la configuration dans `sites-available`:
+
+```nginx
+  location /cartobio-parcelles-2025/ {
+    alias /var/www/cartobio-parcelles-2025/;
+    add_header Access-Control-Allow-Origin *;
+  }
 ```
 
 ## Autodétéction des communes
@@ -258,12 +312,12 @@ crontab -e
 
 Tous les mois les parcellaires marqués comme supprimés (`deleted_at`) depuis plus de 6 mois, sont supprimés dans la base de données.
 
-Le script supprimant les parcellaires est utilisable via `npm run clean-records`
+Le script supprimant les parcellaires est utilisable via `npm run cron:clean-records`
 
 Exemple d'utilisation dans le crontab:
 
 ```sh
-* 1 * * * (date && docker exec cartobio-api-test npm run clean-records) >> /var/log/cron.log
+* 1 * * * (date && docker exec cartobio-api-test npm run cron:clean-records) >> /var/log/cron.log
 ```
 
 </details>

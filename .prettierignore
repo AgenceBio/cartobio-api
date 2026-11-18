@@ -1,0 +1,19 @@
+# build & générés
+dist
+coverage
+docs/types
+data
+storage
+node_modules
+package-lock.json
+**/*.d.ts
+
+# migrations : historique figé (db-migrate) et sorties drizzle-kit
+database/old_migrations
+database/drizzle
+
+# fixtures de test (formats source à préserver)
+test/fixtures
+
+# templates mail : HTML spécifique aux clients mail, ne pas reformater
+src/services/mailer/templates

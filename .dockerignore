@@ -1,0 +1,12 @@
+node_modules
+**/node_modules
+dist
+**/dist
+coverage
+.env*
+!.example.env
+.git
+data/generated/*
+!data/generated/.gitkeep
+storage/pdf/*
+!storage/pdf/.gitkeep

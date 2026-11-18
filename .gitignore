@@ -16,3 +16,6 @@ storage/pdf/*
 
 # types
 docs/types
+
+# build
+dist
