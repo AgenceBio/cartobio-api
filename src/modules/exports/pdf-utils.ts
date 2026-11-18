@@ -3,36 +3,11 @@ import pdflib from 'pdf-lib'
 import path from 'path'
 
 import { findPdfParcelles } from './exports.repository.js'
-import type { PdfParcelle } from './exports.repository.js'
+import type { BoundingBox, MapDrawOptions, MapDrawResult, PdfParcelle } from './exports.types.js'
 import { ASSETS_DIR } from '../../shared/paths.js'
 import { getErrorMessage } from '../../shared/errors.js'
 import type { Browser, Page } from 'puppeteer'
 import { logger } from '../../config/logger.js'
-
-export interface BoundingBox {
-  minx: number
-  miny: number
-  maxx: number
-  maxy: number
-  centerx: number
-  centery: number
-  width: number
-  height: number
-}
-
-export interface MapDrawOptions {
-  width: number
-  height: number
-  center: [number, number]
-  zoom: number
-  timeout: number
-}
-
-export interface MapDrawResult {
-  buffer?: string
-  error?: string
-  err?: unknown
-}
 
 /**
  * Lancer le navigateur
@@ -100,13 +75,13 @@ function getOptimalZoom (bboxWidth: number, bboxHeight: number, viewportWidth: n
   const WORLD_DIM = { width: 512, height: 512 }
   const ZOOM_MAX = 20
 
-  function latRad (lat: number) {
+  function latRad (lat: number): number {
     const sin = Math.sin((lat * Math.PI) / 180)
     const result = Math.log((1 + sin) / (1 - sin)) / 2
     return result
   }
 
-  function zoom (mapPx: number, worldPx: number, fraction: number) {
+  function zoom (mapPx: number, worldPx: number, fraction: number): number {
     return Math.floor(Math.log(mapPx / worldPx / fraction) / Math.LN2)
   }
 
@@ -315,7 +290,7 @@ async function drawParcelleHighlightOnMap (page: Page, parcelles: Array<PdfParce
   return { buffer }
 }
 
-async function mergeAndAddFooter (pdfPaths: string[], name: string, deleteFilesAfter: boolean) {
+async function mergeAndAddFooter (pdfPaths: string[], name: string, deleteFilesAfter: boolean): Promise<pdflib.PDFDocument> {
   const mergedPdf = await pdflib.PDFDocument.create()
   const copiedPages: Array<{ page: pdflib.PDFPage; docIndex: number }> = []
 
@@ -356,7 +331,7 @@ async function mergeAndAddFooter (pdfPaths: string[], name: string, deleteFilesA
   return mergedPdf
 }
 
-function imageToBase64 (imagePath: string) {
+function imageToBase64 (imagePath: string): string {
   try {
     const ext = path.extname(imagePath).substring(1)
     const data = fs.readFileSync(imagePath).toString('base64')
@@ -367,12 +342,12 @@ function imageToBase64 (imagePath: string) {
   }
 }
 
-function formatDate (dateStr: string) {
+function formatDate (dateStr: string): string {
   const [year, month, day] = dateStr.split('-')
   return `${day}/${month}/${year}`
 }
 
-function formatRefCad (enter: string) {
+function formatRefCad (enter: string): string {
   // On retire les 5 premiers chiffres (code commune)
   const reste = enter.slice(5)
   // On sépare chiffres + lettres + chiffres

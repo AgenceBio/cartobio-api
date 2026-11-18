@@ -4,6 +4,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
@@ -31,6 +32,7 @@ export const attestationsProduction = cartobio.table(
   },
   (table) => [
     index('attestations_production_record_id_idx').on(table.recordId),
+    uniqueIndex('attestations_production_record_id_type_idx').on(table.recordId, table.type),
   ],
 );
 

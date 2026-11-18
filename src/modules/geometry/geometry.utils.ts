@@ -1,9 +1,5 @@
 import type { Feature, Geometry } from 'geojson'
-import type { parcellaires, parcelles } from '../../database/schema/index.js'
-
-export type ComparisonResult = 'r1_old_r2_new' | 'r2_old_r1_new'
-type ParcellaireDates = Pick<typeof parcellaires.$inferSelect, 'auditDate' | 'anneeReferenceControle' | 'createdAt'>
-type ParcelleLabel = Pick<typeof parcelles.$inferSelect, 'numeroIlotPac' | 'numeroParcellesPac' | 'name'>
+import type { ComparisonResult, ParcellaireDates, ParcelleLabel } from './geometry.types.js'
 
 export function compareParcellaires (r1: ParcellaireDates, r2: ParcellaireDates): ComparisonResult {
   const anneeControle = ({ auditDate, anneeReferenceControle }: ParcellaireDates): number =>

@@ -7,15 +7,8 @@ import { ASSETS_DIR } from '../../shared/paths.js'
 import type { Page } from 'puppeteer'
 import type { PDFDocument } from 'pdf-lib'
 import type { AgenceBioNormalizedOperator } from '@agencebio/cartobio-types'
-import type { PdfParcelle, PdfRecord } from './exports.repository.js'
+import type { MapImagesOptions, OperatorMapImages, PdfParcelle, PdfRecord } from './exports.types.js'
 import { logger } from '../../config/logger.js'
-
-interface OperatorMapImages {
-  global: { buffer: string | undefined } | null
-  parcelles: Array<{ id: string, buffer: string | undefined }>
-}
-
-type MapImagesOptions = { width?: number, height?: number, timeout?: number }
 
 /**
  * Génère une image de carte pour un opérateur et ses parcelles
@@ -90,7 +83,7 @@ async function generateOperatorMapImages (parcelles: PdfParcelle[], page: Page, 
   }
 }
 
-async function createPdfContent (numeroBio: string, recordId: string, parcelles: Array<PdfParcelle>, currentOperator: AgenceBioNormalizedOperator & PdfRecord, pac: boolean) {
+async function createPdfContent (numeroBio: string, recordId: string, parcelles: Array<PdfParcelle>, currentOperator: AgenceBioNormalizedOperator & PdfRecord, pac: boolean): Promise<PDFDocument[]> {
   const dateTraitement = new Date()
 
   const browser = await puppeteer.launch({
@@ -638,7 +631,7 @@ async function createPdfContent (numeroBio: string, recordId: string, parcelles:
                 </p>
                 <p>
                   <span class="title-header">Numéro pacage&nbsp;:</span>
-                  ${currentOperator.numeroPacage ?? '-'}
+                  ${currentOperator.numeroPacage ?? currentOperator.numeros_pacage ?? '-'}
                 </p>
                 <p>
                   <span class="title-header">Adresse&nbsp;:</span>

@@ -1,7 +1,7 @@
 import * as exportPdf from '../../../src/modules/exports/exports.service.js'
 import * as generatePdfContent from '../../../src/modules/exports/pdf-content.js'
 import * as utils from '../../../src/modules/exports/pdf-utils.js'
-import pool from '../../../src/database/database.js'
+import * as repository from '../../../src/modules/exports/exports.repository.js'
 import config from '../../../src/config/env.js'
 import { get } from '../../got-mock.js'
 import agencebioOperator from '../../fixtures/providers/agence-bio-operateur.json' with { type: 'json' }
@@ -9,18 +9,20 @@ import parcellesJSON from '../../fixtures/providers/parcelles.json' with { type:
 import { randomUUID } from 'crypto'
 import { AttestationsProductionsStatus, AttestationsProductionsType } from '@agencebio/cartobio-types'
 import fs from 'fs'
-import { asPdfDocument, buildCulture, buildPdfParcelle, mockedQuery, queryResult } from '../../factories.js'
+import { asPdfDocument, buildCulture, buildPdfParcelle } from '../../factories.js'
+import type { PdfParcelle, PdfRecord } from '../../../src/modules/exports/exports.types.js'
 
 const parcelles = parcellesJSON.map(p => buildPdfParcelle({
   id: p.id,
   name: 'test',
   commune: p.commune,
-  conversion_niveau: p.conversion_niveau,
+  conversion_niveau: p.conversion_niveau as PdfParcelle['conversion_niveau'],
   engagement_date: p.engagement_date,
   nbilot: p.numero_ilot_pac,
   nbp: p.numero_parcelle_pac,
   cultures: p.cultures.map(({ CPF, variete }) => buildCulture({ CPF, variete }))
 }))
+const pdfRecord = agencebioOperator as unknown as PdfRecord
 const generatedPdf = () => asPdfDocument({ save: vi.fn().mockReturnValue('save'), saveAsBase64: vi.fn().mockReturnValue('save-as-base-64') })
 
 vi.mock('../../../src/modules/exports/pdf-utils.js', () => ({
@@ -29,6 +31,12 @@ vi.mock('../../../src/modules/exports/pdf-utils.js', () => ({
 
 vi.mock('../../../src/modules/exports/pdf-content.js', () => ({
   createPdfContent: vi.fn()
+}))
+
+vi.mock('../../../src/modules/exports/exports.repository.js', () => ({
+  updateAttestationsProductions: vi.fn(),
+  findValidAttestationProduction: vi.fn(),
+  findPdfRecord: vi.fn()
 }))
 
 describe('Generation du PDF', () => {
@@ -42,7 +50,8 @@ describe('Generation du PDF', () => {
   })
 
   it('on jette une exception si aucune parcelle', async () => {
-    mockedQuery().mockResolvedValue(queryResult([])).mockResolvedValueOnce(queryResult([])).mockResolvedValueOnce(queryResult([])).mockResolvedValueOnce(queryResult([agencebioOperator]))
+    vi.mocked(repository.findValidAttestationProduction).mockResolvedValue(null)
+    vi.mocked(repository.findPdfRecord).mockResolvedValue(pdfRecord)
     get.mockReturnValue({
       async json () {
         return agencebioOperator
@@ -62,24 +71,23 @@ describe('Generation du PDF', () => {
 
     expect(hasTrown).toEqual(true)
 
-    expect(pool.query).toHaveBeenNthCalledWith(1,
-      expect.stringContaining('SELECT'),
-      [UUID, AttestationsProductionsType.COMPLET])
-    expect(pool.query).toHaveBeenNthCalledWith(2,
-      expect.stringContaining('INSERT'),
-      [UUID, AttestationsProductionsType.COMPLET, AttestationsProductionsStatus.STARTED, null])
-    expect(pool.query).toHaveBeenNthCalledWith(3,
-      expect.stringContaining('SELECT'),
-      [UUID])
-    expect(pool.query).toHaveBeenNthCalledWith(4,
-      expect.stringContaining('INSERT'),
-      [UUID, AttestationsProductionsType.COMPLET, AttestationsProductionsStatus.ERROR, null])
+    expect(repository.findValidAttestationProduction).toHaveBeenNthCalledWith(1,
+      UUID, AttestationsProductionsType.COMPLET)
+    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(1,
+      UUID, AttestationsProductionsStatus.STARTED, AttestationsProductionsType.COMPLET, null)
+    expect(repository.findPdfRecord).toHaveBeenNthCalledWith(1,
+      UUID)
+    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(2,
+      UUID, AttestationsProductionsStatus.ERROR, AttestationsProductionsType.COMPLET, null)
 
-    expect(pool.query).toHaveBeenCalledTimes(4)
+    expect(repository.findValidAttestationProduction).toHaveBeenCalledTimes(1)
+    expect(repository.updateAttestationsProductions).toHaveBeenCalledTimes(2)
+    expect(repository.findPdfRecord).toHaveBeenCalledTimes(1)
   })
 
   it('on jette une exception si parcelle sans culture', async () => {
-    mockedQuery().mockResolvedValue(queryResult([])).mockResolvedValueOnce(queryResult([])).mockResolvedValueOnce(queryResult([])).mockResolvedValueOnce(queryResult([agencebioOperator]))
+    vi.mocked(repository.findValidAttestationProduction).mockResolvedValue(null)
+    vi.mocked(repository.findPdfRecord).mockResolvedValue(pdfRecord)
     get.mockReturnValue({
       async json () {
         return agencebioOperator
@@ -102,24 +110,23 @@ describe('Generation du PDF', () => {
 
     expect(hasTrown).toEqual(true)
 
-    expect(pool.query).toHaveBeenNthCalledWith(1,
-      expect.stringContaining('SELECT'),
-      [UUID, AttestationsProductionsType.COMPLET])
-    expect(pool.query).toHaveBeenNthCalledWith(2,
-      expect.stringContaining('INSERT'),
-      [UUID, AttestationsProductionsType.COMPLET, AttestationsProductionsStatus.STARTED, null])
-    expect(pool.query).toHaveBeenNthCalledWith(3,
-      expect.stringContaining('SELECT'),
-      [UUID])
-    expect(pool.query).toHaveBeenNthCalledWith(4,
-      expect.stringContaining('INSERT'),
-      [UUID, AttestationsProductionsType.COMPLET, AttestationsProductionsStatus.ERROR, null])
+    expect(repository.findValidAttestationProduction).toHaveBeenNthCalledWith(1,
+      UUID, AttestationsProductionsType.COMPLET)
+    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(1,
+      UUID, AttestationsProductionsStatus.STARTED, AttestationsProductionsType.COMPLET, null)
+    expect(repository.findPdfRecord).toHaveBeenNthCalledWith(1,
+      UUID)
+    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(2,
+      UUID, AttestationsProductionsStatus.ERROR, AttestationsProductionsType.COMPLET, null)
 
-    expect(pool.query).toHaveBeenCalledTimes(4)
+    expect(repository.findValidAttestationProduction).toHaveBeenCalledTimes(1)
+    expect(repository.updateAttestationsProductions).toHaveBeenCalledTimes(2)
+    expect(repository.findPdfRecord).toHaveBeenCalledTimes(1)
   })
 
   it("on stock en base les resultat en cas d'exception", async () => {
-    mockedQuery().mockResolvedValue(queryResult([])).mockResolvedValueOnce(queryResult([])).mockResolvedValueOnce(queryResult([])).mockResolvedValueOnce(queryResult([agencebioOperator]))
+    vi.mocked(repository.findValidAttestationProduction).mockResolvedValue(null)
+    vi.mocked(repository.findPdfRecord).mockResolvedValue(pdfRecord)
     get.mockReturnValue({
       async json () {
         return agencebioOperator
@@ -143,24 +150,23 @@ describe('Generation du PDF', () => {
 
     expect(hasTrown).toEqual(true)
 
-    expect(pool.query).toHaveBeenNthCalledWith(1,
-      expect.stringContaining('SELECT'),
-      [UUID, AttestationsProductionsType.COMPLET])
-    expect(pool.query).toHaveBeenNthCalledWith(2,
-      expect.stringContaining('INSERT'),
-      [UUID, AttestationsProductionsType.COMPLET, AttestationsProductionsStatus.STARTED, null])
-    expect(pool.query).toHaveBeenNthCalledWith(3,
-      expect.stringContaining('SELECT'),
-      [UUID])
-    expect(pool.query).toHaveBeenNthCalledWith(4,
-      expect.stringContaining('INSERT'),
-      [UUID, AttestationsProductionsType.COMPLET, AttestationsProductionsStatus.ERROR, null])
+    expect(repository.findValidAttestationProduction).toHaveBeenNthCalledWith(1,
+      UUID, AttestationsProductionsType.COMPLET)
+    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(1,
+      UUID, AttestationsProductionsStatus.STARTED, AttestationsProductionsType.COMPLET, null)
+    expect(repository.findPdfRecord).toHaveBeenNthCalledWith(1,
+      UUID)
+    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(2,
+      UUID, AttestationsProductionsStatus.ERROR, AttestationsProductionsType.COMPLET, null)
 
-    expect(pool.query).toHaveBeenCalledTimes(4)
+    expect(repository.findValidAttestationProduction).toHaveBeenCalledTimes(1)
+    expect(repository.updateAttestationsProductions).toHaveBeenCalledTimes(2)
+    expect(repository.findPdfRecord).toHaveBeenCalledTimes(1)
   })
 
   it('on stock en base les resultat en cas de succès', async () => {
-    mockedQuery().mockResolvedValue(queryResult([])).mockResolvedValueOnce(queryResult([])).mockResolvedValueOnce(queryResult([])).mockResolvedValueOnce(queryResult([agencebioOperator]))
+    vi.mocked(repository.findValidAttestationProduction).mockResolvedValue(null)
+    vi.mocked(repository.findPdfRecord).mockResolvedValue(pdfRecord)
     get.mockReturnValue({
       async json () {
         return agencebioOperator
@@ -178,26 +184,25 @@ describe('Generation du PDF', () => {
     expect(count).toEqual(3)
     const res = (await gen.next()).value
 
-    expect(pool.query).toHaveBeenNthCalledWith(1,
-      expect.stringContaining('SELECT'),
-      [UUID, AttestationsProductionsType.COMPLET])
-    expect(pool.query).toHaveBeenNthCalledWith(2,
-      expect.stringContaining('INSERT'),
-      [UUID, AttestationsProductionsType.COMPLET, AttestationsProductionsStatus.STARTED, null])
-    expect(pool.query).toHaveBeenNthCalledWith(3,
-      expect.stringContaining('SELECT'),
-      [UUID])
-    expect(pool.query).toHaveBeenNthCalledWith(4,
-      expect.stringContaining('INSERT'),
-      [UUID, AttestationsProductionsType.COMPLET, AttestationsProductionsStatus.GENERATED, expect.stringContaining(UUID)])
+    expect(repository.findValidAttestationProduction).toHaveBeenNthCalledWith(1,
+      UUID, AttestationsProductionsType.COMPLET)
+    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(1,
+      UUID, AttestationsProductionsStatus.STARTED, AttestationsProductionsType.COMPLET, null)
+    expect(repository.findPdfRecord).toHaveBeenNthCalledWith(1,
+      UUID)
+    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(2,
+      UUID, AttestationsProductionsStatus.GENERATED, AttestationsProductionsType.COMPLET, expect.stringContaining(UUID))
 
-    expect(pool.query).toHaveBeenCalledTimes(4)
+    expect(repository.findValidAttestationProduction).toHaveBeenCalledTimes(1)
+    expect(repository.updateAttestationsProductions).toHaveBeenCalledTimes(2)
+    expect(repository.findPdfRecord).toHaveBeenCalledTimes(1)
 
     expect(res).toEqual('save-as-base-64')
   })
 
   it('on ne regenere pas le pdf si il existe deja', async () => {
-    mockedQuery().mockResolvedValue(queryResult([])).mockResolvedValueOnce(queryResult([{ path: 'test' }])).mockResolvedValueOnce(queryResult([])).mockResolvedValueOnce(queryResult([agencebioOperator]))
+    vi.mocked(repository.findValidAttestationProduction).mockResolvedValue({ path: 'test' })
+    vi.mocked(repository.findPdfRecord).mockResolvedValue(pdfRecord)
     get.mockReturnValue({
       async json () {
         return agencebioOperator
@@ -215,17 +220,18 @@ describe('Generation du PDF', () => {
     expect(count).toEqual(0)
     const res = (await gen.next()).value
 
-    expect(pool.query).toHaveBeenNthCalledWith(1,
-      expect.stringContaining('SELECT'),
-      [UUID, AttestationsProductionsType.COMPLET])
+    expect(repository.findValidAttestationProduction).toHaveBeenNthCalledWith(1,
+      UUID, AttestationsProductionsType.COMPLET)
 
-    expect(pool.query).toHaveBeenCalledTimes(1)
+    expect(repository.findValidAttestationProduction).toHaveBeenCalledTimes(1)
+    expect(repository.updateAttestationsProductions).toHaveBeenCalledTimes(0)
+    expect(repository.findPdfRecord).toHaveBeenCalledTimes(0)
 
     expect(res).toEqual('test-file')
   })
 
   it('on regenere le pdf si le boolean force est a true', async () => {
-    mockedQuery().mockResolvedValue(queryResult([])).mockResolvedValueOnce(queryResult([])).mockResolvedValueOnce(queryResult([agencebioOperator]))
+    vi.mocked(repository.findPdfRecord).mockResolvedValue(pdfRecord)
     get.mockReturnValue({
       async json () {
         return agencebioOperator
@@ -244,23 +250,23 @@ describe('Generation du PDF', () => {
     expect(count).toEqual(3)
     const res = (await gen.next()).value
 
-    expect(pool.query).toHaveBeenNthCalledWith(1,
-      expect.stringContaining('INSERT'),
-      [UUID, AttestationsProductionsType.COMPLET, AttestationsProductionsStatus.STARTED, null])
-    expect(pool.query).toHaveBeenNthCalledWith(2,
-      expect.stringContaining('SELECT'),
-      [UUID])
-    expect(pool.query).toHaveBeenNthCalledWith(3,
-      expect.stringContaining('INSERT'),
-      [UUID, AttestationsProductionsType.COMPLET, AttestationsProductionsStatus.GENERATED, expect.stringContaining(UUID)])
+    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(1,
+      UUID, AttestationsProductionsStatus.STARTED, AttestationsProductionsType.COMPLET, null)
+    expect(repository.findPdfRecord).toHaveBeenNthCalledWith(1,
+      UUID)
+    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(2,
+      UUID, AttestationsProductionsStatus.GENERATED, AttestationsProductionsType.COMPLET, expect.stringContaining(UUID))
 
-    expect(pool.query).toHaveBeenCalledTimes(3)
+    expect(repository.findValidAttestationProduction).toHaveBeenCalledTimes(0)
+    expect(repository.updateAttestationsProductions).toHaveBeenCalledTimes(2)
+    expect(repository.findPdfRecord).toHaveBeenCalledTimes(1)
 
     expect(res).toEqual('save-as-base-64')
   })
 
   it("regenere le pdf si le fichier n'existe pas malgré la ligne en BDD", async () => {
-    mockedQuery().mockResolvedValue(queryResult([])).mockResolvedValueOnce(queryResult([{ path: 'test' }])).mockResolvedValueOnce(queryResult([])).mockResolvedValueOnce(queryResult([agencebioOperator]))
+    vi.mocked(repository.findValidAttestationProduction).mockResolvedValue({ path: 'test' })
+    vi.mocked(repository.findPdfRecord).mockResolvedValue(pdfRecord)
     get.mockReturnValue({
       async json () {
         return agencebioOperator
@@ -282,20 +288,18 @@ describe('Generation du PDF', () => {
     expect(regenerationCount).toEqual(3)
     const res = (await gen.next()).value
 
-    expect(pool.query).toHaveBeenNthCalledWith(1,
-      expect.stringContaining('SELECT'),
-      [UUID, AttestationsProductionsType.COMPLET])
-    expect(pool.query).toHaveBeenNthCalledWith(2,
-      expect.stringContaining('INSERT'),
-      [UUID, AttestationsProductionsType.COMPLET, AttestationsProductionsStatus.STARTED, null])
-    expect(pool.query).toHaveBeenNthCalledWith(3,
-      expect.stringContaining('SELECT'),
-      [UUID])
-    expect(pool.query).toHaveBeenNthCalledWith(4,
-      expect.stringContaining('INSERT'),
-      [UUID, AttestationsProductionsType.COMPLET, AttestationsProductionsStatus.GENERATED, expect.stringContaining(UUID)])
+    expect(repository.findValidAttestationProduction).toHaveBeenNthCalledWith(1,
+      UUID, AttestationsProductionsType.COMPLET)
+    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(1,
+      UUID, AttestationsProductionsStatus.STARTED, AttestationsProductionsType.COMPLET, null)
+    expect(repository.findPdfRecord).toHaveBeenNthCalledWith(1,
+      UUID)
+    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(2,
+      UUID, AttestationsProductionsStatus.GENERATED, AttestationsProductionsType.COMPLET, expect.stringContaining(UUID))
 
-    expect(pool.query).toHaveBeenCalledTimes(4)
+    expect(repository.findValidAttestationProduction).toHaveBeenCalledTimes(1)
+    expect(repository.updateAttestationsProductions).toHaveBeenCalledTimes(2)
+    expect(repository.findPdfRecord).toHaveBeenCalledTimes(1)
 
     expect(res).toEqual('save-as-base-64')
   })

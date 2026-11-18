@@ -106,3 +106,10 @@ export const repetitionsResponseSchema = z.object({
 })
 
 export type StatsQuery = z.infer<typeof statsQuerySchema>
+export type GeneralKpiResponse = z.infer<typeof generalKpiResponseSchema>
+export type TableauBilanResponse = z.infer<typeof tableauBilanResponseSchema>
+export type TableauErreursResponse = z.infer<typeof tableauErreursResponseSchema>
+export type HistoriqueResponse = z.infer<typeof historiqueResponseSchema>
+export type TopAnomaliesResponse = z.infer<typeof topAnomaliesResponseSchema>
+export type TopAnomaliesGroupedResponse = z.infer<typeof topAnomaliesGroupedResponseSchema>
+export type RepetitionsResponse = z.infer<typeof repetitionsResponseSchema>

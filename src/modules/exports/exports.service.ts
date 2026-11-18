@@ -4,8 +4,8 @@ import AdmZip from 'adm-zip'
 import config from '../../config/env.js'
 import { fetchOperatorByNumeroBio } from '../../clients/agence-bio.client.js'
 import { AttestationsProductionsStatus, AttestationsProductionsType } from '@agencebio/cartobio-types'
-import type { ExportParcellaireBody } from '@agencebio/cartobio-types'
-import type { PdfParcelle } from './exports.repository.js'
+import type { ExportParcellaireBody, ExportParcellaireResponse } from '@agencebio/cartobio-types'
+import type { ArchiveOperator, ExportRow, PdfParcelle } from './exports.types.js'
 import { getAllParcelles } from './pdf-utils.js'
 import { createPdfContent } from './pdf-content.js'
 import * as repository from './exports.repository.js'
@@ -57,7 +57,7 @@ function assertParcellesCanProducePdf(parcelles: PdfParcelle[], recordId: string
   }
 }
 
-function archivePdfs(paths: string[], operator: { annee_reference_controle: number | string | null; numeroBio: string }) {
+function archivePdfs(paths: string[], operator: ArchiveOperator): string {
   const zip = new AdmZip();
   paths.forEach((pdfPath, index): void => {
     const name =
@@ -77,7 +77,7 @@ async function* generatePDF(
   force = false,
   pac = false,
   zip = false
-) {
+): AsyncGenerator<number, string> {
   const types =
     pac || zip
       ? [
@@ -163,7 +163,7 @@ function createdAtTime(record: { created_at?: string | null }): number {
   return record.created_at ? new Date(record.created_at).getTime() : 0;
 }
 
-async function exportDataOcId(ocId: number, filter: ExportParcellaireBody['payload'], userId: number) {
+async function exportDataOcId(ocId: number, filter: ExportParcellaireBody['payload'], userId: number): Promise<ExportParcellaireResponse | null> {
   try {
     const operators = await searchControlBodyRecords({
       ocId,
@@ -178,14 +178,14 @@ async function exportDataOcId(ocId: number, filter: ExportParcellaireBody['paylo
         ? createdAtTime(b) - createdAtTime(a)
         : Number(a.numeroBio) - Number(b.numeroBio)
     );
-    const rows: Awaited<ReturnType<typeof repository.findExportRows>> = [];
+    const rows: ExportRow[] = [];
     for (let index = 0; index < records.length; index += 10000)
       rows.push(
         ...(await repository.findExportRows(
           ocId,
           records
             .slice(index, index + 10000)
-            .map(({ numeroBio }) => String(numeroBio))
+            .map(({ numeroBio }) => Number(numeroBio))
         ))
       );
     const byNumeroBio = new Map(

@@ -58,6 +58,7 @@ export const productionAttestationType = cartobio.enum('production_attestation_t
 ]);
 
 export const productionAttestationStatus = cartobio.enum('production_attestation_status', [
+  'started',
   'generated',
   'error',
 ]);

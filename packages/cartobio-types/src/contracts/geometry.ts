@@ -69,3 +69,6 @@ export const addGeometryResponseSchema = z.object({
 export type BorderCutBody = z.infer<typeof borderCutBodySchema>
 export type GeometryEqualsBody = z.infer<typeof geometryEqualsBodySchema>
 export type AddGeometryBody = z.infer<typeof addGeometryBodySchema>
+export type BorderCutResponse = z.infer<typeof borderCutResponseSchema>
+export type GeometryEqualsResponse = z.infer<typeof geometryEqualsResponseSchema>
+export type AddGeometryResponse = z.infer<typeof addGeometryResponseSchema>

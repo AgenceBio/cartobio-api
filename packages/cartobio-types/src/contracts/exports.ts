@@ -65,3 +65,4 @@ export const exportPdfErrorResponseSchema = z.object({
 export type ExportPdfParams = z.infer<typeof exportPdfParamsSchema>
 export type ExportPdfQuery = z.infer<typeof exportPdfQuerySchema>
 export type ExportParcellaireBody = z.infer<typeof exportParcellaireBodySchema>
+export type ExportParcellaireResponse = z.infer<typeof exportParcellaireResponseSchema>

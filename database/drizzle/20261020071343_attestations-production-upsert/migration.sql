@@ -1,0 +1,2 @@
+ALTER TYPE "cartobio"."production_attestation_status" ADD VALUE 'started' BEFORE 'generated';--> statement-breakpoint
+CREATE UNIQUE INDEX "attestations_production_record_id_type_idx" ON "cartobio"."attestations_production" ("record_id","type");

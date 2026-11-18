@@ -1,14 +1,19 @@
 import { and, desc, eq, inArray, isNull, ne, notExists, sql } from 'drizzle-orm'
 import type { AnyColumn, SQL, SQLWrapper } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
-import type { FeatureCollection, Position } from 'geojson'
+import type { Position } from 'geojson'
 import { db } from '../../database/database.js'
 import { asGeoJSON, asWgs84GeoJSON, fromGeoJSON, makeValid, webMercator } from '../../database/postgis.js'
 import { parcellaires, parcelles } from '../../database/schema/index.js'
 import { compareParcellaires, feature, label } from './geometry.utils.js'
-import type { ComparisonResult } from './geometry.utils.js'
-
-type GeometryConflictStatus = 'inclusion' | 'overlap' | 'ok'
+import type {
+  GeometryConflict,
+  GeometryConflictStatus,
+  GeometryCorrection,
+  GeometryEquals,
+  ParcelBorder,
+  ParcelleColumnKey
+} from './geometry.types.js'
 
 const ancienne = alias(parcelles, 'ancienne')
 const nouvelle = alias(parcelles, 'nouvelle')
@@ -17,7 +22,7 @@ function parcellesActives (table: typeof ancienne | typeof nouvelle, recordId: s
   return and(eq(table.recordId, recordId), isNull(table.deletedAt))
 }
 
-function parcelleColumns (table: typeof ancienne | typeof nouvelle) {
+function parcelleColumns<T extends typeof ancienne | typeof nouvelle> (table: T): Pick<T, ParcelleColumnKey> {
   return {
     id: table.id,
     numeroIlotPac: table.numeroIlotPac,
@@ -26,7 +31,7 @@ function parcelleColumns (table: typeof ancienne | typeof nouvelle) {
   }
 }
 
-async function findGeometryConflicts (inputGeomGeoJSON: unknown, recordId: string, id: string | number = '') {
+async function findGeometryConflicts (inputGeomGeoJSON: unknown, recordId: string, id: string | number = ''): Promise<GeometryConflict[]> {
   const input = fromGeoJSON(inputGeomGeoJSON)
 
   /** L'area n'est pas a 0 a cause des imprécision du front, et des segments frontières */
@@ -47,7 +52,7 @@ async function findGeometryConflicts (inputGeomGeoJSON: unknown, recordId: strin
     ))
 }
 
-async function findGeometryCorrections (inputGeomGeoJSON: unknown, recordId: string, ids: string[]) {
+async function findGeometryCorrections (inputGeomGeoJSON: unknown, recordId: string, ids: string[]): Promise<GeometryCorrection[]> {
   const input = fromGeoJSON(inputGeomGeoJSON)
 
   return db
@@ -64,7 +69,7 @@ async function findGeometryCorrections (inputGeomGeoJSON: unknown, recordId: str
 /**
  * Vérifie que deux géométries sont de même géométrie spacial
  */
-async function findGeometryEquals (input: { old: string; new: string }): Promise<Array<{ comparison_result: ComparisonResult; geojson: FeatureCollection }>> {
+async function findGeometryEquals (input: { old: string; new: string }): Promise<GeometryEquals[]> {
   const records = await db
     .select({
       recordId: parcellaires.recordId,
@@ -170,7 +175,7 @@ async function findGeometryEquals (input: { old: string; new: string }): Promise
   }]
 }
 
-async function findParcelBorder (geometry: unknown, distance: number) {
+async function findParcelBorder (geometry: unknown, distance: number): Promise<ParcelBorder | undefined> {
   const parcelle = db
     .$with('parcelle', { geom: sql`geom`.as('geom') })
     .as(sql`SELECT ${webMercator(fromGeoJSON(geometry))} AS geom`)
@@ -194,7 +199,7 @@ async function findParcelBorder (geometry: unknown, distance: number) {
   return result
 }
 
-async function findParcelBorderBetweenPoints (geometry: unknown, distance: number, start: Position, end: Position, isInverted: boolean) {
+async function findParcelBorderBetweenPoints (geometry: unknown, distance: number, start: Position, end: Position, isInverted: boolean): Promise<ParcelBorder | undefined> {
   const parcelle = db
     .$with('parcelle', { geom: sql`geom`.as('geom') })
     .as(sql`SELECT ${webMercator(fromGeoJSON(geometry))} AS geom`)

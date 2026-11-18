@@ -3,10 +3,14 @@ import { getOptimalZoom, getAllParcelles, calculateGlobalBoundingBox, formatDate
 import fs from 'fs'
 import path from 'path'
 import pdflib from 'pdf-lib'
-import pool from '../../../src/database/database.js'
-import type { MapDrawOptions } from '../../../src/modules/exports/pdf-utils.js'
-import { asBrowser, asPage, asPdfDocument, buildPdfParcelle, mockedQuery, queryResult } from '../../factories.js'
+import { findPdfParcelles } from '../../../src/modules/exports/exports.repository.js'
+import type { MapDrawOptions, PdfParcelle } from '../../../src/modules/exports/exports.types.js'
+import { asBrowser, asPage, asPdfDocument, buildPdfParcelle } from '../../factories.js'
 import { logger } from '../../../src/config/logger.js'
+
+vi.mock('../../../src/modules/exports/exports.repository.js', () => ({
+  findPdfParcelles: vi.fn()
+}))
 
 describe('getOptimalZoom', () => {
   test('calcul le zoom optimal', () => {
@@ -251,9 +255,9 @@ describe('getAllParcelles', () => {
       nbp: '123',
       refcad: 'AB001'
     }
-    mockedQuery().mockResolvedValueOnce(queryResult([mockRow]))
+    vi.mocked(findPdfParcelles).mockResolvedValueOnce([mockRow as unknown as PdfParcelle])
     const result = await getAllParcelles('some-record-id')
-    expect(pool.query).toHaveBeenCalledWith(expect.stringContaining('SELECT'), ['some-record-id'])
+    expect(findPdfParcelles).toHaveBeenCalledWith('some-record-id', false)
     expect(result).toHaveLength(1)
     expect(result[0]).toMatchObject({
       id: 'p1',
@@ -265,11 +269,11 @@ describe('getAllParcelles', () => {
 
   it('retourne [] et loggue en cas d\'erreur', async () => {
     const loggerErrorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {})
-    mockedQuery().mockRejectedValueOnce(new Error('DB down'))
+    vi.mocked(findPdfParcelles).mockRejectedValueOnce(new Error('DB down'))
 
     const result = await getAllParcelles('fail-id')
 
-    expect(pool.query).toHaveBeenCalled()
+    expect(findPdfParcelles).toHaveBeenCalled()
     expect(result).toEqual([])
     expect(loggerErrorSpy).toHaveBeenCalledWith(
       { err: expect.any(Error) },

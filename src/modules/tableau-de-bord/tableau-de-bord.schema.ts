@@ -1,7 +1,8 @@
 import { generalKpiResponseSchema, historiqueResponseSchema, repetitionsResponseSchema, statsQuerySchema, tableauBilanResponseSchema, tableauErreursResponseSchema, topAnomaliesGroupedResponseSchema, topAnomaliesResponseSchema } from '@agencebio/cartobio-types'
 import { commonErrorResponses, protectedWithToken, TAGS, withSchema } from '../../shared/routes.js'
+import type { CartobioExtendedRouteShorthandOptions } from '../../shared/routes.js'
 
-const tableauDeBordRoute = () => protectedWithToken({ oc: true, cartobio: true })
+const tableauDeBordRoute = (): CartobioExtendedRouteShorthandOptions => protectedWithToken({ oc: true, cartobio: true })
 
 const periode = { from: true, to: true } as const
 const paginationRecherche = { ...periode, page: true, limit: true, recherche: true } as const

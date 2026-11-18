@@ -5,7 +5,7 @@ import { CertificationState } from '@agencebio/cartobio-types'
 import type { AgenceBioAdresses, AgenceBioNormalizedOperator, AgenceBioNotification, AgenceBioOperator, CartoBioCulture, CartoBioFeature, CartoBioFeatureProperties, CartoBioOCUser, CartoBioUser, DBOperatorRecordWithParcelles, DBParcelle, NormalizedRecord } from '@agencebio/cartobio-types'
 import type { createOrUpdateOperatorRecord } from '../src/shared/parcellaires/parcellaires.service.js'
 import pool from '../src/database/database.js'
-import type { PdfParcelle } from '../src/modules/exports/exports.repository.js'
+import type { PdfParcelle } from '../src/modules/exports/exports.types.js'
 import type { Browser, Page } from 'puppeteer'
 import type { PDFDocument } from 'pdf-lib'
 import type { FastifyRequest } from 'fastify'
@@ -49,7 +49,7 @@ export function buildPdfParcelle (overrides: Partial<PdfParcelle> = {}): PdfParc
     conversion_niveau: 'AB',
     commune: null,
     communename: 'inconnu',
-    created: null,
+    created: new Date('2023-01-01'),
     engagement_date: null,
     nbilot: null,
     nbp: null,

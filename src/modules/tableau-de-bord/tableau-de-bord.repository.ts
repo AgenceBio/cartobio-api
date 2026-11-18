@@ -4,17 +4,26 @@ import { db } from '../../database/database.js'
 import { parcellaireImportLogs, parcellaireImportPayload, parcellairesImport } from '../../database/schema/index.js'
 import { getStreaksSuspectes } from './tableau-de-bord.utils.js'
 import type {
+  GeneralKpiResponse,
+  HistoriqueResponse,
+  RepetitionsResponse,
+  TableauBilanResponse,
+  TableauErreursResponse,
+  TopAnomaliesGroupedResponse,
+  TopAnomaliesResponse
+} from '@agencebio/cartobio-types'
+import type {
+  AlerteSuspecte,
   DateRange,
-  ErrorByCode,
   ErrorDetail,
+  EtatJob,
+  GroupeEnvois,
   HistoriqueParams,
-  PaginationParams
-} from './tableau-de-bord.utils.js'
-
-type Numeric = string | number | null
-
-type StatutJob = (typeof parcellairesImport.statutJob.enumValues)[number]
-type EtatJob = (typeof parcellairesImport.etat.enumValues)[number]
+  Numeric,
+  PaginationParams,
+  PeriodeAnomalies,
+  StatutJob
+} from './tableau-de-bord.types.js'
 
 function organismeCondition(organismeCertificateur?: number): SQL {
   return eq(parcellairesImport.organismeCertificateur, String(organismeCertificateur))
@@ -73,7 +82,7 @@ async function getErrorLogsByJobId(jobIds: number[]): Promise<Record<number, Err
   return logsByJobId
 }
 
-async function getGeneralKpi({ from, to, organismeCertificateur }: DateRange) {
+async function getGeneralKpi({ from, to, organismeCertificateur }: DateRange): Promise<GeneralKpiResponse['data']> {
   const [[bilanRow], [anomalyRow]] = await Promise.all([
     db
       .select({
@@ -132,7 +141,7 @@ async function getTableauBilanRepo({
   statuts,
   etats,
   ordreDate
-}: PaginationParams) {
+}: PaginationParams): Promise<TableauBilanResponse> {
   const where = and(
     organismeCondition(organismeCertificateur),
     ...periodConditions({ from, to }),
@@ -182,7 +191,7 @@ async function getTableauErreursRepo({
   ordreDate,
   codes,
   organismeCertificateur
-}: PaginationParams) {
+}: PaginationParams): Promise<TableauErreursResponse> {
   const where = and(
     eq(parcellairesImport.statutJob, 'REJECTED'),
     organismeCondition(organismeCertificateur),
@@ -246,7 +255,7 @@ async function getHistoriqueSpecificParcellaireRepo({
   numeroClient,
   auditDate,
   organismeCertificateur
-}: HistoriqueParams) {
+}: HistoriqueParams): Promise<HistoriqueResponse> {
   const rows = await db
     .select({
       jobId: parcellairesImport.id,
@@ -299,7 +308,7 @@ function getTruncate(from: string, to: string): 'day' | 'week' {
   return diffInDays <= 7 ? 'day' : 'week'
 }
 
-async function getTopAnomaliesRepo({ from, to, organismeCertificateur }: DateRange) {
+async function getTopAnomaliesRepo({ from, to, organismeCertificateur }: DateRange): Promise<TopAnomaliesResponse['data']> {
   if (!from || !to) {
     return []
   }
@@ -329,7 +338,7 @@ async function getTopAnomaliesRepo({ from, to, organismeCertificateur }: DateRan
   return rows
 }
 
-async function getTopAnomaliesGroupedRepo({ from, to, organismeCertificateur }: DateRange) {
+async function getTopAnomaliesGroupedRepo({ from, to, organismeCertificateur }: DateRange): Promise<TopAnomaliesGroupedResponse> {
   if (!from || !to) {
     return []
   }
@@ -399,16 +408,7 @@ async function getTopAnomaliesGroupedRepo({ from, to, organismeCertificateur }: 
     .leftJoin(errorStats, eq(errorStats.period, periodsCte.period))
     .orderBy(asc(periodsCte.period), desc(errorCount))
 
-  const periods = new Map<
-    string,
-    {
-      period: Date
-      accepted: number | null
-      refused: number | null
-      errorCount: number
-      errors: ErrorByCode[]
-    }
-  >()
+  const periods = new Map<string, PeriodeAnomalies>()
 
   for (const row of rows) {
     const key = new Date(row.period).toISOString()
@@ -450,7 +450,7 @@ async function getEnvoisSuspectsRepo({
   recherche,
   type,
   organismeCertificateur
-}: PaginationParams) {
+}: PaginationParams): Promise<RepetitionsResponse> {
   const rows = await db
     .select({
       jobId: parcellairesImport.id,
@@ -474,11 +474,7 @@ async function getEnvoisSuspectsRepo({
 
   const logsByJobId = await getErrorLogsByJobId(rows.map((row) => row.jobId))
 
-  type Envoi = { jobId: number; statut: string | null; etat: string; createdAt: Date; erreurs: ErrorDetail[] }
-  const groupes = new Map<
-    string,
-    { numeroBio: string | null; numeroClient: string | null; auditDate: string | null; envois: Envoi[] }
-  >()
+  const groupes = new Map<string, GroupeEnvois>()
 
   for (const row of rows) {
     const key = `${row.numeroBio}|${row.numeroClient}|${row.auditDate}`
@@ -501,13 +497,7 @@ async function getEnvoisSuspectsRepo({
     })
   }
 
-  const alertes: Array<{
-    numeroBio: string | null
-    numeroClient: string | null
-    auditDate: string | null
-    type: 'envois' | 'refus'
-    envois: Envoi[]
-  }> = []
+  const alertes: AlerteSuspecte[] = []
 
   for (const groupe of groupes.values()) {
     for (const streak of getStreaksSuspectes(groupe.envois)) {

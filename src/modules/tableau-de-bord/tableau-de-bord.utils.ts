@@ -1,41 +1,4 @@
-export type OrdreTri = 'asc' | 'desc'
-
-export type DateRange = {
-  from?: string
-  to?: string
-  organismeCertificateur?: number
-}
-
-export type PaginationParams = DateRange & {
-  page: number
-  limit: number
-  recherche?: string
-  statuts?: string[]
-  etats?: string[]
-  ordreDate?: OrdreTri
-  codes?: string[]
-  type?: string
-}
-
-export type HistoriqueParams = {
-  numeroBio?: string
-  numeroClient?: string
-  auditDate?: string
-  organismeCertificateur?: number
-}
-
-export type ErrorDetail = {
-  numeroBio: string | null
-  parcelleId: string | null
-  parcelleName: string | null
-  code: string | null
-  message: string | null
-}
-
-export type ErrorByCode = {
-  code: string | null
-  count: number | null
-}
+import type { StreakSuspecte } from './tableau-de-bord.types.js'
 
 function getTypeEnvoi (statut: string | null): 'success' | 'echec' | null {
   if (statut === 'VALID') {
@@ -51,8 +14,8 @@ function getTypeEnvoi (statut: string | null): 'success' | 'echec' | null {
 
 const NB_MINIMUM_STREAK = 4
 
-function getStreaksSuspectes<T extends { statut: string | null }> (envois: T[]): Array<{ type: 'envois' | 'refus'; envois: T[] }> {
-  const streaks: Array<{ type: 'envois' | 'refus'; envois: T[] }> = []
+function getStreaksSuspectes<T extends { statut: string | null }> (envois: T[]): Array<StreakSuspecte<T>> {
+  const streaks: Array<StreakSuspecte<T>> = []
   let streakStart = 0
 
   for (let i = 1; i <= envois.length; i++) {

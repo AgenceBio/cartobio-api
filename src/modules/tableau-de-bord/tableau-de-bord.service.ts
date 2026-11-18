@@ -1,11 +1,20 @@
 import * as repository from './tableau-de-bord.repository.js'
-import type { StatsQuery } from '@agencebio/cartobio-types'
+import type {
+  GeneralKpiResponse,
+  HistoriqueResponse,
+  RepetitionsResponse,
+  StatsQuery,
+  TableauBilanResponse,
+  TableauErreursResponse,
+  TopAnomaliesGroupedResponse,
+  TopAnomaliesResponse
+} from '@agencebio/cartobio-types'
 
-async function getGeneralKpi ({ from, to }: StatsQuery, organismeCertificateur?: number) {
+async function getGeneralKpi ({ from, to }: StatsQuery, organismeCertificateur?: number): Promise<GeneralKpiResponse['data']> {
   return repository.getGeneralKpi({ from, to, organismeCertificateur })
 }
 
-async function getTableauBilan ({ from, to, page = '1', limit = '20', recherche, statuts, etats, ordreDate }: StatsQuery, organismeCertificateur?: number) {
+async function getTableauBilan ({ from, to, page = '1', limit = '20', recherche, statuts, etats, ordreDate }: StatsQuery, organismeCertificateur?: number): Promise<TableauBilanResponse> {
   return repository.getTableauBilanRepo({
     from,
     to,
@@ -19,7 +28,7 @@ async function getTableauBilan ({ from, to, page = '1', limit = '20', recherche,
   })
 }
 
-async function getHistoriqueSpecificParcellaire ({ numeroBio, numeroClient, auditDate }: StatsQuery, organismeCertificateur?: number) {
+async function getHistoriqueSpecificParcellaire ({ numeroBio, numeroClient, auditDate }: StatsQuery, organismeCertificateur?: number): Promise<HistoriqueResponse> {
   return repository.getHistoriqueSpecificParcellaireRepo({
     numeroBio,
     numeroClient,
@@ -28,7 +37,7 @@ async function getHistoriqueSpecificParcellaire ({ numeroBio, numeroClient, audi
   })
 }
 
-async function getTableauErreurs ({ from, to, page = '1', limit = '20', recherche, ordreDate, codes }: StatsQuery, organismeCertificateur?: number) {
+async function getTableauErreurs ({ from, to, page = '1', limit = '20', recherche, ordreDate, codes }: StatsQuery, organismeCertificateur?: number): Promise<TableauErreursResponse> {
   const ordreDateValue = ordreDate === 'asc' || ordreDate === 'desc' ? ordreDate : undefined
   const codesValue = (
     Array.isArray(codes) ? codes : typeof codes === 'string' ? codes.split(',') : []
@@ -48,15 +57,15 @@ async function getTableauErreurs ({ from, to, page = '1', limit = '20', recherch
   })
 }
 
-async function getTopAnomalies ({ from, to }: StatsQuery, organismeCertificateur?: number) {
+async function getTopAnomalies ({ from, to }: StatsQuery, organismeCertificateur?: number): Promise<TopAnomaliesResponse['data']> {
   return repository.getTopAnomaliesRepo({ from, to, organismeCertificateur })
 }
 
-async function getTopAnomaliesGrouped ({ from, to }: StatsQuery, organismeCertificateur?: number) {
+async function getTopAnomaliesGrouped ({ from, to }: StatsQuery, organismeCertificateur?: number): Promise<TopAnomaliesGroupedResponse> {
   return repository.getTopAnomaliesGroupedRepo({ from, to, organismeCertificateur })
 }
 
-async function getRepetErreurs ({ from, to, page = '1', limit = '10', recherche, type }: StatsQuery, organismeCertificateur?: number) {
+async function getRepetErreurs ({ from, to, page = '1', limit = '10', recherche, type }: StatsQuery, organismeCertificateur?: number): Promise<RepetitionsResponse> {
   const typeValue = type === 'envois' || type === 'refus' ? type : undefined
 
   return repository.getEnvoisSuspectsRepo({
