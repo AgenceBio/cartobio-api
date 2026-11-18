@@ -261,10 +261,10 @@ const STEPS: Step[] = [
   {
     table: 'parcellaires_import',
     extract: `
-      SELECT id::text AS id, status, organisme_certificateur,
+      SELECT id, status, organisme_certificateur,
         coalesce(created_at::timestamptz, now()) AS created_at,
         started_at::timestamptz AS started_at, ended_at::timestamptz AS ended_at,
-        numerobio, numeroclient, audit_date::timestamp AS audit_date,
+        numerobio, numeroclient, audit_date,
         result_job, statut_job::text AS statut_job, etat::text AS etat
       FROM parcellaire_import
     `
@@ -272,14 +272,14 @@ const STEPS: Step[] = [
   {
     table: 'parcellaire_import_logs',
     extract: `
-      SELECT import_id::text AS import_id, type, message, numero_bio, code, parcelle_id, parcelle_name
+      SELECT import_id, type, message, numero_bio, code, parcelle_id, parcelle_name
       FROM parcellaire_import_logs WHERE message <> ''
     `,
     transform: (log) => ({ ...log, code: log.code ?? 'UNKNOWN' })
   },
   {
     table: 'parcellaire_import_payload',
-    extract: 'SELECT id::text AS id, import_id::text AS import_id, payload FROM parcellaire_import_payload'
+    extract: 'SELECT id::text AS id, import_id, payload FROM parcellaire_import_payload'
   },
   {
     table: 'import_pac',
@@ -366,6 +366,9 @@ async function main(): Promise<void> {
     await target.query('BEGIN')
     const report: Row[] = []
     for (const step of STEPS) report.push(await run(source, target, step))
+    await target.query(
+      "SELECT setval(pg_get_serial_sequence('parcellaires_import', 'id'), coalesce(max(id), 0) + 1, false) FROM parcellaires_import"
+    )
     await target.query('COMMIT')
     await source.query('COMMIT')
 

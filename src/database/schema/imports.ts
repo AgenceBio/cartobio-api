@@ -1,6 +1,8 @@
 import {
   boolean,
+  date,
   index,
+  integer,
   jsonb,
   timestamp,
   uuid,
@@ -10,7 +12,7 @@ import { cartobio } from "./cartobio.js";
 import { importJobEtat, importJobResult, importLogType, importStatus } from "./enums.js";
 
 export const parcellairesImport = cartobio.table("parcellaires_import", {
-  id: varchar("id", { length: 64 }).primaryKey(),
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   status: importStatus("status").notNull().default("CREATED"),
   organismeCertificateur: varchar("organisme_certificateur", {
     length: 64,
@@ -22,7 +24,7 @@ export const parcellairesImport = cartobio.table("parcellaires_import", {
   endedAt: timestamp("ended_at", { withTimezone: true }),
   numeroBio: varchar("numerobio"),
   numeroClient: varchar("numeroclient"),
-  auditDate: timestamp("audit_date", { mode: "date" }),
+  auditDate: date("audit_date"),
   resultJob: jsonb("result_job"),
   statutJob: importJobResult("statut_job"),
   etat: importJobEtat("etat").notNull().default("UNKNOWN"),
@@ -32,7 +34,7 @@ export const parcellaireImportLogs = cartobio.table(
   "parcellaire_import_logs",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    importId: varchar("import_id", { length: 64 })
+    importId: integer("import_id")
       .notNull()
       .references(() => parcellairesImport.id, { onDelete: "cascade" }),
     type: importLogType("type").notNull(),
@@ -47,7 +49,7 @@ export const parcellaireImportLogs = cartobio.table(
 
 export const parcellaireImportPayload = cartobio.table("parcellaire_import_payload", {
   id: varchar("id").primaryKey(),
-  importId: varchar("import_id")
+  importId: integer("import_id")
     .notNull()
     .references(() => parcellairesImport.id, { onDelete: "cascade" }),
   payload: jsonb("payload"),

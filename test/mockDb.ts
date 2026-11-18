@@ -107,6 +107,11 @@ vi.mock('../src/database/database.js', async () => {
       _end: client.end.bind(client),
       _clientQuery: _clientQuery,
       _clientRelease: _clientRelease
+    },
+    db: {
+      $client: {
+        end: vi.fn(async (): Promise<void> => {})
+      }
     }
   }
 })

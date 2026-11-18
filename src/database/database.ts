@@ -11,11 +11,9 @@ pgTypes.setTypeParser(
   (value) => value === null ? null : new Date(value).toISOString().split('T')[0]
 )
 
-const connectionString = config.get('databaseUrl')
-
 // the exported variable will be shared across all imports
-const pool = new Pool({ connectionString })
+const pool = new Pool({ connectionString: config.get('databaseUrl') })
 
-export const db = drizzle({ client: pool })
+export const db = drizzle({ client: new Pool({ connectionString: config.get('drizzleDatabaseUrl') }) })
 
 export default pool

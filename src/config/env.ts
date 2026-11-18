@@ -14,6 +14,7 @@ interface AppConfig {
   host: string
   frontendUrl: string
   databaseUrl: string
+  drizzleDatabaseUrl: string
   testDatabaseName: string
   douanes: {
     baseUrl: string
@@ -80,6 +81,12 @@ const config = convict<AppConfig>({
     default: 'postgresql://docker:docker@localhost:15432/gis',
     format: 'pg-url',
     env: 'DATABASE_URL'
+  },
+  drizzleDatabaseUrl: {
+    sensitive: true,
+    default: 'postgresql://docker:docker@localhost:25432/cartobio',
+    format: 'pg-url',
+    env: 'TARGET_DATABASE_URL'
   },
   testDatabaseName: {
     sensitive: true,

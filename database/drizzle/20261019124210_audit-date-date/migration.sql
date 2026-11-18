@@ -1,0 +1,1 @@
+ALTER TABLE "cartobio"."parcellaires_import" ALTER COLUMN "audit_date" SET DATA TYPE date USING "audit_date"::date;

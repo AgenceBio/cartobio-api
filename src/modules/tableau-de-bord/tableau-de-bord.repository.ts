@@ -1,92 +1,113 @@
-import pool from '../../database/database.js'
+import { and, asc, count, desc, eq, exists, gte, ilike, inArray, lte, or, sql } from 'drizzle-orm'
+import type { SQL } from 'drizzle-orm'
+import { db } from '../../database/database.js'
+import { parcellaireImportLogs, parcellaireImportPayload, parcellairesImport } from '../../database/schema/index.js'
 import { getStreaksSuspectes } from './tableau-de-bord.utils.js'
-import type { DateRange, ErrorByCode, ErrorDetail, HistoriqueParams, PaginationParams } from './tableau-de-bord.utils.js'
-
-type Scalar = string | number | Date | string[] | undefined
+import type {
+  DateRange,
+  ErrorByCode,
+  ErrorDetail,
+  HistoriqueParams,
+  PaginationParams
+} from './tableau-de-bord.utils.js'
 
 type Numeric = string | number | null
 
-interface ImportLogRow {
-  import_id: number
-  numero_bio: string | null
-  parcelle_id: string | null
-  parcelle_name: string | null
-  code: string | null
-  message: string | null
+type StatutJob = (typeof parcellairesImport.statutJob.enumValues)[number]
+type EtatJob = (typeof parcellairesImport.etat.enumValues)[number]
+
+function organismeCondition(organismeCertificateur?: number): SQL {
+  return eq(parcellairesImport.organismeCertificateur, String(organismeCertificateur))
 }
 
-function toNumber (value: unknown): number | null {
-  return value !== null && value !== undefined ? Number(value) : null
+function periodConditions({ from, to }: DateRange): SQL[] {
+  const conditions: SQL[] = []
+
+  if (from) {
+    conditions.push(gte(parcellairesImport.createdAt, new Date(from)))
+  }
+
+  if (to) {
+    conditions.push(lte(parcellairesImport.createdAt, new Date(to)))
+  }
+
+  return conditions
 }
 
-function groupLogsByJobId (logs: ImportLogRow[]): Record<number, ErrorDetail[]> {
+function rechercheCondition(recherche?: string): SQL | undefined {
+  if (!recherche) {
+    return undefined
+  }
+
+  return or(
+    ilike(parcellairesImport.numeroClient, `%${recherche}%`),
+    ilike(parcellairesImport.numeroBio, `%${recherche}%`)
+  )
+}
+
+async function getErrorLogsByJobId(jobIds: number[]): Promise<Record<number, ErrorDetail[]>> {
+  if (jobIds.length === 0) {
+    return {}
+  }
+
+  const logs = await db
+    .select({
+      importId: parcellaireImportLogs.importId,
+      numeroBio: parcellaireImportLogs.numeroBio,
+      parcelleId: parcellaireImportLogs.parcelleId,
+      parcelleName: parcellaireImportLogs.parcelleName,
+      code: parcellaireImportLogs.code,
+      message: parcellaireImportLogs.message
+    })
+    .from(parcellaireImportLogs)
+    .where(and(inArray(parcellaireImportLogs.importId, jobIds), eq(parcellaireImportLogs.type, 'error')))
+    .orderBy(asc(parcellaireImportLogs.id))
+
   const logsByJobId: Record<number, ErrorDetail[]> = {}
 
-  for (const log of logs) {
-    if (!logsByJobId[log.import_id]) {
-      logsByJobId[log.import_id] = []
-    }
-
-    logsByJobId[log.import_id].push({
-      numeroBio: log.numero_bio,
-      parcelleId: log.parcelle_id,
-      parcelleName: log.parcelle_name,
-      code: log.code,
-      message: log.message
-    })
+  for (const { importId, ...detail } of logs) {
+    logsByJobId[importId] ??= []
+    logsByJobId[importId].push(detail)
   }
 
   return logsByJobId
 }
 
-async function getGeneralKpi ({ from, to, organismeCertificateur }: DateRange) {
-  const [bilan, anomalies] = await Promise.all([
-    pool.query<{ totalEnvoyes: Numeric; totalValides: Numeric; totalRejetes: Numeric }>(
-      `
-        SELECT
-          COALESCE(
-            SUM((result_job->>'count')::int),
-            0
-          ) AS "totalEnvoyes",
-          COALESCE(
-            SUM(jsonb_array_length(result_job->'numeroBioValid')),
-            0
-          ) AS "totalValides",
-          COALESCE(
-            SUM(jsonb_array_length(result_job->'numeroBioError')),
-            0
-          ) AS "totalRejetes"
-        FROM parcellaire_import
-        WHERE status = 'DONE'
-          AND created_at >= $1
-          AND created_at <= $2
-          AND organisme_certificateur = $3
-      `,
-      [from, to, organismeCertificateur]
-    ),
+async function getGeneralKpi({ from, to, organismeCertificateur }: DateRange) {
+  const [[bilanRow], [anomalyRow]] = await Promise.all([
+    db
+      .select({
+        totalEnvoyes: sql<Numeric>`COALESCE(SUM((${parcellairesImport.resultJob}->>'count')::int), 0)`,
+        totalValides: sql<Numeric>`COALESCE(SUM(jsonb_array_length(${parcellairesImport.resultJob}->'numeroBioValid')), 0)`,
+        totalRejetes: sql<Numeric>`COALESCE(SUM(jsonb_array_length(${parcellairesImport.resultJob}->'numeroBioError')), 0)`
+      })
+      .from(parcellairesImport)
+      .where(
+        and(
+          eq(parcellairesImport.status, 'DONE'),
+          ...periodConditions({ from, to }),
+          organismeCondition(organismeCertificateur)
+        )
+      ),
 
-    pool.query<{ code: string; count: Numeric }>(
-      `
-        SELECT
-          pil.code,
-          COUNT(*) AS count
-        FROM parcellaire_import_logs pil
-        JOIN parcellaire_import pi
-          ON pi.id = pil.import_id
-        WHERE pil.type = 'error'
-          AND pi.created_at >= $1
-          AND pi.created_at <= $2
-          AND pi.organisme_certificateur = $3
-        GROUP BY pil.code
-        ORDER BY count DESC
-        LIMIT 1
-      `,
-      [from, to, organismeCertificateur]
-    )
+    db
+      .select({
+        code: parcellaireImportLogs.code,
+        count: count()
+      })
+      .from(parcellaireImportLogs)
+      .innerJoin(parcellairesImport, eq(parcellairesImport.id, parcellaireImportLogs.importId))
+      .where(
+        and(
+          eq(parcellaireImportLogs.type, 'error'),
+          ...periodConditions({ from, to }),
+          organismeCondition(organismeCertificateur)
+        )
+      )
+      .groupBy(parcellaireImportLogs.code)
+      .orderBy(desc(count()))
+      .limit(1)
   ])
-
-  const bilanRow = bilan.rows[0]
-  const anomalyRow = anomalies.rows[0]
 
   return {
     totalEnvoyes: Number(bilanRow.totalEnvoyes),
@@ -95,13 +116,13 @@ async function getGeneralKpi ({ from, to, organismeCertificateur }: DateRange) {
     anomaliePlusFrequente: anomalyRow
       ? {
           code: anomalyRow.code,
-          count: Number(anomalyRow.count)
+          count: anomalyRow.count
         }
       : null
   }
 }
 
-async function getTableauBilanRepo ({
+async function getTableauBilanRepo({
   from,
   to,
   organismeCertificateur,
@@ -112,98 +133,47 @@ async function getTableauBilanRepo ({
   etats,
   ordreDate
 }: PaginationParams) {
-  const conditions: string[] = []
-  const params: Scalar[] = []
-  let index = 2
+  const where = and(
+    organismeCondition(organismeCertificateur),
+    ...periodConditions({ from, to }),
+    rechercheCondition(recherche),
+    statuts?.length ? inArray(parcellairesImport.statutJob, statuts as StatutJob[]) : undefined,
+    etats?.length ? inArray(parcellairesImport.etat, etats as EtatJob[]) : undefined
+  )
 
-  conditions.push('pi.organisme_certificateur = $1')
-  params.push(organismeCertificateur)
+  const ordre = ordreDate === 'asc' ? asc : desc
 
-  if (from) {
-    conditions.push(`pi.created_at >= $${index++}`)
-    params.push(from)
-  }
+  const [rows, total] = await Promise.all([
+    db
+      .select({
+        jobId: parcellairesImport.id,
+        numeroClient: parcellairesImport.numeroClient,
+        numeroBio: parcellairesImport.numeroBio,
+        auditDate: parcellairesImport.auditDate,
+        statut: parcellairesImport.statutJob,
+        etat: parcellairesImport.etat,
+        createdAt: parcellairesImport.createdAt
+      })
+      .from(parcellairesImport)
+      .where(where)
+      .orderBy(ordre(parcellairesImport.createdAt))
+      .limit(limit)
+      .offset((page - 1) * limit),
 
-  if (to) {
-    conditions.push(`pi.created_at <= $${index++}`)
-    params.push(to)
-  }
-
-  if (recherche) {
-    conditions.push(
-      `(pi.numeroclient ILIKE $${index} OR pi.numerobio ILIKE $${index})`
-    )
-    params.push(`%${recherche}%`)
-    index++
-  }
-
-  if (statuts && statuts.length > 0) {
-    conditions.push(`pi.statut_job = ANY($${index++})`)
-    params.push(statuts)
-  }
-
-  if (etats && etats.length > 0) {
-    conditions.push(`pi.etat = ANY($${index++})`)
-    params.push(etats)
-  }
-
-  const where =
-    conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
-
-  const limitIndex = index++
-  const offsetIndex = index++
-  const offset = (page - 1) * limit
-  const ordreSql = ordreDate === 'asc' ? 'ASC' : 'DESC'
-
-  const [rows, count] = await Promise.all([
-    pool.query<{ jobId: number; numeroclient: string | null; numerobio: string | null; audit_date: string | null; statut_job: string | null; etat: string; created_at: Date }>(
-      `
-        SELECT
-          pi.id AS "jobId",
-          pi.numeroclient,
-          pi.numerobio,
-          pi.audit_date,
-          pi.statut_job,
-          pi.etat,
-          pi.created_at
-        FROM parcellaire_import pi
-        ${where}
-        ORDER BY pi.created_at ${ordreSql}
-        LIMIT $${limitIndex}
-        OFFSET $${offsetIndex}
-      `,
-      [...params, limit, offset]
-    ),
-
-    pool.query<{ count: Numeric }>(
-      `
-        SELECT COUNT(*) AS count
-        FROM parcellaire_import pi
-        ${where}
-      `,
-      params
-    )
+    db.$count(parcellairesImport, where)
   ])
 
   return {
-    data: rows.rows.map((row) => ({
-      jobId: row.jobId,
-      numeroClient: row.numeroclient,
-      numeroBio: row.numerobio,
-      auditDate: row.audit_date,
-      statut: row.statut_job,
-      etat: row.etat,
-      createdAt: row.created_at
-    })),
+    data: rows,
     meta: {
-      total: Number(count.rows[0].count),
+      total,
       page,
       limit
     }
   }
 }
 
-async function getTableauErreursRepo ({
+async function getTableauErreursRepo({
   from,
   to,
   page,
@@ -213,333 +183,232 @@ async function getTableauErreursRepo ({
   codes,
   organismeCertificateur
 }: PaginationParams) {
-  const conditions = ["pi.statut_job = 'REJECTED'", 'pi.organisme_certificateur = $1']
+  const where = and(
+    eq(parcellairesImport.statutJob, 'REJECTED'),
+    organismeCondition(organismeCertificateur),
+    ...periodConditions({ from, to }),
+    rechercheCondition(recherche),
+    codes?.length
+      ? exists(
+          db
+            .select({ id: parcellaireImportLogs.id })
+            .from(parcellaireImportLogs)
+            .where(
+              and(
+                eq(parcellaireImportLogs.importId, parcellairesImport.id),
+                eq(parcellaireImportLogs.type, 'error'),
+                inArray(parcellaireImportLogs.code, codes)
+              )
+            )
+        )
+      : undefined
+  )
 
-  const params: Scalar[] = [organismeCertificateur]
-  let index = 2
+  const ordre = ordreDate === 'asc' ? asc : desc
 
-  if (from) {
-    conditions.push(`pi.created_at >= $${index++}`)
-    params.push(from)
-  }
+  const [rows, total] = await Promise.all([
+    db
+      .select({
+        jobId: parcellairesImport.id,
+        statut: parcellairesImport.statutJob,
+        etat: parcellairesImport.etat,
+        numeroBio: parcellairesImport.numeroBio,
+        numeroClient: parcellairesImport.numeroClient,
+        auditDate: parcellairesImport.auditDate,
+        createdAt: parcellairesImport.createdAt
+      })
+      .from(parcellairesImport)
+      .where(where)
+      .orderBy(ordre(parcellairesImport.createdAt))
+      .limit(limit)
+      .offset((page - 1) * limit),
 
-  if (to) {
-    conditions.push(`pi.created_at <= $${index++}`)
-    params.push(to)
-  }
-
-  if (recherche) {
-    conditions.push(
-      `(pi.numeroclient ILIKE $${index} OR pi.numerobio ILIKE $${index})`
-    )
-    params.push(`%${recherche}%`)
-    index++
-  }
-
-  if (codes?.length) {
-    conditions.push(
-      `EXISTS (
-        SELECT 1
-        FROM parcellaire_import_logs pil
-        WHERE pil.import_id = pi.id
-          AND pil.type = 'error'
-          AND pil.code = ANY($${index++}::text[])
-      )`
-    )
-    params.push(codes)
-  }
-
-  const where = `WHERE ${conditions.join(' AND ')}`
-  const limitIndex = index++
-  const offsetIndex = index++
-  const offset = (page - 1) * limit
-  const orderSql = ordreDate === 'asc' ? 'ASC' : 'DESC'
-
-  const [rows, count] = await Promise.all([
-    pool.query<{ jobId: number; statut_job: string | null; etat: string; audit_date: string | null; numerobio: string | null; numeroclient: string | null; created_at: Date }>(
-      `
-        SELECT
-          pi.id AS "jobId",
-          pi.statut_job,
-          pi.etat,
-          pi.audit_date,
-          pi.numerobio,
-          pi.numeroclient,
-          pi.created_at
-        FROM parcellaire_import pi
-        ${where}
-        ORDER BY pi.created_at ${orderSql}
-        LIMIT $${limitIndex}
-        OFFSET $${offsetIndex}
-      `,
-      [...params, limit, offset]
-    ),
-
-    pool.query<{ count: Numeric }>(
-      `
-        SELECT COUNT(*) AS count
-        FROM parcellaire_import pi
-        ${where}
-      `,
-      params
-    )
+    db.$count(parcellairesImport, where)
   ])
 
-  const jobIds = rows.rows.map((row) => row.jobId)
-
-  let logsByJobId: Record<number, ErrorDetail[]> = {}
-
-  if (jobIds.length > 0) {
-    const { rows: logs } = await pool.query<ImportLogRow>(
-      `
-        SELECT
-          import_id,
-          numero_bio,
-          parcelle_id,
-          parcelle_name,
-          code,
-          message
-        FROM parcellaire_import_logs
-        WHERE import_id = ANY($1::int[])
-          AND type = 'error'
-        ORDER BY id ASC
-      `,
-      [jobIds]
-    )
-
-    logsByJobId = groupLogsByJobId(logs)
-  }
+  const logsByJobId = await getErrorLogsByJobId(rows.map((row) => row.jobId))
 
   return {
-    data: rows.rows.map((row) => ({
-      jobId: row.jobId,
-      statut: row.statut_job,
-      etat: row.etat,
-      numeroBio: row.numerobio,
-      numeroClient: row.numeroclient,
-      auditDate: row.audit_date,
-      createdAt: row.created_at,
+    data: rows.map((row) => ({
+      ...row,
       details: logsByJobId[row.jobId] ?? []
     })),
     meta: {
-      total: Number(count.rows[0].count),
+      total,
       page,
       limit
     }
   }
 }
 
-async function getHistoriqueSpecificParcellaireRepo ({
+async function getHistoriqueSpecificParcellaireRepo({
   numeroBio,
   numeroClient,
   auditDate,
   organismeCertificateur
 }: HistoriqueParams) {
-  const conditions: string[] = []
-  const params: Scalar[] = []
-  let index = 2
-
-  conditions.push('pi.organisme_certificateur = $1')
-  params.push(organismeCertificateur)
-
-  if (numeroBio) {
-    conditions.push(`pi.numerobio = $${index++}`)
-    params.push(numeroBio)
-  }
-
-  if (numeroClient) {
-    conditions.push(`pi.numeroclient = $${index++}`)
-    params.push(numeroClient)
-  }
-
-  if (auditDate) {
-    conditions.push(`pi.audit_date = $${index++}`)
-    params.push(auditDate)
-  }
-
-  const where =
-    conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
-
-  const { rows } = await pool.query<{ jobId: number; statut_job: string | null; etat: string; created_at: Date }>(
-    `
-      SELECT
-        pi.id AS "jobId",
-        pi.statut_job,
-        pi.etat,
-        pi.created_at
-      FROM parcellaire_import pi
-      ${where}
-      ORDER BY pi.created_at DESC
-    `,
-    params
-  )
+  const rows = await db
+    .select({
+      jobId: parcellairesImport.id,
+      statut: parcellairesImport.statutJob,
+      etat: parcellairesImport.etat,
+      createdAt: parcellairesImport.createdAt
+    })
+    .from(parcellairesImport)
+    .where(
+      and(
+        organismeCondition(organismeCertificateur),
+        numeroBio ? eq(parcellairesImport.numeroBio, numeroBio) : undefined,
+        numeroClient ? eq(parcellairesImport.numeroClient, numeroClient) : undefined,
+        auditDate ? eq(parcellairesImport.auditDate, auditDate) : undefined
+      )
+    )
+    .orderBy(desc(parcellairesImport.createdAt))
 
   const jobIds = rows.map((row) => row.jobId)
 
-  let logsByJobId: Record<number, ErrorDetail[]> = {}
+  const [logsByJobId, payloads] = await Promise.all([
+    getErrorLogsByJobId(jobIds),
+    jobIds.length > 0
+      ? db
+          .select({
+            importId: parcellaireImportPayload.importId,
+            payload: parcellaireImportPayload.payload
+          })
+          .from(parcellaireImportPayload)
+          .where(inArray(parcellaireImportPayload.importId, jobIds))
+      : []
+  ])
+
   const payloadByJobId: Record<number, unknown> = {}
 
-  if (jobIds.length > 0) {
-    const [{ rows: logs }, { rows: payloads }] = await Promise.all([
-      pool.query<ImportLogRow>(
-        `
-            SELECT
-              import_id,
-              numero_bio,
-              parcelle_id,
-              parcelle_name,
-              code,
-              message
-            FROM parcellaire_import_logs
-            WHERE import_id = ANY($1::int[])
-              AND type = 'error'
-            ORDER BY id ASC
-          `,
-        [jobIds]
-      ),
-
-      pool.query<{ import_id: number; payload: unknown }>(
-        `
-            SELECT
-              import_id,
-              payload
-            FROM parcellaire_import_payload
-            WHERE import_id = ANY($1::int[])
-          `,
-        [jobIds]
-      )
-    ])
-
-    logsByJobId = groupLogsByJobId(logs)
-
-    for (const payload of payloads) {
-      payloadByJobId[payload.import_id] = payload.payload
-    }
+  for (const { importId, payload } of payloads) {
+    payloadByJobId[importId] = payload
   }
 
   return rows.map((row) => ({
-    jobId: row.jobId,
-    statut: row.statut_job,
-    etat: row.etat,
-    createdAt: row.created_at,
+    ...row,
     payload: payloadByJobId[row.jobId] ?? null,
     erreurs: logsByJobId[row.jobId] ?? []
   }))
 }
 
-function getTruncate (from: string, to: string): 'day' | 'week' {
-  const diffInDays =
-    (new Date(to).getTime() - new Date(from).getTime()) / (1000 * 60 * 60 * 24)
+function getTruncate(from: string, to: string): 'day' | 'week' {
+  const diffInDays = (new Date(to).getTime() - new Date(from).getTime()) / (1000 * 60 * 60 * 24)
 
   return diffInDays <= 7 ? 'day' : 'week'
 }
 
-async function getTopAnomaliesRepo ({ from, to, organismeCertificateur }: DateRange) {
+async function getTopAnomaliesRepo({ from, to, organismeCertificateur }: DateRange) {
   if (!from || !to) {
     return []
   }
 
-  const truncate = getTruncate(from, to)
-
-  const { rows } = await pool.query<{ period: Date; code: string | null; count: Numeric }>(
-    `
-      SELECT
-        date_trunc('${truncate}', pi.created_at) AS period,
-        pil.code,
-        COUNT(*) AS count
-      FROM parcellaire_import_logs pil
-      INNER JOIN parcellaire_import pi
-        ON pi.id = pil.import_id
-      WHERE pil.type = 'error'
-        AND pi.created_at >= $1
-        AND pi.created_at <= $2
-        AND pi.organisme_certificateur = $3
-      GROUP BY period, pil.code
-      ORDER BY period, count DESC
-    `,
-    [from, to, organismeCertificateur]
+  const period = sql<Date>`date_trunc(${sql.raw(`'${getTruncate(from, to)}'`)}, ${parcellairesImport.createdAt})`.mapWith(
+    parcellairesImport.createdAt
   )
 
-  return rows.map((row) => ({
-    period: row.period,
-    code: row.code,
-    count: toNumber(row.count)
-  }))
+  const rows = await db
+    .select({
+      period,
+      code: parcellaireImportLogs.code,
+      count: count()
+    })
+    .from(parcellaireImportLogs)
+    .innerJoin(parcellairesImport, eq(parcellairesImport.id, parcellaireImportLogs.importId))
+    .where(
+      and(
+        eq(parcellaireImportLogs.type, 'error'),
+        ...periodConditions({ from, to }),
+        organismeCondition(organismeCertificateur)
+      )
+    )
+    .groupBy(period, parcellaireImportLogs.code)
+    .orderBy(period, desc(count()))
+
+  return rows
 }
 
-async function getTopAnomaliesGroupedRepo ({ from, to, organismeCertificateur }: DateRange) {
+async function getTopAnomaliesGroupedRepo({ from, to, organismeCertificateur }: DateRange) {
   if (!from || !to) {
     return []
   }
 
   const truncate = getTruncate(from, to)
+  const unit = sql.raw(`'${truncate}'`)
+  const interval = sql.raw(truncate === 'day' ? "'1 day'" : "'1 week'")
+  const periodOfImport = sql<Date>`date_trunc(${unit}, ${parcellairesImport.createdAt})`
 
-  const interval = truncate === 'day' ? '1 day' : '1 week'
+  const periodsCte = db
+    .$with('periods')
+    .as(
+      db
+        .select({ period: sql<Date>`period`.mapWith(parcellairesImport.createdAt).as('period') })
+        .from(
+          sql`generate_series(date_trunc(${unit}, ${from}::timestamptz), date_trunc(${unit}, ${to}::timestamptz), ${interval}::interval) AS period`
+        )
+    )
 
-  const { rows } = await pool.query<{ period: Date; accepted: Numeric; refused: Numeric; code: string | null; error_count: Numeric }>(
-    `
-      WITH periods AS (
-        SELECT generate_series(
-          date_trunc('${truncate}', $1::timestamptz),
-          date_trunc('${truncate}', $2::timestamptz),
-          '${interval}'::interval
-        ) AS period
-      ),
-
-      import_stats AS (
-        SELECT
-          date_trunc('${truncate}', pi.created_at) AS period,
-          COUNT(*) FILTER (
-            WHERE pi.statut_job = 'VALID'
-          ) AS accepted,
-          COUNT(*) FILTER (
-            WHERE pi.statut_job IN ('REJECTED', 'ERROR')
-          ) AS refused
-        FROM parcellaire_import pi
-        WHERE pi.created_at >= $1
-          AND pi.created_at <= $2
-          AND pi.organisme_certificateur = $3
-        GROUP BY 1
-      ),
-
-      error_stats AS (
-        SELECT
-          date_trunc('${truncate}', pi.created_at) AS period,
-          pil.code,
-          COUNT(*) AS count
-        FROM parcellaire_import_logs pil
-        INNER JOIN parcellaire_import pi
-          ON pi.id = pil.import_id
-        WHERE pil.type = 'error'
-          AND pi.created_at >= $1
-          AND pi.created_at <= $2
-          AND pi.organisme_certificateur = $3
-        GROUP BY 1, 2
-      )
-
-      SELECT
-        periods.period,
-        COALESCE(import_stats.accepted, 0) AS accepted,
-        COALESCE(import_stats.refused, 0) AS refused,
-        error_stats.code,
-        COALESCE(error_stats.count, 0) AS error_count
-      FROM periods
-      LEFT JOIN import_stats
-        ON import_stats.period = periods.period
-      LEFT JOIN error_stats
-        ON error_stats.period = periods.period
-      ORDER BY periods.period ASC, error_count DESC
-    `,
-    [from, to, organismeCertificateur]
+  const importStats = db.$with('import_stats').as(
+    db
+      .select({
+        period: periodOfImport.as('period'),
+        accepted: sql<number>`COUNT(*) FILTER (WHERE ${eq(parcellairesImport.statutJob, 'VALID')})`.as('accepted'),
+        refused:
+          sql<number>`COUNT(*) FILTER (WHERE ${inArray(parcellairesImport.statutJob, ['REJECTED', 'ERROR'])})`.as(
+            'refused'
+          )
+      })
+      .from(parcellairesImport)
+      .where(and(...periodConditions({ from, to }), organismeCondition(organismeCertificateur)))
+      .groupBy(periodOfImport)
   )
 
-  const periods = new Map<string, {
-    period: Date
-    accepted: number | null
-    refused: number | null
-    errorCount: number
-    errors: ErrorByCode[]
-  }>()
+  const errorStats = db.$with('error_stats').as(
+    db
+      .select({
+        period: periodOfImport.as('period'),
+        code: parcellaireImportLogs.code,
+        count: count().as('count')
+      })
+      .from(parcellaireImportLogs)
+      .innerJoin(parcellairesImport, eq(parcellairesImport.id, parcellaireImportLogs.importId))
+      .where(
+        and(
+          eq(parcellaireImportLogs.type, 'error'),
+          ...periodConditions({ from, to }),
+          organismeCondition(organismeCertificateur)
+        )
+      )
+      .groupBy(periodOfImport, parcellaireImportLogs.code)
+  )
+
+  const errorCount = sql<number>`COALESCE(${errorStats.count}, 0)`.mapWith(Number)
+
+  const rows = await db
+    .with(periodsCte, importStats, errorStats)
+    .select({
+      period: periodsCte.period,
+      accepted: sql<number>`COALESCE(${importStats.accepted}, 0)`.mapWith(Number),
+      refused: sql<number>`COALESCE(${importStats.refused}, 0)`.mapWith(Number),
+      code: errorStats.code,
+      errorCount
+    })
+    .from(periodsCte)
+    .leftJoin(importStats, eq(importStats.period, periodsCte.period))
+    .leftJoin(errorStats, eq(errorStats.period, periodsCte.period))
+    .orderBy(asc(periodsCte.period), desc(errorCount))
+
+  const periods = new Map<
+    string,
+    {
+      period: Date
+      accepted: number | null
+      refused: number | null
+      errorCount: number
+      errors: ErrorByCode[]
+    }
+  >()
 
   for (const row of rows) {
     const key = new Date(row.period).toISOString()
@@ -547,8 +416,8 @@ async function getTopAnomaliesGroupedRepo ({ from, to, organismeCertificateur }:
     if (!periods.has(key)) {
       periods.set(key, {
         period: row.period,
-        accepted: toNumber(row.accepted),
-        refused: toNumber(row.refused),
+        accepted: row.accepted,
+        refused: row.refused,
         errorCount: 0,
         errors: []
       })
@@ -560,22 +429,20 @@ async function getTopAnomaliesGroupedRepo ({ from, to, organismeCertificateur }:
       continue
     }
 
-    const count = toNumber(row.error_count)
-
     if (row.code) {
       currentPeriod.errors.push({
         code: row.code,
-        count
+        count: row.errorCount
       })
 
-      currentPeriod.errorCount += count ?? 0
+      currentPeriod.errorCount += row.errorCount
     }
   }
 
   return Array.from(periods.values())
 }
 
-async function getEnvoisSuspectsRepo ({
+async function getEnvoisSuspectsRepo({
   from,
   to,
   page,
@@ -584,105 +451,63 @@ async function getEnvoisSuspectsRepo ({
   type,
   organismeCertificateur
 }: PaginationParams) {
-  const conditions: string[] = []
-  const params: Scalar[] = []
-  let index = 2
-
-  conditions.push('pi.organisme_certificateur = $1')
-  params.push(organismeCertificateur)
-
-  if (from) {
-    conditions.push(`pi.created_at >= $${index++}`)
-    params.push(from)
-  }
-
-  if (to) {
-    conditions.push(`pi.created_at <= $${index++}`)
-    params.push(to)
-  }
-
-  if (recherche) {
-    conditions.push(
-      `(pi.numeroclient ILIKE $${index} OR pi.numerobio ILIKE $${index})`
+  const rows = await db
+    .select({
+      jobId: parcellairesImport.id,
+      numeroBio: parcellairesImport.numeroBio,
+      numeroClient: parcellairesImport.numeroClient,
+      auditDate: parcellairesImport.auditDate,
+      statut: parcellairesImport.statutJob,
+      etat: parcellairesImport.etat,
+      createdAt: parcellairesImport.createdAt
+    })
+    .from(parcellairesImport)
+    .where(
+      and(organismeCondition(organismeCertificateur), ...periodConditions({ from, to }), rechercheCondition(recherche))
     )
-    params.push(`%${recherche}%`)
-    index++
-  }
-
-  const where =
-    conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
-
-  const { rows } = await pool.query<{ jobId: number; numerobio: string | null; numeroclient: string | null; audit_date: string | null; statut_job: string | null; etat: string; created_at: Date }>(
-    `
-    SELECT
-      pi.id AS "jobId",
-      pi.numerobio,
-      pi.numeroclient,
-      pi.audit_date,
-      pi.statut_job,
-      pi.etat,
-      pi.created_at
-    FROM parcellaire_import pi
-    ${where}
-    ORDER BY
-      pi.numerobio,
-      pi.numeroclient,
-      pi.audit_date,
-      pi.created_at ASC
-    `,
-    params
-  )
-
-  const jobIds = rows.map((row) => row.jobId)
-
-  let logsByJobId: Record<number, ErrorDetail[]> = {}
-
-  if (jobIds.length > 0) {
-    const { rows: logs } = await pool.query<ImportLogRow>(
-      `
-      SELECT
-        import_id,
-        numero_bio,
-        parcelle_id,
-        parcelle_name,
-        code,
-        message
-      FROM parcellaire_import_logs
-      WHERE import_id = ANY($1::int[])
-        AND type = 'error'
-      ORDER BY id ASC
-      `,
-      [jobIds]
+    .orderBy(
+      parcellairesImport.numeroBio,
+      parcellairesImport.numeroClient,
+      parcellairesImport.auditDate,
+      asc(parcellairesImport.createdAt)
     )
 
-    logsByJobId = groupLogsByJobId(logs)
-  }
+  const logsByJobId = await getErrorLogsByJobId(rows.map((row) => row.jobId))
 
   type Envoi = { jobId: number; statut: string | null; etat: string; createdAt: Date; erreurs: ErrorDetail[] }
-  const groupes = new Map<string, { numeroBio: string | null; numeroClient: string | null; auditDate: string | null; envois: Envoi[] }>()
+  const groupes = new Map<
+    string,
+    { numeroBio: string | null; numeroClient: string | null; auditDate: string | null; envois: Envoi[] }
+  >()
 
   for (const row of rows) {
-    const key = `${row.numerobio}|${row.numeroclient}|${row.audit_date}`
+    const key = `${row.numeroBio}|${row.numeroClient}|${row.auditDate}`
 
     if (!groupes.has(key)) {
       groupes.set(key, {
-        numeroBio: row.numerobio,
-        numeroClient: row.numeroclient,
-        auditDate: row.audit_date,
+        numeroBio: row.numeroBio,
+        numeroClient: row.numeroClient,
+        auditDate: row.auditDate,
         envois: []
       })
     }
 
     groupes.get(key)?.envois.push({
       jobId: row.jobId,
-      statut: row.statut_job,
+      statut: row.statut,
       etat: row.etat,
-      createdAt: row.created_at,
+      createdAt: row.createdAt,
       erreurs: logsByJobId[row.jobId] ?? []
     })
   }
 
-  const alertes: Array<{ numeroBio: string | null; numeroClient: string | null; auditDate: string | null; type: 'envois' | 'refus'; envois: Envoi[] }> = []
+  const alertes: Array<{
+    numeroBio: string | null
+    numeroClient: string | null
+    auditDate: string | null
+    type: 'envois' | 'refus'
+    envois: Envoi[]
+  }> = []
 
   for (const groupe of groupes.values()) {
     for (const streak of getStreaksSuspectes(groupe.envois)) {
