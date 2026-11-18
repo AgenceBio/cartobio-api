@@ -1,21 +1,38 @@
-import pool from '../../database/database.js'
+import { and, count, eq, gte, inArray, lte, sql } from 'drizzle-orm'
+import { db } from '../../database/database.js'
+import { organismeCertificateur, parcellairesImport } from '../../database/schema/index.js'
+import type { DestinataireRapport, StatsOrganisme } from './types.js'
 
-async function getStatsByOrganisme (organismeCertificateur: string, start: Date | string, end: Date | string): Promise<{ totalrecu: string; totalacceptes: string; totalrefuses: string; organismeCertificateur: string } | null> {
-  const query = `
-    SELECT
-      organisme_certificateur AS organismeCertificateur,
-      SUM(nb_objets_recu)     AS totalRecu,
-      SUM(nb_objets_acceptes) AS totalAcceptes,
-      SUM(nb_objets_refuses)  AS totalRefuses
-    FROM parcellaire_import
-    WHERE organisme_certificateur = $1
-      AND ended_at >= $2
-      AND ended_at <= $3
+async function getStatsByOrganisme(organisme: string, start: Date, end: Date): Promise<StatsOrganisme | null> {
+  const [stats] = await db
+    .select({
+      organismeCertificateur: parcellairesImport.organismeCertificateur,
+      totalRecu: count(),
+      totalAcceptes: sql<number>`COUNT(*) FILTER (WHERE ${eq(parcellairesImport.statutJob, 'VALID')})`.mapWith(Number),
+      totalRefuses: sql<number>`COUNT(*) FILTER (WHERE ${inArray(parcellairesImport.statutJob, ['REJECTED', 'ERROR'])})`.mapWith(Number)
+    })
+    .from(parcellairesImport)
+    .where(
+      and(
+        eq(parcellairesImport.organismeCertificateur, organisme),
+        gte(parcellairesImport.endedAt, start),
+        lte(parcellairesImport.endedAt, end)
+      )
+    )
+    .groupBy(parcellairesImport.organismeCertificateur)
 
-    GROUP BY organisme_certificateur
-  `
-  const result = await pool.query(query, [organismeCertificateur, start, end])
-  return result.rows[0] ?? null
+  return stats ?? null
 }
 
-export { getStatsByOrganisme }
+async function getDestinatairesRapport(): Promise<DestinataireRapport[]> {
+  return db
+    .select({
+      id: organismeCertificateur.id,
+      label: organismeCertificateur.label,
+      email: sql<string>`UNNEST(${organismeCertificateur.email})`
+    })
+    .from(organismeCertificateur)
+    .where(eq(organismeCertificateur.active, true))
+}
+
+export { getStatsByOrganisme, getDestinatairesRapport }

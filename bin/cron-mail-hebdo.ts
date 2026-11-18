@@ -1,16 +1,12 @@
 #!/usr/bin/env node
 
 import { sendRapportHebdo } from '../src/services/mailer/utils.js'
-import pool from '../src/database/database.js'
+import { getDestinatairesRapport } from '../src/services/mailer/repository.js'
 
 async function sendMail (): Promise<void> {
-  const { rows: ocList } = await pool.query(`
-      SELECT id, label, UNNEST(emails) AS email
-      FROM organisme_certificateur
-      WHERE active = true
-    `)
+  const ocList = await getDestinatairesRapport()
 
-  if (!ocList) {
+  if (!ocList.length) {
     console.error('Aucun organisme certificateur')
     process.exit(1)
   }
