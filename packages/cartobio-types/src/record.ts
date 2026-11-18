@@ -23,7 +23,7 @@ export type NormalizedRecord = Omit<
     audit_notes?: string | null;
     annee_reference_controle?: number | null;
     certification_state?: string;
-    lastmixitestate?: string;
+    lastmixitestate?: string | null;
 };
 
 export type NormalizedRecordSummary = Omit<NormalizedRecord, "parcelles"> & {

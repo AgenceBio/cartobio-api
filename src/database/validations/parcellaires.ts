@@ -1,6 +1,11 @@
 import { createInsertSchema, createUpdateSchema } from 'drizzle-orm/zod';
 import { z } from 'zod';
+import { certificationType } from '../schema/enums.js';
 import { parcellaires } from '../schema/parcellaires.js';
+
+export const certificationEtatEnumSchema = z.enum(certificationType.enumValues);
+
+export type CertificationEtat = z.infer<typeof certificationEtatEnumSchema>;
 
 const emptyStringToNull = <T extends z.ZodTypeAny>(schema: T) =>
   z.preprocess((value) => (value === '' ? null : value), schema.nullable());

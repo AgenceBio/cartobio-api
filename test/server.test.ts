@@ -6,7 +6,9 @@ import { createSigner } from 'fast-jwt'
 import { got, HTTPError, TimeoutError } from './got-mock.js'
 import fs from 'node:fs'
 import { join } from 'node:path'
-import db from '../src/database/database.js'
+import db, { db as drizzleDb } from '../src/database/database.js'
+import { organismeCertificateur, parcellaires } from '../src/database/schema/index.js'
+import { eq } from 'drizzle-orm'
 
 import agencebioOperator from './fixtures/providers/agence-bio-operateur.json' with { type: 'json' }
 import _records from './fixtures/providers/records.json' with { type: 'json' }
@@ -25,7 +27,7 @@ import {
   createImportJob,
   processFullJob
 } from '../src/modules/imports/imports.service.js'
-import { loadRecordFixture, expectDeepCloseTo } from './utils.js'
+import { loadParcellairesFixture, loadRecordFixture, expectDeepCloseTo } from './utils.js'
 import { asAgenceBioOperator, asDBRecordWithParcelles, asMockedDatabase } from './factories.js'
 
 const sign = createSigner({ key: config.get('jwtSecret') })
@@ -232,7 +234,10 @@ describe('GET /api/v2/certification/parcellaire/:numeroBio', () => {
   const postMock = vi.mocked(got.post)
   const getMock = vi.mocked(got.get)
 
-  beforeEach(() => loadRecordFixture())
+  beforeEach(async () => {
+    await loadRecordFixture()
+    await loadParcellairesFixture()
+  })
   afterEach(() => {
     postMock.mockReset()
     getMock.mockReset()
@@ -874,7 +879,7 @@ describe('GET /api/v2/certification/search', () => {
   }
 
   describe('with search', () => {
-    beforeEach(() => loadRecordFixture())
+    beforeEach(() => loadParcellairesFixture())
     beforeEach(() => mockResultsOrder({ nbTotal: 1, operateurs: [{ ...agencebioOperator, siret: '12345678912345' }] }))
     afterEach(() => getMock.mockReset())
 
@@ -1214,6 +1219,7 @@ describe('GET /api/v2/certification/parcellaires', () => {
       }
     })
     await loadRecordFixture()
+    await loadParcellairesFixture()
   })
   afterEach(() => postMock.mockReset())
 
@@ -1247,6 +1253,8 @@ describe('GET /api/v2/certification/parcellaires', () => {
     await db.query(`
       UPDATE cartobio_operators SET oc_id = '1' WHERE numerobio = '99999';
     `)
+    await drizzleDb.insert(organismeCertificateur).values({ id: '1', label: 'OC 1' }).onConflictDoNothing()
+    await drizzleDb.update(parcellaires).set({ ocId: '1' }).where(eq(parcellaires.numeroBio, 99999))
     const res = await request(app.server)
       .get('/api/v2/certification/parcellaires')
       .set('Authorization', OTHER_OC_AUTH_TOKEN)

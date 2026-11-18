@@ -1,6 +1,7 @@
 import { normalizeOperator, applyOperatorTextSearch } from '../../src/shared/outputs/operator.js'
 import { getFilterData, addRecordData } from '../../src/modules/operators/operators.repository.js'
-import pool from '../../src/database/database.js'
+import { db } from '../../src/database/database.js'
+import { parcellaires } from '../../src/database/schema/index.js'
 
 import { buildAdresse, buildAgenceBioOperator, buildNotification } from '../factories.js'
 
@@ -138,10 +139,9 @@ describe('populateWithRecords()', () => {
   const operators = [normalizedOperator]
 
   it('should expand an AgenceBioOperator with a matching database value', async () => {
-    await pool.query(
-      'INSERT INTO cartobio_operators (numerobio, certification_state, version_name, annee_reference_controle) VALUES ($1, $2, $3, $4)',
-      ['34857', 'OPERATOR_DRAFT', 'v1', 2001]
-    )
+    await db
+      .insert(parcellaires)
+      .values({ numeroBio: 34857, certificationEtat: 'OPERATOR_DRAFT', versionNom: 'v1', anneeReferenceControle: 2001 })
 
     const result = await getFilterData(operators, false)
 

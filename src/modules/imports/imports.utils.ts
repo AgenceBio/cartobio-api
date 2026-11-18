@@ -7,9 +7,9 @@ import {
   parcellaireImportPayload,
   parcellaires,
   parcellairesEvenements,
-  parcellaireImport,
-  parcellairesMetadata
+  parcellaireImport
 } from '../../database/schema/index.js'
+import { recordMetadata } from '../../shared/parcellaires/parcellaires.utils.js'
 import type { ImportJobListRow, OperatorRecordFilters } from './imports.types.js'
 
 export const importJobColumns = {
@@ -46,14 +46,7 @@ export const operatorRecordColumns = {
   updated_at: sql<string>`${parcellaires.updatedAt}`,
   oc_id: sql<number | null>`${parcellaires.ocId}`.mapWith(Number),
   oc_label: organismeCertificateur.label,
-  metadata: sql<Record<string, unknown>>`jsonb_strip_nulls(jsonb_build_object(
-    'source', ${parcellairesMetadata.source},
-    'sourceLastUpdate', ${parcellairesMetadata.sourceUpdatedAt},
-    'provenance', ${parcellairesMetadata.provenance},
-    'campagne', ${parcellairesMetadata.campagne}::text,
-    'pacage', ${parcellairesMetadata.numeroPacage},
-    'anneeAssolement', ${parcellairesMetadata.anneeAssolement}::text
-  ))`,
+  metadata: recordMetadata,
   audit_date: parcellaires.auditDate,
   audit_history: sql<HistoryEntry[]>`COALESCE((
     SELECT json_agg(json_strip_nulls(json_build_object(

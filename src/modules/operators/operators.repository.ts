@@ -1,56 +1,105 @@
-import pool from '../../database/database.js'
-import type { AgenceBioNormalizedOperator, AgenceBioNormalizedOperatorWithRecord, AgenceBioNormalizedOperatorWithFilterData } from '@agencebio/cartobio-types'
+import { and, desc, eq, inArray, isNull, max, sql } from 'drizzle-orm'
+import type { AgenceBioNormalizedOperator, AgenceBioNormalizedOperatorWithFilterData } from '@agencebio/cartobio-types'
+import { db } from '../../database/database.js'
+import {
+  importPac,
+  operateursConsultes,
+  operateursEpingles,
+  parcellaires,
+  parcellairesEvenements,
+  parcellairesMetadata
+} from '../../database/schema/index.js'
+import { createOperateurConsulteSchema, createOperateurEpingleSchema } from '../../database/validations/activites.js'
+import { updateImportPacSchema } from '../../database/validations/imports.js'
+import { certificationEtatEnumSchema } from '../../database/validations/parcellaires.js'
+import { recordMetadata } from '../../shared/parcellaires/parcellaires.utils.js'
+import type { SQL } from 'drizzle-orm'
+import { numerosBioEntiers } from './operators.utils.js'
+import type { DashboardStateRow, ImportPacRow, NumeroBio, OperatorRecordRow, OperatorWithRecordData } from './operators.types.js'
 
-const recordFields = /* sqlFragment */ `certification_state,audit_date,certification_date_debut,created_at,numerobio, metadata,record_id,updated_at,annee_reference_controle,version_name, (audit_history->jsonb_array_length(audit_history) - 1)->>'user' AS user `
+const dateReference = sql`COALESCE(${parcellaires.certificationDateDebut}, ${parcellaires.auditDate}, ${parcellaires.createdAt})`
+
+const recordFields = {
+  certification_state: parcellaires.certificationEtat,
+  audit_date: parcellaires.auditDate,
+  certification_date_debut: parcellaires.certificationDateDebut,
+  created_at: parcellaires.createdAt,
+  numerobio: sql<string>`${parcellaires.numeroBio}::text`,
+  metadata: recordMetadata,
+  record_id: parcellaires.recordId,
+  updated_at: parcellaires.updatedAt,
+  annee_reference_controle: parcellaires.anneeReferenceControle,
+  version_name: parcellaires.versionNom,
+  user_id: sql<string | null>`(
+    SELECT ${parcellairesEvenements.userId}
+    FROM ${parcellairesEvenements}
+    WHERE ${eq(parcellairesEvenements.recordId, parcellaires.recordId)}
+    ORDER BY ${parcellairesEvenements.date} DESC
+    LIMIT 1
+  )`,
+  user_role: sql<string | null>`(
+    SELECT ${parcellairesEvenements.userRole}
+    FROM ${parcellairesEvenements}
+    WHERE ${eq(parcellairesEvenements.recordId, parcellaires.recordId)}
+    ORDER BY ${parcellairesEvenements.date} DESC
+    LIMIT 1
+  )`
+}
 
 async function getFilterData (operators: AgenceBioNormalizedOperator[], mixite = false): Promise<AgenceBioNormalizedOperatorWithFilterData[]> {
   operators = operators.sort((a, b) => (+a.numeroBio - +b.numeroBio))
-  const ids = operators.map(({ numeroBio }) => String(numeroBio))
+  const ids = numerosBioEntiers(operators.map(({ numeroBio }) => numeroBio))
 
   if (ids.length === 0) {
     return []
   }
 
-  const CTE: string[] = []
-  const select: string[] = []
+  const allParcellaire = db.$with('all_parcellaire').as(
+    db
+      .select({
+        numerobio: sql<string>`${parcellaires.numeroBio}::text`.as('numerobio'),
+        states: sql<Array<{ certification_state: string; annee_reference_controle: number }>>`JSON_AGG(JSON_BUILD_OBJECT('certification_state', ${parcellaires.certificationEtat}, 'annee_reference_controle', ${parcellaires.anneeReferenceControle}))`.as('states'),
+        list_oc_id: sql<number[]>`JSON_AGG(${parcellaires.ocId}::int)`.as('list_oc_id'),
+        max_audit_date: max(parcellaires.auditDate).as('max_audit_date')
+      })
+      .from(parcellaires)
+      .where(and(inArray(parcellaires.numeroBio, ids), isNull(parcellaires.deletedAt)))
+      .groupBy(parcellaires.numeroBio)
+  )
 
-  if (mixite === true) {
-    CTE.push(`last_certified_parcelle AS (
-    SELECT DISTINCT ON (numerobio) numerobio, certification_date_debut AS lastCertifiedDate, mixite as lastMixiteState
-    FROM cartobio_operators
-    WHERE numerobio = ANY ($1)
-      AND certification_state = 'CERTIFIED'
-      AND deleted_at IS NULL
-    ORDER BY numerobio, certification_date_debut DESC NULLS LAST
-    )`)
-    select.push('last_certified_parcelle.lastMixiteState')
-  }
+  const lastCertifiedParcelle = db.$with('last_certified_parcelle').as(
+    db
+      .selectDistinctOn([parcellaires.numeroBio], {
+        numerobio: sql<string>`${parcellaires.numeroBio}::text`.as('numerobio'),
+        lastmixitestate: parcellaires.mixite
+      })
+      .from(parcellaires)
+      .where(and(
+        inArray(parcellaires.numeroBio, ids),
+        eq(parcellaires.certificationEtat, certificationEtatEnumSchema.enum.CERTIFIED),
+        isNull(parcellaires.deletedAt)
+      ))
+      .orderBy(parcellaires.numeroBio, sql`${parcellaires.certificationDateDebut} DESC NULLS LAST`)
+  )
 
-  CTE.push(`all_parcellaire AS (
-  SELECT numerobio,
-  JSON_AGG(JSON_BUILD_OBJECT('certification_state', certification_state, 'annee_reference_controle', annee_reference_controle)) as states,
-  JSON_AGG(oc_id) as list_oc_id,
-  MAX(audit_date) as max_audit_date
-  FROM cartobio_operators
-  WHERE numerobio = ANY ($1)
-  AND deleted_at IS NULL
-  GROUP BY numerobio
-  )`)
-  select.push(' all_parcellaire.numerobio')
-  select.push('all_parcellaire.states')
-  select.push('all_parcellaire.list_oc_id')
-  select.push('all_parcellaire.max_audit_date')
-  const { rows } = await pool
-    .query(/* sql */`
-WITH
-  ${CTE.join(',')}
-SELECT
-  ${select.join(',')}
-FROM all_parcellaire
-  ${mixite === true ? 'LEFT JOIN last_certified_parcelle ON all_parcellaire.numerobio = last_certified_parcelle.numerobio' : ''}
-ORDER BY all_parcellaire.numerobio::bigint ASC
-`,
-    [ids])
+  const rows: Array<Partial<AgenceBioNormalizedOperatorWithFilterData> & { numerobio: string }> = mixite
+    ? await db
+      .with(allParcellaire, lastCertifiedParcelle)
+      .select({
+        lastmixitestate: lastCertifiedParcelle.lastmixitestate,
+        numerobio: allParcellaire.numerobio,
+        states: allParcellaire.states,
+        list_oc_id: allParcellaire.list_oc_id,
+        max_audit_date: allParcellaire.max_audit_date
+      })
+      .from(allParcellaire)
+      .leftJoin(lastCertifiedParcelle, eq(allParcellaire.numerobio, lastCertifiedParcelle.numerobio))
+      .orderBy(sql`${allParcellaire.numerobio}::bigint ASC`)
+    : await db
+      .with(allParcellaire)
+      .select()
+      .from(allParcellaire)
+      .orderBy(sql`${allParcellaire.numerobio}::bigint ASC`)
 
   const res: AgenceBioNormalizedOperatorWithFilterData[] = []
   let j = 0
@@ -78,56 +127,55 @@ ORDER BY all_parcellaire.numerobio::bigint ASC
   return res
 }
 
-async function addRecordData (operateur: AgenceBioNormalizedOperator): Promise<AgenceBioNormalizedOperatorWithRecord> {
-  const { rows } = await pool
-    .query(/* sql */`
-WITH latest_by_state AS (
-    SELECT DISTINCT ON (numerobio) *
-    FROM cartobio_operators
-    WHERE numerobio = $1
-      AND deleted_at IS NULL
-      AND certification_state IN ('AUDITED', 'PENDING_CERTIFICATION', 'CERTIFIED')
-    ORDER BY numerobio, COALESCE(certification_date_debut, audit_date, created_at) DESC
-),
-latest_global AS (
-    SELECT DISTINCT ON (numerobio) *
-    FROM cartobio_operators
-    WHERE numerobio = $1
-      AND deleted_at IS NULL
-    ORDER BY numerobio, COALESCE(certification_date_debut, audit_date, created_at) DESC
-),
-last_certified_parcelle AS (
-    SELECT DISTINCT ON (numerobio) numerobio, annee_reference_controle AS lastCertifiedDate, mixite as lastMixiteState
-    FROM cartobio_operators
-    WHERE numerobio = $1
-      AND certification_state = 'CERTIFIED'
-      AND deleted_at IS NULL
-    ORDER BY numerobio, certification_date_debut DESC NULLS LAST
-)
-SELECT
-    combined_results.*,
-    last_certified_parcelle.lastCertifiedDate,
-    last_certified_parcelle.lastMixiteState
-FROM (
-    SELECT ${recordFields} FROM latest_by_state
-    UNION
-    SELECT ${recordFields} FROM latest_global
-) AS combined_results
-LEFT JOIN last_certified_parcelle ON combined_results.numerobio = last_certified_parcelle.numerobio
-ORDER BY combined_results.numerobio, COALESCE(combined_results.certification_date_debut, combined_results.audit_date, combined_results.created_at) DESC;
-    `,
-    [operateur.numeroBio])
+async function addRecordData (operateur: AgenceBioNormalizedOperator): Promise<OperatorWithRecordData> {
+  const [numeroBio] = numerosBioEntiers([operateur.numeroBio])
 
-  const matchingRows = rows.filter(({ numerobio }) => numerobio === String(operateur.numeroBio))
+  if (numeroBio === undefined) {
+    return { ...operateur, metadata: {} }
+  }
 
-  if (!Array.isArray(matchingRows) || matchingRows.length === 0) {
+  const operateurRecords = and(eq(parcellaires.numeroBio, numeroBio), isNull(parcellaires.deletedAt))
+
+  const latestRecord = (...conditions: SQL[]): Promise<OperatorRecordRow[]> => db
+    .select(recordFields)
+    .from(parcellaires)
+    .leftJoin(parcellairesMetadata, eq(parcellairesMetadata.recordId, parcellaires.recordId))
+    .where(and(operateurRecords, ...conditions))
+    .orderBy(desc(dateReference))
+    .limit(1)
+
+  const [latestByState, latestGlobal, [lastCertifiedParcelle]] = await Promise.all([
+    latestRecord(inArray(parcellaires.certificationEtat, [certificationEtatEnumSchema.enum.AUDITED, certificationEtatEnumSchema.enum.PENDING_CERTIFICATION, certificationEtatEnumSchema.enum.CERTIFIED])),
+    latestRecord(),
+    db
+      .select({
+        lastcertifieddate: parcellaires.anneeReferenceControle,
+        lastmixitestate: parcellaires.mixite
+      })
+      .from(parcellaires)
+      .where(and(operateurRecords, eq(parcellaires.certificationEtat, certificationEtatEnumSchema.enum.CERTIFIED)))
+      .orderBy(sql`${parcellaires.certificationDateDebut} DESC NULLS LAST`)
+      .limit(1)
+  ])
+
+  const matchingRows = [...latestByState, ...latestGlobal]
+    .filter((row, index, all) => all.findIndex(({ record_id: recordId }) => recordId === row.record_id) === index)
+    .map((row) => ({
+      ...row,
+      created_at: row.created_at.toISOString(),
+      updated_at: row.updated_at.toISOString(),
+      lastcertifieddate: lastCertifiedParcelle?.lastcertifieddate ?? null,
+      lastmixitestate: lastCertifiedParcelle?.lastmixitestate ?? null
+    }))
+
+  if (matchingRows.length === 0) {
     return { ...operateur, metadata: {} }
   }
   matchingRows.sort((a, b) => {
-    return +(a.certification_state === 'OPERATOR_DRAFT') - +(b.certification_state === 'OPERATOR_DRAFT')
+    return +(a.certification_state === certificationEtatEnumSchema.enum.OPERATOR_DRAFT) - +(b.certification_state === certificationEtatEnumSchema.enum.OPERATOR_DRAFT)
   })
   const [primaryRecord, ...otherRecords] = matchingRows
-  const { metadata, ...record } = primaryRecord || { metadata: {} }
+  const { metadata, ...record } = primaryRecord
 
   return {
     ...operateur,
@@ -138,71 +186,79 @@ ORDER BY combined_results.numerobio, COALESCE(combined_results.certification_dat
 }
 
 async function findConsultedOperators (userId: number): Promise<number[]> {
-  const { rows } = await pool
-    .query(/* sql */`SELECT numerobio
-      FROM operateurs_consultes
-      WHERE user_id = $1
-      ORDER BY created_at DESC
-      LIMIT 10`,
-    [userId])
+  const rows = await db
+    .select({ numerobio: operateursConsultes.numeroBio })
+    .from(operateursConsultes)
+    .where(eq(operateursConsultes.userId, String(userId)))
+    .orderBy(desc(operateursConsultes.createdAt))
+    .limit(10)
 
   return rows.map((r) => r.numerobio)
 }
 
-type NumeroBio = string | number
-
-export type ImportPacRow = {
-  size: string
-  nb_parcelles: string
-  pacage: string
-  imported: boolean
-  record: Record<string, unknown>
-}
-
 async function pinOperator(numeroBio: NumeroBio, userId: number): Promise<void> {
-  await pool.query(
-    "INSERT INTO operateurs_epingles (numerobio, user_id) VALUES ($1, $2) ON CONFLICT (numerobio, user_id) DO NOTHING",
-    [numeroBio, userId]
-  );
+  await db
+    .insert(operateursEpingles)
+    .values(createOperateurEpingleSchema.parse({ numeroBio: Number(numeroBio), userId: String(userId) }))
+    .onConflictDoNothing({ target: [operateursEpingles.numeroBio, operateursEpingles.userId] })
 }
 async function unpinOperator(numeroBio: NumeroBio, userId: number): Promise<void> {
-  await pool.query(
-    "DELETE FROM operateurs_epingles WHERE numerobio = $1 AND user_id = $2",
-    [numeroBio, userId]
-  );
+  await db
+    .delete(operateursEpingles)
+    .where(and(eq(operateursEpingles.numeroBio, Number(numeroBio)), eq(operateursEpingles.userId, String(userId))))
 }
 async function consultOperator(numeroBio: NumeroBio, userId: number): Promise<void> {
-  await pool.query(
-    "INSERT INTO operateurs_consultes (numerobio, user_id) VALUES ($1, $2) ON CONFLICT (numerobio, user_id) DO UPDATE SET created_at = now()",
-    [numeroBio, userId]
-  );
+  await db
+    .insert(operateursConsultes)
+    .values(createOperateurConsulteSchema.parse({ numeroBio: Number(numeroBio), userId: String(userId) }))
+    .onConflictDoUpdate({ target: [operateursConsultes.numeroBio, operateursConsultes.userId], set: { createdAt: sql`now()` } })
 }
 async function findImportPac(numeroBio: NumeroBio): Promise<ImportPacRow | null> {
-  const { rows } = await pool.query<ImportPacRow>(
-    "SELECT size, nb_parcelles, pacage, imported, record FROM import_pac_26 WHERE numerobio = $1",
-    [numeroBio]
-  );
-  return rows[0] ?? null;
+  const [row] = await db
+    .select({
+      size: importPac.size,
+      nb_parcelles: importPac.nbParcelles,
+      pacage: importPac.pacage,
+      imported: importPac.imported,
+      record: importPac.record
+    })
+    .from(importPac)
+    .where(eq(importPac.numeroBio, String(numeroBio)))
+    .limit(1)
+
+  return row ?? null
 }
 async function hideImport(numeroBio: NumeroBio): Promise<void> {
-  await pool.query(
-    "UPDATE import_pac_26 SET imported = true WHERE numerobio = $1",
-    [numeroBio]
-  );
+  await db
+    .update(importPac)
+    .set(updateImportPacSchema.parse({ imported: true }))
+    .where(eq(importPac.numeroBio, String(numeroBio)))
 }
 async function findPinnedOperators(userId: number): Promise<number[]> {
-  const { rows } = await pool.query<{ numerobio: number }>(
-    "SELECT numerobio FROM operateurs_epingles WHERE user_id = $1 ORDER BY created_at DESC",
-    [userId]
-  );
-  return rows.map(({ numerobio }) => numerobio);
+  const rows = await db
+    .select({ numerobio: operateursEpingles.numeroBio })
+    .from(operateursEpingles)
+    .where(eq(operateursEpingles.userId, String(userId)))
+    .orderBy(desc(operateursEpingles.createdAt))
+
+  return rows.map(({ numerobio }) => numerobio)
 }
-async function findDashboardStates(numeroBios: string[], anneeReferenceControle: number): Promise<Array<{ certifie: boolean; numerobios: string[] }>> {
-  const { rows } = await pool.query<{ certifie: boolean; numerobios: string[] }>(
-    `SELECT (certification_state = 'CERTIFIED') AS certifie, JSON_AGG(DISTINCT numerobio) AS numerobios FROM cartobio_operators WHERE numerobio = ANY($1) AND deleted_at IS NULL AND annee_reference_controle = $2 AND certification_state IN ('AUDITED', 'PENDING_CERTIFICATION', 'CERTIFIED') GROUP BY certification_state = 'CERTIFIED'`,
-    [numeroBios, anneeReferenceControle]
-  );
-  return rows;
+async function findDashboardStates(numeroBios: string[], anneeReferenceControle: number): Promise<DashboardStateRow[]> {
+  const certifie = sql<boolean>`(${eq(parcellaires.certificationEtat, certificationEtatEnumSchema.enum.CERTIFIED)})`
+
+  return db
+    .select({
+      certifie,
+      numerobios: sql<string[]>`JSON_AGG(DISTINCT ${parcellaires.numeroBio}::text)`
+    })
+    .from(parcellaires)
+    .where(and(
+      inArray(parcellaires.numeroBio, numerosBioEntiers(numeroBios)),
+      isNull(parcellaires.deletedAt),
+      eq(parcellaires.anneeReferenceControle, anneeReferenceControle),
+      inArray(parcellaires.certificationEtat, [certificationEtatEnumSchema.enum.AUDITED, certificationEtatEnumSchema.enum.PENDING_CERTIFICATION, certificationEtatEnumSchema.enum.CERTIFIED])
+    ))
+    .groupBy(certifie)
 }
 export {
   pinOperator,

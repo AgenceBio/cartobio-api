@@ -1,6 +1,7 @@
 import {
   foreignKey,
   index,
+  integer,
   primaryKey,
   text,
   timestamp,
@@ -36,32 +37,28 @@ export const attestationsProduction = cartobio.table(
   ],
 );
 
-export const parcellairesConsultes = cartobio.table(
-  'parcellaires_consultes',
+export const operateursConsultes = cartobio.table(
+  'operateurs_consultes',
   {
-    recordId: uuid('record_id')
-      .notNull()
-      .references(() => parcellaires.recordId, { onDelete: 'cascade' }),
+    numeroBio: integer('numerobio').notNull(),
     userId: varchar('user_id', { length: 255 }).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
-  (table) => [primaryKey({ columns: [table.recordId, table.userId] })],
+  (table) => [primaryKey({ columns: [table.numeroBio, table.userId] })],
 );
 
-export const parcellairesEpingles = cartobio.table(
-  'parcellaires_epingles',
+export const operateursEpingles = cartobio.table(
+  'operateurs_epingles',
   {
-    recordId: uuid('record_id')
-      .notNull()
-      .references(() => parcellaires.recordId, { onDelete: 'cascade' }),
+    numeroBio: integer('numerobio').notNull(),
     userId: varchar('user_id', { length: 255 }).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
-  (table) => [primaryKey({ columns: [table.recordId, table.userId] })],
+  (table) => [primaryKey({ columns: [table.numeroBio, table.userId] })],
 );
 
 export const parcellesControles = cartobio.table(

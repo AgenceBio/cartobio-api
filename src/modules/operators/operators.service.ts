@@ -1,8 +1,11 @@
 import { fetchCustomersByOc, fetchUserOperators, fetchOperatorsForAdmin } from '../../clients/agence-bio.client.js'
-import { escapeLiteral } from 'pg'
 import { applyOperatorTextSearch, filterOperatorForAutocomplete, sortRecord } from '../../shared/outputs/operator.js'
 
+import memo from 'p-memoize'
+import gotModule from 'got'
 import * as repository from './operators.repository.js'
+import { getUserProfileById } from '../auth/auth.service.js'
+import type { OperatorRecordWithUser } from './operators.types.js'
 import type { OperatorFilter, AgenceBioNormalizedOperator, AgenceBioNormalizedOperatorWithRecord, AgenceBioNormalizedOperatorWithFilterData, AgenceBioNormalizedOperatorWithPinnedStatus, CartoBioOCUser } from '@agencebio/cartobio-types'
 import { getRecords } from '../../shared/parcellaires/parcellaires.service.js'
 
@@ -21,6 +24,44 @@ type OperatorAutocompleteResult = {
   denominationCourante: string
   siret: string
   numeroClient?: string
+}
+
+const getUserProfile = memo(getUserProfileById, { maxAge: 60 * 60 * 1000 })
+
+const { HTTPError } = gotModule.default
+
+async function serializeUser (userId: string | null, userRole: string | null): Promise<string | null> {
+  if (userId === null) {
+    return null
+  }
+
+  try {
+    return JSON.stringify(await getUserProfile(Number(userId)))
+  } catch (error) {
+    if (error instanceof HTTPError && error.response.statusCode === 404) {
+      return JSON.stringify({ id: Number(userId), nom: 'Utilisateur supprimé', prenom: '', groups: [], mainGroup: { nom: userRole } })
+    }
+
+    throw error
+  }
+}
+
+async function withUser<T extends { user_id?: string | null; user_role?: string | null }> (record: T): Promise<OperatorRecordWithUser<T>> {
+  const { user_id: userId, user_role: userRole, ...rest } = record
+  return { ...rest, user: await serializeUser(userId ?? null, userRole ?? null) }
+}
+
+async function addRecordData (operateur: AgenceBioNormalizedOperator): Promise<AgenceBioNormalizedOperatorWithRecord> {
+  const { otherParcellaire, ...record } = await repository.addRecordData(operateur)
+
+  if (record.record_id === undefined) {
+    return record
+  }
+
+  return {
+    ...await withUser(record),
+    otherParcellaire: otherParcellaire ? await Promise.all(otherParcellaire.map(withUser)) : null
+  }
 }
 
 async function pinOperator (numeroBio: NumeroBio, userId: number): Promise<void> {
@@ -177,7 +218,7 @@ const RECORD_SORTS: Record<'audit_date' | 'engagement_date' | 'notifications' | 
     psql (order) {
       return /* sql */`
         CASE certification_state
-          ${Object.entries(STATUS_PRIORITY).map(([key, value]) => `WHEN ${escapeLiteral(key)} THEN ${value} `).join(' ')}
+          ${Object.entries(STATUS_PRIORITY).map(([key, value]) => `WHEN '${key}' THEN ${value} `).join(' ')}
         END
         ${order === 'asc' ? 'ASC' : 'DESC'} NULLS LAST,
         audit_date DESC NULLS LAST
@@ -279,7 +320,7 @@ async function searchControlBodyRecords ({ ocId, userId, input, page, filter, li
 
   const pageRecords = records.sort((a, b) => sortRecord(a, b, filter?.sort)).slice(
     (pagination.page - 1) * PER_PAGE,
-    (pagination.page) * PER_PAGE).map((record) => repository.addRecordData(record))
+    (pagination.page) * PER_PAGE).map((record) => addRecordData(record))
   return {
     pagination,
     records: await Promise.all(pageRecords)
@@ -298,7 +339,7 @@ async function searchControlBodyRecordsAdmin ({ input, page, filter, limit = 7 }
   const pageRecords = records
     .sort((a, b) => sortRecord(a, b, filter?.sort))
     .slice((pagination.page - 1) * limit, pagination.page * limit)
-    .map((record) => repository.addRecordData(record))
+    .map((record) => addRecordData(record))
 
   return {
     pagination,
@@ -453,7 +494,7 @@ async function getOperatorsDashboard (userId: number, ocId: number): Promise<{ p
       operator.notifications.organismeCertificateurId === ocId &&
       ['ENGAGEE', 'ENGAGEE FUTUR'].includes(operator.notifications.etatCertification)
   )
-  const operatorsWithData = await Promise.all(operators.map((o) => repository.addRecordData(o)))
+  const operatorsWithData = await Promise.all(operators.map((o) => addRecordData(o)))
   const findOperator = (numeroBio: number): AgenceBioNormalizedOperatorWithRecord | undefined =>
     operatorsWithData.find((o) => Number(o.numeroBio) === numeroBio)
 

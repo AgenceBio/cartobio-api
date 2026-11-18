@@ -239,16 +239,8 @@ const STEPS: Step[] = [
     })
   },
   ...['consultes', 'epingles'].map((name): Step => ({
-    table: `parcellaires_${name}`,
-    extract: `
-      SELECT DISTINCT ON (r.record_id, x.user_id) r.record_id, x.user_id::text AS user_id, coalesce(x.created_at, now()) AS created_at
-      FROM operateurs_${name} x
-      JOIN LATERAL (
-        SELECT record_id FROM ${RECORDS}
-        WHERE o.numerobio = x.numerobio::text AND o.deleted_at IS NULL
-        ORDER BY o.created_at DESC NULLS LAST LIMIT 1
-      ) r ON true
-    `
+    table: `operateurs_${name}`,
+    extract: `SELECT numerobio::int AS numerobio, user_id::text AS user_id, coalesce(created_at, now()) AS created_at FROM operateurs_${name}`
   })),
   {
     table: 'parcelles_controles',

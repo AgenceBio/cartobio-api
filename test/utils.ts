@@ -8,16 +8,16 @@ type FixtureRecord = Partial<Record<keyof (typeof records)[number], unknown>>
 type CertificationEtat = (typeof schema.parcellaires.certificationEtat.enumValues)[number]
 type ConversionNiveau = (typeof schema.conversionNiveau.enumValues)[number]
 
-export async function loadParcellairesFixture (data: typeof records = records): Promise<void> {
+export async function loadParcellairesFixture (data: typeof records = records, pinnedRecords: Array<string | number> = [], userId = 1): Promise<void> {
   await drizzleDb
     .insert(schema.organismeCertificateur)
-    .values(data.map((record) => ({ id: String(record.oc_id), label: record.oc_label })))
+    .values(data.filter((record) => record.oc_id != null).map((record) => ({ id: String(record.oc_id), label: record.oc_label })))
     .onConflictDoNothing()
 
   await drizzleDb.insert(schema.parcellaires).values(data.map((record, i) => ({
     recordId: record.record_id,
     numeroBio: Number(record.numerobio),
-    ocId: String(record.oc_id),
+    ocId: record.oc_id == null ? null : String(record.oc_id),
     certificationEtat: record.certification_state as CertificationEtat,
     certificationDateDebut: record.certification_date_debut,
     certificationDateFin: record.certification_date_fin,
@@ -26,8 +26,16 @@ export async function loadParcellairesFixture (data: typeof records = records): 
     auditNotesCertif: record.audit_notes,
     auditDemandesOperateur: record.audit_demandes,
     versionNom: record.version_name,
-    createdAt: sql`now() + make_interval(mins => ${i})`
+    createdAt: sql`now() + make_interval(mins => ${i})`,
+    updatedAt: sql`now() + make_interval(mins => ${i})`
   })))
+
+  if (pinnedRecords.length > 0) {
+    await drizzleDb
+      .insert(schema.operateursEpingles)
+      .values(pinnedRecords.map((numeroBio) => ({ numeroBio: Number(numeroBio), userId: String(userId) })))
+      .onConflictDoNothing()
+  }
 
   await drizzleDb.insert(schema.parcelles).values(data.flatMap((record) => parcelles.map((parcelle) => {
     const geometry = sql`ST_GeomFromGeoJSON(${JSON.stringify(parcelle.geometry)})`

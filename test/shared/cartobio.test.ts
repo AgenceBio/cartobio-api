@@ -16,7 +16,7 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import { normalizeRecord } from '../../src/shared/outputs/record.js'
 import db from '../../src/database/database.js'
-import { loadRecordFixture } from '../utils.js'
+import { loadParcellairesFixture, loadRecordFixture } from '../utils.js'
 import { EtatProduction, CertificationState } from '@agencebio/cartobio-types'
 import { randomUUID } from 'crypto'
 import { getConsultedOperators } from '../../src/modules/operators/operators.service.js'
@@ -850,13 +850,13 @@ describe('evvParcelles', () => {
 
 describe('test search with filter', () => {
   beforeEach(async () => {
-    await loadRecordFixture(
+    await loadParcellairesFixture(
       records.map(
         (r, index) =>
           (
             {
               ...r,
-              numerobio: index + 1,
+              numerobio: String(index + 1),
               annee_reference_controle: new Date().getFullYear()
             }
           )

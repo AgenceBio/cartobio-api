@@ -28,19 +28,22 @@ export type AgenceBioNormalizedOperator = {
 
 export type AgenceBioNormalizedOperatorWithRecord =
     AgenceBioNormalizedOperator &
-        (Partial<NormalizedRecord> & { metadata: Record<string, unknown> });
+        (Partial<NormalizedRecord> & {
+            metadata: Record<string, unknown>;
+            otherParcellaire?: unknown[] | null;
+        });
 
 export type AgenceBioNormalizedOperatorWithPinnedStatus =
     AgenceBioNormalizedOperator & { epingle: boolean };
 
 export type AgenceBioNormalizedOperatorWithFilterData =
     AgenceBioNormalizedOperator & {
-        lastmixitestate?: string;
+        lastmixitestate?: string | null;
         states?: {
             certification_state: string;
             annee_reference_controle: number;
         }[];
         list_oc_id?: number[];
-        max_audit_date?: Date | null;
+        max_audit_date?: string | null;
         metadata?: Record<string, unknown>;
     };

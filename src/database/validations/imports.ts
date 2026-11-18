@@ -1,7 +1,7 @@
 import { createInsertSchema, createUpdateSchema } from 'drizzle-orm/zod';
 import { z } from 'zod';
 import { importJobEtat, importJobResult, importStatus } from '../schema/enums.js';
-import { parcellaireImportLogs, parcellaireImportPayload, parcellaireImport } from '../schema/imports.js';
+import { importPac, parcellaireImportLogs, parcellaireImportPayload, parcellaireImport } from '../schema/imports.js';
 import { emptyToNull, isoDate } from './helpers.js';
 
 export const importStatusEnumSchema = z.enum(importStatus.enumValues);
@@ -56,7 +56,14 @@ export const createImportPayloadSchema = createInsertSchema(parcellaireImportPay
   importId: (schema) => schema.int().positive(),
 }).strict();
 
+export const updateImportPacSchema = createUpdateSchema(importPac)
+  .pick({
+    imported: true,
+  })
+  .strict();
+
 export type CreateImportJobInput = z.infer<typeof createImportJobSchema>;
 export type UpdateImportJobInput = z.infer<typeof updateImportJobSchema>;
 export type CreateImportLogInput = z.infer<typeof createImportLogSchema>;
 export type CreateImportPayloadInput = z.infer<typeof createImportPayloadSchema>;
+export type UpdateImportPacInput = z.infer<typeof updateImportPacSchema>;
