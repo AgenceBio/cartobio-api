@@ -71,7 +71,7 @@ app.register(fastifyOauth, {
     if (request.query.state && request.cookies['oauth2-redirect-state'] === request.query.state) {
       return next()
     }
-    next(new Error('Invalid state'))
+    next(new Error('État de connexion invalide'))
   } as FastifyOAuth2Options['checkStateFunction'],
   cookie: {
     secure: true,

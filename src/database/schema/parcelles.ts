@@ -1,4 +1,3 @@
-import { sql } from 'drizzle-orm'
 import {
   boolean,
   date,
@@ -28,7 +27,7 @@ export const parcelles = cartobio.table(
       .references(() => parcellaires.recordId, { onDelete: 'cascade' }),
     commune: varchar('commune', { length: 5 }).references(() => communes.fid),
     geometry: polygon('geometry').notNull(),
-    surfaceHa: numeric('surface_ha', { precision: 12, scale: 4 }).notNull(),
+    surfaceHa: numeric('surface_ha', { precision: 12, scale: 4, mode: 'number' }).notNull(),
     conversionNiveau: conversionNiveau('conversion_niveau'),
     engagementDate: date('engagement_date'),
     commentaireOperateur: text('commentaire_operateur'),
@@ -48,7 +47,7 @@ export const parcelles = cartobio.table(
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
       .defaultNow()
-      .$onUpdate(() => sql`now()`),
+      .$onUpdate(() => new Date()),
     deletedAt: timestamp('deleted_at', { withTimezone: true })
   },
   (table) => [

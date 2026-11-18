@@ -45,7 +45,7 @@ function groupByPACAGE(features: Iterable<gdal.Feature>): gdal.Feature[][] {
   for (const feature of features) {
     const pacage = feature.fields.get('PACAGE')
     if (!pacage) {
-      throw new Error(`Feature without PACAGE: ${JSON.stringify(feature.fields.toObject())}`)
+      throw new Error(`Entité sans PACAGE : ${JSON.stringify(feature.fields.toObject())}`)
     }
 
     let group = groups.get(pacage)
@@ -216,7 +216,7 @@ try {
   await cleanup()
   progress.stop()
 
-  console.warn('\n Warnings:')
+  console.warn('\n Avertissements :')
   if (warningsCorrespondance.length > 0) {
     console.log('\n Warnings => Aucune correspondance pour les pacages : ')
     for (const wc of warningsCorrespondance) console.log(wc)

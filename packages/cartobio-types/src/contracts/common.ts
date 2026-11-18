@@ -39,8 +39,13 @@ export const isoDateSchema = z.iso
 export type IsoDateTime = z.infer<typeof isoDateTimeSchema>
 export type IsoDate = z.infer<typeof isoDateSchema>
 
-export const toIsoDateTime = (date: Date): IsoDateTime => isoDateTimeSchema.parse(date.toISOString())
-export const toIsoDate = (value: string): IsoDate => isoDateSchema.parse(value)
+export function toIsoDateTime(date: Date): IsoDateTime {
+  return isoDateTimeSchema.parse(date.toISOString())
+}
+
+export function toIsoDate(value: string): IsoDate {
+  return isoDateSchema.parse(value)
+}
 
 export const bboxSchema = z.array(z.number()).optional().meta({ description: 'Emprise GeoJSON' })
 
@@ -95,3 +100,19 @@ export type ApiError = z.infer<typeof apiErrorSchema>
 export type ValidationIssue = z.infer<typeof validationIssueSchema>
 export type RecordIdParams = z.infer<typeof recordIdParamsSchema>
 export type Position = z.infer<typeof positionSchema>
+
+export const ifUnmodifiedSinceHeadersSchema = z.looseObject({
+  'if-unmodified-since': z
+    .string()
+    .refine((value) => !Number.isNaN(Date.parse(value)), { message: 'Date invalide' })
+    .optional()
+    .meta({ description: 'Date de dernière lecture du parcellaire, refuse la modification s’il a changé depuis' })
+})
+
+export const sameOriginHeadersSchema = z.looseObject({
+  'x-requested-with': z.string().min(1).meta({ description: 'Protection CSRF, valeur libre (ex. XMLHttpRequest)' })
+})
+
+export const authorizationHeadersSchema = z.looseObject({
+  authorization: z.string().min(1).meta({ description: 'Jeton du portail Notifications' })
+})

@@ -3,7 +3,7 @@ import type { AgenceBioOperator, AgenceBioNotification } from '../../clients/age
 import { agenceBioNotificationSchema } from '../../clients/agence-bio.types.js'
 import type { AgenceBioNormalizedOperatorWithFilterData } from '../../modules/operators/operators.types.js'
 
-function sortRecord(
+export function sortRecord(
   a: AgenceBioNormalizedOperatorWithFilterData,
   b: AgenceBioNormalizedOperatorWithFilterData,
   sortKey?: string | null
@@ -77,7 +77,7 @@ function formatPacage(numeroPacage: null | string | number): string | null {
 /**
  * Normalize an operator to be used in Cartobio
  */
-function normalizeOperator(operator: AgenceBioOperator): AgenceBioNormalizedOperator {
+export function normalizeOperator(operator: AgenceBioOperator): AgenceBioNormalizedOperator {
   const {
     id,
     nom,
@@ -210,7 +210,7 @@ function getNotification(notifications: AgenceBioNotification[]): AgenceBioNotif
   } else return null
 }
 
-function applyOperatorTextSearch(record: AgenceBioNormalizedOperator, input?: string): boolean {
+export function applyOperatorTextSearch(record: AgenceBioNormalizedOperator, input?: string): boolean {
   const recordNom = record.nom
     ? record.nom
         .toLocaleLowerCase()
@@ -256,7 +256,7 @@ function applyOperatorTextSearch(record: AgenceBioNormalizedOperator, input?: st
   return false
 }
 
-function filterOperatorForAutocomplete(record: AgenceBioNormalizedOperator, ocId: number): boolean {
+export function filterOperatorForAutocomplete(record: AgenceBioNormalizedOperator, ocId: number): boolean {
   if (!record.notifications) return false
 
   if (record.notifications.status === 'BROUILLON') {
@@ -273,5 +273,3 @@ function filterOperatorForAutocomplete(record: AgenceBioNormalizedOperator, ocId
   }
   return true
 }
-
-export { sortRecord, normalizeOperator, applyOperatorTextSearch, filterOperatorForAutocomplete }

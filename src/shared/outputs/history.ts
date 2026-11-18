@@ -49,17 +49,17 @@ type NewEventPayload = {
 /**
  * Create a new Event if necessary
  */
-function createNewEvent(
+export function createNewEvent(
   eventType: EventType,
   payload: NewEventPayload,
   context: { user?: CartoBioUser | null; record: null }
 ): HistoryEntry
-function createNewEvent(
+export function createNewEvent(
   eventType: EventType,
   payload: NewEventPayload,
   context: { user?: CartoBioUser | null; record: NormalizedRecord | null }
 ): HistoryEntry | null
-function createNewEvent(
+export function createNewEvent(
   eventType: EventType,
   payload: NewEventPayload,
   { user, record }: { user?: CartoBioUser | null; record: NormalizedRecord | null }
@@ -78,7 +78,7 @@ function createNewEvent(
   return null
 }
 
-function collectFeatureIdsFromPayload(
+export function collectFeatureIdsFromPayload(
   payload: Array<{ id?: string | number }> | { features?: Array<{ id?: string | number }> } | null | undefined
 ): Array<string | number | undefined> | null {
   const features = Array.isArray(payload) ? payload : payload?.features
@@ -87,7 +87,7 @@ function collectFeatureIdsFromPayload(
 
 type HistoryViewer = { user?: CartoBioUser | null; ocId?: number | null }
 
-function maskOcAgents<T extends object>(record: T, viewer: HistoryViewer, currentOcId?: number | null): T {
+export function maskOcAgents<T extends object>(record: T, viewer: HistoryViewer, currentOcId?: number | null): T {
   const history = (record as { audit_history?: HistoryEntry[] | null }).audit_history
   if (!history?.length || isAdmin(viewer.user)) return record
 
@@ -111,5 +111,3 @@ function maskOcAgents<T extends object>(record: T, viewer: HistoryViewer, curren
     })
   }
 }
-
-export { EventType, collectFeatureIdsFromPayload, createNewEvent, maskOcAgents }

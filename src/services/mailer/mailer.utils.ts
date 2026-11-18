@@ -72,8 +72,10 @@ export function getLastWeekDates(): { dateDebut: string; dateFin: string } {
   }
 }
 
-export const formatDateFr = (date: string): string =>
-  new Date(date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+export function formatDateFr(date: string): string {
+  return new Date(date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
 
-export const operatorRecordUrl = (numerobio: string, recordId: string | number): string =>
-  `${config.get('frontendUrl')}/exploitations/${numerobio}/${recordId}`
+export function operatorRecordUrl(numerobio: string, recordId: string | number): string {
+  return `${config.get('frontendUrl')}/exploitations/${numerobio}/${recordId}`
+}

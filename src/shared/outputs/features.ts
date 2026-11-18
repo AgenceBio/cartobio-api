@@ -11,7 +11,7 @@ const MAX_RANDOM_INT = Math.pow(2, 48)
  *
  * @see https://github.com/maplibre/maplibre-gl-js/issues/1043
  */
-function getRandomFeatureId(): number {
+export function getRandomFeatureId(): number {
   return randomInt(1, MAX_RANDOM_INT)
 }
 
@@ -26,7 +26,7 @@ function getRandomFeatureId(): number {
  * 2. Because they are translated from a PAC code (the `TYPE` feature property)
  * 3. Or because they are set from an external system (the crop may or may not be selectable via the UI)
  */
-function populateWithMultipleCultures<F extends CartoBioFeatureInput>(feature: F): F {
+export function populateWithMultipleCultures<F extends CartoBioFeatureInput>(feature: F): F {
   // convert from single to multi
   if (!Array.isArray(feature.properties.cultures)) {
     const { CPF, TYPE = null, variete = null, SURF: surface = null } = feature.properties
@@ -64,7 +64,7 @@ function populateWithMultipleCultures<F extends CartoBioFeatureInput>(feature: F
   return feature
 }
 
-function normalizeParcelle(parcelle: DBParcelle): CartoBioFeature {
+export function normalizeParcelle(parcelle: DBParcelle): CartoBioFeature {
   return {
     type: 'Feature',
     id: parcelle.id,
@@ -119,5 +119,3 @@ function normalizeParcelle(parcelle: DBParcelle): CartoBioFeature {
     geometry: parcelle.geometry ?? null
   }
 }
-
-export { getRandomFeatureId, populateWithMultipleCultures, normalizeParcelle }

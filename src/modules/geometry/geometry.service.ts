@@ -8,7 +8,7 @@ import * as repository from './geometry.repository.js'
 import { compareParcellaires, feature, label } from './geometry.utils.js'
 import { InvalidRequestApiError } from '../../shared/errors.js'
 
-async function verifyGeometry(
+export async function verifyGeometry(
   inputGeomGeoJSON: unknown,
   recordId: string,
   id: string | number = ''
@@ -32,7 +32,7 @@ async function verifyGeometry(
   }
 }
 
-async function getGeometryEquals(input: GeometryEqualsBody['payload']): Promise<GeometryEqualsResponse> {
+export async function getGeometryEquals(input: GeometryEqualsBody['payload']): Promise<GeometryEqualsResponse> {
   const records = await repository.findParcellairesComparables([input.old, input.new])
 
   const r1 = records.find(({ recordId }) => recordId === input.old)
@@ -85,7 +85,7 @@ async function getGeometryEquals(input: GeometryEqualsBody['payload']): Promise<
   ]
 }
 
-async function calculateParcelBorder(
+export async function calculateParcelBorder(
   geometry: unknown,
   distance: number,
   allBorder: boolean,
@@ -103,5 +103,3 @@ async function calculateParcelBorder(
 
   return repository.findParcelBorderBetweenPoints(geometry, distance, startBorderPoint, endBorderPoint, isInverted)
 }
-
-export { verifyGeometry, getGeometryEquals, calculateParcelBorder }

@@ -31,7 +31,7 @@ function parcelleColumns<T extends typeof ancienne | typeof nouvelle>(table: T):
   }
 }
 
-async function findGeometryConflicts(
+export async function findGeometryConflicts(
   inputGeomGeoJSON: unknown,
   recordId: string,
   id: string | number = ''
@@ -52,7 +52,7 @@ async function findGeometryConflicts(
     .where(and(eq(parcelles.recordId, recordId), ne(parcelles.id, String(id)), isNull(parcelles.deletedAt)))
 }
 
-async function findGeometryCorrections(
+export async function findGeometryCorrections(
   inputGeomGeoJSON: unknown,
   recordId: string,
   ids: string[]
@@ -70,7 +70,7 @@ async function findGeometryCorrections(
     .where(and(eq(parcelles.recordId, recordId), inArray(parcelles.id, ids)))
 }
 
-async function findParcellairesComparables(recordIds: string[]): Promise<ParcellaireComparable[]> {
+export async function findParcellairesComparables(recordIds: string[]): Promise<ParcellaireComparable[]> {
   return db
     .select({
       recordId: parcellaires.recordId,
@@ -83,7 +83,7 @@ async function findParcellairesComparables(recordIds: string[]): Promise<Parcell
     .where(inArray(parcellaires.recordId, recordIds))
 }
 
-async function findParcellesComparees(oldRecordId: string, newRecordId: string): Promise<ParcellesComparees> {
+export async function findParcellesComparees(oldRecordId: string, newRecordId: string): Promise<ParcellesComparees> {
   const recouvrement = (
     geometry: AnyColumn,
     autre: AnyColumn
@@ -153,7 +153,7 @@ async function findParcellesComparees(oldRecordId: string, newRecordId: string):
   return { modified, deleted, added }
 }
 
-async function findParcelBorder(geometry: unknown, distance: number): Promise<ParcelBorder | undefined> {
+export async function findParcelBorder(geometry: unknown, distance: number): Promise<ParcelBorder | undefined> {
   const parcelle = db
     .$with('parcelle', { geom: sql`geom`.as('geom') })
     .as(sql`SELECT ${webMercator(fromGeoJSON(geometry))} AS geom`)
@@ -175,7 +175,7 @@ async function findParcelBorder(geometry: unknown, distance: number): Promise<Pa
   return result
 }
 
-async function findParcelBorderBetweenPoints(
+export async function findParcelBorderBetweenPoints(
   geometry: unknown,
   distance: number,
   start: Position,
@@ -237,13 +237,4 @@ async function findParcelBorderBetweenPoints(
     .leftJoin(bande, sql`true`)
 
   return result
-}
-
-export {
-  findGeometryConflicts,
-  findGeometryCorrections,
-  findParcellairesComparables,
-  findParcellesComparees,
-  findParcelBorder,
-  findParcelBorderBetweenPoints
 }

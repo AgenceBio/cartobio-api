@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm'
+import { and, asc, count, eq, gt, inArray, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm'
 import { db } from '../../database/database.js'
 import {
   attestationsProduction,
@@ -20,10 +20,10 @@ import {
   updateAttestationProductionSchema
 } from '../../database/validations/activites.js'
 import { sansDateParDefaut, surfaceHa } from './exports.utils.js'
-import { isoDay, isoTimestamp } from '../../shared/parcellaires/parcellaires.utils.js'
+import { isoTimestamp } from '../../shared/parcellaires/parcellaires.utils.js'
 import type { AttestationProduction, ExportRow, PdfParcelle, PdfRecord } from './exports.types.js'
 
-async function updateAttestationsProductions(
+export async function updateAttestationsProductions(
   recordId: string,
   status: AttestationsProductionsStatus,
   type: AttestationsProductionsType,
@@ -34,16 +34,16 @@ async function updateAttestationsProductions(
     .values(createAttestationProductionSchema.parse({ recordId, type, status, path }))
     .onConflictDoUpdate({
       target: [attestationsProduction.recordId, attestationsProduction.type],
-      set: { status, path, updatedAt: sql`now()` }
+      set: { status, path, updatedAt: new Date() }
     })
 }
 
-async function findValidAttestationProduction(
+export async function findValidAttestationProduction(
   recordId: string,
   type: AttestationsProductionsType
 ): Promise<AttestationProduction | null> {
   const [production] = await db
-    .select({ path: sql<string>`${attestationsProduction.path}` })
+    .select({ path: attestationsProduction.path })
     .from(attestationsProduction)
     .innerJoin(parcellaires, eq(parcellaires.recordId, attestationsProduction.recordId))
     .where(
@@ -51,34 +51,35 @@ async function findValidAttestationProduction(
         eq(attestationsProduction.recordId, recordId),
         gt(attestationsProduction.updatedAt, parcellaires.updatedAt),
         eq(attestationsProduction.status, productionAttestationStatusEnumSchema.enum.generated),
-        eq(attestationsProduction.type, type)
+        eq(attestationsProduction.type, type),
+        isNotNull(attestationsProduction.path)
       )
     )
 
-  return production ?? null
+  return production?.path ? { path: production.path } : null
 }
 
-async function failInterruptedAttestationsProductions(): Promise<number> {
+export async function failInterruptedAttestationsProductions(): Promise<number> {
   const { rowCount } = await db
     .update(attestationsProduction)
     .set({
       ...updateAttestationProductionSchema.parse({
         status: productionAttestationStatusEnumSchema.enum.error
       }),
-      updatedAt: sql`now()`
+      updatedAt: new Date()
     })
     .where(
       and(
         eq(attestationsProduction.status, productionAttestationStatusEnumSchema.enum.started),
-        lt(attestationsProduction.updatedAt, sql`now() - interval '1 hour'`)
+        lt(attestationsProduction.updatedAt, new Date(Date.now() - 60 * 60 * 1000))
       )
     )
   return rowCount ?? 0
 }
 
-async function findKeptAttestationsPaths(): Promise<string[]> {
+export async function findKeptAttestationsPaths(): Promise<string[]> {
   const rows = await db
-    .select({ path: sql<string>`${attestationsProduction.path}` })
+    .select({ path: attestationsProduction.path })
     .from(attestationsProduction)
     .where(
       and(
@@ -87,14 +88,14 @@ async function findKeptAttestationsPaths(): Promise<string[]> {
       )
     )
 
-  return rows.map(({ path }) => path)
+  return rows.flatMap(({ path }) => (path ? [path] : []))
 }
 
-async function deleteAttestationsProductions(recordId: string): Promise<void> {
+export async function deleteAttestationsProductions(recordId: string): Promise<void> {
   await db.delete(attestationsProduction).where(eq(attestationsProduction.recordId, recordId))
 }
 
-async function findPdfRecord(recordId: string): Promise<PdfRecord | null> {
+export async function findPdfRecord(recordId: string): Promise<PdfRecord | null> {
   const [record] = await db
     .select({
       version_name: parcellaires.versionNom,
@@ -112,25 +113,25 @@ async function findPdfRecord(recordId: string): Promise<PdfRecord | null> {
   return record ?? null
 }
 
-async function findExportRows(ocId: number, numeroBios: number[]): Promise<ExportRow[]> {
-  return db
+export async function findExportRows(ocId: number, numeroBios: number[]): Promise<ExportRow[]> {
+  const rows = await db
     .select({
       record_id: parcellaires.recordId,
       numerobio: parcellaires.numeroBio,
       version_name: parcellaires.versionNom,
       source: parcellairesMetadata.source,
       provenance: parcellairesMetadata.provenance,
-      campagne: sql<string | null>`${parcellairesMetadata.campagne}::text`,
+      campagne: parcellairesMetadata.campagne,
       created_at: isoTimestamp(parcellaires.createdAt),
       updated_at: isoTimestamp(parcellaires.updatedAt),
       mixite: parcellaires.mixite,
       anneereference: parcellaires.anneeReferenceControle,
       certification_state: parcellaires.certificationEtat,
-      audit_date: isoDay(sansDateParDefaut(parcellaires.auditDate)),
+      audit_date: parcellaires.auditDate,
       audit_notes: parcellaires.auditNotesCertif,
-      certification_date_debut: isoDay(sansDateParDefaut(parcellaires.certificationDateDebut)),
-      certification_date_fin: isoDay(sansDateParDefaut(parcellaires.certificationDateFin)),
-      nombre_parcelles: sql`COUNT(${parcelles.id})`.mapWith(Number),
+      certification_date_debut: parcellaires.certificationDateDebut,
+      certification_date_fin: parcellaires.certificationDateFin,
+      nombre_parcelles: count(parcelles.id),
       superficie_totale_ha: surfaceHa(),
       surface_conventionnel_ha: surfaceHa('CONV'),
       surface_c1_ha: surfaceHa('C1'),
@@ -146,9 +147,17 @@ async function findExportRows(ocId: number, numeroBios: number[]): Promise<Expor
     )
     .groupBy(parcellaires.recordId, parcellairesMetadata.recordId)
     .orderBy(asc(parcellaires.numeroBio))
+
+  return rows.map((row) => ({
+    ...row,
+    campagne: row.campagne === null ? null : String(row.campagne),
+    audit_date: sansDateParDefaut(row.audit_date),
+    certification_date_debut: sansDateParDefaut(row.certification_date_debut),
+    certification_date_fin: sansDateParDefaut(row.certification_date_fin)
+  }))
 }
 
-async function findPdfParcelles(recordId: string, pac: boolean): Promise<PdfParcelle[]> {
+export async function findPdfParcelles(recordId: string, pac: boolean): Promise<PdfParcelle[]> {
   const cultures = db
     .select({
       cultures: sql<CartoBioCulture[]>`COALESCE(json_agg(json_build_object(
@@ -164,18 +173,18 @@ async function findPdfParcelles(recordId: string, pac: boolean): Promise<PdfParc
     .from(parcelleCultures)
     .where(and(eq(parcelleCultures.recordId, parcelles.recordId), eq(parcelleCultures.parcelleId, parcelles.id)))
 
-  return db
+  const rows = await db
     .select({
       id: parcelles.id,
       name: parcelles.name,
       cultures: sql<CartoBioCulture[]>`(${cultures})`,
       conversion_niveau: parcelles.conversionNiveau,
       commune: parcelles.commune,
-      communename: sql<string>`COALESCE(${communes.nom}, 'inconnu')`,
+      communename: communes.nom,
       created: parcelles.createdAt,
       engagement_date: parcelles.engagementDate,
-      nbilot: sql<string | null>`${parcelles.numeroIlotPac}::text`,
-      nbp: sql<string | null>`${parcelles.numeroParcellesPac}::text`,
+      nbilot: parcelles.numeroIlotPac,
+      nbp: parcelles.numeroParcellesPac,
       refcad: parcelles.referenceCadastre,
       geojson: sql<string>`ST_AsGeoJSON(${parcelles.geometry})`,
       minx: sql<number>`ST_XMin(${parcelles.geometry})`,
@@ -184,7 +193,7 @@ async function findPdfParcelles(recordId: string, pac: boolean): Promise<PdfParc
       maxy: sql<number>`ST_YMax(${parcelles.geometry})`,
       centerx: sql<number>`ST_X(ST_Centroid(${parcelles.geometry}))`,
       centery: sql<number>`ST_Y(ST_Centroid(${parcelles.geometry}))`,
-      superficie_totale_ha: sql`${parcelles.surfaceHa}`.mapWith(Number)
+      superficie_totale_ha: parcelles.surfaceHa
     })
     .from(parcelles)
     .leftJoin(communes, eq(communes.fid, parcelles.commune))
@@ -197,15 +206,11 @@ async function findPdfParcelles(recordId: string, pac: boolean): Promise<PdfParc
           : undefined
       )
     )
-}
 
-export {
-  updateAttestationsProductions,
-  findValidAttestationProduction,
-  findKeptAttestationsPaths,
-  deleteAttestationsProductions,
-  failInterruptedAttestationsProductions,
-  findPdfRecord,
-  findExportRows,
-  findPdfParcelles
+  return rows.map((row) => ({
+    ...row,
+    communename: row.communename ?? 'inconnu',
+    nbilot: row.nbilot === null ? null : String(row.nbilot),
+    nbp: row.nbp === null ? null : String(row.nbp)
+  }))
 }

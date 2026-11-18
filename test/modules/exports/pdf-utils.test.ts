@@ -172,7 +172,7 @@ describe('launchStyleTab', () => {
     pageMock.goto!.mockRejectedValue(new Error('Page style'))
 
     await expect(launchStyleTab(asBrowser(browserMock))).rejects.toThrow(
-      'Timeout lors du chargement de la page avec le style Page style'
+      'Délai dépassé lors du chargement de la page avec le style Page style'
     )
     expect(pageMock.close).toHaveBeenCalled()
   })
@@ -225,7 +225,7 @@ describe('drawAllParcellesOnMap', () => {
     pageMock.waitForFunction!.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('Timeout'))
 
     const result = await drawAllParcellesOnMap(asPage(pageMock), parcelles, options)
-    expect(result).toEqual({ error: 'Timeout exceeded (5000ms)' })
+    expect(result).toEqual({ error: 'Délai dépassé (5000 ms)' })
   })
 })
 

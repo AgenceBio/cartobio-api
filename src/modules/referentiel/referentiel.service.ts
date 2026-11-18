@@ -2,7 +2,7 @@ import * as repository from './referentiel.repository.js'
 import type { DepartementRow } from './referentiel.types.js'
 import type { DepartementsResponse } from '@agencebio/cartobio-types'
 
-async function getDepartement(): Promise<DepartementsResponse> {
+export async function getDepartement(): Promise<DepartementsResponse> {
   const rows = await repository.findDepartements()
   const grouped = rows.reduce<Record<string, DepartementRow[]>>((regions, row) => {
     ;(regions[row.nomRegion] ??= []).push(row)
@@ -17,5 +17,3 @@ async function getDepartement(): Promise<DepartementsResponse> {
       ])
   )
 }
-
-export { getDepartement }

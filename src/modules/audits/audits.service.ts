@@ -1,10 +1,12 @@
 import * as cartobio from '../../shared/parcellaires/parcellaires.service.js'
-import { deleteRecordAttestations, findValidAttestationProduction } from '../exports/exports.service.js'
-import { normalizeRecord } from '../../shared/outputs/record.js'
+import { deleteRecordAttestations } from '../exports/exports.service.js'
+import { findValidAttestationProduction } from '../exports/exports.repository.js'
+import type { AttestationProduction } from '../exports/exports.types.js'
+import { findMixite, updateMixite } from '../../shared/parcellaires/parcellaires.repository.js'
 import * as repository from './audits.repository.js'
 import { logger } from '../../config/logger.js'
 import { db, firstRow } from '../../database/database.js'
-import { CertificationState, EventType } from '@agencebio/cartobio-types'
+import { AttestationsProductionsType, CertificationState, EventType } from '@agencebio/cartobio-types'
 import type {
   AgenceBioNormalizedOperator,
   CartoBioUser,
@@ -16,7 +18,6 @@ import type {
   RecordInfosBody
 } from '@agencebio/cartobio-types'
 import type { DBOperatorRecord, DBOperatorRecordWithParcelles } from '../../shared/parcellaires/parcellaires.types.js'
-import { sql } from 'drizzle-orm'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import { createNewEvent } from '../../shared/outputs/history.js'
 import { InvalidRequestApiError, NotFoundApiError, getErrorCode } from '../../shared/errors.js'
@@ -35,18 +36,18 @@ type AuditContext = {
   ifUnmodifiedSince?: string
 }
 
-async function deleteRecord(record: NormalizedRecord): Promise<void> {
+export async function deleteRecord(record: NormalizedRecord): Promise<void> {
   await repository.softDeleteRecord(record.record_id)
   await deleteRecordAttestations(record.record_id).catch((error: unknown): void =>
     logger.error({ err: error }, `Suppression des attestations du parcellaire ${record.record_id} en échec`)
   )
 }
 
-async function markFeatureControlled(recordId: string, id: FeatureId, userId: number): Promise<void> {
+export async function markFeatureControlled(recordId: string, id: FeatureId, userId: number): Promise<void> {
   await repository.insertParcelleControle(recordId, id, userId)
 }
 
-async function markFeatureUncontrolled(recordId: string, id: FeatureId, userId: number): Promise<void> {
+export async function markFeatureUncontrolled(recordId: string, id: FeatureId, userId: number): Promise<void> {
   await repository.deleteParcelleControle(recordId, id, userId)
 }
 
@@ -57,7 +58,7 @@ function getOc(user: AuditUser | null, operator: OptionalOperator): { id: number
   }
 }
 
-async function updateAuditRecordState(
+export async function updateAuditRecordState(
   {
     user,
     record,
@@ -78,7 +79,7 @@ async function updateAuditRecordState(
       !(patch.certification_date_fin ?? record.certification_date_fin))
   )
     throw new InvalidRequestApiError('Les dates de certification sont manquantes.')
-  const changes: AuditRecordChanges = { updated_at: sql`now()`, ...patch }
+  const changes: AuditRecordChanges = { updated_at: new Date(), ...patch }
 
   if (record.oc_id === null) {
     const oc = getOc(user, operator)
@@ -91,10 +92,10 @@ async function updateAuditRecordState(
   if (state) {
     historyEntry = createNewEvent(EventType.CERTIFICATION_STATE_CHANGE, { state }, { user, record })
     if (state === CertificationState.AUDITED && !('audit_date' in changes)) {
-      changes.audit_date = sql`now()`
+      changes.audit_date = new Date().toISOString().slice(0, 10)
     }
     if (state === CertificationState.CERTIFIED && !('mixite' in changes)) {
-      changes.mixite = await repository.findMixite(db, record.record_id)
+      changes.mixite = await findMixite(db, record.record_id)
     }
   }
 
@@ -133,10 +134,10 @@ async function updateOperator(
 }
 
 async function refreshMixiteIfCertified(tx: NodePgDatabase, record: NormalizedRecord): Promise<void> {
-  if (record.certification_state === CertificationState.CERTIFIED) await repository.updateMixite(tx, record.record_id)
+  if (record.certification_state === CertificationState.CERTIFIED) await updateMixite(tx, record.record_id)
 }
 
-async function patchFeatureCollection(
+export async function patchFeatureCollection(
   { user, record, operator, ifUnmodifiedSince }: AuditContext,
   input: FeatureInput[]
 ): Promise<DBOperatorRecordWithParcelles> {
@@ -154,7 +155,7 @@ async function patchFeatureCollection(
   return joinRecordParcelles(updatedRecord)
 }
 
-async function updateFeature(
+export async function updateFeature(
   { featureId, user, record, operator, ifUnmodifiedSince }: AuditContext & { featureId: FeatureId },
   { properties, geometry }: FeatureInput
 ): Promise<DBOperatorRecordWithParcelles> {
@@ -171,7 +172,7 @@ async function updateFeature(
   return joinRecordParcelles(updatedRecord)
 }
 
-async function deleteSingleFeature(
+export async function deleteSingleFeature(
   {
     featureId,
     user,
@@ -203,7 +204,7 @@ async function deleteSingleFeature(
   return joinRecordParcelles(updatedRecord)
 }
 
-async function addRecordFeature(
+export async function addRecordFeature(
   { user, record, operator, ifUnmodifiedSince }: AuditContext,
   feature: FeatureInput
 ): Promise<DBOperatorRecordWithParcelles> {
@@ -226,7 +227,7 @@ async function addRecordFeature(
   return joinRecordParcelles(updatedRecord)
 }
 
-async function createFeaturesFromOther(
+export async function createFeaturesFromOther(
   user: AuditUser | null,
   record: NormalizedRecord,
   operator: OptionalOperator,
@@ -251,17 +252,9 @@ async function createFeaturesFromOther(
   return joinRecordParcelles(updatedRecord)
 }
 
-export { createOrUpdateOperatorRecord } from '../../shared/parcellaires/parcellaires.service.js'
-export {
-  findValidAttestationProduction as getAttestationProduction,
-  normalizeRecord,
-  markFeatureControlled,
-  markFeatureUncontrolled,
-  deleteRecord,
-  updateAuditRecordState,
-  addRecordFeature,
-  patchFeatureCollection,
-  updateFeature,
-  deleteSingleFeature,
-  createFeaturesFromOther
+export async function getAttestationProduction(
+  recordId: string,
+  type: AttestationsProductionsType
+): Promise<AttestationProduction | null> {
+  return findValidAttestationProduction(recordId, type)
 }

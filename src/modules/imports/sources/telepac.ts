@@ -72,7 +72,7 @@ const telepacPropertiesSchema = z.looseObject({
 
 const removeEmptyElements = (item: unknown): unknown => item
 
-async function parseTelepacArchive(file: Promise<MultipartFile | undefined>): Promise<FeatureCollection> {
+export async function parseTelepacArchive(file: Promise<MultipartFile | undefined>): Promise<FeatureCollection> {
   const data = await file
   if (!data) throw new InvalidRequestApiError('Aucun fichier transmis.')
   const buffer = await getStreamAsBuffer(data.file)
@@ -265,5 +265,3 @@ async function fromXMLFile(xmlContent: string): Promise<FeatureCollection> {
 
   return toWgs84(geojson, LegalProjections.metropole)
 }
-
-export { parseTelepacArchive }

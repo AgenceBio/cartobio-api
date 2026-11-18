@@ -19,6 +19,7 @@ import {
 import { AttestationsProductionsType } from '@agencebio/cartobio-types'
 import type { FeatureInput } from '@agencebio/cartobio-types'
 import * as service from './audits.service.js'
+import { createOrUpdateOperatorRecord } from '../../shared/parcellaires/parcellaires.service.js'
 import { requireOperator, requireRecord, requireUser } from '../../shared/request.js'
 import { NotFoundApiError } from '../../shared/errors.js'
 import { outputRecord } from './audits.utils.js'
@@ -40,7 +41,12 @@ export default async function auditRoutes(fastify: FastifyInstance): Promise<voi
         pac ? AttestationsProductionsType.PACCOMPLET : AttestationsProductionsType.COMPLET
       )
 
-      const fileExists = attestation ? await access(attestation.path).then(() => true, () => false) : false
+      const fileExists = attestation
+        ? await access(attestation.path).then(
+            () => true,
+            () => false
+          )
+        : false
 
       return reply.code(200).send({ hasAttestationProduction: fileExists })
     }
@@ -65,7 +71,7 @@ export default async function auditRoutes(fastify: FastifyInstance): Promise<voi
   app.post('/api/v2/operator/:numeroBio/records', createRecordSchema, async (request, reply) => {
     const { numeroBio } = request.params
     const { id: ocId, nom: ocLabel, numeroClient } = requireOperator(request).organismeCertificateur
-    const record = await service.createOrUpdateOperatorRecord(
+    const record = await createOrUpdateOperatorRecord(
       {
         ...request.body,
         numerobio: String(numeroBio),

@@ -1,13 +1,7 @@
 import { z } from 'zod'
 import { ImportJobEtat, ImportJobResult } from '../enums.js'
 import { optionalString } from './helpers.js'
-import {
-  integerStringSchema,
-  isoDateSchema,
-  isoDateTimeSchema,
-  optionalIsoDateQuerySchema,
-  pageStringSchema
-} from './common.js'
+import { isoDateSchema, isoDateTimeSchema, optionalIsoDateQuerySchema } from './common.js'
 
 export const STATS_MAX_LIMIT = 100
 
@@ -16,9 +10,12 @@ const csvListSchema = z.string().transform((value) => value.split(',').filter(Bo
 export const statsQuerySchema = z.object({
   from: optionalIsoDateQuerySchema.meta({ description: "Date de début d'envoi (ISO 8601)" }),
   to: optionalIsoDateQuerySchema.meta({ description: "Date de fin d'envoi (ISO 8601)" }),
-  page: pageStringSchema.optional().meta({ description: 'Numéro de page, à partir de 1' }),
-  limit: integerStringSchema
-    .refine((limit) => Number(limit) <= STATS_MAX_LIMIT)
+  page: z.coerce.number().int().min(1).optional().meta({ description: 'Numéro de page, à partir de 1' }),
+  limit: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(STATS_MAX_LIMIT)
     .optional()
     .meta({ description: `Nombre de lignes par page (défaut 20, ${STATS_MAX_LIMIT} maximum)` }),
   numeroBio: optionalString("Numéro bio de l'opérateur"),

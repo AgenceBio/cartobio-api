@@ -1,13 +1,7 @@
 import { z } from 'zod'
 import { CertificationState } from '../enums.js'
 import { booleanQuery, opt, optionalString, textOrNumber } from './helpers.js'
-import {
-  anyGeometrySchema,
-  bboxSchema,
-  integerStringSchema,
-  optionalIsoDateQuerySchema,
-  pageStringSchema
-} from './common.js'
+import { anyGeometrySchema, bboxSchema, integerStringSchema, optionalIsoDateQuerySchema } from './common.js'
 
 const currentYear = new Date().getUTCFullYear()
 export const geofoliaQuerySchema = z.object({
@@ -38,10 +32,13 @@ export const importListQuerySchema = z.object({
     description: "Date de fin d'envoi incluse, jusqu'à 23:59:59 (ISO 8601)"
   }),
   withPayload: booleanQuery('Inclure le corps JSON envoyé'),
-  page: pageStringSchema.optional().meta({ description: 'Numéro de page, à partir de 1 (défaut 1)' }),
-  limit: integerStringSchema
-    .refine((limit) => Number(limit) <= 100)
-    .optional()
+  page: z.coerce.number().int().min(1).default(1).meta({ description: 'Numéro de page, à partir de 1 (défaut 1)' }),
+  limit: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(100)
+    .default(20)
     .meta({ description: "Nombre d'imports par page (défaut 20, 100 maximum)" }),
   withRejected: booleanQuery('Uniquement les imports comportant au moins un objet refusé')
 })
@@ -51,18 +48,21 @@ export const importDetailsQuerySchema = z.object({
 })
 
 export const certificationParcellairesQuerySchema = z.object({
-  limit: integerStringSchema
-    .refine((limit) => Number(limit) >= 1 && Number(limit) <= 1000)
-    .optional()
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(1000)
+    .default(100)
     .meta({ description: 'Nombre de parcellaires par page (défaut 100, 1000 maximum)' }),
-  start: integerStringSchema.optional().meta({ description: 'Décalage de pagination (défaut 0)' }),
-  anneeAudit: optionalString("Année de la date d'audit"),
+  start: z.coerce.number().int().min(0).default(0).meta({ description: 'Décalage de pagination (défaut 0)' }),
+  anneeAudit: z.coerce.number().int().min(1900).max(2100).optional().meta({ description: "Année de la date d'audit" }),
   statut: z.enum(CertificationState).optional().meta({ description: 'État du parcellaire' }),
   anneeReferenceControle: integerStringSchema.optional().meta({ description: 'Année de référence du contrôle' })
 })
 
 export const certificationParcellaireQuerySchema = z.object({
-  anneeAudit: optionalString("Année de la date d'audit"),
+  anneeAudit: z.coerce.number().int().min(1900).max(2100).optional().meta({ description: "Année de la date d'audit" }),
   statut: z.enum(CertificationState).optional().meta({ description: 'État du parcellaire' })
 })
 

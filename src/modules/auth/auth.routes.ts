@@ -1,5 +1,5 @@
 import config from '../../config/env.js'
-import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
+import type { FastifyInstance, FastifyReply } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import {
   devLoginSchema,
@@ -11,6 +11,7 @@ import {
 } from './auth.schema.js'
 import { ForbiddenApiError, InvalidCredentialsApiError, UnauthorizedApiError } from '../../shared/errors.js'
 import * as service from './auth.service.js'
+import { fetchOperatorByNumeroBio } from '../../clients/agence-bio.client.js'
 import { decodeAuthState, userRoles } from './auth.utils.js'
 
 const SESSION_COOKIE = 'cartobio_session'
@@ -28,12 +29,6 @@ function setSessionCookie(reply: FastifyReply, token: string, expiresAt: Date): 
 
 function clearSessionCookie(reply: FastifyReply): void {
   reply.clearCookie(SESSION_COOKIE, { path: SESSION_COOKIE_PATH, httpOnly: true, secure: true, sameSite: 'strict' })
-}
-
-function assertSameOriginRequest(request: FastifyRequest): void {
-  if (!request.headers['x-requested-with']) {
-    throw new ForbiddenApiError("l'en-tête X-Requested-With est obligatoire.")
-  }
 }
 
 export default async function authenticationRoutes(fastify: FastifyInstance): Promise<void> {
@@ -56,7 +51,7 @@ export default async function authenticationRoutes(fastify: FastifyInstance): Pr
     }
 
     const [operator, userProfile] = await Promise.all([
-      service.fetchOperatorByNumeroBio(decodedToken.numeroBio),
+      fetchOperatorByNumeroBio(decodedToken.numeroBio),
       service.getUserProfileById(decodedToken.userId)
     ])
 
@@ -93,7 +88,6 @@ export default async function authenticationRoutes(fastify: FastifyInstance): Pr
   })
 
   app.post('/api/auth-provider/refresh', refreshSchema, async (request, reply) => {
-    assertSameOriginRequest(request)
     const sessionToken = request.cookies[SESSION_COOKIE]
     if (!sessionToken) throw new InvalidCredentialsApiError('aucune session, veuillez vous connecter.')
 
@@ -107,7 +101,6 @@ export default async function authenticationRoutes(fastify: FastifyInstance): Pr
   })
 
   app.post('/api/auth-provider/logout', logoutSchema, async (request, reply) => {
-    assertSameOriginRequest(request)
     const sessionToken = request.cookies[SESSION_COOKIE]
     const idToken = sessionToken ? await service.endSession(sessionToken) : null
     clearSessionCookie(reply)

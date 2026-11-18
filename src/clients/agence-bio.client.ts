@@ -137,7 +137,7 @@ const memoFetchOperatorsForAdmin = memo(_fetchOperatorsForAdmin, {
   cacheKey: JSON.stringify
 })
 
-async function fetchUserOperators(userId: number): Promise<{ operators: AgenceBioNormalizedOperator[] }> {
+export async function fetchUserOperators(userId: number): Promise<{ operators: AgenceBioNormalizedOperator[] }> {
   const data = parseApiList(
     agenceBioOperatorSchema,
     parseApiResponse(
@@ -153,15 +153,15 @@ async function fetchUserOperators(userId: number): Promise<{ operators: AgenceBi
   }
 }
 
-async function fetchCustomersByOc(oc: number): Promise<OperatorWithNotification[]> {
+export async function fetchCustomersByOc(oc: number): Promise<OperatorWithNotification[]> {
   return (await memoFetchOperatorsByOc({ oc })).filter(hasNotification)
 }
 
-async function fetchOperatorsForAdmin(input = ''): Promise<OperatorWithNotification[]> {
+export async function fetchOperatorsForAdmin(input = ''): Promise<OperatorWithNotification[]> {
   return (await memoFetchOperatorsForAdmin({ input })).filter(hasNotification)
 }
 
-async function fetchOperatorByNumeroBio(numeroBio: string): Promise<AgenceBioNormalizedOperator> {
+export async function fetchOperatorByNumeroBio(numeroBio: string): Promise<AgenceBioNormalizedOperator> {
   const data = parseApiResponse(
     agenceBioOperatorSchema,
     await get(endpoint(`/api/operateur/${encodeURIComponent(numeroBio)}`), requestOptions).json(),
@@ -170,7 +170,7 @@ async function fetchOperatorByNumeroBio(numeroBio: string): Promise<AgenceBioNor
   return normalizeOperator(data)
 }
 
-async function fetchEmailForNumeroBio(numeroBio: string): Promise<AgenceBioOperatorEmails> {
+export async function fetchEmailForNumeroBio(numeroBio: string): Promise<AgenceBioOperatorEmails> {
   const data = parseApiResponse(
     agenceBioOperatorEmailsSchema,
     await get(endpoint(`/api/operateur/${encodeURIComponent(numeroBio)}/utilisateurs-emails`), requestOptions).json(),
@@ -190,10 +190,10 @@ async function fetchOcToken(token: string): Promise<OrganismeCertificateur> {
   )
 }
 
-const checkOcToken =
+export const checkOcToken =
   config.get('env') === 'test' ? fetchOcToken : memo(fetchOcToken, { cache: new ExpiryMap(5 * ONE_MINUTE) })
 
-function parsePacDetailsFromComment(commentaire?: string | null): {
+export function parsePacDetailsFromComment(commentaire?: string | null): {
   numeroIlot: string | null
   numeroParcelle: string | null
 } {
@@ -217,14 +217,4 @@ function parsePacDetailsFromComment(commentaire?: string | null): {
   }
 
   return result
-}
-
-export {
-  checkOcToken,
-  fetchOperatorByNumeroBio,
-  fetchUserOperators,
-  fetchCustomersByOc,
-  fetchOperatorsForAdmin,
-  parsePacDetailsFromComment,
-  fetchEmailForNumeroBio
 }

@@ -26,7 +26,7 @@ function localPdfFile(pathname: string): string | null {
   return null
 }
 
-async function restrictNetwork(page: Page): Promise<void> {
+export async function restrictNetwork(page: Page): Promise<void> {
   await page.setRequestInterception(true)
   page.on('request', (request): void => {
     const url = new URL(request.url())
@@ -48,7 +48,7 @@ async function restrictNetwork(page: Page): Promise<void> {
   })
 }
 
-async function launchStyleTab(browser: Browser, timeout = 30000): Promise<Page> {
+export async function launchStyleTab(browser: Browser, timeout = 30000): Promise<Page> {
   const page = await browser.newPage()
   await restrictNetwork(page)
   const filePath = `${PDF_ORIGIN}/map.html`
@@ -86,20 +86,25 @@ async function launchStyleTab(browser: Browser, timeout = 30000): Promise<Page> 
 
         // Timeout de sécurité
         window.setTimeout((): void => {
-          reject(new Error('Timeout lors du chargement du style'))
+          reject(new Error('Délai dépassé lors du chargement du style'))
         }, 20000)
       })
     }, style)
     return page
   } catch (error) {
     await page.close()
-    throw new Error(`Timeout lors du chargement de la page avec le style ${getErrorMessage(error)}`, {
+    throw new Error(`Délai dépassé lors du chargement de la page avec le style ${getErrorMessage(error)}`, {
       cause: error
     })
   }
 }
 
-function getOptimalZoom(bboxWidth: number, bboxHeight: number, viewportWidth: number, viewportHeight: number): number {
+export function getOptimalZoom(
+  bboxWidth: number,
+  bboxHeight: number,
+  viewportWidth: number,
+  viewportHeight: number
+): number {
   const WORLD_DIM = { width: 512, height: 512 }
   const ZOOM_MAX = 20
 
@@ -122,11 +127,11 @@ function getOptimalZoom(bboxWidth: number, bboxHeight: number, viewportWidth: nu
   return Math.min(zoomX, zoomY, ZOOM_MAX)
 }
 
-async function getAllParcelles(recordId: string, pac: boolean = false): Promise<Array<PdfParcelle>> {
+export async function getAllParcelles(recordId: string, pac: boolean = false): Promise<Array<PdfParcelle>> {
   return findPdfParcelles(recordId, pac)
 }
 
-function calculateGlobalBoundingBox(parcelles: Array<PdfParcelle>): BoundingBox | null {
+export function calculateGlobalBoundingBox(parcelles: Array<PdfParcelle>): BoundingBox | null {
   if (parcelles.length === 0) return null
 
   let minX = Infinity
@@ -153,7 +158,7 @@ function calculateGlobalBoundingBox(parcelles: Array<PdfParcelle>): BoundingBox 
   }
 }
 
-async function drawAllParcellesOnMap(
+export async function drawAllParcellesOnMap(
   page: Page,
   parcelles: Array<PdfParcelle>,
   { width, height, center, zoom, timeout }: MapDrawOptions
@@ -211,15 +216,15 @@ async function drawAllParcellesOnMap(
 
     await page.waitForFunction(() => typeof map !== 'undefined' && map.isStyleLoaded(), { timeout })
   } catch (err) {
-    logger.error({ err }, `Timeout exceeded (${timeout}ms)`)
-    return { error: `Timeout exceeded (${timeout}ms)` }
+    logger.error({ err }, `Délai dépassé (${timeout} ms)`)
+    return { error: `Délai dépassé (${timeout} ms)` }
   }
 
   const buffer = await page.screenshot({ type: 'jpeg', encoding: 'base64', quality: 50 })
   return { buffer }
 }
 
-async function drawParcelleHighlightOnMap(
+export async function drawParcelleHighlightOnMap(
   page: Page,
   parcelles: Array<PdfParcelle>,
   parcelleHighlight: PdfParcelle,
@@ -307,14 +312,14 @@ async function drawParcelleHighlightOnMap(
 
     await page.waitForFunction(() => typeof map !== 'undefined' && map.isStyleLoaded(), { timeout })
   } catch (err) {
-    return { error: `Timeout exceeded (${timeout}ms)`, err }
+    return { error: `Délai dépassé (${timeout} ms)`, err }
   }
 
   const buffer = await page.screenshot({ type: 'jpeg', encoding: 'base64', quality: 50 })
   return { buffer }
 }
 
-async function mergeAndAddFooter(
+export async function mergeAndAddFooter(
   pdfPaths: string[],
   name: string,
   deleteFilesAfter: boolean
@@ -359,12 +364,12 @@ async function mergeAndAddFooter(
   return mergedPdf
 }
 
-function formatDate(dateStr: string): string {
+export function formatDate(dateStr: string): string {
   const [year, month, day] = dateStr.split('-')
   return `${day}/${month}/${year}`
 }
 
-function formatRefCad(enter: string): string {
+export function formatRefCad(enter: string): string {
   // On retire les 5 premiers chiffres (code commune)
   const reste = enter.slice(5)
   // On sépare chiffres + lettres + chiffres
@@ -372,17 +377,4 @@ function formatRefCad(enter: string): string {
   if (!match) return reste
   const [, prefixe, lettres, numero] = match
   return `${prefixe} ${lettres} ${numero}`
-}
-
-export {
-  formatDate,
-  getOptimalZoom,
-  calculateGlobalBoundingBox,
-  launchStyleTab,
-  restrictNetwork,
-  drawParcelleHighlightOnMap,
-  drawAllParcellesOnMap,
-  mergeAndAddFooter,
-  getAllParcelles,
-  formatRefCad
 }

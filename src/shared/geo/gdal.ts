@@ -58,9 +58,9 @@ export const MAX_UNZIPPED_SIZE = 200 * 1024 * 1024
 
 export const GEO_DRIVERS = ['ESRI Shapefile', 'GeoJSON', 'KML', 'GPKG']
 
-const wgs84 = gdal.SpatialReference.fromProj4('+init=epsg:4326')
+export const wgs84 = gdal.SpatialReference.fromProj4('+init=epsg:4326')
 
-async function detectSrs(layer: gdal.Layer): Promise<gdal.SpatialReference> {
+export async function detectSrs(layer: gdal.Layer): Promise<gdal.SpatialReference> {
   if (layer.srs) {
     return layer.srs
   }
@@ -92,7 +92,7 @@ async function detectSrs(layer: gdal.Layer): Promise<gdal.SpatialReference> {
 /**
  * Unzip geographical files into a temporary directory
  */
-async function unzipGeographicalContent(buffer: Buffer): Promise<FileAnalysisResult> {
+export async function unzipGeographicalContent(buffer: Buffer): Promise<FileAnalysisResult> {
   let zip
 
   try {
@@ -169,7 +169,9 @@ async function identifyFiles(file: Promise<MultipartFile | undefined>): Promise<
   throw new InvalidRequestApiError('Format de fichier non-reconnu.')
 }
 
-async function parseAnyGeographicalArchive(file: Promise<MultipartFile | undefined>): Promise<FeatureCollection> {
+export async function parseAnyGeographicalArchive(
+  file: Promise<MultipartFile | undefined>
+): Promise<FeatureCollection> {
   const { files, cleanup } = await identifyFiles(file)
   const featureCollection: FeatureCollection = {
     type: 'FeatureCollection',
@@ -345,5 +347,3 @@ function stripZFromGeometry(geometry: gdal.Geometry | null): gdal.Geometry | nul
       return geometry.clone()
   }
 }
-
-export { detectSrs, parseAnyGeographicalArchive, unzipGeographicalContent, wgs84 }

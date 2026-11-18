@@ -13,18 +13,10 @@ import {
 import type { ImportStatus } from '../../database/validations/imports.js'
 import { logger } from '../../config/logger.js'
 
-export * from './sources/api-parcellaire.js'
-export * from './sources/certification.js'
-export * from './sources/douanes.js'
-export * from './sources/geofolia.js'
-export * from './sources/telepac.js'
-export { parseAnyGeographicalArchive } from '../../shared/geo/gdal.js'
-export { recordToApi, recordsToApi } from '../../shared/outputs/api.js'
-
 /**
  * Seule passe de validation : le validItem retourné contient le record déjà parsé et prêt pour l'insert.
  */
-async function collectValidationResult(
+export async function collectValidationResult(
   payload: unknown,
   { organismeCertificateur }: { organismeCertificateur: OrganismeCertificateur },
   jobId: number
@@ -162,11 +154,11 @@ async function parcellaireValidItemToDb(
   return { count, errors: dbErrors, warning, numeroBioValid, numeroBioError }
 }
 
-async function createImportJob(organismeCertificateurId: number): Promise<number> {
+export async function createImportJob(organismeCertificateurId: number): Promise<number> {
   return repository.insertImportJob(organismeCertificateurId)
 }
 
-async function addErrorJob(jobId: number, error: ErrorItem): Promise<void> {
+export async function addErrorJob(jobId: number, error: ErrorItem): Promise<void> {
   await repository.insertImportLog(jobId, {
     numeroBio: error.numeroBio,
     idParcelle: error.idParcelle ?? null,
@@ -177,7 +169,7 @@ async function addErrorJob(jobId: number, error: ErrorItem): Promise<void> {
   })
 }
 
-async function updateJobError(
+export async function updateJobError(
   numeroBioValid: Array<string | number>,
   numeroBioError: Array<{ numeroBio?: string | number }>,
   count: number,
@@ -197,7 +189,7 @@ async function updateJobError(
   })
 }
 
-async function getCurrentStatusJobs(
+export async function getCurrentStatusJobs(
   id: number | string,
   organismeCertificateur: number
 ): Promise<ImportJobStatusResult> {
@@ -232,7 +224,7 @@ async function getCurrentStatusJobs(
   return { status: 'error', error: `Statut inconnu : ${job.status}` }
 }
 
-async function updateImportJobStatus(
+export async function updateImportJobStatus(
   jobId: number,
   status: ImportStatus,
   result?: Record<string, unknown>
@@ -240,7 +232,7 @@ async function updateImportJobStatus(
   await repository.updateImportJobStatusResult(jobId, status, result)
 }
 
-async function failImportJob(jobId: number, error: unknown): Promise<void> {
+export async function failImportJob(jobId: number, error: unknown): Promise<void> {
   await repository.updateImportJobError(jobId, {
     name: error instanceof Error ? error.name : String(error),
     message: error instanceof Error ? error.message : String(error)
@@ -252,7 +244,7 @@ async function failImportJob(jobId: number, error: unknown): Promise<void> {
  * fait uniquement l'insert en base et collecte les warnings post-insert.
  * Appelé en fire-and-forget après la réponse au client.
  */
-async function processFullJob(jobId: number, validItem: ValidItem): Promise<void> {
+export async function processFullJob(jobId: number, validItem: ValidItem): Promise<void> {
   await updateImportJobStatus(jobId, importStatusEnumSchema.enum.PENDING)
   try {
     const result = await parcellaireValidItemToDb(validItem, jobId)
@@ -266,7 +258,7 @@ async function processFullJob(jobId: number, validItem: ValidItem): Promise<void
   }
 }
 
-async function getImportList({
+export async function getImportList({
   status,
   organismeCertificateur,
   from,
@@ -300,7 +292,7 @@ async function getImportList({
   }
 }
 
-async function getImportById({
+export async function getImportById({
   id,
   payload,
   organismeCertificateur
@@ -313,7 +305,7 @@ async function getImportById({
   return row ? normalizeJobReturn(row) : null
 }
 
-async function updateStatus(
+export async function updateStatus(
   jobId: number,
   record: Pick<InputApiRecordBody, 'numeroBio' | 'numeroClient' | 'dateAudit'>
 ): Promise<void> {
@@ -325,18 +317,4 @@ async function updateStatus(
       : null
 
   await repository.updateImportJobEtat(jobId, { numeroBio, numeroClient, auditDate })
-}
-
-export {
-  collectValidationResult,
-  updateImportJobStatus,
-  createImportJob,
-  failImportJob,
-  processFullJob,
-  updateStatus,
-  getCurrentStatusJobs,
-  getImportList,
-  getImportById,
-  addErrorJob,
-  updateJobError
 }

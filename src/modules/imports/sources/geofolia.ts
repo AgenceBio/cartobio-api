@@ -181,7 +181,7 @@ async function geofoliaRequestDataOrder(
   return orders.find(({ identificationCodes }) => identificationCodes.includes(numeroSiret))
 }
 
-async function geofoliaLookup(numeroSiret: string, year: number): Promise<boolean> {
+export async function geofoliaLookup(numeroSiret: string, year: number): Promise<boolean> {
   try {
     await geofoliaTriggerDataOrder(numeroSiret, year)
     return true
@@ -215,7 +215,7 @@ async function geofoliaFetchDataOrder(order: { id: string }): Promise<Buffer> {
     .then((data) => Buffer.from(data))
 }
 
-async function geofoliaParcellaire(numeroSiret: string): Promise<FeatureCollection | null> {
+export async function geofoliaParcellaire(numeroSiret: string): Promise<FeatureCollection | null> {
   const order = await geofoliaRequestDataOrder(numeroSiret)
 
   if (!order) {
@@ -227,7 +227,7 @@ async function geofoliaParcellaire(numeroSiret: string): Promise<FeatureCollecti
   return parseGeofoliaArchive(archive)
 }
 
-async function parseGeofoliaArchive(buffer: Buffer): Promise<FeatureCollection> {
+export async function parseGeofoliaArchive(buffer: Buffer): Promise<FeatureCollection> {
   let zip
   try {
     zip = new AdmZip(buffer)
@@ -253,5 +253,3 @@ async function parseGeofoliaArchive(buffer: Buffer): Promise<FeatureCollection> 
 
   return toWgs84(geojson, lambert93)
 }
-
-export { geofoliaLookup, geofoliaParcellaire, parseGeofoliaArchive }

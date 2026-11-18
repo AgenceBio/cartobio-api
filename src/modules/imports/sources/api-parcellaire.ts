@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { randomUUID } from 'node:crypto'
 import { polygon } from '@turf/helpers'
 import bboxPolygon from '@turf/bbox-polygon'
@@ -45,7 +46,22 @@ function buildFeatureError(parcelle: InputApiParcelleBody, message: string, code
   }
 }
 
-async function parseAPIParcellaire(
+const coordinatesSchema = z.array(
+  z.array(
+    z
+      .tuple(
+        [
+          z.number('les coordonnées doivent être des nombres finis'),
+          z.number('les coordonnées doivent être des nombres finis')
+        ],
+        z.number()
+      )
+      .refine(([, y]) => y >= -90 && y <= 90, 'la latitude doit être comprise entre 90 et -90')
+      .refine(([x]) => x >= -180 && x <= 180, 'la longitude doit être comprise entre 180 et -180')
+  )
+)
+
+export async function parseAPIParcellaire(
   payload: InputApiRecordBody,
   { organismeCertificateur }: { organismeCertificateur: OrganismeCertificateur }
 ): Promise<ParsedRecord> {
@@ -217,21 +233,9 @@ async function parseAPIParcellaire(
       }
 
       try {
-        coordinates = JSON.parse(parcelle.geom.replace(/}$/, ''))
-        coordinates.forEach((ring): void =>
-          ring.forEach(([x, y]): void => {
-            if (x === undefined || y === undefined || !Number.isFinite(x) || !Number.isFinite(y)) {
-              throw new Error('les coordonnées doivent être des nombres finis')
-            }
-            if (y > 90 || y < -90) {
-              throw new Error('la latitude doit être comprise entre 90 et -90')
-            }
-
-            if (x > 180 || x < -180) {
-              throw new Error('la longitude doit être comprise entre 180 et -180')
-            }
-          })
-        )
+        const parsed = coordinatesSchema.safeParse(JSON.parse(parcelle.geom.replace(/}$/, '')))
+        if (!parsed.success) throw new Error(parsed.error.issues[0]?.message)
+        coordinates = parsed.data
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         featureErrors.push(buildFeatureError(parcelle, 'champ geom incorrect : ' + message, ImportLogCode.INVALID_GEOM))
@@ -319,5 +323,3 @@ async function fetchOperator(numeroBio: string): Promise<AgenceBioNormalizedOper
     return null
   }
 }
-
-export { parseAPIParcellaire }

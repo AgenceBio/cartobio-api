@@ -25,7 +25,7 @@ import parcelles from '../fixtures/providers/parcelles.json' with { type: 'json'
 import otherParcelles from '../fixtures/providers/parcelles-aquacole-frontaliere.json' with { type: 'json' }
 /** TMP */
 import agencebioOperatorsApiResults from '../fixtures/providers/agence-bio-operateur-for-search.json' with { type: 'json' }
-import { evvClient, evvLookup, evvParcellaire } from '../../src/modules/imports/imports.service.js'
+import { evvClient, evvLookup, evvParcellaire } from '../../src/modules/imports/sources/douanes.js'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { normalizeRecord } from '../../src/shared/outputs/record.js'

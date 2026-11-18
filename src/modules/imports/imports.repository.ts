@@ -1,6 +1,6 @@
 import type { ImportLogCode } from '@agencebio/cartobio-types'
 import { randomUUID } from 'node:crypto'
-import { and, asc, desc, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, inArray, isNull, lte } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import { db, firstRow } from '../../database/database.js'
 import {
@@ -32,7 +32,7 @@ import type {
   OperatorRecordFilters
 } from './imports.types.js'
 
-async function completeImportJob({
+export async function completeImportJob({
   result,
   jobId,
   statutJob = null
@@ -50,7 +50,7 @@ async function completeImportJob({
           status: importStatusEnumSchema.enum.DONE,
           ...(statutJob ? { statutJob } : {})
         }),
-        endedAt: sql`now()`
+        endedAt: new Date()
       })
       .where(eq(parcellaireImport.id, Number(jobId)))
       .returning({ id: parcellaireImport.id })
@@ -59,7 +59,7 @@ async function completeImportJob({
   return id
 }
 
-async function insertImportLog(
+export async function insertImportLog(
   importId: string | number,
   {
     numeroBio,
@@ -90,7 +90,7 @@ async function insertImportLog(
   )
 }
 
-async function insertImportJob(organismeCertificateurId: number): Promise<number> {
+export async function insertImportJob(organismeCertificateurId: number): Promise<number> {
   const { id } = firstRow(
     await db
       .insert(parcellaireImport)
@@ -106,7 +106,7 @@ async function insertImportJob(organismeCertificateurId: number): Promise<number
   return id
 }
 
-async function insertPayload(jobId: string | number, payload: unknown): Promise<void> {
+export async function insertPayload(jobId: string | number, payload: unknown): Promise<void> {
   await db
     .insert(parcellaireImportPayload)
     .values(createImportPayloadSchema.parse({ id: randomUUID(), importId: Number(jobId), payload }))
@@ -116,16 +116,16 @@ async function insertPayload(jobId: string | number, payload: unknown): Promise<
  * Renseigne les informations du record et détermine s'il s'agit d'une création
  * ou de la mise à jour d'un parcellaire existant (colonne etat)
  */
-async function updateImportJobEtat(
+export async function updateImportJobEtat(
   jobId: string | number,
   { numeroBio, numeroClient, auditDate }: ImportJobRecordInfos
 ): Promise<void> {
   const parcellaireExistant =
-    numeroBio !== null && numeroClient !== null && auditDate !== null
+    numeroBio !== null && /^\d+$/.test(numeroBio) && numeroClient !== null && auditDate !== null
       ? (await db.$count(
           parcellaires,
           and(
-            /^\d+$/.test(numeroBio) ? eq(parcellaires.numeroBio, Number(numeroBio)) : sql`false`,
+            eq(parcellaires.numeroBio, Number(numeroBio)),
             eq(parcellaires.auditDate, auditDate),
             isNull(parcellaires.deletedAt)
           )
@@ -150,14 +150,17 @@ async function updateImportJobEtat(
     .where(eq(parcellaireImport.id, Number(jobId)))
 }
 
-async function updateImportJobResult(jobId: string | number, statutJob: ImportJobResult): Promise<void> {
+export async function updateImportJobResult(jobId: string | number, statutJob: ImportJobResult): Promise<void> {
   await db
     .update(parcellaireImport)
     .set(updateImportJobSchema.parse({ statutJob }))
     .where(eq(parcellaireImport.id, Number(jobId)))
 }
 
-async function updateImportJobError(jobId: string | number, result: { name: string; message: string }): Promise<void> {
+export async function updateImportJobError(
+  jobId: string | number,
+  result: { name: string; message: string }
+): Promise<void> {
   await db
     .update(parcellaireImport)
     .set({
@@ -166,12 +169,12 @@ async function updateImportJobError(jobId: string | number, result: { name: stri
         statutJob: importJobResultEnumSchema.enum.ERROR,
         resultJob: result
       }),
-      endedAt: sql`now()`
+      endedAt: new Date()
     })
     .where(eq(parcellaireImport.id, Number(jobId)))
 }
 
-async function failInterruptedImportJobs(): Promise<number> {
+export async function failInterruptedImportJobs(): Promise<number> {
   const { rowCount } = await db
     .update(parcellaireImport)
     .set({
@@ -183,18 +186,18 @@ async function failInterruptedImportJobs(): Promise<number> {
           message: "Le traitement de l'import a été interrompu."
         }
       }),
-      endedAt: sql`now()`
+      endedAt: new Date()
     })
     .where(
       and(
         inArray(parcellaireImport.status, [importStatusEnumSchema.enum.CREATED, importStatusEnumSchema.enum.PENDING]),
-        lte(parcellaireImport.createdAt, sql`now() - interval '1 hour'`)
+        lte(parcellaireImport.createdAt, new Date(Date.now() - 60 * 60 * 1000))
       )
     )
   return rowCount ?? 0
 }
 
-async function findImportJob(id: string | number, organisme: number): Promise<ImportJobRow | null> {
+export async function findImportJob(id: string | number, organisme: number): Promise<ImportJobRow | null> {
   const [job] = await db
     .select({
       status: parcellaireImport.status,
@@ -211,7 +214,7 @@ async function findImportJob(id: string | number, organisme: number): Promise<Im
   return job ?? null
 }
 
-async function updateImportJobStatusResult(
+export async function updateImportJobStatusResult(
   jobId: string | number,
   status: ImportStatus,
   result?: Record<string, unknown>
@@ -221,13 +224,13 @@ async function updateImportJobStatusResult(
     .set({
       ...updateImportJobSchema.parse({ status, resultJob: result ?? {} }),
       ...(status === importStatusEnumSchema.enum.DONE || status === importStatusEnumSchema.enum.ERROR
-        ? { endedAt: sql`now()` }
+        ? { endedAt: new Date() }
         : {})
     })
     .where(eq(parcellaireImport.id, Number(jobId)))
 }
 
-async function findImportList({
+export async function findImportList({
   status,
   organismeCertificateur: organisme,
   from,
@@ -291,7 +294,7 @@ async function findImportList({
   return { rows, total }
 }
 
-async function findImportById(
+export async function findImportById(
   id: string | number,
   organisme: number,
   includePayload: boolean
@@ -316,7 +319,7 @@ async function findImportById(
   return row ?? null
 }
 
-async function findLastOperatorRecord(
+export async function findLastOperatorRecord(
   numeroBio: string | number,
   { anneeAudit = null, statut = null }: OperatorRecordFilters = {}
 ): Promise<DBOperatorRecord | null> {
@@ -338,7 +341,7 @@ async function findLastOperatorRecord(
   return record ?? null
 }
 
-async function findOperatorLastRecords(
+export async function findOperatorLastRecords(
   ocId: number,
   {
     anneeAudit = null,
@@ -372,21 +375,4 @@ async function findOperatorLastRecords(
   }
 
   return query
-}
-
-export {
-  completeImportJob,
-  insertImportLog,
-  insertImportJob,
-  insertPayload,
-  updateImportJobEtat,
-  updateImportJobResult,
-  updateImportJobError,
-  failInterruptedImportJobs,
-  findImportJob,
-  updateImportJobStatusResult,
-  findImportList,
-  findImportById,
-  findLastOperatorRecord,
-  findOperatorLastRecords
 }

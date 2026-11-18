@@ -6,11 +6,11 @@ import { failInterruptedImportJobs } from '../../../src/modules/imports/imports.
 import {
   getImportById,
   getImportList,
-  parseAPIParcellaire,
   getCurrentStatusJobs,
   updateImportJobStatus,
   updateStatus
 } from '../../../src/modules/imports/imports.service.js'
+import { parseAPIParcellaire } from '../../../src/modules/imports/sources/api-parcellaire.js'
 
 import { fetchOperatorByNumeroBio, parsePacDetailsFromComment } from '../../../src/clients/agence-bio.client.js'
 import { buildOperator } from '../../factories.js'

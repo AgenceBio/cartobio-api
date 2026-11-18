@@ -1,7 +1,7 @@
-import { and, eq, sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import type { SQL, SQLWrapper } from 'drizzle-orm'
-import type { PgInsertValue } from 'drizzle-orm/pg-core'
-import { EventType } from '@agencebio/cartobio-types'
+import type { PgColumn, PgInsertValue, PgUpdateSetSource } from 'drizzle-orm/pg-core'
+import { EventType, toIsoDate, toIsoDateTime } from '@agencebio/cartobio-types'
 import type { IsoDate, IsoDateTime } from '@agencebio/cartobio-types'
 import type { Polygon } from 'geojson'
 import type {
@@ -22,14 +22,28 @@ import {
   territoires
 } from '../../database/schema/index.js'
 import { areaHa, asGeoJSON } from '../../database/postgis.js'
+import type { DBParcelle, ParcelleRow } from './parcellaires.types.js'
 import {
   annotationCodes,
   createParcelleAttributesSchema,
   updateParcelleSchema
 } from '../../database/validations/parcelles.js'
 
-function engagementDateAB(conversionNiveau: SQL, engagementDate: SQL): SQL {
-  return sql`CASE WHEN ${conversionNiveau} = 'AB' AND ${engagementDate} IS NULL THEN DATE '1900-01-01' ELSE ${engagementDate} END`
+export function engagementDateAB(conversionNiveau: string | null, engagementDate: string | null): string | null {
+  return conversionNiveau === 'AB' && engagementDate === null ? '1900-01-01' : engagementDate
+}
+
+function engagementDateUpdate(
+  conversionNiveau: string | null | undefined,
+  engagementDate: string | null | undefined
+): string | null | SQL | undefined {
+  if (conversionNiveau !== undefined && engagementDate !== undefined)
+    return engagementDateAB(conversionNiveau, engagementDate)
+  if (engagementDate) return engagementDate
+  if (conversionNiveau === 'AB') return sql`coalesce(${parcelles.engagementDate}, DATE '1900-01-01')`
+  if (conversionNiveau !== undefined) return undefined
+  if (engagementDate === null) return sql`CASE WHEN ${parcelles.conversionNiveau} = 'AB' THEN DATE '1900-01-01' END`
+  return sql`CASE WHEN ${parcelles.conversionNiveau} = 'AB' AND ${parcelles.engagementDate} IS NULL THEN DATE '1900-01-01' ELSE ${parcelles.engagementDate} END`
 }
 
 export function communeLaPlusProche(geometry: SQLWrapper): SQL {
@@ -45,13 +59,22 @@ export function communeLaPlusProche(geometry: SQLWrapper): SQL {
   )`
 }
 
-function communeEtEtranger(commune: SQL, etranger: SQL, geometry: SQLWrapper): { commune: SQL; etranger: SQL } {
+function communeEtEtranger<E extends boolean | SQLWrapper>(
+  commune: string | null | SQLWrapper,
+  etranger: E,
+  geometry: SQLWrapper
+): { commune: string | SQL; etranger: E | SQL } {
+  if (typeof commune === 'string') return { commune, etranger }
+
   const valid = sql`CASE WHEN ST_IsValid(${geometry}) THEN ${geometry} ELSE ST_MakeValid(${geometry}, 'method=structure') END`
   const horsTerritoires = sql`NOT EXISTS (SELECT 1 FROM ${territoires} WHERE ST_Intersects(${valid}, ${territoires.geometry}))`
-  const renseignee = sql`nullif(${commune}, '') IS NOT NULL`
+  const communeCalculee = sql`CASE WHEN ${horsTerritoires} THEN NULL ELSE ${communeLaPlusProche(valid)} END`
 
+  if (commune === null) return { commune: communeCalculee, etranger: horsTerritoires }
+
+  const renseignee = sql`nullif(${commune}, '') IS NOT NULL`
   return {
-    commune: sql`CASE WHEN ${renseignee} THEN ${commune} WHEN ${horsTerritoires} THEN NULL ELSE ${communeLaPlusProche(valid)} END`,
+    commune: sql`CASE WHEN ${renseignee} THEN ${commune} ELSE ${communeCalculee} END`,
     etranger: sql`CASE WHEN ${renseignee} THEN ${etranger} ELSE ${horsTerritoires} END`
   }
 }
@@ -61,21 +84,25 @@ export function parcelleInsertValues(
   id: string,
   properties: FeaturePropertiesInput,
   geometry: SQL,
-  etranger: SQL,
+  etranger: boolean,
   from: string[] | null = null
 ): PgInsertValue<typeof parcelles> {
-  assertParcelleProperties(properties)
-  const conversionNiveau = sql`${properties.conversion_niveau || null}::cartobio.conversion_niveau`
-  const localisation = communeEtEtranger(sql`${blankToNull(properties.COMMUNE)}::text`, etranger, geometry)
+  const conversionNiveau = blankToNull(properties.conversion_niveau)
+  const localisation = communeEtEtranger(blankToNull(properties.COMMUNE), etranger, geometry)
 
   return {
     ...createParcelleAttributesSchema.parse({
       recordId,
       id,
+      conversionNiveau,
+      engagementDate: engagementDateAB(conversionNiveau, blankToNull(properties.engagement_date)),
       commentaireOperateur: blankToNull(properties.commentaires),
       auditeurNotesParcelles: blankToNull(properties.auditeur_notes),
       name: blankToNull(properties.NOM),
       numeroPacage: blankToNull(properties.PACAGE),
+      numeroIlotPac: blankToNull(properties.NUMERO_I),
+      numeroParcellesPac: blankToNull(properties.NUMERO_P),
+      referenceCadastre: properties.cadastre ?? null,
       codeCulturePac: blankToNull(properties.TYPE),
       codePrecisionPac: blankToNull(properties.CODE_VAR),
       fromParcelles: from
@@ -83,72 +110,38 @@ export function parcelleInsertValues(
     geometry,
     surfaceHa: areaHa(geometry),
     commune: localisation.commune,
-    etranger: localisation.etranger,
-    conversionNiveau,
-    engagementDate: engagementDateAB(
-      conversionNiveau,
-      sql`nullif(${properties.engagement_date ?? null}::text, '')::date`
-    ),
-    createdAt: sql`now()`,
-    updatedAt: sql`now()`,
-    numeroIlotPac: sql`${blankToNull(properties.NUMERO_I)}::smallint`,
-    numeroParcellesPac: sql`${blankToNull(properties.NUMERO_P)}::smallint`,
-    referenceCadastre: sql`${properties.cadastre ?? null}::text[]`
+    etranger: localisation.etranger
   }
-}
-
-function assertParcelleProperties(properties: FeaturePropertiesInput): void {
-  const values = Object.fromEntries(
-    Object.entries({
-      conversionNiveau: properties.conversion_niveau,
-      commentaireOperateur: properties.commentaires,
-      auditeurNotesParcelles: properties.auditeur_notes,
-      name: properties.NOM,
-      numeroPacage: properties.PACAGE,
-      numeroIlotPac: properties.NUMERO_I,
-      numeroParcellesPac: properties.NUMERO_P,
-      referenceCadastre: properties.cadastre,
-      codeCulturePac: properties.TYPE,
-      codePrecisionPac: properties.CODE_VAR,
-      attentePac: properties.attente_pac,
-      etranger: properties.etranger
-    }).filter(([, value]) => blankToNull(value) !== null)
-  )
-
-  if (Object.keys(values).length > 0) updateParcelleSchema.parse(values)
 }
 
 export function parcelleUpdateSet(
   properties: FeaturePropertiesInput,
   geometry: SQLWrapper,
-  etranger: SQL
-): Record<string, SQL> {
-  assertParcelleProperties(properties)
-  const conversionNiveau =
-    properties.conversion_niveau === ''
-      ? sql`NULL`
-      : sql`coalesce(${properties.conversion_niveau ?? null}::cartobio.conversion_niveau, ${parcelles.conversionNiveau})`
-  const localisation = communeEtEtranger(coalesceBlank(properties.COMMUNE, parcelles.commune), etranger, geometry)
+  etranger: boolean | PgColumn
+): PgUpdateSetSource<typeof parcelles> {
+  const values = definedOnly({
+    conversionNiveau: updatedValue(properties.conversion_niveau),
+    engagementDate: updatedValue(properties.engagement_date),
+    commentaireOperateur: updatedValue(properties.commentaires),
+    auditeurNotesParcelles: updatedValue(properties.auditeur_notes),
+    name: updatedValue(properties.NOM),
+    numeroPacage: updatedValue(properties.PACAGE),
+    numeroIlotPac: updatedValue(properties.NUMERO_I),
+    numeroParcellesPac: updatedValue(properties.NUMERO_P),
+    referenceCadastre: properties.cadastre ?? undefined,
+    codeCulturePac: updatedValue(properties.TYPE),
+    codePrecisionPac: updatedValue(properties.CODE_VAR)
+  })
+  const parsed = Object.keys(values).length > 0 ? updateParcelleSchema.parse(values) : {}
+  const commune = updatedValue(properties.COMMUNE)
+  const localisation = communeEtEtranger(commune === undefined ? parcelles.commune : commune, etranger, geometry)
 
-  return {
+  return definedOnly({
+    ...parsed,
     commune: localisation.commune,
     etranger: localisation.etranger,
-    conversionNiveau,
-    engagementDate: engagementDateAB(
-      conversionNiveau,
-      sql`nullif(coalesce(${properties.engagement_date ?? null}::text, ${parcelles.engagementDate}::text), '')::date`
-    ),
-    commentaireOperateur: coalesceBlank(properties.commentaires, parcelles.commentaireOperateur),
-    auditeurNotesParcelles: coalesceBlank(properties.auditeur_notes, parcelles.auditeurNotesParcelles),
-    updatedAt: sql`now()`,
-    name: coalesceBlank(properties.NOM, parcelles.name),
-    numeroPacage: coalesceBlank(properties.PACAGE, parcelles.numeroPacage),
-    numeroIlotPac: coalesceBlank(properties.NUMERO_I, parcelles.numeroIlotPac, 'smallint'),
-    numeroParcellesPac: coalesceBlank(properties.NUMERO_P, parcelles.numeroParcellesPac, 'smallint'),
-    referenceCadastre: sql`coalesce(${properties.cadastre ?? null}::text[], ${parcelles.referenceCadastre})`,
-    codeCulturePac: coalesceBlank(properties.TYPE, parcelles.codeCulturePac),
-    codePrecisionPac: coalesceBlank(properties.CODE_VAR, parcelles.codePrecisionPac)
-  }
+    engagementDate: engagementDateUpdate(parsed.conversionNiveau, parsed.engagementDate)
+  })
 }
 
 export function setHistoryUsers<T extends { audit_history: HistoryEntry[] }>(
@@ -169,13 +162,16 @@ export function blankToNull<T>(value: T | null | undefined): T | null {
   return typeof value === 'string' && !value.trim() ? null : (value ?? null)
 }
 
-export function coalesceBlank(
-  value: string | number | null | undefined,
-  column: SQLWrapper,
-  type: 'text' | 'smallint' = 'text'
-): SQL {
-  if (value != null && blankToNull(value) === null) return sql`NULL`
-  return sql`coalesce(${value ?? null}::${sql.raw(type)}, ${column})`
+export function updatedValue<T>(value: T | null | undefined): T | null | undefined {
+  return value == null ? undefined : blankToNull(value)
+}
+
+export function definedOnly<T extends Record<string, unknown>>(
+  values: T
+): { [K in keyof T]?: Exclude<T[K], undefined> } {
+  return Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined)) as {
+    [K in keyof T]?: Exclude<T[K], undefined>
+  }
 }
 
 export const INSERT_BATCH_SIZE = 1000
@@ -266,70 +262,79 @@ export const recordColumns = {
   mixite: parcellaires.mixite
 }
 
-export function culturesJson(recordId: SQLWrapper, parcelleId: SQLWrapper): SQL<CartoBioCulture[]> {
-  return sql<CartoBioCulture[]>`COALESCE((
-    SELECT jsonb_agg(${withoutNullKeys(sql`jsonb_build_object(
-      'id', ${parcelleCultures.id}::text,
-      'CPF', ${parcelleCultures.cpf},
-      'TYPE', ${parcelleCultures.codeCultureImport},
-      'variete', ${parcelleCultures.variete},
-      'surface', ${parcelleCultures.surface},
-      'unit', ${parcelleCultures.unit},
-      'date_semis', ${parcelleCultures.dateSemis},
-      'commentaire', ${parcelleCultures.commentaire}
-    )`)} ORDER BY ${parcelleCultures.position})
-    FROM ${parcelleCultures}
-    WHERE ${and(eq(parcelleCultures.recordId, recordId), eq(parcelleCultures.parcelleId, parcelleId))}
-  ), '[]'::jsonb)`
+export function withoutNulls<T extends Record<string, unknown>>(values: T): T {
+  return Object.fromEntries(Object.entries(values).filter(([, value]) => value != null)) as T
 }
 
-const legacyAnnotationCode = sql.join(
-  Object.entries(annotationCodes).map(([code, type]) => sql`WHEN ${type} THEN ${code}::text`),
-  sql` `
-)
+const annotationCodeByType = Object.fromEntries(
+  Object.entries(annotationCodes).map(([code, type]) => [type, code])
+) as Record<string, string | undefined>
 
-function annotationsJson(recordId: SQLWrapper, parcelleId: SQLWrapper): SQL<CartoBioAnnotation[]> {
-  return sql<CartoBioAnnotation[]>`COALESCE((
-    SELECT jsonb_agg(${withoutNullKeys(sql`jsonb_build_object(
-      'id', ${parcellesAnnotations.id},
-      'code', CASE ${parcellesAnnotations.typeAnnot}::text ${legacyAnnotationCode} END,
-      'date', ${isoTimestamp(parcellesAnnotations.createdAt)},
-      'metadata', ${parcellesAnnotations.metadata}
-    )`)} ORDER BY ${parcellesAnnotations.createdAt})
-    FROM ${parcellesAnnotations}
-    WHERE ${and(eq(parcellesAnnotations.recordId, recordId), eq(parcellesAnnotations.parcelleId, parcelleId))}
-  ), '[]'::jsonb)`
+export function toCulture(row: typeof parcelleCultures.$inferSelect): CartoBioCulture {
+  return withoutNulls({
+    id: row.id,
+    CPF: row.cpf,
+    TYPE: row.codeCultureImport,
+    variete: row.variete,
+    surface: row.surface === null ? null : Number(row.surface),
+    unit: row.unit,
+    date_semis: row.dateSemis,
+    commentaire: row.commentaire
+  }) as CartoBioCulture
 }
 
-const legacyStatutImportGeom: SQL<string | null> = sql<
-  string | null
->`CASE ${parcelles.statutImportGeom}::text WHEN 'ACCEPTE_NON_CORRIGE' THEN 'ACCEPTENONCORRIGE' ELSE ${parcelles.statutImportGeom}::text END`
+export function toAnnotation(row: typeof parcellesAnnotations.$inferSelect): CartoBioAnnotation {
+  return withoutNulls({
+    id: row.id,
+    code: annotationCodeByType[row.typeAnnot],
+    date: toIsoDateTime(row.createdAt),
+    metadata: row.metadata
+  }) as CartoBioAnnotation
+}
+
+export function parcelleKey(recordId: string, parcelleId: string): string {
+  return `${recordId}/${parcelleId}`
+}
+
+export function toDBParcelle(
+  row: ParcelleRow,
+  cultures: CartoBioCulture[],
+  annotations: CartoBioAnnotation[]
+): DBParcelle {
+  return {
+    ...row,
+    cultures,
+    annotations,
+    engagement_date: row.engagement_date === null ? null : toIsoDate(row.engagement_date),
+    created: toIsoDateTime(row.created),
+    updated: toIsoDateTime(row.updated),
+    numero_ilot_pac: row.numero_ilot_pac === null ? null : String(row.numero_ilot_pac),
+    numero_parcelle_pac: row.numero_parcelle_pac === null ? null : String(row.numero_parcelle_pac),
+    statut_import_geom: row.statut_import_geom === 'ACCEPTE_NON_CORRIGE' ? 'ACCEPTENONCORRIGE' : row.statut_import_geom
+  }
+}
 
 export const parcelleColumns = {
   record_id: parcelles.recordId,
   id: parcelles.id,
   geometry: asGeoJSON<Polygon>(parcelles.geometry),
   commune: parcelles.commune,
-  commune_label: sql<
-    string | null
-  >`(SELECT ${communes.nom} FROM ${communes} WHERE ${communes.fid} = ${parcelles.commune})`,
-  cultures: culturesJson(parcelles.recordId, parcelles.id),
+  commune_label: communes.nom,
   conversion_niveau: parcelles.conversionNiveau,
-  engagement_date: isoDay(parcelles.engagementDate),
+  engagement_date: parcelles.engagementDate,
   commentaire: parcelles.commentaireOperateur,
   auditeur_notes: parcelles.auditeurNotesParcelles,
-  annotations: annotationsJson(parcelles.recordId, parcelles.id),
-  created: isoTimestamp(parcelles.createdAt),
-  updated: isoTimestamp(parcelles.updatedAt),
+  created: parcelles.createdAt,
+  updated: parcelles.updatedAt,
   name: parcelles.name,
   numero_pacage: parcelles.numeroPacage,
-  numero_ilot_pac: sql<string | null>`${parcelles.numeroIlotPac}::text`,
-  numero_parcelle_pac: sql<string | null>`${parcelles.numeroParcellesPac}::text`,
+  numero_ilot_pac: parcelles.numeroIlotPac,
+  numero_parcelle_pac: parcelles.numeroParcellesPac,
   reference_cadastre: parcelles.referenceCadastre,
   code_culture_pac: parcelles.codeCulturePac,
   code_precision_pac: parcelles.codePrecisionPac,
   etranger: parcelles.etranger,
-  statut_import_geom: legacyStatutImportGeom,
+  statut_import_geom: parcelles.statutImportGeom,
   attente_pac: parcelles.attentePac,
   from_parcelles: parcelles.fromParcelles,
   deleted_at: parcelles.deletedAt

@@ -7,7 +7,7 @@ import { db, firstRow } from './database/database.js'
 import { failInterruptedImportJobs } from './modules/imports/imports.repository.js'
 import { failInterruptedAttestationsProductions } from './modules/exports/exports.repository.js'
 
-async function start(): Promise<void> {
+export async function start(): Promise<void> {
   try {
     await access(config.get('attestationsProductions.directory'), constants.W_OK)
 
@@ -52,5 +52,3 @@ async function start(): Promise<void> {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   start()
 }
-
-export { start }

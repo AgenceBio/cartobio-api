@@ -293,7 +293,7 @@ describe('session', () => {
       .post('/api/auth-provider/refresh')
       .set('Cookie', `cartobio_session=${token}`)
 
-    expect(response.status).toBe(403)
+    expect(response.status).toBe(400)
   })
 
   test.each([

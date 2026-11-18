@@ -79,7 +79,7 @@ function releasePdfSlot(): void {
   else runningPdfGenerations--
 }
 
-async function* generatePDF(
+export async function* generatePDF(
   numeroBio: string,
   recordId: string,
   force = false,
@@ -156,7 +156,7 @@ async function* generatePDF(
   }
 }
 
-async function deleteRecordAttestations(recordId: string): Promise<void> {
+export async function deleteRecordAttestations(recordId: string): Promise<void> {
   const directory = config.get('attestationsProductions.directory')
   const files = (await fs.promises.readdir(directory)).filter(
     (file) => file.includes(recordId) && file.toLowerCase().endsWith('.pdf')
@@ -165,7 +165,7 @@ async function deleteRecordAttestations(recordId: string): Promise<void> {
   await repository.deleteAttestationsProductions(recordId)
 }
 
-async function exportDataOcId(
+export async function exportDataOcId(
   ocId: number,
   filter: ExportParcellaireBody['payload'],
   userId: number
@@ -199,6 +199,3 @@ async function exportDataOcId(
     }
   })
 }
-
-export { findValidAttestationProduction } from './exports.repository.js'
-export { generatePDF, exportDataOcId, deleteRecordAttestations }

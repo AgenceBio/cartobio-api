@@ -1,6 +1,8 @@
 import type { Polygon } from 'geojson'
 import type { SelectResultFields } from 'drizzle-orm/query-builders/select.types'
 import type {
+  CartoBioAnnotation,
+  CartoBioCulture,
   CartoBioFeatureCollectionInput,
   CartoBioHistoriqueCulture,
   IsoDate,
@@ -18,7 +20,22 @@ export type GeometryAnalysis = {
 
 type DBRecord = SelectResultFields<typeof recordColumns>
 
-export type DBParcelle = SelectResultFields<typeof parcelleColumns> & {
+export type ParcelleRow = Omit<SelectResultFields<typeof parcelleColumns>, 'commune_label'> & {
+  commune_label: string | null
+}
+
+export type DBParcelle = Omit<
+  ParcelleRow,
+  'engagement_date' | 'created' | 'updated' | 'numero_ilot_pac' | 'numero_parcelle_pac' | 'statut_import_geom'
+> & {
+  cultures: CartoBioCulture[]
+  annotations: CartoBioAnnotation[]
+  engagement_date: IsoDate | null
+  created: IsoDateTime
+  updated: IsoDateTime
+  numero_ilot_pac: string | null
+  numero_parcelle_pac: string | null
+  statut_import_geom: string | null
   controlee?: boolean
   historique_cultures?: CartoBioHistoriqueCulture[]
 }

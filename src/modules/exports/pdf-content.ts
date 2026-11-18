@@ -22,7 +22,7 @@ import type { MapImagesOptions, OperatorMapImages, PdfParcelle, PdfRecord } from
 import { logger } from '../../config/logger.js'
 import config from '../../config/env.js'
 
-async function generateOperatorMapImages(
+export async function generateOperatorMapImages(
   parcelles: PdfParcelle[],
   page: Page,
   options: MapImagesOptions = {}
@@ -90,7 +90,7 @@ async function generateOperatorMapImages(
   }
 }
 
-async function createPdfContent(
+export async function createPdfContent(
   numeroBio: string,
   recordId: string,
   parcelles: Array<PdfParcelle>,
@@ -883,5 +883,3 @@ async function renderPdfContent(
   }
   return pdf
 }
-
-export { createPdfContent, generateOperatorMapImages }

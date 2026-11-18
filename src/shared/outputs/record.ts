@@ -6,7 +6,7 @@ import type { DBOperatorRecordWithParcelles, RecordSummaryRow } from '../parcell
 /**
  * Normalize a record
  */
-function normalizeRecord(record: DBOperatorRecordWithParcelles): NormalizedRecord {
+export function normalizeRecord(record: DBOperatorRecordWithParcelles): NormalizedRecord {
   const features = (record?.parcelles ?? []).map(normalizeParcelle)
 
   return {
@@ -16,13 +16,13 @@ function normalizeRecord(record: DBOperatorRecordWithParcelles): NormalizedRecor
   }
 }
 
-function normalizeRecordSummary(record: RecordSummaryRow): NormalizedRecordSummary {
+export function normalizeRecordSummary(record: RecordSummaryRow): NormalizedRecordSummary {
   return {
     ...record
   }
 }
 
-function normalizeEtatProduction(
+export function normalizeEtatProduction(
   etat: string,
   options: { strict: boolean } = { strict: false }
 ): EtatProduction | string {
@@ -37,7 +37,7 @@ function normalizeEtatProduction(
   return etat
 }
 
-function redactAuditNotes(record: NormalizedRecord): NormalizedRecord {
+export function redactAuditNotes(record: NormalizedRecord): NormalizedRecord {
   record.audit_notes = null
   record.audit_demandes = null
   record.parcelles = {
@@ -50,5 +50,3 @@ function redactAuditNotes(record: NormalizedRecord): NormalizedRecord {
   }
   return record
 }
-
-export { normalizeRecord, normalizeRecordSummary, normalizeEtatProduction, redactAuditNotes }

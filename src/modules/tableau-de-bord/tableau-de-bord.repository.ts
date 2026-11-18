@@ -88,7 +88,11 @@ async function findErrorLogsByJobId(jobIds: number[]): Promise<Record<number, Er
   return logsByJobId
 }
 
-async function findGeneralKpi({ from, to, organismeCertificateur }: DateRange): Promise<GeneralKpiResponse['data']> {
+export async function findGeneralKpi({
+  from,
+  to,
+  organismeCertificateur
+}: DateRange): Promise<GeneralKpiResponse['data']> {
   const [bilanRows, [anomalyRow]] = await Promise.all([
     db
       .select({
@@ -138,7 +142,7 @@ async function findGeneralKpi({ from, to, organismeCertificateur }: DateRange): 
   }
 }
 
-async function findTableauBilan({
+export async function findTableauBilan({
   from,
   to,
   organismeCertificateur,
@@ -189,7 +193,7 @@ async function findTableauBilan({
   }
 }
 
-async function findTableauErreurs({
+export async function findTableauErreurs({
   from,
   to,
   page,
@@ -257,7 +261,7 @@ async function findTableauErreurs({
   }
 }
 
-async function findHistoriqueParcellaire({
+export async function findHistoriqueParcellaire({
   numeroBio,
   numeroClient,
   auditDate,
@@ -309,7 +313,7 @@ async function findHistoriqueParcellaire({
   }))
 }
 
-async function findTopAnomalies({
+export async function findTopAnomalies({
   from,
   to,
   organismeCertificateur
@@ -340,7 +344,7 @@ async function findTopAnomalies({
   return rows.map((row) => ({ ...row, period: toIsoDateTime(row.period) }))
 }
 
-async function findTopAnomaliesGrouped({
+export async function findTopAnomaliesGrouped({
   from,
   to,
   organismeCertificateur
@@ -399,12 +403,12 @@ async function findTopAnomaliesGrouped({
 
   const errorCount = sql<number>`COALESCE(${errorStats.count}, 0)`.mapWith(Number)
 
-  return db
+  const rows = await db
     .with(periodsCte, importStats, errorStats)
     .select({
       period: periodsCte.period,
-      accepted: sql<number>`COALESCE(${importStats.accepted}, 0)`.mapWith(Number),
-      refused: sql<number>`COALESCE(${importStats.refused}, 0)`.mapWith(Number),
+      accepted: importStats.accepted,
+      refused: importStats.refused,
       code: errorStats.code,
       errorCount
     })
@@ -412,9 +416,11 @@ async function findTopAnomaliesGrouped({
     .leftJoin(importStats, eq(importStats.period, periodsCte.period))
     .leftJoin(errorStats, eq(errorStats.period, periodsCte.period))
     .orderBy(asc(periodsCte.period), desc(errorCount))
+
+  return rows.map((row) => ({ ...row, accepted: Number(row.accepted ?? 0), refused: Number(row.refused ?? 0) }))
 }
 
-async function findEnvois({
+export async function findEnvois({
   from,
   to,
   recherche,
@@ -444,14 +450,4 @@ async function findEnvois({
   const logsByJobId = await findErrorLogsByJobId(rows.map((row) => row.jobId))
 
   return rows.map((row) => ({ ...row, erreurs: logsByJobId[row.jobId] ?? [] }))
-}
-
-export {
-  findGeneralKpi,
-  findTableauBilan,
-  findTableauErreurs,
-  findHistoriqueParcellaire,
-  findTopAnomalies,
-  findTopAnomaliesGrouped,
-  findEnvois
 }

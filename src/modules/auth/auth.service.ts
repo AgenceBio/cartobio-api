@@ -10,7 +10,7 @@ import * as repository from './auth.repository.js'
 import { accessTokenSchema, notificationsTokenSchema, ssoAccessTokenSchema } from './auth.tokens.js'
 import type { AccessToken, RefreshedSession } from './auth.types.js'
 import { InvalidCredentialsApiError } from '../../shared/errors.js'
-import { fetchOperatorByNumeroBio, fetchUserOperators } from '../../clients/agence-bio.client.js'
+import { fetchUserOperators } from '../../clients/agence-bio.client.js'
 import { organismeCertificateurSchema } from '@agencebio/cartobio-types'
 import type { AgenceBioNormalizedOperator, CartoBioUser, OrganismeCertificateur } from '@agencebio/cartobio-types'
 import { agenceBioUserByEmailSchema, agenceBioUserProfileSchema } from '../../clients/agence-bio.types.js'
@@ -66,7 +66,7 @@ const getCertificationBodies = memo(fetchCertificationBodies, {
   cache: new ExpiryMap(24 * oneHour)
 })
 
-async function getUserProfileById(userId: number): Promise<CartoBioUser> {
+export async function getUserProfileById(userId: number): Promise<CartoBioUser> {
   const [userProfile, certificationBodies] = await Promise.all([
     get(`${config.get('notifications.endpoint')}/api/users/${userId}`, {
       timeout: HTTP_TIMEOUT,
@@ -97,9 +97,9 @@ async function getUserProfileById(userId: number): Promise<CartoBioUser> {
   }
 }
 
-const getCachedUserProfile = memo(getUserProfileById, { cache: new ExpiryMap(5 * 60 * 1000) })
+export const getCachedUserProfile = memo(getUserProfileById, { cache: new ExpiryMap(5 * 60 * 1000) })
 
-async function getHistoryUser(userId: string | number, userRole: string | null): Promise<CartoBioUser> {
+export async function getHistoryUser(userId: string | number, userRole: string | null): Promise<CartoBioUser> {
   try {
     return await getCachedUserProfile(Number(userId))
   } catch (error) {
@@ -124,7 +124,7 @@ async function getHistoryUser(userId: string | number, userRole: string | null):
   }
 }
 
-async function getUserProfileFromSSOToken(accessToken: string): Promise<CartoBioUser> {
+export async function getUserProfileFromSSOToken(accessToken: string): Promise<CartoBioUser> {
   const { sub: email } = ssoAccessTokenSchema.parse(decode(accessToken))
   const userProfile = parseApiResponse(
     agenceBioUserByEmailSchema,
@@ -139,7 +139,7 @@ async function getUserProfileFromSSOToken(accessToken: string): Promise<CartoBio
   return getUserProfileById(userProfile.id)
 }
 
-function verifyNotificationAuthorization(
+export function verifyNotificationAuthorization(
   authorizationHeader: string | undefined
 ):
   | { decodedToken: NotificationsDecodedToken; token: string; error?: undefined }
@@ -152,7 +152,7 @@ function verifyNotificationAuthorization(
   }
 }
 
-async function canAccessOperator(user: CartoBioUser, operator: AgenceBioNormalizedOperator): Promise<boolean> {
+export async function canAccessOperator(user: CartoBioUser, operator: AgenceBioNormalizedOperator): Promise<boolean> {
   if (isAdmin(user)) return true
   if (isOperatorUser(user)) {
     const { operators } = await fetchUserOperators(user.id)
@@ -165,26 +165,29 @@ async function canAccessOperator(user: CartoBioUser, operator: AgenceBioNormaliz
 const hashToken = (token: string): string => createHash('sha256').update(token).digest('hex')
 const newRefreshToken = (): string => randomBytes(32).toString('base64url')
 
-function signAccessToken(userId: number): string {
+export function signAccessToken(userId: number): string {
   return signToken({ sub: String(userId), typ: 'session' })
 }
 
-function signExchangeToken(userId: number, numeroBio: string): string {
+export function signExchangeToken(userId: number, numeroBio: string): string {
   return signExchange({ sub: String(userId), typ: 'exchange', numeroBio })
 }
 
-function verifyAccessToken(token: string): AccessToken {
+export function verifyAccessToken(token: string): AccessToken {
   return accessTokenSchema.parse(verifyToken(token))
 }
 
-async function createSession(userId: number, idToken: string | null): Promise<{ token: string; expiresAt: Date }> {
+export async function createSession(
+  userId: number,
+  idToken: string | null
+): Promise<{ token: string; expiresAt: Date }> {
   const token = newRefreshToken()
   const expiresAt = new Date(Date.now() + SESSION_IDLE_DURATION)
   await repository.insertSession({ userId, tokenHash: hashToken(token), idToken, expiresAt })
   return { token, expiresAt }
 }
 
-async function refreshSession(token: string): Promise<RefreshedSession> {
+export async function refreshSession(token: string): Promise<RefreshedSession> {
   const tokenHash = hashToken(token)
   const session = await repository.findSessionByTokenHash(tokenHash)
   if (!session) throw new InvalidCredentialsApiError('session inconnue, veuillez vous reconnecter.')
@@ -215,25 +218,9 @@ async function refreshSession(token: string): Promise<RefreshedSession> {
   return { userId: session.userId, token: nextToken, expiresAt }
 }
 
-async function endSession(token: string): Promise<string | null> {
+export async function endSession(token: string): Promise<string | null> {
   const session = await repository.findSessionByTokenHash(hashToken(token))
   if (!session) return null
   await repository.deleteSession(session.id)
   return session.idToken
-}
-
-export {
-  canAccessOperator,
-  verifyNotificationAuthorization,
-  fetchOperatorByNumeroBio,
-  getUserProfileById,
-  getCachedUserProfile,
-  getHistoryUser,
-  getUserProfileFromSSOToken,
-  signAccessToken,
-  signExchangeToken,
-  verifyAccessToken,
-  createSession,
-  refreshSession,
-  endSession
 }

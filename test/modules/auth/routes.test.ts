@@ -4,16 +4,20 @@ import type { CartoBioUser } from '@agencebio/cartobio-types'
 import app from '../../../src/app.js'
 import config from '../../../src/config/env.js'
 import * as service from '../../../src/modules/auth/auth.service.js'
+import { fetchOperatorByNumeroBio } from '../../../src/clients/agence-bio.client.js'
 import { encodeAuthState } from '../../../src/modules/auth/auth.utils.js'
 import { buildOcUser, buildOperator } from '../../factories.js'
 
 vi.mock('../../../src/modules/auth/auth.service.js', async (importOriginal) => ({
   ...(await importOriginal()),
   verifyNotificationAuthorization: vi.fn(),
-  fetchOperatorByNumeroBio: vi.fn(),
   getUserProfileById: vi.fn(),
   canAccessOperator: vi.fn(),
   getUserProfileFromSSOToken: vi.fn()
+}))
+vi.mock('../../../src/clients/agence-bio.client.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  fetchOperatorByNumeroBio: vi.fn()
 }))
 
 const verify = createVerifier({ key: config.get('jwtSecret'), allowedIss: 'cartobio', allowedAud: 'cartobio' })
@@ -29,7 +33,7 @@ afterEach(() => {
 
 describe('GET /api/v2/user/exchangeToken', () => {
   beforeEach(() => {
-    vi.mocked(service.fetchOperatorByNumeroBio).mockResolvedValue(operator)
+    vi.mocked(fetchOperatorByNumeroBio).mockResolvedValue(operator)
     vi.mocked(service.getUserProfileById).mockResolvedValue(user)
   })
 
@@ -48,7 +52,7 @@ describe('GET /api/v2/user/exchangeToken', () => {
     expect(payload).toMatchObject({ sub: String(user.id), typ: 'exchange', numeroBio: '99999' })
     expect(payload).not.toHaveProperty('organismeCertificateur')
     expect(payload.exp - payload.iat).toBe(2 * 60 * 60)
-    expect(service.fetchOperatorByNumeroBio).toHaveBeenCalledWith('99999')
+    expect(fetchOperatorByNumeroBio).toHaveBeenCalledWith('99999')
     expect(service.getUserProfileById).toHaveBeenCalledWith(1)
   })
 
@@ -60,7 +64,7 @@ describe('GET /api/v2/user/exchangeToken', () => {
     const response = await request(app.server).get('/api/v2/user/exchangeToken').set('Authorization', 'Bearer x')
 
     expect(response.status).toBe(401)
-    expect(service.fetchOperatorByNumeroBio).not.toHaveBeenCalled()
+    expect(fetchOperatorByNumeroBio).not.toHaveBeenCalled()
   })
 
   test("refuse un utilisateur sans accès à l'opérateur", async () => {
@@ -111,7 +115,7 @@ describe('POST /api/auth-provider/logout', () => {
       .post('/api/auth-provider/logout')
       .set('Cookie', `cartobio_session=${token}`)
 
-    expect(response.status).toBe(403)
+    expect(response.status).toBe(400)
     expect(await service.endSession(token)).toBe('id-token-sso')
   })
 })

@@ -5,7 +5,7 @@ import { createSessionSchema, rotateSessionSchema } from '../../database/validat
 
 type Session = typeof sessions.$inferSelect
 
-async function insertSession(values: {
+export async function insertSession(values: {
   userId: number
   tokenHash: string
   idToken: string | null
@@ -14,7 +14,7 @@ async function insertSession(values: {
   await db.insert(sessions).values(createSessionSchema.parse(values))
 }
 
-async function findSessionByTokenHash(tokenHash: string): Promise<Session | undefined> {
+export async function findSessionByTokenHash(tokenHash: string): Promise<Session | undefined> {
   const [row] = await db
     .select()
     .from(sessions)
@@ -23,7 +23,7 @@ async function findSessionByTokenHash(tokenHash: string): Promise<Session | unde
   return row
 }
 
-async function rotateSession(
+export async function rotateSession(
   id: string,
   currentTokenHash: string,
   values: { tokenHash: string; previousTokenHash: string; rotatedAt: Date; expiresAt: Date }
@@ -35,8 +35,6 @@ async function rotateSession(
   return rowCount === 1
 }
 
-async function deleteSession(id: string): Promise<void> {
+export async function deleteSession(id: string): Promise<void> {
   await db.delete(sessions).where(eq(sessions.id, id))
 }
-
-export { insertSession, findSessionByTokenHash, rotateSession, deleteSession }

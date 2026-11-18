@@ -1,4 +1,5 @@
-import { sql } from 'drizzle-orm'
+import { lt, sql } from 'drizzle-orm'
+import type { PgUpdateSetSource } from 'drizzle-orm/pg-core'
 import type { SQL } from 'drizzle-orm'
 import { CertificationState } from '@agencebio/cartobio-types'
 import type {
@@ -47,7 +48,7 @@ export function outputRecord(
 
 export function unmodifiedSinceCondition(ifUnmodifiedSince: string | undefined): SQL | undefined {
   if (!ifUnmodifiedSince || Number.isNaN(Date.parse(ifUnmodifiedSince))) return undefined
-  return sql`date_trunc('second', ${parcellaires.updatedAt}) <= ${new Date(ifUnmodifiedSince).toISOString()}::timestamptz`
+  return lt(parcellaires.updatedAt, new Date(Math.floor(Date.parse(ifUnmodifiedSince) / 1000) * 1000 + 1000))
 }
 
 export function assertUnmodified(updatedRows: unknown[]): void {
@@ -62,14 +63,14 @@ export function geometryInput(geometry: FeatureInput['geometry'] | null | undefi
 export function featureUpdateSet(
   properties: FeaturePropertiesInput,
   geometry: FeatureInput['geometry'] | null | undefined
-): Record<string, SQL> {
-  const geometrySql = geometryInput(geometry)
-  const finalGeometry = sql`coalesce(${geometrySql}, ${parcelles.geometry})`
+): PgUpdateSetSource<typeof parcelles> {
+  if (!geometry) return parcelleUpdateSet(properties, parcelles.geometry, parcelles.etranger)
 
+  const geometrySql = wgs84FromGeoJSON(geometry)
   return {
-    ...parcelleUpdateSet(properties, finalGeometry, sql`${parcelles.etranger}`),
-    geometry: finalGeometry,
-    surfaceHa: sql`coalesce(${areaHa(geometrySql)}, ${parcelles.surfaceHa})`
+    ...parcelleUpdateSet(properties, geometrySql, parcelles.etranger),
+    geometry: geometrySql,
+    surfaceHa: areaHa(geometrySql)
   }
 }
 

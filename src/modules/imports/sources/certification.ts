@@ -8,7 +8,7 @@ import { chunk } from '../../../shared/parcellaires/parcellaires.utils.js'
 
 const JOIN_CONCURRENCY = 5
 
-async function getOperatorLastRecord(
+export async function getOperatorLastRecord(
   numeroBio: string | number,
   { anneeAudit = null, statut = null }: OperatorRecordFilters = {}
 ): Promise<NormalizedRecord> {
@@ -21,7 +21,7 @@ async function getOperatorLastRecord(
   return normalizeRecord(await cartobio.joinRecordParcelles(record))
 }
 
-async function iterateOperatorLastRecords(
+export async function iterateOperatorLastRecords(
   ocId: number,
   {
     anneeAudit = null,
@@ -47,5 +47,3 @@ async function iterateOperatorLastRecords(
   }
   return records
 }
-
-export { getOperatorLastRecord, iterateOperatorLastRecords }

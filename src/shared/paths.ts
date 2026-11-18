@@ -10,7 +10,7 @@ function findRootDir(from: string): string {
   let dir = from
   while (!isApiRoot(dir)) {
     const parent = dirname(dir)
-    if (parent === dir) throw new Error(`@agencebio/cartobio-api package.json not found above ${from}`)
+    if (parent === dir) throw new Error(`package.json de @agencebio/cartobio-api introuvable au-dessus de ${from}`)
     dir = parent
   }
   return dir

@@ -58,23 +58,23 @@ async function addRecordData(operateur: AgenceBioNormalizedOperator): Promise<Ag
   }
 }
 
-async function pinOperator(numeroBio: NumeroBio, userId: number): Promise<void> {
+export async function pinOperator(numeroBio: NumeroBio, userId: number): Promise<void> {
   await repository.insertPinnedOperator(numeroBio, userId)
 }
 
-async function unpinOperator(numeroBio: NumeroBio, userId: number): Promise<void> {
+export async function unpinOperator(numeroBio: NumeroBio, userId: number): Promise<void> {
   await repository.deletePinnedOperator(numeroBio, userId)
 }
 
-async function consultOperator(numeroBio: NumeroBio, userId: number): Promise<void> {
+export async function consultOperator(numeroBio: NumeroBio, userId: number): Promise<void> {
   await repository.upsertConsultedOperator(numeroBio, userId)
 }
 
-async function getImportPAC(numeroBio: NumeroBio): Promise<ImportPacRow | null> {
+export async function getImportPAC(numeroBio: NumeroBio): Promise<ImportPacRow | null> {
   return repository.findImportPac(numeroBio)
 }
 
-async function hideImport(numeroBio: NumeroBio): Promise<void> {
+export async function hideImport(numeroBio: NumeroBio): Promise<void> {
   await repository.updateImportPacImported(numeroBio)
 }
 
@@ -116,7 +116,7 @@ function compareByNotificationsDesc(a: SortableOperator, b: SortableOperator): n
   return (NOTIF_PRIORITY[bNotif] ?? 0) - (NOTIF_PRIORITY[aNotif] ?? 0)
 }
 
-async function findControlBodyOperators({
+export async function findControlBodyOperators({
   ocId,
   userId,
   input,
@@ -206,7 +206,7 @@ async function findControlBodyOperators({
   })
 }
 
-async function searchControlBodyRecords({
+export async function searchControlBodyRecords({
   ocId,
   userId,
   input,
@@ -243,7 +243,7 @@ async function searchControlBodyRecords({
   }
 }
 
-async function searchControlBodyRecordsAdmin({
+export async function searchControlBodyRecordsAdmin({
   input,
   page,
   filter,
@@ -276,7 +276,7 @@ async function searchControlBodyRecordsAdmin({
   }
 }
 
-async function searchForAutocomplete(
+export async function searchForAutocomplete(
   ocId: number | undefined,
   userId: number,
   input?: string
@@ -296,7 +296,7 @@ async function searchForAutocomplete(
     }))
 }
 
-async function getDashboardSummary(
+export async function getDashboardSummary(
   ocId: number,
   departements: string[],
   anneeReferenceControle: number
@@ -333,7 +333,7 @@ async function getDashboardSummary(
   }
 }
 
-async function getPinnedOperators(userId: number): Promise<number[]> {
+export async function getPinnedOperators(userId: number): Promise<number[]> {
   return repository.findPinnedOperators(userId)
 }
 
@@ -403,11 +403,11 @@ async function getCustomersByOcWithRecords(
   return repository.findFilterData(operators, false)
 }
 
-async function getConsultedOperators(userId: number): Promise<number[]> {
+export async function getConsultedOperators(userId: number): Promise<number[]> {
   return repository.findConsultedOperators(userId)
 }
 
-async function listUserOperators(
+export async function listUserOperators(
   userId: number,
   { search, limit, offset }: { search?: string; limit: number; offset: number }
 ): Promise<{ nbTotal: number; operators: AgenceBioNormalizedOperatorWithPinnedStatus[] }> {
@@ -438,7 +438,7 @@ async function listUserOperators(
   }
 }
 
-async function getOperatorsDashboard(
+export async function getOperatorsDashboard(
   userId: number,
   ocId: number
 ): Promise<{
@@ -486,7 +486,7 @@ async function getOperatorsDashboard(
   }
 }
 
-async function getOperatorRecordsForUser(
+export async function getOperatorRecordsForUser(
   numeroBio: string | number,
   user: CartoBioUser,
   operator: AgenceBioNormalizedOperator
@@ -504,23 +504,4 @@ async function getOperatorRecordsForUser(
       return maskOcAgents({ ...record, audit_notes: null, audit_demandes: null }, viewer, currentOcId)
     return maskOcAgents(record, viewer, currentOcId)
   })
-}
-
-export { fetchUserOperators, fetchCustomersByOc }
-export {
-  findControlBodyOperators,
-  searchControlBodyRecords,
-  searchControlBodyRecordsAdmin,
-  searchForAutocomplete,
-  pinOperator,
-  unpinOperator,
-  consultOperator,
-  getDashboardSummary,
-  getImportPAC,
-  hideImport,
-  getPinnedOperators,
-  getConsultedOperators,
-  listUserOperators,
-  getOperatorsDashboard,
-  getOperatorRecordsForUser
 }

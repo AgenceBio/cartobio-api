@@ -21,7 +21,9 @@ import { fromCodePacStrict } from '@agencebio/rosetta-cultures'
 import { unzipGeographicalContent, detectSrs, wgs84 } from '../src/shared/geo/gdal.js'
 import { getRandomFeatureId } from '../src/shared/outputs/features.js'
 import { CertificationState, EtatProduction, MetadataSource } from '@agencebio/cartobio-types'
-import type { AgenceBioOperator } from '../src/clients/agence-bio.types.js'
+import { agenceBioOperatorSchema } from '../src/clients/agence-bio.types.js'
+import { parseApiResponse } from '../src/clients/clients.utils.js'
+import { z } from 'zod'
 
 type CorrespondanceRow = Record<string, string> & { PACAGE: string; SIRET: string }
 
@@ -52,7 +54,7 @@ function groupByPACAGE(features: Iterable<gdal.Feature>): gdal.Feature[][] {
   for (const feature of features) {
     const pacage = feature.fields.get('PACAGE')
     if (!pacage) {
-      throw new Error(`Feature without PACAGE: ${JSON.stringify(feature.fields.toObject())}`)
+      throw new Error(`Entité sans PACAGE : ${JSON.stringify(feature.fields.toObject())}`)
     }
 
     let group = groups.get(pacage)
@@ -67,16 +69,19 @@ function groupByPACAGE(features: Iterable<gdal.Feature>): gdal.Feature[][] {
   return Array.from(groups.values())
 }
 
-interface SiretPacage {
-  siret: string
-  pacage: string
-}
+const siretPacageSchema = z.object({
+  siret: z.string(),
+  pacage: z.string()
+})
 
-interface ValidOperatorsResponse {
-  doublons: SiretPacage[]
-  sansOperateur: SiretPacage[]
-  operateurs: AgenceBioOperator[]
-}
+const validOperatorsResponseSchema = z.object({
+  doublons: z.array(siretPacageSchema),
+  sansOperateur: z.array(siretPacageSchema),
+  operateurs: z.array(agenceBioOperatorSchema)
+})
+
+type SiretPacage = z.infer<typeof siretPacageSchema>
+type ValidOperatorsResponse = z.infer<typeof validOperatorsResponseSchema>
 
 async function getValidOperator(tabCouplage: SiretPacage[]): Promise<ValidOperatorsResponse | undefined> {
   try {
@@ -92,8 +97,8 @@ async function getValidOperator(tabCouplage: SiretPacage[]): Promise<ValidOperat
         methods: ['GET', 'POST'],
         errorCodes: ['EPIPE', 'ECONNRESET', 'ETIMEDOUT']
       }
-    }).json<ValidOperatorsResponse>()
-    return response
+    }).json()
+    return parseApiResponse(validOperatorsResponseSchema, response, "l'API Agence Bio")
   } catch (e) {
     console.error(e)
   }
@@ -284,7 +289,7 @@ try {
   await cleanup()
   progress.stop()
 
-  console.warn('\n Warnings:')
+  console.warn('\n Avertissements :')
   if (warningsDoublon.length > 0) {
     console.log('\n Warnings =>  Couple Siret / Pacage avec plusieurs numéros Bio')
     console.table(warningsDoublon)

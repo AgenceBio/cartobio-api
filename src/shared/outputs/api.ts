@@ -43,7 +43,7 @@ function parcelleToApi(parcelle: CartoBioFeature, surface: number): OutputApiPar
   }
 }
 
-async function recordsToApi(records: NormalizedRecord[]): Promise<OutputApiRecord[]> {
+export async function recordsToApi(records: NormalizedRecord[]): Promise<OutputApiRecord[]> {
   const surfaces = await legalProjectionSurfaces(
     records.flatMap((record) => record.parcelles.features.map((feature) => feature.geometry))
   )
@@ -68,7 +68,7 @@ async function recordsToApi(records: NormalizedRecord[]): Promise<OutputApiRecor
   }))
 }
 
-async function recordToApi(record: NormalizedRecord): Promise<OutputApiRecord> {
+export async function recordToApi(record: NormalizedRecord): Promise<OutputApiRecord> {
   return firstRow(await recordsToApi([record]))
 }
 
@@ -85,11 +85,9 @@ async function legalProjectionSurfaces(geometries: unknown[]): Promise<Array<num
   return rows.map(({ surface }) => surface)
 }
 
-async function surfaceForFeatureCollection(featureCollection: {
+export async function surfaceForFeatureCollection(featureCollection: {
   features: Array<{ geometry?: unknown }>
 }): Promise<number> {
   const surfaces = await legalProjectionSurfaces(featureCollection.features.map((feature) => feature.geometry ?? null))
   return surfaces.reduce<number>((total, surface) => total + (surface || 0), 0)
 }
-
-export { recordToApi, recordsToApi, surfaceForFeatureCollection }

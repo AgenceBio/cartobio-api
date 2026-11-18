@@ -3,6 +3,7 @@ import type { FeatureInput } from '@agencebio/cartobio-types'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import { db } from '../../../src/database/database.js'
 import * as repository from '../../../src/modules/audits/audits.repository.js'
+import * as parcellairesRepository from '../../../src/shared/parcellaires/parcellaires.repository.js'
 import * as cartobio from '../../../src/shared/parcellaires/parcellaires.service.js'
 import { deleteRecordAttestations } from '../../../src/modules/exports/exports.service.js'
 import {
@@ -16,10 +17,12 @@ import type { DBOperatorRecord } from '../../../src/shared/parcellaires/parcella
 import { buildFeature, buildNormalizedRecord, buildOcUser, buildOperator } from '../../factories.js'
 
 vi.mock('../../../src/modules/audits/audits.repository.js')
+vi.mock('../../../src/shared/parcellaires/parcellaires.repository.js')
 vi.mock('../../../src/shared/parcellaires/parcellaires.service.js')
 vi.mock('../../../src/modules/exports/exports.service.js')
 
 const mockedRepo = vi.mocked(repository)
+const mockedParcellairesRepo = vi.mocked(parcellairesRepository)
 const dbRow = { record_id: 'r1' } as unknown as DBOperatorRecord
 const tx = {} as NodePgDatabase
 
@@ -63,11 +66,11 @@ describe('updateAuditRecordState', () => {
       certification_date_fin: toIsoDate('2025-12-31'),
       certification_state: CertificationState.AUDITED
     })
-    mockedRepo.findMixite.mockResolvedValue('AB')
+    mockedParcellairesRepo.findMixite.mockResolvedValue('AB')
 
     await updateAuditRecordState({ user: buildOcUser(), record }, { certification_state: CertificationState.CERTIFIED })
 
-    expect(mockedRepo.findMixite).toHaveBeenCalledWith(db, record.record_id)
+    expect(mockedParcellairesRepo.findMixite).toHaveBeenCalledWith(db, record.record_id)
     expect(mockedRepo.updateAuditRecord.mock.calls[0]![2]).toMatchObject({ mixite: 'AB' })
     expect(cartobio.notifyCertificationComplete).toHaveBeenCalledWith(record)
   })
@@ -84,7 +87,7 @@ describe('updateAuditRecordState', () => {
       { certification_state: CertificationState.CERTIFIED, mixite: 'MIXTE' }
     )
 
-    expect(mockedRepo.findMixite).not.toHaveBeenCalled()
+    expect(mockedParcellairesRepo.findMixite).not.toHaveBeenCalled()
     expect(cartobio.notifyCertificationComplete).not.toHaveBeenCalled()
   })
 
@@ -185,7 +188,7 @@ describe('createFeaturesFromOther', () => {
       "CartoBi'OC",
       undefined
     )
-    expect(mockedRepo.updateMixite).toHaveBeenCalledWith(tx, record.record_id)
+    expect(mockedParcellairesRepo.updateMixite).toHaveBeenCalledWith(tx, record.record_id)
   })
 
   test('exige le niveau de conversion sur un parcellaire certifié', async () => {

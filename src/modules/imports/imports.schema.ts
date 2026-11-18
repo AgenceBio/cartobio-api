@@ -205,5 +205,3 @@ export const certificationParcellaireSchema = withSchema(
     }
   }
 )
-
-export { mergeSchemas }

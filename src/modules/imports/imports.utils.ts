@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm'
+import { eq, gte, lte, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import {
   organismeCertificateur,
@@ -38,7 +38,10 @@ export function operatorRecordConditions({ anneeAudit, statut, anneeReferenceCon
   const conditions: SQL[] = []
 
   if (anneeAudit) {
-    conditions.push(sql`EXTRACT(YEAR FROM ${parcellaires.auditDate}) = ${Number(anneeAudit)}`)
+    conditions.push(
+      gte(parcellaires.auditDate, `${Number(anneeAudit)}-01-01`),
+      lte(parcellaires.auditDate, `${Number(anneeAudit)}-12-31`)
+    )
   }
 
   if (statut) {

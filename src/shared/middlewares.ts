@@ -1,6 +1,6 @@
 import { TokenError } from 'fast-jwt'
 import type { FastifyRequest, FastifyReply, onRequestHookHandler, preSerializationHookHandler } from 'fastify'
-import { CertificationState, recordIdSchema } from '@agencebio/cartobio-types'
+import { CertificationState, integerStringSchema, recordIdSchema } from '@agencebio/cartobio-types'
 import type {
   AgenceBioNormalizedOperator,
   CartoBioUser,
@@ -84,7 +84,7 @@ const requiredRoleByState = new Map<unknown, (user: CartoBioUser) => boolean>([
   [CertificationState.CERTIFIED, isOcCertif]
 ])
 
-function getRequestOc(request: FastifyRequest): OrganismeCertificateur | null | undefined {
+export function getRequestOc(request: FastifyRequest): OrganismeCertificateur | null | undefined {
   return request.organismeCertificateur ?? request.user?.organismeCertificateur
 }
 
@@ -96,7 +96,7 @@ function hasCartobioRole(user: CartoBioUser): boolean {
   return isAdmin(user) || isOperatorUser(user) || isOc(user)
 }
 
-function decodeUserToken(): onRequestHookHandler {
+export function decodeUserToken(): onRequestHookHandler {
   return async function decodeUserTokenMiddleware(request: FastifyRequest): Promise<void> {
     const { authorization } = request.headers
     const token = authorization?.startsWith('Bearer ') ? authorization.slice('Bearer '.length).trim() : ''
@@ -129,7 +129,7 @@ function decodeUserToken(): onRequestHookHandler {
   }
 }
 
-function verifyAgenceBioToken(): onRequestHookHandler {
+export function verifyAgenceBioToken(): onRequestHookHandler {
   return async function verifyAgenceBioTokenMiddleware(request: FastifyRequest): Promise<void> {
     const token = request.headers.authorization
     if (!token || token.startsWith('Bearer ')) return
@@ -147,7 +147,7 @@ function verifyAgenceBioToken(): onRequestHookHandler {
   }
 }
 
-function enforceAnyFastifyDecorator(names: Array<'user' | 'organismeCertificateur'> = []): onRequestHookHandler {
+export function enforceAnyFastifyDecorator(names: Array<'user' | 'organismeCertificateur'> = []): onRequestHookHandler {
   return async function enforceAnyFastifyDecoratorMiddleware(
     request: FastifyRequest,
     reply: FastifyReply
@@ -160,7 +160,7 @@ function enforceAnyFastifyDecorator(names: Array<'user' | 'organismeCertificateu
   }
 }
 
-function enforceAdminRole(): RequestHook {
+export function enforceAdminRole(): RequestHook {
   return async function enforceAdminRoleMiddleware(request: FastifyRequest): Promise<void> {
     if (!isAdmin(request.user)) throw new ForbiddenApiError(ACCESS_DENIED)
   }
@@ -184,7 +184,7 @@ async function loadOperator(request: FastifyRequest, numeroBio: string | number)
   }
 }
 
-function enforceTokenScope(): RequestHook {
+export function enforceTokenScope(): RequestHook {
   return async function enforceTokenScopeMiddleware(request: FastifyRequest): Promise<void> {
     const { tokenNumeroBio, operator } = request
     if (tokenNumeroBio != null && String(operator?.numeroBio) !== tokenNumeroBio) {
@@ -193,12 +193,12 @@ function enforceTokenScope(): RequestHook {
   }
 }
 
-function enforceOperator({ param }: { param: string }): RequestHook {
+export function enforceOperator({ param }: { param: string }): RequestHook {
   return async function enforceOperatorMiddleware(request: FastifyRequest): Promise<void> {
-    const numeroBio = (request.params as Record<string, string>)[param]
-    if (numeroBio === undefined || !/^\d+$/.test(numeroBio)) throw new NotFoundApiError('Opérateur introuvable')
+    const numeroBio = integerStringSchema.safeParse((request.params as Record<string, string>)[param])
+    if (!numeroBio.success) throw new NotFoundApiError('Opérateur introuvable')
 
-    await loadOperator(request, numeroBio)
+    await loadOperator(request, numeroBio.data)
   }
 }
 
@@ -207,7 +207,7 @@ function wasModifiedSince(updatedAt: string | Date, ifUnmodifiedSince: string | 
   return new Date(ifUnmodifiedSince).getTime() < new Date(new Date(updatedAt).toUTCString()).getTime()
 }
 
-async function loadRecordAndOperator(request: FastifyRequest, id: string, queryFn: RecordQuery): Promise<void> {
+export async function loadRecordAndOperator(request: FastifyRequest, id: string, queryFn: RecordQuery): Promise<void> {
   if (!recordIdSchema.safeParse(id).success) throw new NotFoundApiError('Parcellaire introuvable')
   const record = await queryFn(id, request.user)
   if (!record) throw new NotFoundApiError('Parcellaire introuvable')
@@ -230,7 +230,7 @@ async function loadRecordAndOperator(request: FastifyRequest, id: string, queryF
   )
 }
 
-function enforceRecordAndOperator({ queryFn, param }: { queryFn: RecordQuery; param: string }): RequestHook {
+export function enforceRecordAndOperator({ queryFn, param }: { queryFn: RecordQuery; param: string }): RequestHook {
   return async function enforceRecordAndOperatorMiddleware(request: FastifyRequest): Promise<void> {
     const id = (request.params as Record<string, string>)[param]
     if (id === undefined) throw new NotFoundApiError('Parcellaire introuvable')
@@ -330,7 +330,7 @@ function restrictPatch(patch: RecordPatch): void {
   }
 }
 
-function haveRightToUpdate(): RequestHook {
+export function haveRightToUpdate(): RequestHook {
   return async function haveRightToUpdateMiddleware(request: FastifyRequest): Promise<void> {
     const { user, record } = request
     if (!user) return
@@ -381,13 +381,13 @@ async function hasOperatorAccess(
   return record ? false : hasRecordForOc(operator.numeroBio, userOc.id)
 }
 
-function enforceOperatorAccess(): RequestHook {
+export function enforceOperatorAccess(): RequestHook {
   return async function enforceOperatorAccessMiddleware(request: FastifyRequest): Promise<void> {
     if (!(await hasOperatorAccess(request, getRequestOc(request)))) throw new UnauthorizedApiError(ACCESS_DENIED)
   }
 }
 
-function checkCertification(request: FastifyRequest): void {
+export function checkCertification(request: FastifyRequest): void {
   const { user, operator } = request
   if (!user || isAdmin(user)) return
 
@@ -402,7 +402,7 @@ function checkCertification(request: FastifyRequest): void {
   }
 }
 
-function compareOperatorOutputAndToken(
+export function compareOperatorOutputAndToken(
   accessor: (request: FastifyRequest) => OrganismeCertificateur | null | undefined
 ): preSerializationHookHandler {
   return async function compareOperatorOutputAndTokenMiddleware(
@@ -429,20 +429,4 @@ function compareOperatorOutputAndToken(
 
     return payload
   }
-}
-
-export {
-  checkCertification,
-  compareOperatorOutputAndToken,
-  decodeUserToken,
-  enforceAdminRole,
-  enforceAnyFastifyDecorator,
-  enforceOperator,
-  enforceOperatorAccess,
-  enforceRecordAndOperator,
-  enforceTokenScope,
-  getRequestOc,
-  haveRightToUpdate,
-  loadRecordAndOperator,
-  verifyAgenceBioToken
 }

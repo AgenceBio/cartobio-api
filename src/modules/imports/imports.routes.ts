@@ -24,38 +24,49 @@ import { requireOperator, requireOrganismeCertificateur } from '../../shared/req
 import { redactAuditNotes } from '../../shared/outputs/record.js'
 import { pageUrl } from './imports.utils.js'
 import * as service from './imports.service.js'
+import { parseTelepacArchive } from './sources/telepac.js'
+import { geofoliaLookup, geofoliaParcellaire, parseGeofoliaArchive } from './sources/geofolia.js'
+import { evvLookup, evvParcellaire } from './sources/douanes.js'
+import { getOperatorLastRecord, iterateOperatorLastRecords } from './sources/certification.js'
+import { parseAnyGeographicalArchive } from '../../shared/geo/gdal.js'
+import { recordToApi, recordsToApi } from '../../shared/outputs/api.js'
 import { isOperatorUser } from '../auth/auth.utils.js'
 
 export default async function importRoutes(fastify: FastifyInstance): Promise<void> {
   const app = fastify.withTypeProvider<ZodTypeProvider>()
   app.post('/api/v2/convert/telepac/geojson', convertTelepacSchema, async (request, reply) => {
-    return service.parseTelepacArchive(request.file()).then((geojson) => reply.send(geojson))
+    return parseTelepacArchive(request.file()).then((geojson) => reply.send(geojson))
   })
 
   app.post('/api/v2/convert/geofolia/geojson', convertGeofoliaSchema, async (request, reply) => {
     const data = await request.file()
     if (!data) throw new InvalidRequestApiError('Aucun fichier transmis.')
 
-    return service.parseGeofoliaArchive(await data.toBuffer()).then((geojson) => reply.send(geojson))
+    return parseGeofoliaArchive(await data.toBuffer()).then((geojson) => reply.send(geojson))
   })
 
   app.post('/api/v2/convert/anygeo/geojson', convertAnyGeoSchema, async (request, reply) => {
-    return service.parseAnyGeographicalArchive(request.file()).then((geojson) => reply.send(geojson))
+    return parseAnyGeographicalArchive(request.file()).then((geojson) => reply.send(geojson))
   })
 
   app.head('/api/v2/import/geofolia/:numeroBio', geofoliaLookupSchema, async (request, reply) => {
     const { siret } = requireOperator(request)
     const { year } = request.query
 
-    const isWellKnown = await service.geofoliaLookup(siret ?? '', year)
+    const isWellKnown = siret ? await geofoliaLookup(siret, year) : false
 
-    return reply.code(isWellKnown === true ? 204 : 404).send()
+    return reply.code(isWellKnown ? 204 : 404).send()
   })
 
   app.get('/api/v2/import/geofolia/:numeroBio', geofoliaParcellaireSchema, async (request, reply) => {
     const { siret } = requireOperator(request)
+    if (!siret) {
+      throw new InvalidRequestApiError(
+        "Le numéro SIRET de l'opérateur n'est pas renseigné sur le portail de Notification de l'Agence Bio."
+      )
+    }
 
-    const featureCollection = await service.geofoliaParcellaire(siret ?? '')
+    const featureCollection = await geofoliaParcellaire(siret)
 
     if (!featureCollection) {
       return reply.code(202).send()
@@ -74,8 +85,7 @@ export default async function importRoutes(fastify: FastifyInstance): Promise<vo
       )
     }
 
-    return service
-      .evvLookup({ numeroEvv })
+    return evvLookup({ numeroEvv })
       .then(({ siret }): void => {
         if (!siret) {
           throw new NotFoundApiError('Ce numéro EVV est introuvable')
@@ -83,7 +93,7 @@ export default async function importRoutes(fastify: FastifyInstance): Promise<vo
           throw new UnauthorizedApiError("les numéros SIRET du nCVI et de l'opérateur Agence Bio ne correspondent pas.")
         }
       })
-      .then(() => service.evvParcellaire({ numeroEvv }))
+      .then(() => evvParcellaire({ numeroEvv }))
       .then((featureCollection) => {
         if (featureCollection.features.length === 0) {
           throw new NotFoundApiError('Ce numéro EVV ne retourne pas de parcelles.')
@@ -128,7 +138,7 @@ export default async function importRoutes(fastify: FastifyInstance): Promise<vo
 
     service
       .processFullJob(jobId, validItem)
-      .catch((err): void => request.log.error({ err }, 'service.processFullJob error'))
+      .catch((err): void => request.log.error({ err }, "Traitement du job d'import en échec"))
 
     return reply.code(202).send({
       jobId,
@@ -150,10 +160,7 @@ export default async function importRoutes(fastify: FastifyInstance): Promise<vo
   })
 
   app.get('/api/v3/import/parcellaire-imports', importListSchema, async (request, reply) => {
-    const { status, from, to, withPayload, page = '1', limit = '20', withRejected } = request.query
-
-    const finalPage = parseInt(page)
-    const finalLimit = parseInt(limit)
+    const { status, from, to, withPayload, page: finalPage, limit: finalLimit, withRejected } = request.query
 
     const organismeCertificateur = requireOrganismeCertificateur(request).id
     const result = await service.getImportList({
@@ -198,11 +205,9 @@ export default async function importRoutes(fastify: FastifyInstance): Promise<vo
 
   app.get('/api/v2/certification/parcellaires', certificationParcellairesSchema, async (request, reply) => {
     reply.header('Content-Type', 'application/json')
-    const { limit, start, anneeAudit, statut, anneeReferenceControle } = request.query
-    const finalLimit = limit ? Number(limit) : 100
-    const finalStart = start ? Number(start) : 0
+    const { limit: finalLimit, start: finalStart, anneeAudit, statut, anneeReferenceControle } = request.query
 
-    const records = await service.iterateOperatorLastRecords(requireOrganismeCertificateur(request).id, {
+    const records = await iterateOperatorLastRecords(requireOrganismeCertificateur(request).id, {
       anneeAudit,
       statut,
       anneeReferenceControle,
@@ -210,7 +215,7 @@ export default async function importRoutes(fastify: FastifyInstance): Promise<vo
       start: finalStart
     })
 
-    const apiRecords = await service.recordsToApi(records)
+    const apiRecords = await recordsToApi(records)
     request.log.info(
       {
         audit: 'export-api',
@@ -241,7 +246,7 @@ export default async function importRoutes(fastify: FastifyInstance): Promise<vo
       throw new ForbiddenApiError('Accès réservé aux organismes certificateurs et aux administrateurs.')
     }
     const ocId = (request.organismeCertificateur ?? request.user?.organismeCertificateur)?.id
-    const record = await service.getOperatorLastRecord(request.params.numeroBio, {
+    const record = await getOperatorLastRecord(request.params.numeroBio, {
       anneeAudit: request.query.anneeAudit,
       statut: request.query.statut
     })
@@ -254,6 +259,6 @@ export default async function importRoutes(fastify: FastifyInstance): Promise<vo
       { audit: 'export-api', ocId, userId: request.user?.id, recordId: record.record_id },
       "Lecture d'un parcellaire par l'API OC"
     )
-    return reply.code(200).send(await service.recordToApi(record))
+    return reply.code(200).send(await recordToApi(record))
   })
 }

@@ -33,8 +33,8 @@ describe('dashboard service', () => {
       {
         from: '2026-01-01',
         to: '2026-01-31',
-        page: '2',
-        limit: '50',
+        page: 2,
+        limit: 50,
         recherche: 'bio-42',
         statuts: ['VALID', 'REJECTED'],
         etats: ['CREATED', 'UPDATED']

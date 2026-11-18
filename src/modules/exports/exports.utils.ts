@@ -1,10 +1,12 @@
 import { eq, sql } from 'drizzle-orm'
-import type { SQL, SQLWrapper } from 'drizzle-orm'
+import type { SQL } from 'drizzle-orm'
+import { toIsoDate } from '@agencebio/cartobio-types'
+import type { IsoDate } from '@agencebio/cartobio-types'
 import { parcelles } from '../../database/schema/index.js'
 import type { ConversionNiveau } from '../../database/validations/parcelles.js'
 
-export function sansDateParDefaut(date: SQLWrapper): SQL<string | null> {
-  return sql<string | null>`NULLIF(${date}, '1970-01-01')`
+export function sansDateParDefaut(date: string | null): IsoDate | null {
+  return date === null || date === '1970-01-01' ? null : toIsoDate(date)
 }
 
 export function surfaceHa(niveau?: ConversionNiveau): SQL<number> {

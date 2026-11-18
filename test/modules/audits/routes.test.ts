@@ -6,10 +6,8 @@ import app from '../../../src/app.js'
 import { db } from '../../../src/database/database.js'
 import { parcellaires, parcelles, parcellesControles } from '../../../src/database/schema/index.js'
 import { getCachedUserProfile, getHistoryUser, signAccessToken } from '../../../src/modules/auth/auth.service.js'
-import {
-  deleteRecordAttestations,
-  findValidAttestationProduction
-} from '../../../src/modules/exports/exports.service.js'
+import { deleteRecordAttestations } from '../../../src/modules/exports/exports.service.js'
+import { findValidAttestationProduction } from '../../../src/modules/exports/exports.repository.js'
 import { got } from '../../got-mock.js'
 import { loadRecordFixture } from '../../utils.js'
 import agencebioOperator from '../../fixtures/providers/agence-bio-operateur.json' with { type: 'json' }
@@ -21,8 +19,11 @@ vi.mock('../../../src/modules/auth/auth.service.js', async (importOriginal) => (
 }))
 vi.mock('../../../src/modules/exports/exports.service.js', async (importOriginal) => ({
   ...(await importOriginal()),
-  findValidAttestationProduction: vi.fn(),
   deleteRecordAttestations: vi.fn()
+}))
+vi.mock('../../../src/modules/exports/exports.repository.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  findValidAttestationProduction: vi.fn()
 }))
 
 const sign = (user: { id: number }): string => signAccessToken(user.id)

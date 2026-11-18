@@ -41,7 +41,7 @@ const evvParcellaireSchema = z.looseObject({
   })
 })
 
-const evvClient = extend({
+export const evvClient = extend({
   http2: false,
   https: { rejectUnauthorized: config.get('douanes.rejectUnauthorized') },
   timeout: { lookup: 200, connect: 500, response: 30000 },
@@ -56,7 +56,7 @@ const evvClient = extend({
   prefixUrl: config.get('douanes.baseUrl')
 })
 
-async function evvLookup({
+export async function evvLookup({
   numeroEvv
 }: {
   numeroEvv: string
@@ -77,7 +77,7 @@ async function evvLookup({
   }
 }
 
-async function evvParcellaire({ numeroEvv }: { numeroEvv: string }): Promise<FeatureCollection> {
+export async function evvParcellaire({ numeroEvv }: { numeroEvv: string }): Promise<FeatureCollection> {
   const response = await evvClient.get(`parcellaire/${numeroEvv}`).text()
   const { listePcv } = parseApiResponse(
     evvParcellaireSchema,
@@ -112,5 +112,3 @@ async function evvParcellaire({ numeroEvv }: { numeroEvv: string }): Promise<Fea
     })
   )
 }
-
-export { evvClient, evvLookup, evvParcellaire }

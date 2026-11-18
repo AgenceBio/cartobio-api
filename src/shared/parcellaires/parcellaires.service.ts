@@ -34,7 +34,7 @@ import { isAdmin, isOperatorUser } from '../../modules/auth/auth.utils.js'
  * Create a new record unless we find a dangling one with the same numeroBio and audit date, in which case we update it
  * with the merge algorithm described in ../../docs/rfc/[001-api-parcellaire.md](http://001-api-parcellaire.md)
  */
-async function createOrUpdateOperatorRecord(
+export async function createOrUpdateOperatorRecord(
   record: RecordInput,
   context: {
     user?: CartoBioUser | null
@@ -134,7 +134,9 @@ async function createOrUpdateOperatorRecord(
   }
 }
 
-async function notifyCertificationComplete(record: Parameters<typeof sendCertificationComplete>[0]): Promise<void> {
+export async function notifyCertificationComplete(
+  record: Parameters<typeof sendCertificationComplete>[0]
+): Promise<void> {
   try {
     const emails = await fetchEmailForNumeroBio(record.numerobio)
     for (const email of new Set(emails.utilisateurs.map((utilisateur) => utilisateur.email))) {
@@ -297,19 +299,19 @@ async function findHistoryUsers(entries: HistoryEntry[]): Promise<Map<string, Ca
   return new Map(users)
 }
 
-async function withHistoryUsers<T extends { audit_history: HistoryEntry[] }>(record: T): Promise<T> {
+export async function withHistoryUsers<T extends { audit_history: HistoryEntry[] }>(record: T): Promise<T> {
   if (!record.audit_history?.length) return record
 
   return setHistoryUsers(record, await findHistoryUsers(record.audit_history))
 }
 
-async function getRecords(numeroBio: string | number): Promise<NormalizedRecordSummary[]> {
+export async function getRecords(numeroBio: string | number): Promise<NormalizedRecordSummary[]> {
   const records = await repository.findRecords(numeroBio)
   const users = await findHistoryUsers(records.flatMap((record) => record.audit_history ?? []))
   return records.map((record) => normalizeRecordSummary(setHistoryUsers(record, users)))
 }
 
-async function getRecord(recordId: string, user: CartoBioUser | null = null): Promise<NormalizedRecord | null> {
+export async function getRecord(recordId: string, user: CartoBioUser | null = null): Promise<NormalizedRecord | null> {
   const record = await repository.findRecord(db, recordId)
   if (!record) return null
 
@@ -317,18 +319,9 @@ async function getRecord(recordId: string, user: CartoBioUser | null = null): Pr
   return normalizeRecord(await withHistoryUsers(recordWithParcelles))
 }
 
-async function joinRecordParcelles(
+export async function joinRecordParcelles(
   record: DBOperatorRecord,
   userId: number | null = null
 ): Promise<DBOperatorRecordWithParcelles> {
   return repository.findRecordParcelles(record, userId)
-}
-
-export {
-  createOrUpdateOperatorRecord,
-  notifyCertificationComplete,
-  getRecords,
-  getRecord,
-  joinRecordParcelles,
-  withHistoryUsers
 }

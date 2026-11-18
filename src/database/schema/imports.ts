@@ -1,4 +1,3 @@
-import { sql } from 'drizzle-orm'
 import {
   boolean,
   date,
@@ -77,7 +76,7 @@ export const importPac = cartobio.table(
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
       .defaultNow()
-      .$onUpdate(() => sql`now()`)
+      .$onUpdate(() => new Date())
   },
   (table) => [uniqueIndex('import_pac_numero_bio_pacage_siret_idx').on(table.numeroBio, table.pacage, table.siret)]
 )

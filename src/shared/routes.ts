@@ -43,7 +43,9 @@ export type ProtectedRoute = {
  * Deep merge with stacked merge of arrays
  * It then enable multiple schemas with same key (eg: preValidation) to combine middlewares
  */
-function mergeSchemas(...schemas: CartobioExtendedRouteShorthandOptions[]): CartobioExtendedRouteShorthandOptions {
+export function mergeSchemas(
+  ...schemas: CartobioExtendedRouteShorthandOptions[]
+): CartobioExtendedRouteShorthandOptions {
   return merge.all(schemas, {
     isMergeableObject: (value) =>
       value !== null &&
@@ -70,27 +72,27 @@ function mergeSchemas(...schemas: CartobioExtendedRouteShorthandOptions[]): Cart
   })
 }
 
-function withSchema<B extends CartobioExtendedRouteShorthandOptions, S extends FastifySchema>(
+export function withSchema<B extends CartobioExtendedRouteShorthandOptions, S extends FastifySchema>(
   base: B,
   schema: S
 ): WithSchema<B, S> {
   return { ...base, schema: { ...base.schema, ...schema } } as WithSchema<B, S>
 }
 
-function describedResponse(description: string): z.ZodUnknown {
+export function describedResponse(description: string): z.ZodUnknown {
   return z.unknown().meta({ description })
 }
 
-function apiError(description: string): typeof apiErrorSchema {
+export function apiError(description: string): typeof apiErrorSchema {
   return apiErrorSchema.meta({ description })
 }
 
-const commonErrorResponses = {
+export const commonErrorResponses = {
   401: apiError("Jeton d'accès absent, invalide, expiré ou sans droit sur cette ressource"),
   500: apiError('Erreur serveur')
 }
 
-const TAGS = {
+export const TAGS = {
   SYSTEME: 'Système',
   AUTH: 'Authentification',
   API_PARCELLAIRE: 'API parcellaire',
@@ -105,13 +107,13 @@ const TAGS = {
   REFERENTIELS: 'Référentiels'
 } as const
 
-const internalSchema: CartobioExtendedRouteShorthandOptions = {
+export const internalSchema: CartobioExtendedRouteShorthandOptions = {
   schema: {
     security: [{ bearerAuth: [] }]
   }
 }
 
-const hiddenSchema: CartobioExtendedRouteShorthandOptions = {
+export const hiddenSchema: CartobioExtendedRouteShorthandOptions = {
   schema: {
     tags: ['X-HIDDEN']
   }
@@ -120,7 +122,12 @@ const hiddenSchema: CartobioExtendedRouteShorthandOptions = {
 /**
  * Use to protect a route with one or more authentication methods
  */
-function protectedWithToken({ oc = false, cartobio = true, admin = false, exchange = false } = {}): ProtectedRoute {
+export function protectedWithToken({
+  oc = false,
+  cartobio = true,
+  admin = false,
+  exchange = false
+} = {}): ProtectedRoute {
   const requiredDecorators: Array<'user' | 'organismeCertificateur'> = []
   const root: ProtectedRoute = {
     schema: { security: [] },
@@ -161,7 +168,7 @@ function protectedWithToken({ oc = false, cartobio = true, admin = false, exchan
  * ROUTE Schemas
  */
 
-const operatorFromNumeroBio: CartobioExtendedRouteShorthandOptions = {
+export const operatorFromNumeroBio: CartobioExtendedRouteShorthandOptions = {
   schema: {
     params: numeroBioParamsSchema
   },
@@ -169,7 +176,7 @@ const operatorFromNumeroBio: CartobioExtendedRouteShorthandOptions = {
   preValidation: [enforceOperator({ param: 'numeroBio' })]
 }
 
-const checkCertificationStatus = {
+export const checkCertificationStatus = {
   schema: {
     params: numeroBioParamsSchema
   },
@@ -177,25 +184,10 @@ const checkCertificationStatus = {
   preValidation: [async (request: FastifyRequest): Promise<void> => checkCertification(request)]
 }
 
-const operatorFromRecordId: CartobioExtendedRouteShorthandOptions = {
+export const operatorFromRecordId: CartobioExtendedRouteShorthandOptions = {
   schema: {
     params: auditParamsSchema
   },
 
   preValidation: [enforceRecordAndOperator({ queryFn: getRecord, param: 'recordId' }), haveRightToUpdate()]
-}
-
-export {
-  mergeSchemas,
-  withSchema,
-  describedResponse,
-  apiError,
-  commonErrorResponses,
-  TAGS,
-  internalSchema,
-  hiddenSchema,
-  checkCertificationStatus,
-  protectedWithToken,
-  operatorFromNumeroBio,
-  operatorFromRecordId
 }

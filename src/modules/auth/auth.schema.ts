@@ -1,8 +1,10 @@
 import {
+  authorizationHeadersSchema,
   exchangeTokenResponseSchema,
   externalExploitationParamsSchema,
   logoutResponseSchema,
   refreshResponseSchema,
+  sameOriginHeadersSchema,
   ssoCallbackQuerySchema,
   verifyResponseSchema
 } from '@agencebio/cartobio-types'
@@ -36,6 +38,7 @@ export const exchangeTokenSchema = withSchema(internalSchema, {
   summary: 'Échanger un jeton du portail Notifications contre un jeton CartoBio',
   description:
     "Le jeton CartoBio émis est valable 15 minutes et n'est accepté que pour l'opérateur de la notification.",
+  headers: authorizationHeadersSchema,
   response: {
     ...commonErrorResponses,
     200: exchangeTokenResponseSchema.meta({ description: 'Opérateur et jeton CartoBio' }),
@@ -65,10 +68,11 @@ export const refreshSchema = withSchema(
     summary: "Renouveler le jeton d'accès",
     description:
       "Renouvelle le cookie de session et émet un jeton d'accès de 15 minutes. L'en-tête `X-Requested-With` est obligatoire.",
+    headers: sameOriginHeadersSchema,
     response: {
       ...commonErrorResponses,
       200: refreshResponseSchema.meta({ description: "Jeton d'accès" }),
-      403: apiError('En-tête `X-Requested-With` absent')
+      400: apiError('En-tête `X-Requested-With` absent')
     }
   }
 )
@@ -81,9 +85,10 @@ export const logoutSchema = withSchema(
     summary: 'Se déconnecter',
     description:
       "Supprime la session CartoBio du cookie et renvoie l'URL de déconnexion du SSO. L'en-tête `X-Requested-With` est obligatoire.",
+    headers: sameOriginHeadersSchema,
     response: {
       200: logoutResponseSchema.meta({ description: 'Session supprimée' }),
-      403: apiError('En-tête `X-Requested-With` absent')
+      400: apiError('En-tête `X-Requested-With` absent')
     }
   }
 )

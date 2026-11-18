@@ -23,12 +23,18 @@ export const annotationCodes = {
 
 export type AnnotationCode = keyof typeof annotationCodes
 
-export const isAnnotationCode = (code: string): code is AnnotationCode => Object.hasOwn(annotationCodes, code)
+export function isAnnotationCode(code: string): code is AnnotationCode {
+  return Object.hasOwn(annotationCodes, code)
+}
+
+const smallint = emptyToNull(z.coerce.number().int().min(-32768).max(32767))
 
 export const createParcelleSchema = createInsertSchema(parcelles, {
   id: (schema) => schema.min(1).max(255),
   surfaceHa: () => z.coerce.number().positive().max(1_000_000),
   engagementDate: () => isoDate,
+  numeroIlotPac: () => smallint,
+  numeroParcellesPac: () => smallint,
   commentaireOperateur: () => emptyToNull(z.string().trim().max(10_000)),
   auditeurNotesParcelles: () => emptyToNull(z.string().trim().max(10_000)),
   name: () => emptyToNull(z.string().trim().max(1000))
@@ -43,20 +49,26 @@ export const createParcelleSchema = createInsertSchema(parcelles, {
 export const createParcelleAttributesSchema = createParcelleSchema.pick({
   recordId: true,
   id: true,
+  conversionNiveau: true,
+  engagementDate: true,
   commentaireOperateur: true,
   auditeurNotesParcelles: true,
   name: true,
   numeroPacage: true,
+  numeroIlotPac: true,
+  numeroParcellesPac: true,
+  referenceCadastre: true,
   codeCulturePac: true,
   codePrecisionPac: true,
   fromParcelles: true
 })
 
 export const updateParcelleSchema = createUpdateSchema(parcelles, {
+  geometry: () => z.string(),
   surfaceHa: () => z.coerce.number().positive().max(1_000_000),
   engagementDate: () => isoDate,
-  numeroIlotPac: () => emptyToNull(z.coerce.number().int().min(-32768).max(32767)),
-  numeroParcellesPac: () => emptyToNull(z.coerce.number().int().min(-32768).max(32767))
+  numeroIlotPac: () => smallint,
+  numeroParcellesPac: () => smallint
 })
   .omit({
     id: true,

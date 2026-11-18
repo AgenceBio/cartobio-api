@@ -14,7 +14,8 @@ import {
   patchFeatureBodySchema,
   patchFeatureCollectionBodySchema,
   patchRecordBodySchema,
-  numeroBioParamsSchema
+  numeroBioParamsSchema,
+  ifUnmodifiedSinceHeadersSchema
 } from '@agencebio/cartobio-types'
 import {
   apiError,
@@ -137,6 +138,7 @@ export const deleteRecordSchema = withSchema(recordRoute(), {
 })
 
 export const patchRecordSchema = withSchema(recordRoute(), {
+  headers: ifUnmodifiedSinceHeadersSchema,
   operationId: 'patchRecord',
   tags: [TAGS.PARCELLAIRES],
   summary: "Modifier les informations d'un parcellaire",
@@ -148,6 +150,7 @@ export const patchRecordSchema = withSchema(recordRoute(), {
 })
 
 export const createFeatureSchema = withSchema(recordRoute(), {
+  headers: ifUnmodifiedSinceHeadersSchema,
   operationId: 'createParcelle',
   tags: [TAGS.PARCELLES],
   summary: 'Ajouter une parcelle',
@@ -156,6 +159,7 @@ export const createFeatureSchema = withSchema(recordRoute(), {
 })
 
 export const patchFeatureCollectionSchema = withSchema(recordRoute(), {
+  headers: ifUnmodifiedSinceHeadersSchema,
   operationId: 'patchParcelles',
   tags: [TAGS.PARCELLES],
   summary: 'Modifier plusieurs parcelles',
@@ -165,6 +169,7 @@ export const patchFeatureCollectionSchema = withSchema(recordRoute(), {
 })
 
 export const updateFeaturePropertiesSchema = withSchema(recordRoute(), {
+  headers: ifUnmodifiedSinceHeadersSchema,
   operationId: 'patchParcelle',
   tags: [TAGS.PARCELLES],
   summary: 'Modifier une parcelle',
@@ -175,6 +180,7 @@ export const updateFeaturePropertiesSchema = withSchema(recordRoute(), {
 })
 
 export const deleteSingleFeatureSchema = withSchema(recordRoute(), {
+  headers: ifUnmodifiedSinceHeadersSchema,
   operationId: 'deleteParcelle',
   tags: [TAGS.PARCELLES],
   summary: 'Supprimer une parcelle',
@@ -184,6 +190,7 @@ export const deleteSingleFeatureSchema = withSchema(recordRoute(), {
 })
 
 export const createFeaturesFromOtherSchema = withSchema(recordRoute(), {
+  headers: ifUnmodifiedSinceHeadersSchema,
   operationId: 'replaceParcelles',
   tags: [TAGS.PARCELLES],
   summary: 'Remplacer des parcelles par de nouvelles',

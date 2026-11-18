@@ -15,7 +15,7 @@ function getTypeEnvoi(statut: string | null): 'success' | 'echec' | null {
 
 const NB_MINIMUM_STREAK = 4
 
-function getStreaksSuspectes<T extends { statut: string | null }>(envois: T[]): Array<StreakSuspecte<T>> {
+export function getStreaksSuspectes<T extends { statut: string | null }>(envois: T[]): Array<StreakSuspecte<T>> {
   const streaks: Array<StreakSuspecte<T>> = []
   let streakStart = 0
 
@@ -44,10 +44,8 @@ function getStreaksSuspectes<T extends { statut: string | null }>(envois: T[]): 
   return streaks
 }
 
-function getTruncate(from: string, to: string): 'day' | 'week' {
+export function getTruncate(from: string, to: string): 'day' | 'week' {
   const diffInDays = (new Date(to).getTime() - new Date(from).getTime()) / (1000 * 60 * 60 * 24)
 
   return diffInDays <= 7 ? 'day' : 'week'
 }
-
-export { getStreaksSuspectes, getTruncate }

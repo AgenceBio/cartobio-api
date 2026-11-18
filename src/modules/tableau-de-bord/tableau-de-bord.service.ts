@@ -13,22 +13,22 @@ import type {
   TopAnomaliesResponse
 } from '@agencebio/cartobio-types'
 
-async function getGeneralKpi(
+export async function getGeneralKpi(
   { from, to }: StatsQuery,
   organismeCertificateur: number
 ): Promise<GeneralKpiResponse['data']> {
   return repository.findGeneralKpi({ from, to, organismeCertificateur })
 }
 
-async function getTableauBilan(
-  { from, to, page = '1', limit = '20', recherche, statuts, etats, ordreDate }: StatsQuery,
+export async function getTableauBilan(
+  { from, to, page = 1, limit = 20, recherche, statuts, etats, ordreDate }: StatsQuery,
   organismeCertificateur: number
 ): Promise<TableauBilanResponse> {
   return repository.findTableauBilan({
     from,
     to,
-    page: Number(page),
-    limit: Number(limit),
+    page,
+    limit,
     recherche,
     statuts,
     etats,
@@ -37,7 +37,7 @@ async function getTableauBilan(
   })
 }
 
-async function getHistoriqueSpecificParcellaire(
+export async function getHistoriqueSpecificParcellaire(
   { numeroBio, numeroClient, auditDate }: StatsQuery,
   organismeCertificateur: number
 ): Promise<HistoriqueResponse> {
@@ -49,19 +49,20 @@ async function getHistoriqueSpecificParcellaire(
   })
 }
 
-async function getTableauErreurs(
-  { from, to, page = '1', limit = '20', recherche, ordreDate, codes }: StatsQuery,
+export async function getTableauErreurs(
+  { from, to, page = 1, limit = 20, recherche, ordreDate, codes }: StatsQuery,
   organismeCertificateur: number
 ): Promise<TableauErreursResponse> {
-  const codesValue = (Array.isArray(codes) ? codes : typeof codes === 'string' ? codes.split(',') : [])
-    .map((code) => String(code).trim())
+  const codesValue = (codes ?? '')
+    .split(',')
+    .map((code) => code.trim())
     .filter(Boolean)
 
   return repository.findTableauErreurs({
     from,
     to,
-    page: Number(page),
-    limit: Number(limit),
+    page,
+    limit,
     recherche,
     ordreDate,
     codes: codesValue.length ? codesValue : undefined,
@@ -69,14 +70,14 @@ async function getTableauErreurs(
   })
 }
 
-async function getTopAnomalies(
+export async function getTopAnomalies(
   { from, to }: Required<Pick<StatsQuery, 'from' | 'to'>>,
   organismeCertificateur: number
 ): Promise<TopAnomaliesResponse['data']> {
   return repository.findTopAnomalies({ from, to, organismeCertificateur })
 }
 
-async function getTopAnomaliesGrouped(
+export async function getTopAnomaliesGrouped(
   { from, to }: Required<Pick<StatsQuery, 'from' | 'to'>>,
   organismeCertificateur: number
 ): Promise<TopAnomaliesGroupedResponse> {
@@ -113,8 +114,8 @@ async function getTopAnomaliesGrouped(
   return Array.from(periods.values())
 }
 
-async function getRepetErreurs(
-  { from, to, page = '1', limit = '10', recherche, type }: StatsQuery & Required<Pick<StatsQuery, 'from' | 'to'>>,
+export async function getRepetErreurs(
+  { from, to, page = 1, limit = 10, recherche, type }: StatsQuery & Required<Pick<StatsQuery, 'from' | 'to'>>,
   organismeCertificateur: number
 ): Promise<RepetitionsResponse> {
   const rows = await repository.findEnvois({ from, to, recherche, organismeCertificateur })
@@ -161,26 +162,14 @@ async function getRepetErreurs(
 
   const alertesFiltrees = type ? alertes.filter((alerte) => alerte.type === type) : alertes
 
-  const pageNumber = Number(page)
-  const limitNumber = Number(limit)
-  const offset = (pageNumber - 1) * limitNumber
+  const offset = (page - 1) * limit
 
   return {
-    data: alertesFiltrees.slice(offset, offset + limitNumber),
+    data: alertesFiltrees.slice(offset, offset + limit),
     meta: {
       total: alertesFiltrees.length,
-      page: pageNumber,
-      limit: limitNumber
+      page,
+      limit
     }
   }
-}
-
-export {
-  getGeneralKpi,
-  getTableauBilan,
-  getTableauErreurs,
-  getHistoriqueSpecificParcellaire,
-  getTopAnomalies,
-  getTopAnomaliesGrouped,
-  getRepetErreurs
 }
