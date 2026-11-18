@@ -1,13 +1,13 @@
 import { vi } from 'vitest'
 
 class HTTPError extends Error {
-  constructor () {
+  constructor() {
     super('HTTPError')
   }
 }
 
 class TimeoutError extends Error {
-  constructor () {
+  constructor() {
     super('TimeoutError')
   }
 }

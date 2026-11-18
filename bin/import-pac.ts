@@ -33,9 +33,7 @@ function parseCSV(text: string): CorrespondanceRow[] {
     return {
       PACAGE: '',
       SIRET: '',
-      ...Object.fromEntries(
-        headers.map((h, i) => [h.toUpperCase(), values[i] ?? ''])
-      )
+      ...Object.fromEntries(headers.map((h, i) => [h.toUpperCase(), values[i] ?? '']))
     }
   })
 }
@@ -44,9 +42,7 @@ function toCSV(data: Array<Record<string, string>>, delimiter = ';', header: str
   const [first] = data
   if (!first) return ''
   const headers = [...Object.keys(first), ...header]
-  const lines = data.map((obj) =>
-    headers.map((h) => obj[h] ?? '').join(delimiter)
-  )
+  const lines = data.map((obj) => headers.map((h) => obj[h] ?? '').join(delimiter))
   return [headers.join(delimiter), ...lines].join('\n')
 }
 
@@ -56,9 +52,7 @@ function groupByPACAGE(features: Iterable<gdal.Feature>): gdal.Feature[][] {
   for (const feature of features) {
     const pacage = feature.fields.get('PACAGE')
     if (!pacage) {
-      throw new Error(
-        `Feature without PACAGE: ${JSON.stringify(feature.fields.toObject())}`
-      )
+      throw new Error(`Feature without PACAGE: ${JSON.stringify(feature.fields.toObject())}`)
     }
 
     let group = groups.get(pacage)
@@ -86,18 +80,15 @@ interface ValidOperatorsResponse {
 
 async function getValidOperator(tabCouplage: SiretPacage[]): Promise<ValidOperatorsResponse | undefined> {
   try {
-    const response = await post(
-      `${process.env.NOTIFICATIONS_AB_ENDPOINT}/api/operateur/siret-pacage`,
-      {
-        headers: {
-          Authorization: process.env.NOTIFICATIONS_AB_SERVICE_TOKEN,
-          origin: process.env.NOTIFICATIONS_AB_ORIGIN
-        },
-        json: tabCouplage,
-        timeout: { request: 10000 },
-        retry: { limit: 3, methods: ['GET', 'POST'], errorCodes: ['EPIPE', 'ECONNRESET', 'ETIMEDOUT'] }
-      }
-    ).json<ValidOperatorsResponse>()
+    const response = await post(`${process.env.NOTIFICATIONS_AB_ENDPOINT}/api/operateur/siret-pacage`, {
+      headers: {
+        Authorization: process.env.NOTIFICATIONS_AB_SERVICE_TOKEN,
+        origin: process.env.NOTIFICATIONS_AB_ORIGIN
+      },
+      json: tabCouplage,
+      timeout: { request: 10000 },
+      retry: { limit: 3, methods: ['GET', 'POST'], errorCodes: ['EPIPE', 'ECONNRESET', 'ETIMEDOUT'] }
+    }).json<ValidOperatorsResponse>()
     return response
   } catch (e) {
     console.error(e)
@@ -117,13 +108,11 @@ function splitToNTabs<T>(array: T[], n: number): T[][] {
 const [, , aspFile, csvFile] = process.argv
 
 if (aspFile === undefined || csvFile === undefined) {
-  console.error(
-    'Usage: node import-pac.js <fichier-zip-asp> <correspondance.csv>'
-  )
+  console.error('Usage: node import-pac.js <fichier-zip-asp> <correspondance.csv>')
   process.exit(1)
 }
 
-(async (): Promise<void> => {
+;(async (): Promise<void> => {
   dotenv.config({ path: process.argv[4] })
 
   const zipBuffer = await getStream.buffer(fs.createReadStream(aspFile))
@@ -203,16 +192,15 @@ if (aspFile === undefined || csvFile === undefined) {
             if (data.sansOperateur.length > 0) {
               for (const so of data.sansOperateur) {
                 warningsNoNumeroBio.push({ siret: so.siret, pacage: so.pacage })
-                const ligneSansOperateur = correspondance.find(
-                  (e) => e.PACAGE === so.pacage && e.SIRET === so.siret
-                )
+                const ligneSansOperateur = correspondance.find((e) => e.PACAGE === so.pacage && e.SIRET === so.siret)
                 if (ligneSansOperateur) exportNoCorrespondance.push(ligneSansOperateur)
               }
               skipped = skipped + data.sansOperateur.length
             }
             for (const operator of data.operateurs) {
               const pacageFeatures = tabGeom.get(operator.numeroPacage ?? '')
-              if (!pacageFeatures) throw new Error(`PACAGE ${operator.numeroPacage} renvoyé par l'API absent du fichier`)
+              if (!pacageFeatures)
+                throw new Error(`PACAGE ${operator.numeroPacage} renvoyé par l'API absent du fichier`)
 
               const featureCollection = {
                 type: 'FeatureCollection',
@@ -226,8 +214,7 @@ if (aspFile === undefined || csvFile === undefined) {
                 await geometry.transformAsync(reproject)
 
                 const fields = feature.fields.toObject()
-                const { BIO, CODE_CULT, PRECISION, NUM_ILOT, NUM_PARCEL } =
-                  fields
+                const { BIO, CODE_CULT, PRECISION, NUM_ILOT, NUM_PARCEL } = fields
                 const id = names.includes('id') ? feature.fields.get('id') : getRandomFeatureId()
 
                 featureCollection.features.push({
@@ -244,8 +231,7 @@ if (aspFile === undefined || csvFile === undefined) {
                         CODE_CULT
                       }
                     ],
-                    conversion_niveau:
-                      BIO === 1 ? EtatProduction.BIO : EtatProduction.NB,
+                    conversion_niveau: BIO === 1 ? EtatProduction.BIO : EtatProduction.NB,
                     NUMERO_I: NUM_ILOT,
                     NUMERO_P: NUM_PARCEL,
                     TYPE: CODE_CULT,
@@ -281,7 +267,12 @@ if (aspFile === undefined || csvFile === undefined) {
                 .values(values)
                 .onConflictDoUpdate({
                   target: [importPac.numeroBio, importPac.pacage, importPac.siret],
-                  set: { nbParcelles: values.nbParcelles, size: values.size, record: values.record, updatedAt: sql`CURRENT_TIMESTAMP` }
+                  set: {
+                    nbParcelles: values.nbParcelles,
+                    size: values.size,
+                    record: values.record,
+                    updatedAt: sql`CURRENT_TIMESTAMP`
+                  }
                 })
               imported++
               progress.increment()
@@ -289,7 +280,6 @@ if (aspFile === undefined || csvFile === undefined) {
           }
         }
       }
-
     })
   } catch (error) {
     console.error(error)
@@ -300,9 +290,7 @@ if (aspFile === undefined || csvFile === undefined) {
 
     console.warn('\n Warnings:')
     if (warningsDoublon.length > 0) {
-      console.log(
-        '\n Warnings =>  Couple Siret / Pacage avec plusieurs numéros Bio'
-      )
+      console.log('\n Warnings =>  Couple Siret / Pacage avec plusieurs numéros Bio')
       console.table(warningsDoublon)
     }
     if (warningsNoNumeroBio.length > 0) {
@@ -340,9 +328,7 @@ if (aspFile === undefined || csvFile === undefined) {
     if (exportNoCorrespondance.length > 0) {
       const outputCsv = toCSV(exportNoCorrespondance, ';', ['NUMEROBIO'])
       fs.writeFileSync('lignes_sans_numerobio.csv', outputCsv, 'utf8')
-      console.log(
-        'Correctifs à faire disponible dans le fichier lignes_sans_numerobio.csv'
-      )
+      console.log('Correctifs à faire disponible dans le fichier lignes_sans_numerobio.csv')
     }
   }
 })()

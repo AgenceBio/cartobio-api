@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm';
+import { sql } from 'drizzle-orm'
 import {
   foreignKey,
   index,
@@ -8,12 +8,12 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
-  varchar,
-} from 'drizzle-orm/pg-core';
-import { cartobio } from "./cartobio.js";
-import { parcellaires } from './parcellaires.js';
-import { parcelles } from './parcelles.js';
-import { productionAttestationStatus, productionAttestationType } from './enums.js';
+  varchar
+} from 'drizzle-orm/pg-core'
+import { cartobio } from './cartobio.js'
+import { parcellaires } from './parcellaires.js'
+import { parcelles } from './parcelles.js'
+import { productionAttestationStatus, productionAttestationType } from './enums.js'
 
 export const attestationsProduction = cartobio.table(
   'attestations_production',
@@ -25,43 +25,37 @@ export const attestationsProduction = cartobio.table(
     path: varchar('path', { length: 1_024 }),
     status: productionAttestationStatus('status').notNull(),
     type: productionAttestationType('type').notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
       .defaultNow()
-      .$onUpdate(() => sql`now()`),
+      .$onUpdate(() => sql`now()`)
   },
   (table) => [
     index('attestations_production_record_id_idx').on(table.recordId),
-    uniqueIndex('attestations_production_record_id_type_idx').on(table.recordId, table.type),
-  ],
-);
+    uniqueIndex('attestations_production_record_id_type_idx').on(table.recordId, table.type)
+  ]
+)
 
 export const operateursConsultes = cartobio.table(
   'operateurs_consultes',
   {
     numeroBio: integer('numerobio').notNull(),
     userId: varchar('user_id', { length: 255 }).notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
   },
-  (table) => [primaryKey({ columns: [table.numeroBio, table.userId] })],
-);
+  (table) => [primaryKey({ columns: [table.numeroBio, table.userId] })]
+)
 
 export const operateursEpingles = cartobio.table(
   'operateurs_epingles',
   {
     numeroBio: integer('numerobio').notNull(),
     userId: varchar('user_id', { length: 255 }).notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
   },
-  (table) => [primaryKey({ columns: [table.numeroBio, table.userId] })],
-);
+  (table) => [primaryKey({ columns: [table.numeroBio, table.userId] })]
+)
 
 export const parcellesControles = cartobio.table(
   'parcelles_controles',
@@ -71,16 +65,14 @@ export const parcellesControles = cartobio.table(
       .references(() => parcellaires.recordId, { onDelete: 'cascade' }),
     parcelleId: text('parcelle_id').notNull(),
     userId: varchar('user_id', { length: 255 }).notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
   },
   (table) => [
     primaryKey({ columns: [table.recordId, table.parcelleId, table.userId] }),
     foreignKey({
       name: 'parcelles_controles_parcelle_fkey',
       columns: [table.recordId, table.parcelleId],
-      foreignColumns: [parcelles.recordId, parcelles.id],
-    }).onDelete('cascade'),
-  ],
-);
+      foreignColumns: [parcelles.recordId, parcelles.id]
+    }).onDelete('cascade')
+  ]
+)

@@ -6,11 +6,15 @@ import { externalExploitationSchema } from './auth.schema.js'
 import type { AuthRoutesOptions } from './auth.routes.js'
 import { InvalidRequestApiError } from '../../shared/errors.js'
 
-export default async function externalRoutes (fastify: FastifyInstance, { stateCache }: AuthRoutesOptions): Promise<void> {
+export default async function externalRoutes(
+  fastify: FastifyInstance,
+  { stateCache }: AuthRoutesOptions
+): Promise<void> {
   const app = fastify.withTypeProvider<ZodTypeProvider>()
   app.get('/api/v3/external/exploitations/:numeroBio', externalExploitationSchema, async (request, reply) => {
     const { numeroBio } = request.params
-    if (!numeroBio || Number.isNaN(Number(numeroBio)) || Number(numeroBio) <= 0) throw new InvalidRequestApiError('numeroBio invalide')
+    if (!numeroBio || Number.isNaN(Number(numeroBio)) || Number(numeroBio) <= 0)
+      throw new InvalidRequestApiError('numeroBio invalide')
 
     const state = randomUUID()
     stateCache.set(state, { returnto: '/exploitations/' + numeroBio })

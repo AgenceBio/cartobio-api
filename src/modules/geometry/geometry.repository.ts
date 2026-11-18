@@ -18,11 +18,11 @@ import type {
 const ancienne = alias(parcelles, 'ancienne')
 const nouvelle = alias(parcelles, 'nouvelle')
 
-function parcellesActives (table: typeof ancienne | typeof nouvelle, recordId: string): SQL | undefined {
+function parcellesActives(table: typeof ancienne | typeof nouvelle, recordId: string): SQL | undefined {
   return and(eq(table.recordId, recordId), isNull(table.deletedAt))
 }
 
-function parcelleColumns<T extends typeof ancienne | typeof nouvelle> (table: T): Pick<T, ParcelleColumnKey> {
+function parcelleColumns<T extends typeof ancienne | typeof nouvelle>(table: T): Pick<T, ParcelleColumnKey> {
   return {
     id: table.id,
     numeroIlotPac: table.numeroIlotPac,
@@ -31,7 +31,11 @@ function parcelleColumns<T extends typeof ancienne | typeof nouvelle> (table: T)
   }
 }
 
-async function findGeometryConflicts (inputGeomGeoJSON: unknown, recordId: string, id: string | number = ''): Promise<GeometryConflict[]> {
+async function findGeometryConflicts(
+  inputGeomGeoJSON: unknown,
+  recordId: string,
+  id: string | number = ''
+): Promise<GeometryConflict[]> {
   const input = fromGeoJSON(inputGeomGeoJSON)
 
   /** L'area n'est pas a 0 a cause des imprécision du front, et des segments frontières */
@@ -45,14 +49,14 @@ async function findGeometryConflicts (inputGeomGeoJSON: unknown, recordId: strin
       END`
     })
     .from(parcelles)
-    .where(and(
-      eq(parcelles.recordId, recordId),
-      ne(parcelles.id, String(id)),
-      isNull(parcelles.deletedAt)
-    ))
+    .where(and(eq(parcelles.recordId, recordId), ne(parcelles.id, String(id)), isNull(parcelles.deletedAt)))
 }
 
-async function findGeometryCorrections (inputGeomGeoJSON: unknown, recordId: string, ids: string[]): Promise<GeometryCorrection[]> {
+async function findGeometryCorrections(
+  inputGeomGeoJSON: unknown,
+  recordId: string,
+  ids: string[]
+): Promise<GeometryCorrection[]> {
   const input = fromGeoJSON(inputGeomGeoJSON)
 
   return db
@@ -69,7 +73,7 @@ async function findGeometryCorrections (inputGeomGeoJSON: unknown, recordId: str
 /**
  * Vérifie que deux géométries sont de même géométrie spacial
  */
-async function findGeometryEquals (input: { old: string; new: string }): Promise<GeometryEquals[]> {
+async function findGeometryEquals(input: { old: string; new: string }): Promise<GeometryEquals[]> {
   const records = await db
     .select({
       recordId: parcellaires.recordId,
@@ -87,11 +91,13 @@ async function findGeometryEquals (input: { old: string; new: string }): Promise
   if (!r1 || !r2 || r1.numeroBio !== r2.numeroBio) return []
 
   const comparisonResult = compareParcellaires(r1, r2)
-  const [oldRecordId, newRecordId] = comparisonResult === 'r1_old_r2_new'
-    ? [input.old, input.new]
-    : [input.new, input.old]
+  const [oldRecordId, newRecordId] =
+    comparisonResult === 'r1_old_r2_new' ? [input.old, input.new] : [input.new, input.old]
 
-  const recouvrement = (geometry: AnyColumn, autre: AnyColumn): SQL => sql`ST_Intersects(${makeValid(autre)}, ${makeValid(geometry)})
+  const recouvrement = (
+    geometry: AnyColumn,
+    autre: AnyColumn
+  ): SQL => sql`ST_Intersects(${makeValid(autre)}, ${makeValid(geometry)})
     AND ST_Area(ST_Intersection(${makeValid(autre)}, ${makeValid(geometry)})) / ST_Area(${makeValid(geometry)}) > 0.1`
 
   const intersectionArea = sql`ST_Area(ST_Intersection(${makeValid(ancienne.geometry)}, ${makeValid(nouvelle.geometry)}))`
@@ -104,86 +110,101 @@ async function findGeometryEquals (input: { old: string; new: string }): Promise
         nouvelle: parcelleColumns(nouvelle)
       })
       .from(ancienne)
-      .innerJoin(nouvelle, and(
-        sql`ST_Intersects(${makeValid(ancienne.geometry)}, ${makeValid(nouvelle.geometry)})`,
-        sql`${intersectionArea} > 0.00000001`
-      ))
-      .where(and(
-        parcellesActives(ancienne, oldRecordId),
-        parcellesActives(nouvelle, newRecordId),
-        sql`NOT ST_Equals(
+      .innerJoin(
+        nouvelle,
+        and(
+          sql`ST_Intersects(${makeValid(ancienne.geometry)}, ${makeValid(nouvelle.geometry)})`,
+          sql`${intersectionArea} > 0.00000001`
+        )
+      )
+      .where(
+        and(
+          parcellesActives(ancienne, oldRecordId),
+          parcellesActives(nouvelle, newRecordId),
+          sql`NOT ST_Equals(
           ST_ReducePrecision(${makeValid(nouvelle.geometry)}, 0.0001),
           ST_ReducePrecision(${makeValid(ancienne.geometry)}, 0.0001)
         )`
-      ))
+        )
+      )
       .orderBy(nouvelle.id, desc(intersectionArea)),
 
     db
       .select({ geometry: asGeoJSON(ancienne.geometry), ...parcelleColumns(ancienne) })
       .from(ancienne)
-      .where(and(
-        parcellesActives(ancienne, oldRecordId),
-        notExists(
-          db
-            .select({ id: nouvelle.id })
-            .from(nouvelle)
-            .where(and(parcellesActives(nouvelle, newRecordId), recouvrement(ancienne.geometry, nouvelle.geometry)))
+      .where(
+        and(
+          parcellesActives(ancienne, oldRecordId),
+          notExists(
+            db
+              .select({ id: nouvelle.id })
+              .from(nouvelle)
+              .where(and(parcellesActives(nouvelle, newRecordId), recouvrement(ancienne.geometry, nouvelle.geometry)))
+          )
         )
-      )),
+      ),
 
     db
       .select({ geometry: asGeoJSON(nouvelle.geometry), ...parcelleColumns(nouvelle) })
       .from(nouvelle)
-      .where(and(
-        parcellesActives(nouvelle, newRecordId),
-        notExists(
-          db
-            .select({ id: ancienne.id })
-            .from(ancienne)
-            .where(and(parcellesActives(ancienne, oldRecordId), recouvrement(nouvelle.geometry, ancienne.geometry)))
+      .where(
+        and(
+          parcellesActives(nouvelle, newRecordId),
+          notExists(
+            db
+              .select({ id: ancienne.id })
+              .from(ancienne)
+              .where(and(parcellesActives(ancienne, oldRecordId), recouvrement(nouvelle.geometry, ancienne.geometry)))
+          )
         )
-      ))
+      )
   ])
 
-  return [{
-    comparison_result: comparisonResult,
-    geojson: {
-      type: 'FeatureCollection',
-      features: [
-        ...modified.map(({ geometry, ancienne, nouvelle }) => feature(geometry, {
-          status: 'modified',
-          new_id: nouvelle.id,
-          old_id: ancienne.id,
-          label: label(nouvelle),
-          old_label: label(ancienne)
-        })),
-        ...deleted.map(({ geometry, ...parcelle }) => feature(geometry, {
-          status: 'deleted',
-          new_id: null,
-          old_id: parcelle.id,
-          label: label(parcelle),
-          old_label: null
-        })),
-        ...added.map(({ geometry, ...parcelle }) => feature(geometry, {
-          status: 'added',
-          new_id: parcelle.id,
-          old_id: null,
-          label: label(parcelle),
-          old_label: null
-        }))
-      ]
+  return [
+    {
+      comparison_result: comparisonResult,
+      geojson: {
+        type: 'FeatureCollection',
+        features: [
+          ...modified.map(({ geometry, ancienne, nouvelle }) =>
+            feature(geometry, {
+              status: 'modified',
+              new_id: nouvelle.id,
+              old_id: ancienne.id,
+              label: label(nouvelle),
+              old_label: label(ancienne)
+            })
+          ),
+          ...deleted.map(({ geometry, ...parcelle }) =>
+            feature(geometry, {
+              status: 'deleted',
+              new_id: null,
+              old_id: parcelle.id,
+              label: label(parcelle),
+              old_label: null
+            })
+          ),
+          ...added.map(({ geometry, ...parcelle }) =>
+            feature(geometry, {
+              status: 'added',
+              new_id: parcelle.id,
+              old_id: null,
+              label: label(parcelle),
+              old_label: null
+            })
+          )
+        ]
+      }
     }
-  }]
+  ]
 }
 
-async function findParcelBorder (geometry: unknown, distance: number): Promise<ParcelBorder | undefined> {
+async function findParcelBorder(geometry: unknown, distance: number): Promise<ParcelBorder | undefined> {
   const parcelle = db
     .$with('parcelle', { geom: sql`geom`.as('geom') })
     .as(sql`SELECT ${webMercator(fromGeoJSON(geometry))} AS geom`)
 
-  const bordure = db
-    .$with('bordure', { geom: sql`geom`.as('geom') })
-    .as(sql`
+  const bordure = db.$with('bordure', { geom: sql`geom`.as('geom') }).as(sql`
       SELECT ST_Difference(agrandie, ST_Buffer(agrandie, ${-(distance + 0.01)})) AS geom
       FROM (SELECT ST_Buffer(${parcelle.geom}, 0.01) AS agrandie FROM ${parcelle}) AS parcelle_agrandie
     `)
@@ -200,7 +221,13 @@ async function findParcelBorder (geometry: unknown, distance: number): Promise<P
   return result
 }
 
-async function findParcelBorderBetweenPoints (geometry: unknown, distance: number, start: Position, end: Position, isInverted: boolean): Promise<ParcelBorder | undefined> {
+async function findParcelBorderBetweenPoints(
+  geometry: unknown,
+  distance: number,
+  start: Position,
+  end: Position,
+  isInverted: boolean
+): Promise<ParcelBorder | undefined> {
   const parcelle = db
     .$with('parcelle', { geom: sql`geom`.as('geom') })
     .as(sql`SELECT ${webMercator(fromGeoJSON(geometry))} AS geom`)
@@ -209,13 +236,11 @@ async function findParcelBorderBetweenPoints (geometry: unknown, distance: numbe
     .$with('contour', { ligne: sql`ligne`.as('ligne') })
     .as(sql`SELECT ST_ExteriorRing(${parcelle.geom}) AS ligne FROM ${parcelle}`)
 
-  const positions = db
-    .$with('positions', {
-      ligne: sql`ligne`.as('ligne'),
-      debut: sql`debut`.as('debut'),
-      fin: sql`fin`.as('fin')
-    })
-    .as(sql`
+  const positions = db.$with('positions', {
+    ligne: sql`ligne`.as('ligne'),
+    debut: sql`debut`.as('debut'),
+    fin: sql`fin`.as('fin')
+  }).as(sql`
       SELECT ligne, LEAST(a, b) AS debut, GREATEST(a, b) AS fin
       FROM (
         SELECT
@@ -238,9 +263,7 @@ async function findParcelBorderBetweenPoints (geometry: unknown, distance: numbe
       END`
     : sousLigne(positions.debut, positions.fin)
 
-  const bande = db
-    .$with('bande', { geom: sql`geom`.as('geom') })
-    .as(sql`
+  const bande = db.$with('bande', { geom: sql`geom`.as('geom') }).as(sql`
       SELECT ST_Buffer(${arc}, ${Math.abs(distance)}, 'endcap=square join=round quad_segs=8') AS geom
       FROM ${positions}
       WHERE ST_Length(${positions.ligne}) > 0
@@ -249,7 +272,9 @@ async function findParcelBorderBetweenPoints (geometry: unknown, distance: numbe
   const [result] = await db
     .with(parcelle, contour, positions, bande)
     .select({
-      parcelleSansBordure: asWgs84GeoJSON(sql`COALESCE(ST_Difference(${parcelle.geom}, ${bande.geom}), ${parcelle.geom})`),
+      parcelleSansBordure: asWgs84GeoJSON(
+        sql`COALESCE(ST_Difference(${parcelle.geom}, ${bande.geom}), ${parcelle.geom})`
+      ),
       bordure: asWgs84GeoJSON(sql`CASE
         WHEN ST_Intersects(${bande.geom}, ${parcelle.geom}) THEN ST_MakeValid(ST_Intersection(${bande.geom}, ${parcelle.geom}))
       END`)

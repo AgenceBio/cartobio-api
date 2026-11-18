@@ -1,8 +1,17 @@
-import type { AddGeometryResponse, BorderCutResponse, GeometryEqualsBody, GeometryEqualsResponse } from '@agencebio/cartobio-types'
+import type {
+  AddGeometryResponse,
+  BorderCutResponse,
+  GeometryEqualsBody,
+  GeometryEqualsResponse
+} from '@agencebio/cartobio-types'
 import * as repository from './geometry.repository.js'
 import { InvalidRequestApiError } from '../../shared/errors.js'
 
-async function verifyGeometry (inputGeomGeoJSON: unknown, recordId: string, id: string | number = ''): Promise<AddGeometryResponse> {
+async function verifyGeometry(
+  inputGeomGeoJSON: unknown,
+  recordId: string,
+  id: string | number = ''
+): Promise<AddGeometryResponse> {
   const conflicts = await repository.findGeometryConflicts(inputGeomGeoJSON, recordId, id)
 
   if (conflicts.some(({ status }) => status === 'inclusion')) {
@@ -22,11 +31,18 @@ async function verifyGeometry (inputGeomGeoJSON: unknown, recordId: string, id: 
   }
 }
 
-function getGeometryEquals (input: GeometryEqualsBody['payload']): Promise<GeometryEqualsResponse> {
+function getGeometryEquals(input: GeometryEqualsBody['payload']): Promise<GeometryEqualsResponse> {
   return repository.findGeometryEquals(input)
 }
 
-async function calculateParcelBorder (geometry: unknown, distance: number, allBorder: boolean, isInverted: boolean, startBorderPoint?: number[], endBorderPoint?: number[]): Promise<BorderCutResponse | undefined> {
+async function calculateParcelBorder(
+  geometry: unknown,
+  distance: number,
+  allBorder: boolean,
+  isInverted: boolean,
+  startBorderPoint?: number[],
+  endBorderPoint?: number[]
+): Promise<BorderCutResponse | undefined> {
   if (allBorder) {
     return repository.findParcelBorder(geometry, distance)
   }

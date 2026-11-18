@@ -5,11 +5,9 @@ import config from '../src/config/env.js'
 /**
  * Script de nettoyage des pdfs non utile depuis plus de 2 jours (déchet d'une mauvaise génération)
  */
-async function clearPDFS (): Promise<void> {
+async function clearPDFS(): Promise<void> {
   if (process.argv[2] === '-h' || process.argv[2] === '--help') {
-    console.log(
-      'Usage: node delete-pdf.js (-h|--help)'
-    )
+    console.log('Usage: node delete-pdf.js (-h|--help)')
     process.exit(0)
   }
 

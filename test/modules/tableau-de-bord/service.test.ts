@@ -28,15 +28,18 @@ describe('dashboard service', () => {
     const data = { data: [], meta: { total: 0, page: 2, limit: 50 } }
     mockedRepo.getTableauBilanRepo.mockResolvedValue(data)
 
-    const result = await getTableauBilan({
-      from: '2026-01-01',
-      to: '2026-01-31',
-      page: '2',
-      limit: '50',
-      recherche: 'bio-42',
-      statuts: ['VALID', 'REJECTED'],
-      etats: ['CREATED', 'UPDATED']
-    }, 999)
+    const result = await getTableauBilan(
+      {
+        from: '2026-01-01',
+        to: '2026-01-31',
+        page: '2',
+        limit: '50',
+        recherche: 'bio-42',
+        statuts: ['VALID', 'REJECTED'],
+        etats: ['CREATED', 'UPDATED']
+      },
+      999
+    )
 
     expect(mockedRepo.getTableauBilanRepo).toHaveBeenCalledWith({
       from: '2026-01-01',
@@ -115,9 +118,7 @@ describe('dashboard service', () => {
       auditDate: '2026-03-01'
     })
 
-    expect(
-      mockedRepo.getHistoriqueSpecificParcellaireRepo
-    ).toHaveBeenCalledWith({
+    expect(mockedRepo.getHistoriqueSpecificParcellaireRepo).toHaveBeenCalledWith({
       numeroBio: 'BIO-1',
       numeroClient: 'CLIENT-1',
       auditDate: '2026-03-01'

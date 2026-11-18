@@ -25,9 +25,10 @@ type OperatorRecordData = Omit<OperatorRecordRow, 'created_at' | 'updated_at'> &
   lastmixitestate: string | null
 }
 
-export type OperatorWithRecordData = AgenceBioNormalizedOperatorWithRecord & Partial<Omit<OperatorRecordData, 'metadata'>> & {
-  otherParcellaire?: OperatorRecordData[] | null
-}
+export type OperatorWithRecordData = AgenceBioNormalizedOperatorWithRecord &
+  Partial<Omit<OperatorRecordData, 'metadata'>> & {
+    otherParcellaire?: OperatorRecordData[] | null
+  }
 
 export type OperatorRecordWithUser<T> = Omit<T, 'user_id' | 'user_role'> & {
   user: string | null

@@ -1,5 +1,16 @@
 import { sql } from 'drizzle-orm'
-import { boolean, date, index, integer, jsonb, numeric, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core'
+import {
+  boolean,
+  date,
+  index,
+  integer,
+  jsonb,
+  numeric,
+  timestamp,
+  uniqueIndex,
+  uuid,
+  varchar
+} from 'drizzle-orm/pg-core'
 import { cartobio } from './cartobio.js'
 import { importJobEtat, importJobResult, importLogType, importStatus } from './enums.js'
 
@@ -57,7 +68,10 @@ export const importPac = cartobio.table(
     record: jsonb('record'),
     imported: boolean('imported').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow().$onUpdate(() => sql`now()`)
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => sql`now()`)
   },
   (table) => [uniqueIndex('import_pac_numerobio_pacage_siret_idx').on(table.numeroBio, table.pacage, table.siret)]
 )

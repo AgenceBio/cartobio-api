@@ -1,7 +1,15 @@
 import type { Mock } from 'vitest'
 import { randomUUID } from 'node:crypto'
 import { CertificationState } from '@agencebio/cartobio-types'
-import type { AgenceBioNormalizedOperator, CartoBioCulture, CartoBioFeature, CartoBioFeatureProperties, CartoBioOCUser, CartoBioUser, NormalizedRecord } from '@agencebio/cartobio-types'
+import type {
+  AgenceBioNormalizedOperator,
+  CartoBioCulture,
+  CartoBioFeature,
+  CartoBioFeatureProperties,
+  CartoBioOCUser,
+  CartoBioUser,
+  NormalizedRecord
+} from '@agencebio/cartobio-types'
 import type { AgenceBioAdresses, AgenceBioNotification, AgenceBioOperator } from '../src/clients/agence-bio.types.js'
 import type { DBOperatorRecordWithParcelles, DBParcelle } from '../src/shared/parcellaires/parcellaires.types.js'
 import type { createOrUpdateOperatorRecord } from '../src/shared/parcellaires/parcellaires.service.js'
@@ -10,7 +18,7 @@ import type { Browser, Page } from 'puppeteer'
 import type { PDFDocument } from 'pdf-lib'
 import type { FastifyRequest } from 'fastify'
 
-export function buildOperator (overrides: Partial<AgenceBioNormalizedOperator> = {}): AgenceBioNormalizedOperator {
+export function buildOperator(overrides: Partial<AgenceBioNormalizedOperator> = {}): AgenceBioNormalizedOperator {
   return {
     id: 1,
     nom: 'Opérateur de test',
@@ -33,7 +41,7 @@ export function buildOperator (overrides: Partial<AgenceBioNormalizedOperator> =
   }
 }
 
-export function buildPdfParcelle (overrides: Partial<PdfParcelle> = {}): PdfParcelle {
+export function buildPdfParcelle(overrides: Partial<PdfParcelle> = {}): PdfParcelle {
   return {
     id: '1',
     name: null,
@@ -46,7 +54,18 @@ export function buildPdfParcelle (overrides: Partial<PdfParcelle> = {}): PdfParc
     nbilot: null,
     nbp: null,
     refcad: null,
-    geojson: JSON.stringify({ type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]] }),
+    geojson: JSON.stringify({
+      type: 'Polygon',
+      coordinates: [
+        [
+          [0, 0],
+          [1, 0],
+          [1, 1],
+          [0, 1],
+          [0, 0]
+        ]
+      ]
+    }),
     minx: 0,
     miny: 0,
     maxx: 1,
@@ -63,7 +82,7 @@ export const asBrowser = (mock: Record<string, Mock>) => mock as unknown as Brow
 export const asPdfDocument = (mock: Record<string, Mock>) => mock as unknown as PDFDocument
 export const asFastifyRequest = (mock: object) => mock as FastifyRequest
 
-export function buildCulture (overrides: Partial<CartoBioCulture> = {}): CartoBioCulture {
+export function buildCulture(overrides: Partial<CartoBioCulture> = {}): CartoBioCulture {
   return {
     id: randomUUID(),
     CPF: '01.19.10.8',
@@ -71,7 +90,7 @@ export function buildCulture (overrides: Partial<CartoBioCulture> = {}): CartoBi
   }
 }
 
-export function buildUser (overrides: Partial<CartoBioUser> = {}): CartoBioUser {
+export function buildUser(overrides: Partial<CartoBioUser> = {}): CartoBioUser {
   return {
     id: 1,
     prenom: 'test',
@@ -82,13 +101,16 @@ export function buildUser (overrides: Partial<CartoBioUser> = {}): CartoBioUser 
   }
 }
 
-export function buildOcUser (overrides: Partial<CartoBioOCUser> = {}): CartoBioOCUser {
+export function buildOcUser(overrides: Partial<CartoBioOCUser> = {}): CartoBioOCUser {
   return {
     id: 1,
     prenom: 'test',
     nom: 'test',
     organismeCertificateur: { id: 1, nom: "CartoBi'OC" },
-    groups: [{ id: '1', nom: 'Auditeur' }, { id: '2', nom: 'Chargé de certification' }],
+    groups: [
+      { id: '1', nom: 'Auditeur' },
+      { id: '2', nom: 'Chargé de certification' }
+    ],
     mainGroup: { id: '1', nom: 'Auditeur' },
     ...overrides
   }
@@ -100,13 +122,24 @@ export const asDBRecordWithParcelles = (fixture: object) => fixture as DBOperato
 export const asNormalizedRecord = (fixture: object) => fixture as NormalizedRecord
 export const asAgenceBioOperator = (fixture: object) => fixture as AgenceBioOperator
 
-export const asGotRequest = <T> (mock: Record<string, Mock>) => mock as unknown as T
+export const asGotRequest = <T>(mock: Record<string, Mock>) => mock as unknown as T
 
-export function buildDBParcelle (overrides: Partial<DBParcelle> = {}): DBParcelle {
+export function buildDBParcelle(overrides: Partial<DBParcelle> = {}): DBParcelle {
   return {
     record_id: randomUUID(),
     id: '1',
-    geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]] },
+    geometry: {
+      type: 'Polygon',
+      coordinates: [
+        [
+          [0, 0],
+          [1, 0],
+          [1, 1],
+          [0, 1],
+          [0, 0]
+        ]
+      ]
+    },
     commune: null,
     commune_label: null,
     cultures: [],
@@ -133,7 +166,7 @@ export function buildDBParcelle (overrides: Partial<DBParcelle> = {}): DBParcell
   }
 }
 
-export function buildNotification (overrides: Partial<AgenceBioNotification> = {}): AgenceBioNotification {
+export function buildNotification(overrides: Partial<AgenceBioNotification> = {}): AgenceBioNotification {
   return {
     id: 1,
     etatCertification: '',
@@ -145,7 +178,7 @@ export function buildNotification (overrides: Partial<AgenceBioNotification> = {
   }
 }
 
-export function buildAgenceBioOperator (overrides: Partial<AgenceBioOperator> = {}): AgenceBioOperator {
+export function buildAgenceBioOperator(overrides: Partial<AgenceBioOperator> = {}): AgenceBioOperator {
   return {
     id: 1,
     nom: 'Opérateur de test',
@@ -178,7 +211,7 @@ export function buildAgenceBioOperator (overrides: Partial<AgenceBioOperator> = 
   }
 }
 
-export function buildAdresse (overrides: Partial<AgenceBioAdresses> = {}): AgenceBioAdresses {
+export function buildAdresse(overrides: Partial<AgenceBioAdresses> = {}): AgenceBioAdresses {
   return {
     active: true,
     lat: 0,
@@ -192,12 +225,25 @@ export function buildAdresse (overrides: Partial<AgenceBioAdresses> = {}): Agenc
   }
 }
 
-export function buildFeature (overrides: Omit<Partial<CartoBioFeature>, 'properties'> & { properties?: Partial<CartoBioFeatureProperties> } = {}): CartoBioFeature {
+export function buildFeature(
+  overrides: Omit<Partial<CartoBioFeature>, 'properties'> & { properties?: Partial<CartoBioFeatureProperties> } = {}
+): CartoBioFeature {
   const { properties, ...feature } = overrides
   return {
     type: 'Feature',
     id: '1',
-    geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]] },
+    geometry: {
+      type: 'Polygon',
+      coordinates: [
+        [
+          [0, 0],
+          [1, 0],
+          [1, 1],
+          [0, 1],
+          [0, 0]
+        ]
+      ]
+    },
     ...feature,
     properties: {
       id: feature.id ?? '1',
@@ -211,7 +257,7 @@ export function buildFeature (overrides: Omit<Partial<CartoBioFeature>, 'propert
   }
 }
 
-export function buildNormalizedRecord (overrides: Partial<NormalizedRecord> = {}): NormalizedRecord {
+export function buildNormalizedRecord(overrides: Partial<NormalizedRecord> = {}): NormalizedRecord {
   return {
     record_id: randomUUID(),
     numerobio: '99999',

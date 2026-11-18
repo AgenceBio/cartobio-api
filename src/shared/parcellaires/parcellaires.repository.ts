@@ -19,19 +19,56 @@ import {
   territoires
 } from '../../database/schema/index.js'
 import type { CertificationState } from '@agencebio/cartobio-types'
-import type { HistoryEntry, CartoBioFeatureInput, CartoBioHistoriqueCulture, RecordInfos } from '@agencebio/cartobio-types'
-import type { DBOperatorRecord, DBOperatorRecordWithParcelles, DBParcelle, GeometryAnalysis, PreviousParcelle, RecordSummaryRow } from './parcellaires.types.js'
+import type {
+  HistoryEntry,
+  CartoBioFeatureInput,
+  CartoBioHistoriqueCulture,
+  RecordInfos
+} from '@agencebio/cartobio-types'
+import type {
+  DBOperatorRecord,
+  DBOperatorRecordWithParcelles,
+  DBParcelle,
+  GeometryAnalysis,
+  PreviousParcelle,
+  RecordSummaryRow
+} from './parcellaires.types.js'
 import { MissingGeometryApiError } from '../errors.js'
 import { getRandomFeatureId } from '../outputs/features.js'
-import { annotationCodes, createParcelleAnnotationSchema, createParcelleCultureSchema, isAnnotationCode } from '../../database/validations/parcelles.js'
-import { certificationEtatEnumSchema, createParcellaireEvenementSchema, createParcellaireMetadataSchema, createParcellaireSchema, updateParcellaireSchema } from '../../database/validations/parcellaires.js'
+import {
+  annotationCodes,
+  createParcelleAnnotationSchema,
+  createParcelleCultureSchema,
+  isAnnotationCode
+} from '../../database/validations/parcelles.js'
+import {
+  certificationEtatEnumSchema,
+  createParcellaireEvenementSchema,
+  createParcellaireMetadataSchema,
+  createParcellaireSchema,
+  updateParcellaireSchema
+} from '../../database/validations/parcellaires.js'
 import { createOrganismeCertificateurSchema } from '../../database/validations/references.js'
-import { blankToNull, chunk, communeLaPlusProche, coalesceBlank, culturesJson, eventTypes, INSERT_BATCH_SIZE, notInKeys, parcelleColumns, parcelleInsertValues, parcelleUpdateSet, recordColumns } from './parcellaires.utils.js'
+import {
+  blankToNull,
+  chunk,
+  communeLaPlusProche,
+  coalesceBlank,
+  culturesJson,
+  eventTypes,
+  INSERT_BATCH_SIZE,
+  notInKeys,
+  parcelleColumns,
+  parcelleInsertValues,
+  parcelleUpdateSet,
+  recordColumns
+} from './parcellaires.utils.js'
 import { areaHa, wgs84FromGeoJSON } from '../../database/postgis.js'
 
 type FeatureProperties = CartoBioFeatureInput['properties']
 
-const statutImportGeom = (statut: string | null | undefined): SQL => sql`${statut === 'ACCEPTENONCORRIGE' ? 'ACCEPTE_NON_CORRIGE' : statut ?? null}::cartobio.statut_import_geom`
+const statutImportGeom = (statut: string | null | undefined): SQL =>
+  sql`${statut === 'ACCEPTENONCORRIGE' ? 'ACCEPTE_NON_CORRIGE' : (statut ?? null)}::cartobio.statut_import_geom`
 
 const surfaceCulture = (surface: unknown): string | null => {
   const value = String(surface ?? '').replace(',', '.')
@@ -41,23 +78,31 @@ const surfaceCulture = (surface: unknown): string | null => {
 const dateSemis = (value: unknown): string | null =>
   typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null
 
-async function insertEvent (tx: NodePgDatabase, recordId: string, entry: HistoryEntry | null): Promise<void> {
+async function insertEvent(tx: NodePgDatabase, recordId: string, entry: HistoryEntry | null): Promise<void> {
   if (!entry) return
 
-  await tx.insert(parcellairesEvenements).values(createParcellaireEvenementSchema.parse({
-    recordId,
-    type: eventTypes[entry.type],
-    certificationEtat: (entry.state as CertificationState | undefined) ?? null,
-    date: new Date(entry.date),
-    userId: entry.user?.id != null ? String(entry.user.id) : null,
-    userRole: entry.user?.mainGroup?.nom ?? null,
-    parcellesId: entry.featureIds ? entry.featureIds.map((id) => (id == null ? null : String(id))) as string[] : null,
-    description: entry.description ?? null,
-    metadata: entry.metadata ?? null
-  }))
+  await tx.insert(parcellairesEvenements).values(
+    createParcellaireEvenementSchema.parse({
+      recordId,
+      type: eventTypes[entry.type],
+      certificationEtat: (entry.state as CertificationState | undefined) ?? null,
+      date: new Date(entry.date),
+      userId: entry.user?.id != null ? String(entry.user.id) : null,
+      userRole: entry.user?.mainGroup?.nom ?? null,
+      parcellesId: entry.featureIds
+        ? (entry.featureIds.map((id) => (id == null ? null : String(id))) as string[])
+        : null,
+      description: entry.description ?? null,
+      metadata: entry.metadata ?? null
+    })
+  )
 }
 
-async function ensureOrganismeCertificateur (tx: NodePgDatabase, ocId: number | string | null | undefined, ocLabel: string | null | undefined): Promise<void> {
+async function ensureOrganismeCertificateur(
+  tx: NodePgDatabase,
+  ocId: number | string | null | undefined,
+  ocLabel: string | null | undefined
+): Promise<void> {
   if (ocId == null) return
 
   await tx
@@ -66,10 +111,17 @@ async function ensureOrganismeCertificateur (tx: NodePgDatabase, ocId: number | 
     .onConflictDoNothing()
 }
 
-async function upsertMetadata (tx: NodePgDatabase, recordId: string, metadata: Record<string, unknown> | null | undefined): Promise<void> {
+async function upsertMetadata(
+  tx: NodePgDatabase,
+  recordId: string,
+  metadata: Record<string, unknown> | null | undefined
+): Promise<void> {
   const meta = metadata ?? {}
-  const sourceLastUpdate = typeof meta.sourceLastUpdate === 'string' && !Number.isNaN(Date.parse(meta.sourceLastUpdate)) ? new Date(meta.sourceLastUpdate) : null
-  const year = (value: unknown): number | null => /^\d{4}$/.test(String(value ?? '')) ? Number(value) : null
+  const sourceLastUpdate =
+    typeof meta.sourceLastUpdate === 'string' && !Number.isNaN(Date.parse(meta.sourceLastUpdate))
+      ? new Date(meta.sourceLastUpdate)
+      : null
+  const year = (value: unknown): number | null => (/^\d{4}$/.test(String(value ?? '')) ? Number(value) : null)
   const values = createParcellaireMetadataSchema.omit({ recordId: true }).parse({
     source: typeof meta.source === 'string' ? meta.source : null,
     sourceUpdatedAt: sourceLastUpdate,
@@ -87,35 +139,53 @@ async function upsertMetadata (tx: NodePgDatabase, recordId: string, metadata: R
     .onConflictDoUpdate({ target: parcellairesMetadata.recordId, set: values })
 }
 
-async function upsertCultures (tx: NodePgDatabase, recordId: string, parcelleId: string, cultures: FeatureProperties['cultures'] | null | undefined): Promise<void> {
+async function upsertCultures(
+  tx: NodePgDatabase,
+  recordId: string,
+  parcelleId: string,
+  cultures: FeatureProperties['cultures'] | null | undefined
+): Promise<void> {
   await upsertParcellesCultures(tx, recordId, new Map([[parcelleId, cultures]]))
 }
 
-async function upsertParcellesCultures (tx: NodePgDatabase, recordId: string, culturesByParcelle: Map<string, FeatureProperties['cultures'] | null | undefined>): Promise<void> {
-  const entries = Array.from(culturesByParcelle).flatMap(([parcelleId, cultures]) => cultures ? [{ parcelleId, cultures }] : [])
+async function upsertParcellesCultures(
+  tx: NodePgDatabase,
+  recordId: string,
+  culturesByParcelle: Map<string, FeatureProperties['cultures'] | null | undefined>
+): Promise<void> {
+  const entries = Array.from(culturesByParcelle).flatMap(([parcelleId, cultures]) =>
+    cultures ? [{ parcelleId, cultures }] : []
+  )
   if (entries.length === 0) return
 
-  const values = entries.flatMap(({ parcelleId, cultures }) => cultures.map((culture, position) => createParcelleCultureSchema.parse({
-    id: String(culture.id ?? randomUUID()),
-    recordId,
-    parcelleId,
-    cpf: blankToNull(culture.CPF),
-    codeCultureImport: blankToNull(culture.TYPE),
-    surface: surfaceCulture(culture.surface),
-    unit: blankToNull(culture.unit),
-    variete: blankToNull(culture.variete),
-    dateSemis: dateSemis(culture.date_semis),
-    commentaire: blankToNull(culture.commentaire),
-    position
-  })))
+  const values = entries.flatMap(({ parcelleId, cultures }) =>
+    cultures.map((culture, position) =>
+      createParcelleCultureSchema.parse({
+        id: String(culture.id ?? randomUUID()),
+        recordId,
+        parcelleId,
+        cpf: blankToNull(culture.CPF),
+        codeCultureImport: blankToNull(culture.TYPE),
+        surface: surfaceCulture(culture.surface),
+        unit: blankToNull(culture.unit),
+        variete: blankToNull(culture.variete),
+        dateSemis: dateSemis(culture.date_semis),
+        commentaire: blankToNull(culture.commentaire),
+        position
+      })
+    )
+  )
 
-  await tx
-    .delete(parcelleCultures)
-    .where(and(
+  await tx.delete(parcelleCultures).where(
+    and(
       eq(parcelleCultures.recordId, recordId),
-      inArray(parcelleCultures.parcelleId, entries.map(({ parcelleId }) => parcelleId)),
+      inArray(
+        parcelleCultures.parcelleId,
+        entries.map(({ parcelleId }) => parcelleId)
+      ),
       values.length > 0 ? notInKeys(parcelleCultures.parcelleId, parcelleCultures.id, values) : undefined
-    ))
+    )
+  )
 
   for (const batch of chunk(values, INSERT_BATCH_SIZE)) {
     await tx
@@ -137,35 +207,56 @@ async function upsertParcellesCultures (tx: NodePgDatabase, recordId: string, cu
   }
 }
 
-async function upsertAnnotations (tx: NodePgDatabase, recordId: string, parcelleId: string, annotations: FeatureProperties['annotations'] | null | undefined): Promise<void> {
+async function upsertAnnotations(
+  tx: NodePgDatabase,
+  recordId: string,
+  parcelleId: string,
+  annotations: FeatureProperties['annotations'] | null | undefined
+): Promise<void> {
   await upsertParcellesAnnotations(tx, recordId, new Map([[parcelleId, annotations]]))
 }
 
-async function upsertParcellesAnnotations (tx: NodePgDatabase, recordId: string, annotationsByParcelle: Map<string, FeatureProperties['annotations'] | null | undefined>): Promise<void> {
-  const entries = Array.from(annotationsByParcelle).flatMap(([parcelleId, annotations]) => annotations ? [{ parcelleId, annotations }] : [])
+async function upsertParcellesAnnotations(
+  tx: NodePgDatabase,
+  recordId: string,
+  annotationsByParcelle: Map<string, FeatureProperties['annotations'] | null | undefined>
+): Promise<void> {
+  const entries = Array.from(annotationsByParcelle).flatMap(([parcelleId, annotations]) =>
+    annotations ? [{ parcelleId, annotations }] : []
+  )
   if (entries.length === 0) return
 
-  const values = entries.flatMap(({ parcelleId, annotations }) => annotations.flatMap((annotation) => {
-    const code = String(annotation.code)
-    if (!isAnnotationCode(code)) return []
+  const values = entries.flatMap(({ parcelleId, annotations }) =>
+    annotations.flatMap((annotation) => {
+      const code = String(annotation.code)
+      if (!isAnnotationCode(code)) return []
 
-    return [createParcelleAnnotationSchema.parse({
-      id: typeof annotation.id === 'string' ? annotation.id : randomUUID(),
-      recordId,
-      parcelleId,
-      typeAnnot: annotationCodes[code],
-      createdAt: typeof annotation.date === 'string' && !Number.isNaN(Date.parse(annotation.date)) ? new Date(annotation.date) : new Date(),
-      metadata: annotation.metadata ?? null
-    })]
-  }))
+      return [
+        createParcelleAnnotationSchema.parse({
+          id: typeof annotation.id === 'string' ? annotation.id : randomUUID(),
+          recordId,
+          parcelleId,
+          typeAnnot: annotationCodes[code],
+          createdAt:
+            typeof annotation.date === 'string' && !Number.isNaN(Date.parse(annotation.date))
+              ? new Date(annotation.date)
+              : new Date(),
+          metadata: annotation.metadata ?? null
+        })
+      ]
+    })
+  )
 
-  await tx
-    .delete(parcellesAnnotations)
-    .where(and(
+  await tx.delete(parcellesAnnotations).where(
+    and(
       eq(parcellesAnnotations.recordId, recordId),
-      inArray(parcellesAnnotations.parcelleId, entries.map(({ parcelleId }) => parcelleId)),
+      inArray(
+        parcellesAnnotations.parcelleId,
+        entries.map(({ parcelleId }) => parcelleId)
+      ),
       values.length > 0 ? notInKeys(parcellesAnnotations.parcelleId, parcellesAnnotations.id, values) : undefined
-    ))
+    )
+  )
 
   for (const batch of chunk(values, INSERT_BATCH_SIZE)) {
     await tx
@@ -182,7 +273,7 @@ async function upsertParcellesAnnotations (tx: NodePgDatabase, recordId: string,
   }
 }
 
-async function findParcelles (tx: NodePgDatabase, recordId: string, ids: string[]): Promise<DBParcelle[]> {
+async function findParcelles(tx: NodePgDatabase, recordId: string, ids: string[]): Promise<DBParcelle[]> {
   if (ids.length === 0) return []
 
   const rows = await tx
@@ -193,22 +284,33 @@ async function findParcelles (tx: NodePgDatabase, recordId: string, ids: string[
   return ids.flatMap((id) => rows.filter((row) => row.id === id))
 }
 
-async function findCertificationStateAtAuditDate (tx: NodePgDatabase, numerobio: string | undefined, auditDate: string | null | undefined): Promise<string | null> {
+async function findCertificationStateAtAuditDate(
+  tx: NodePgDatabase,
+  numerobio: string | undefined,
+  auditDate: string | null | undefined
+): Promise<string | null> {
   if (!auditDate) return null
 
   const [row] = await tx
     .select({ certification_state: parcellaires.certificationEtat })
     .from(parcellaires)
-    .where(and(
-      eq(parcellaires.numeroBio, Number(numerobio)),
-      sql`${parcellaires.auditDate} = ${auditDate}::date`,
-      isNull(parcellaires.deletedAt)
-    ))
+    .where(
+      and(
+        eq(parcellaires.numeroBio, Number(numerobio)),
+        sql`${parcellaires.auditDate} = ${auditDate}::date`,
+        isNull(parcellaires.deletedAt)
+      )
+    )
 
   return row?.certification_state ?? null
 }
 
-async function findMatchingPreviousParcelles (tx: NodePgDatabase, numerobio: string, previousRecordId: string, geometries: Array<CartoBioFeatureInput['geometry']>): Promise<Array<PreviousParcelle | null>> {
+async function findMatchingPreviousParcelles(
+  tx: NodePgDatabase,
+  numerobio: string,
+  previousRecordId: string,
+  geometries: Array<CartoBioFeatureInput['geometry']>
+): Promise<Array<PreviousParcelle | null>> {
   if (!geometries.length) return []
 
   const previousGeometry = sql`ST_MakeValid(${parcelles.geometry})`
@@ -242,65 +344,81 @@ async function findMatchingPreviousParcelles (tx: NodePgDatabase, numerobio: str
     ORDER BY input.ord
   `)
 
-  return result.rows.map((row) => row.id === null ? null : row as PreviousParcelle)
+  return result.rows.map((row) => (row.id === null ? null : (row as PreviousParcelle)))
 }
 
-async function copyParcellesFromPreviousRecord (tx: NodePgDatabase, recordId: string, numerobio: string, previousRecordId: string): Promise<Array<DBParcelle>> {
+async function copyParcellesFromPreviousRecord(
+  tx: NodePgDatabase,
+  recordId: string,
+  numerobio: string,
+  previousRecordId: string
+): Promise<Array<DBParcelle>> {
   const cpBase = alias(parcelles, 'cp_base')
   const intersection = sql`ST_Area(ST_Intersection(${cpBase.geometry}, ${parcelles.geometry}))`
 
   const copied = await tx
     .insert(parcelles)
-    .select(tx
-      .select({
-        recordId: sql`${recordId}::uuid`.as('record_id'),
-        id: parcelles.id,
-        geometry: parcelles.geometry,
-        surfaceHa: parcelles.surfaceHa,
-        commune: parcelles.commune,
-        conversionNiveau: parcelles.conversionNiveau,
-        engagementDate: parcelles.engagementDate,
-        auditeurNotesParcelles: sql`NULL`.as('auditeur_notes_parcelles'),
-        name: parcelles.name,
-        referenceCadastre: parcelles.referenceCadastre,
-        codeCulturePac: parcelles.codeCulturePac,
-        codePrecisionPac: parcelles.codePrecisionPac
-      })
-      .from(parcelles)
-      .innerJoin(parcellaires, eq(parcellaires.recordId, parcelles.recordId))
-      .where(and(
-        eq(parcellaires.recordId, previousRecordId),
-        eq(parcellaires.numeroBio, Number(numerobio)),
-        isNull(parcellaires.deletedAt),
-        isNull(parcelles.deletedAt),
-        exists(tx
-          .select({ one: sql`1` })
-          .from(parcellairesEvenements)
-          .where(and(
-            eq(parcellairesEvenements.recordId, parcellaires.recordId),
-            eq(parcellairesEvenements.type, 'FEATURE_COLLECTION_CREATE'),
-            eq(parcellairesEvenements.certificationEtat, certificationEtatEnumSchema.enum.OPERATOR_DRAFT),
-            sql`NOT (${parcelles.id} = ANY(${parcellairesEvenements.parcellesId}))`
-          ))),
-        notExists(tx
-          .select({ one: sql`1` })
-          .from(cpBase)
-          .where(and(
-            eq(cpBase.recordId, recordId),
-            sql`ST_Intersects(${cpBase.geometry}, ${parcelles.geometry})`,
-            sql`(${intersection} / ST_Area(${cpBase.geometry}) > 0.5 OR ${intersection} / ST_Area(${parcelles.geometry}) > 0.5)`,
-            isNull(cpBase.deletedAt)
-          )))
-      )))
+    .select(
+      tx
+        .select({
+          recordId: sql`${recordId}::uuid`.as('record_id'),
+          id: parcelles.id,
+          geometry: parcelles.geometry,
+          surfaceHa: parcelles.surfaceHa,
+          commune: parcelles.commune,
+          conversionNiveau: parcelles.conversionNiveau,
+          engagementDate: parcelles.engagementDate,
+          auditeurNotesParcelles: sql`NULL`.as('auditeur_notes_parcelles'),
+          name: parcelles.name,
+          referenceCadastre: parcelles.referenceCadastre,
+          codeCulturePac: parcelles.codeCulturePac,
+          codePrecisionPac: parcelles.codePrecisionPac
+        })
+        .from(parcelles)
+        .innerJoin(parcellaires, eq(parcellaires.recordId, parcelles.recordId))
+        .where(
+          and(
+            eq(parcellaires.recordId, previousRecordId),
+            eq(parcellaires.numeroBio, Number(numerobio)),
+            isNull(parcellaires.deletedAt),
+            isNull(parcelles.deletedAt),
+            exists(
+              tx
+                .select({ one: sql`1` })
+                .from(parcellairesEvenements)
+                .where(
+                  and(
+                    eq(parcellairesEvenements.recordId, parcellaires.recordId),
+                    eq(parcellairesEvenements.type, 'FEATURE_COLLECTION_CREATE'),
+                    eq(parcellairesEvenements.certificationEtat, certificationEtatEnumSchema.enum.OPERATOR_DRAFT),
+                    sql`NOT (${parcelles.id} = ANY(${parcellairesEvenements.parcellesId}))`
+                  )
+                )
+            ),
+            notExists(
+              tx
+                .select({ one: sql`1` })
+                .from(cpBase)
+                .where(
+                  and(
+                    eq(cpBase.recordId, recordId),
+                    sql`ST_Intersects(${cpBase.geometry}, ${parcelles.geometry})`,
+                    sql`(${intersection} / ST_Area(${cpBase.geometry}) > 0.5 OR ${intersection} / ST_Area(${parcelles.geometry}) > 0.5)`,
+                    isNull(cpBase.deletedAt)
+                  )
+                )
+            )
+          )
+        )
+    )
     .onConflictDoNothing({ target: [parcelles.recordId, parcelles.id] })
     .returning({ id: parcelles.id })
 
   const ids = copied.map(({ id }) => id)
 
   if (ids.length > 0) {
-    await tx
-      .insert(parcelleCultures)
-      .select(tx
+    await tx.insert(parcelleCultures).select(
+      tx
         .select({
           id: parcelleCultures.id,
           recordId: sql`${recordId}::uuid`.as('record_id'),
@@ -315,38 +433,44 @@ async function copyParcellesFromPreviousRecord (tx: NodePgDatabase, recordId: st
           position: parcelleCultures.position
         })
         .from(parcelleCultures)
-        .where(and(eq(parcelleCultures.recordId, previousRecordId), inArray(parcelleCultures.parcelleId, ids))))
+        .where(and(eq(parcelleCultures.recordId, previousRecordId), inArray(parcelleCultures.parcelleId, ids)))
+    )
   }
 
   return findParcelles(tx, recordId, ids)
 }
 
-async function findLastAuditedRecordId (numeroBio: string): Promise<string | null> {
+async function findLastAuditedRecordId(numeroBio: string): Promise<string | null> {
   const [row] = await db
     .select({ recordId: parcellaires.recordId })
     .from(parcellaires)
-    .where(and(
-      inArray(parcellaires.certificationEtat, [
-        certificationEtatEnumSchema.enum.CERTIFIED,
-        certificationEtatEnumSchema.enum.AUDITED,
-        certificationEtatEnumSchema.enum.PENDING_CERTIFICATION
-      ]),
-      eq(parcellaires.numeroBio, Number(numeroBio))
-    ))
-    .orderBy(desc(sql`${parcellaires.certificationEtat} = ${certificationEtatEnumSchema.enum.CERTIFIED}`), desc(parcellaires.auditDate))
+    .where(
+      and(
+        inArray(parcellaires.certificationEtat, [
+          certificationEtatEnumSchema.enum.CERTIFIED,
+          certificationEtatEnumSchema.enum.AUDITED,
+          certificationEtatEnumSchema.enum.PENDING_CERTIFICATION
+        ]),
+        eq(parcellaires.numeroBio, Number(numeroBio))
+      )
+    )
+    .orderBy(
+      desc(sql`${parcellaires.certificationEtat} = ${certificationEtatEnumSchema.enum.CERTIFIED}`),
+      desc(parcellaires.auditDate)
+    )
     .limit(1)
 
   return row?.recordId ?? null
 }
 
-async function markCertificationNotified (tx: NodePgDatabase, recordId: string): Promise<void> {
+async function markCertificationNotified(tx: NodePgDatabase, recordId: string): Promise<void> {
   await tx
     .update(parcellaires)
     .set({ dateDerniereNotif: sql`now()` })
     .where(eq(parcellaires.recordId, recordId))
 }
 
-async function findRecord (recordId: string, tx: NodePgDatabase = db): Promise<DBOperatorRecord | null> {
+async function findRecord(recordId: string, tx: NodePgDatabase = db): Promise<DBOperatorRecord | null> {
   const [record] = await tx
     .select(recordColumns)
     .from(parcellaires)
@@ -357,43 +481,52 @@ async function findRecord (recordId: string, tx: NodePgDatabase = db): Promise<D
   return record ?? null
 }
 
-async function upsertOperator (tx: NodePgDatabase, record: Partial<RecordInfos>, certificationState: CertificationState, historyEntry: HistoryEntry): Promise<DBOperatorRecord> {
+async function upsertOperator(
+  tx: NodePgDatabase,
+  record: Partial<RecordInfos>,
+  certificationState: CertificationState,
+  historyEntry: HistoryEntry
+): Promise<DBOperatorRecord> {
   await ensureOrganismeCertificateur(tx, record.oc_id, record.oc_label)
 
   const auditDate = sql`nullif(${record.audit_date ?? null}::text, '')::date`
   const anneeReferenceControle = sql`nullif(${record.annee_reference_controle == null ? null : String(record.annee_reference_controle)}::text, '')::int`
 
-  const { recordId } = firstRow(await tx
-    .insert(parcellaires)
-    .values({
-      ...createParcellaireSchema.pick({ numeroBio: true, ocId: true, certificationEtat: true, auditNotesCertif: true }).parse({
-        numeroBio: Number(record.numerobio),
-        ocId: record.oc_id == null ? null : String(record.oc_id),
-        certificationEtat: certificationState,
-        auditNotesCertif: blankToNull(record.audit_notes)
-      }),
-      createdAt: sql`now()`,
-      certificationDateDebut: sql`nullif(${record.certification_date_debut ?? null}::text, '')::date`,
-      certificationDateFin: sql`nullif(${record.certification_date_fin ?? null}::text, '')::date`,
-      auditDate,
-      versionNom: sql`COALESCE(${blankToNull(record.version_name)}::text, 'Version créée le ' || to_char(now(), 'DD/MM/YYYY'))`,
-      anneeReferenceControle: sql`COALESCE(${anneeReferenceControle}, DATE_PART('year', COALESCE(${auditDate}, NOW())))`
-    })
-    .onConflictDoUpdate({
-      target: [parcellaires.numeroBio, parcellaires.auditDate],
-      targetWhere: sql`${parcellaires.deletedAt} IS NULL`,
-      set: {
-        ocId: record.oc_id == null ? null : String(record.oc_id),
-        updatedAt: sql`now()`,
-        certificationEtat: sql`coalesce(${certificationState}::cartobio.certification_type, ${parcellaires.certificationEtat})`,
-        certificationDateDebut: sql`nullif(coalesce(${record.certification_date_debut ?? null}::text, ${parcellaires.certificationDateDebut}::text), '')::date`,
-        certificationDateFin: sql`nullif(coalesce(${record.certification_date_fin ?? null}::text, ${parcellaires.certificationDateFin}::text), '')::date`,
-        auditNotesCertif: coalesceBlank(record.audit_notes, parcellaires.auditNotesCertif),
-        versionNom: sql`coalesce(${blankToNull(record.version_name)}::text, ${parcellaires.versionNom})`,
-        anneeReferenceControle: sql`coalesce(${anneeReferenceControle}, ${parcellaires.anneeReferenceControle})`
-      }
-    })
-    .returning({ recordId: parcellaires.recordId }))
+  const { recordId } = firstRow(
+    await tx
+      .insert(parcellaires)
+      .values({
+        ...createParcellaireSchema
+          .pick({ numeroBio: true, ocId: true, certificationEtat: true, auditNotesCertif: true })
+          .parse({
+            numeroBio: Number(record.numerobio),
+            ocId: record.oc_id == null ? null : String(record.oc_id),
+            certificationEtat: certificationState,
+            auditNotesCertif: blankToNull(record.audit_notes)
+          }),
+        createdAt: sql`now()`,
+        certificationDateDebut: sql`nullif(${record.certification_date_debut ?? null}::text, '')::date`,
+        certificationDateFin: sql`nullif(${record.certification_date_fin ?? null}::text, '')::date`,
+        auditDate,
+        versionNom: sql`COALESCE(${blankToNull(record.version_name)}::text, 'Version créée le ' || to_char(now(), 'DD/MM/YYYY'))`,
+        anneeReferenceControle: sql`COALESCE(${anneeReferenceControle}, DATE_PART('year', COALESCE(${auditDate}, NOW())))`
+      })
+      .onConflictDoUpdate({
+        target: [parcellaires.numeroBio, parcellaires.auditDate],
+        targetWhere: sql`${parcellaires.deletedAt} IS NULL`,
+        set: {
+          ocId: record.oc_id == null ? null : String(record.oc_id),
+          updatedAt: sql`now()`,
+          certificationEtat: sql`coalesce(${certificationState}::cartobio.certification_type, ${parcellaires.certificationEtat})`,
+          certificationDateDebut: sql`nullif(coalesce(${record.certification_date_debut ?? null}::text, ${parcellaires.certificationDateDebut}::text), '')::date`,
+          certificationDateFin: sql`nullif(coalesce(${record.certification_date_fin ?? null}::text, ${parcellaires.certificationDateFin}::text), '')::date`,
+          auditNotesCertif: coalesceBlank(record.audit_notes, parcellaires.auditNotesCertif),
+          versionNom: sql`coalesce(${blankToNull(record.version_name)}::text, ${parcellaires.versionNom})`,
+          anneeReferenceControle: sql`coalesce(${anneeReferenceControle}, ${parcellaires.anneeReferenceControle})`
+        }
+      })
+      .returning({ recordId: parcellaires.recordId })
+  )
 
   await upsertMetadata(tx, recordId, record.metadata)
   await insertEvent(tx, recordId, historyEntry)
@@ -403,7 +536,11 @@ async function upsertOperator (tx: NodePgDatabase, record: Partial<RecordInfos>,
   return saved
 }
 
-async function upsertParcelles (tx: NodePgDatabase, recordId: string, features: Array<CartoBioFeatureInput>): Promise<Array<DBParcelle>> {
+async function upsertParcelles(
+  tx: NodePgDatabase,
+  recordId: string,
+  features: Array<CartoBioFeatureInput>
+): Promise<Array<DBParcelle>> {
   const ids: string[] = []
   const culturesByParcelle = new Map<string, FeatureProperties['cultures']>()
   const annotationsByParcelle = new Map<string, FeatureProperties['annotations']>()
@@ -459,7 +596,11 @@ async function upsertParcelles (tx: NodePgDatabase, recordId: string, features: 
   return findParcelles(tx, recordId, ids)
 }
 
-async function deleteMissingParcelles (tx: NodePgDatabase, recordId: string, existing: Array<DBParcelle>): Promise<void> {
+async function deleteMissingParcelles(
+  tx: NodePgDatabase,
+  recordId: string,
+  existing: Array<DBParcelle>
+): Promise<void> {
   const ids = existing.map((parcelle) => parcelle.id)
 
   await tx
@@ -467,7 +608,7 @@ async function deleteMissingParcelles (tx: NodePgDatabase, recordId: string, exi
     .where(and(eq(parcelles.recordId, recordId), ids.length > 0 ? notInArray(parcelles.id, ids) : undefined))
 }
 
-async function findMixite (recordId: string, tx: NodePgDatabase = db): Promise<string | null> {
+async function findMixite(recordId: string, tx: NodePgDatabase = db): Promise<string | null> {
   const [row] = await tx
     .select({
       mixite: sql<string | null>`CASE
@@ -477,28 +618,30 @@ async function findMixite (recordId: string, tx: NodePgDatabase = db): Promise<s
       END`
     })
     .from(parcelles)
-    .where(and(
-      eq(parcelles.recordId, recordId),
-      isNull(parcelles.deletedAt),
-      sql`NOT EXISTS (
+    .where(
+      and(
+        eq(parcelles.recordId, recordId),
+        isNull(parcelles.deletedAt),
+        sql`NOT EXISTS (
         SELECT 1 FROM ${parcelleCultures}
         WHERE ${parcelleCultures.recordId} = ${parcelles.recordId}
           AND ${parcelleCultures.parcelleId} = ${parcelles.id}
           AND ${parcelleCultures.cpf} IN ('01.99.10.1', '01.99.10.2')
       )`
-    ))
+      )
+    )
 
   return row?.mixite ?? null
 }
 
-async function updateMixite (tx: NodePgDatabase, recordId: string): Promise<void> {
+async function updateMixite(tx: NodePgDatabase, recordId: string): Promise<void> {
   await tx
     .update(parcellaires)
     .set(updateParcellaireSchema.parse({ mixite: await findMixite(recordId, tx) }))
     .where(eq(parcellaires.recordId, recordId))
 }
 
-async function findRecords (numeroBio: string | number): Promise<RecordSummaryRow[]> {
+async function findRecords(numeroBio: string | number): Promise<RecordSummaryRow[]> {
   const rows = await db
     .select({
       ...recordColumns,
@@ -522,11 +665,9 @@ async function findRecords (numeroBio: string | number): Promise<RecordSummaryRo
     .from(parcellaires)
     .leftJoin(parcellairesMetadata, eq(parcellairesMetadata.recordId, parcellaires.recordId))
     .leftJoin(parcelles, eq(parcellaires.recordId, parcelles.recordId))
-    .where(and(
-      eq(parcellaires.numeroBio, Number(numeroBio)),
-      isNull(parcellaires.deletedAt),
-      isNull(parcelles.deletedAt)
-    ))
+    .where(
+      and(eq(parcellaires.numeroBio, Number(numeroBio)), isNull(parcellaires.deletedAt), isNull(parcelles.deletedAt))
+    )
     .groupBy(parcellaires.recordId, parcellairesMetadata.recordId)
     .orderBy(
       sql`COALESCE(${parcellaires.certificationDateDebut}, ${parcellaires.auditDate}, ${parcellaires.createdAt}) DESC`,
@@ -536,7 +677,10 @@ async function findRecords (numeroBio: string | number): Promise<RecordSummaryRo
   return rows
 }
 
-async function findRecordParcelles (record: DBOperatorRecord, userId: number | null = null): Promise<DBOperatorRecordWithParcelles> {
+async function findRecordParcelles(
+  record: DBOperatorRecord,
+  userId: number | null = null
+): Promise<DBOperatorRecordWithParcelles> {
   if (record && !record.parcelles) {
     const dp = alias(parcelles, 'dp')
     const dpRecord = alias(parcellaires, 'dp_record')
@@ -551,23 +695,28 @@ async function findRecordParcelles (record: DBOperatorRecord, userId: number | n
           conversion_niveau: sql`${r.conversionNiveau}`.as('conversion_niveau'),
           annee_reference_controle: sql<number>`${co.anneeReferenceControle}`.as('annee_reference_controle'),
           audit_date: sql`${co.auditDate}`.as('audit_date'),
-          intersection_ratio: sql<number>`ST_Area(ST_Intersection(${dp.geometry}, ${r.geometry})) / ST_Area(${dp.geometry})`.as('intersection_ratio')
+          intersection_ratio:
+            sql<number>`ST_Area(ST_Intersection(${dp.geometry}, ${r.geometry})) / ST_Area(${dp.geometry})`.as(
+              'intersection_ratio'
+            )
         })
         .from(r)
         .innerJoin(dp, sql`ST_Intersects(${dp.geometry}, ${r.geometry})`)
         .innerJoin(dpRecord, eq(dpRecord.recordId, dp.recordId))
         .innerJoin(co, eq(r.recordId, co.recordId))
-        .where(and(
-          eq(dp.recordId, record.record_id),
-          sql`${co.certificationEtat} = 'CERTIFIED'`,
-          sql`ST_Isvalid(${r.geometry}) AND ST_Isvalid(${dp.geometry})`,
-          sql`${co.anneeReferenceControle} <= ${dpRecord.anneeReferenceControle}`,
-          sql`(${co.auditDate} < ${dpRecord.auditDate} OR ${dpRecord.auditDate} IS NULL)`,
-          eq(co.numeroBio, dpRecord.numeroBio),
-          sql`${co.anneeReferenceControle} >= EXTRACT(YEAR FROM CURRENT_DATE) - 3`,
-          isNull(r.deletedAt),
-          isNull(co.deletedAt)
-        ))
+        .where(
+          and(
+            eq(dp.recordId, record.record_id),
+            sql`${co.certificationEtat} = 'CERTIFIED'`,
+            sql`ST_Isvalid(${r.geometry}) AND ST_Isvalid(${dp.geometry})`,
+            sql`${co.anneeReferenceControle} <= ${dpRecord.anneeReferenceControle}`,
+            sql`(${co.auditDate} < ${dpRecord.auditDate} OR ${dpRecord.auditDate} IS NULL)`,
+            eq(co.numeroBio, dpRecord.numeroBio),
+            sql`${co.anneeReferenceControle} >= EXTRACT(YEAR FROM CURRENT_DATE) - 3`,
+            isNull(r.deletedAt),
+            isNull(co.deletedAt)
+          )
+        )
     )
 
     const rows = await db
@@ -603,11 +752,14 @@ async function findRecordParcelles (record: DBOperatorRecord, userId: number | n
         )`
       })
       .from(parcelles)
-      .leftJoin(parcellesControles, and(
-        eq(parcellesControles.recordId, record.record_id),
-        eq(parcellesControles.parcelleId, parcelles.id),
-        sql`${parcellesControles.userId} = ${userId === null ? null : String(userId)}`
-      ))
+      .leftJoin(
+        parcellesControles,
+        and(
+          eq(parcellesControles.recordId, record.record_id),
+          eq(parcellesControles.parcelleId, parcelles.id),
+          sql`${parcellesControles.userId} = ${userId === null ? null : String(userId)}`
+        )
+      )
       .innerJoin(parcellaires, eq(parcellaires.recordId, parcelles.recordId))
       .where(and(eq(parcelles.recordId, record.record_id), isNull(parcelles.deletedAt)))
       .orderBy(asc(parcelles.createdAt))
@@ -618,7 +770,10 @@ async function findRecordParcelles (record: DBOperatorRecord, userId: number | n
   return { ...record, parcelles: record?.parcelles ?? [] }
 }
 
-async function analyzeGeometries (inputs: Array<{ geometry: Polygon; commune: string | null | undefined }>, tx: NodePgDatabase = db): Promise<GeometryAnalysis[]> {
+async function analyzeGeometries(
+  inputs: Array<{ geometry: Polygon; commune: string | null | undefined }>,
+  tx: NodePgDatabase = db
+): Promise<GeometryAnalysis[]> {
   if (!inputs.length) return []
 
   const result = await tx.execute<GeometryAnalysis>(sql`

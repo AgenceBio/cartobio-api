@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
   push:
     paths-ignore:
-    - 'docs/**'
+      - 'docs/**'
     branches:
-    - '**'
+      - '**'
     tags:
-    - v*
+      - v*
 
 env:
   DOCKER_BUILDKIT: 1
@@ -32,40 +32,40 @@ jobs:
     runs-on: ubuntu-latest
 
     outputs:
-      image: "agencebio/cartobio-api:${{ steps.publish.outputs.tag }}"
+      image: 'agencebio/cartobio-api:${{ steps.publish.outputs.tag }}'
       version: ${{ steps.version.outputs.name }}
 
     steps:
-    - uses: actions/checkout@v4
-    - uses: docker/setup-buildx-action@v3
-    - run: docker build -f docker/Dockerfile -t agencebio/cartobio-api .
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - run: docker build -f docker/Dockerfile -t agencebio/cartobio-api .
 
-    - name: Get services bridge network name
-      id: network
-      run: echo "SERVICES_NETWORK=$(docker network ls --filter name=github --format '{{.Name}}')" >> "${GITHUB_ENV}"
+      - name: Get services bridge network name
+        id: network
+        run: echo "SERVICES_NETWORK=$(docker network ls --filter name=github --format '{{.Name}}')" >> "${GITHUB_ENV}"
 
-    - name: Login to Docker Hub
-      if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/test' || startsWith(github.ref, 'refs/tags/') }}
-      run: echo "${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}" | docker login -u ${{ secrets.DOCKER_HUB_USERNAME }} --password-stdin
+      - name: Login to Docker Hub
+        if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/test' || startsWith(github.ref, 'refs/tags/') }}
+        run: echo "${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}" | docker login -u ${{ secrets.DOCKER_HUB_USERNAME }} --password-stdin
 
-    - name: Assign Docker ref
-      id: publish
-      run: |
-        if [[ $GITHUB_REF == 'refs/heads/main' ]]; then
-          echo "tag=latest" >> $GITHUB_OUTPUT
-        else
-          echo "tag=${GITHUB_REF_NAME#v*}" >> $GITHUB_OUTPUT
-        fi
+      - name: Assign Docker ref
+        id: publish
+        run: |
+          if [[ $GITHUB_REF == 'refs/heads/main' ]]; then
+            echo "tag=latest" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${GITHUB_REF_NAME#v*}" >> $GITHUB_OUTPUT
+          fi
 
-    - name: Publish to Docker Hub
-      if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/test' || startsWith(github.ref, 'refs/tags/') }}
-      run: |
-        docker tag agencebio/cartobio-api agencebio/cartobio-api:${{ steps.publish.outputs.tag }}
-        docker push agencebio/cartobio-api:${{ steps.publish.outputs.tag }}
+      - name: Publish to Docker Hub
+        if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/test' || startsWith(github.ref, 'refs/tags/') }}
+        run: |
+          docker tag agencebio/cartobio-api agencebio/cartobio-api:${{ steps.publish.outputs.tag }}
+          docker push agencebio/cartobio-api:${{ steps.publish.outputs.tag }}
 
-    - name: Get package.json version
-      id: version
-      run: echo name=$(node -p "require('./package.json').version") >> $GITHUB_OUTPUT
+      - name: Get package.json version
+        id: version
+        run: echo name=$(node -p "require('./package.json').version") >> $GITHUB_OUTPUT
 
   deploy-staging:
     needs: [build]
@@ -73,63 +73,63 @@ jobs:
     environment: staging
     runs-on: ubuntu-latest
     steps:
-    - uses: garygrossgarten/github-action-ssh@0.7.0
-      with:
-        host: ${{ secrets.AGENCEBIO_PREPROD_SSH_HOST }}
-        username: ${{ secrets.AGENCEBIO_SSH_USERNAME }}
-        privateKey: ${{ secrets.AGENCEBIO_SSH_PRIVATE_KEY }}
-        command: |
-          docker pull ${{ needs.build.outputs.image }} \
-          && docker stop cartobio-api-staging || true \
-          && docker container rm cartobio-api-staging || true \
-          && docker run -d --restart always \
-            --network reseau_cartobio --ip 172.20.0.10 \
-            --env-file=.env.cartobio-api-staging \
-            --name cartobio-api-staging \
-            --init \
-            --volume /root/pdf:/usr/src/app/storage/pdf \
-            ${{ needs.build.outputs.image }}
+      - uses: garygrossgarten/github-action-ssh@0.7.0
+        with:
+          host: ${{ secrets.AGENCEBIO_PREPROD_SSH_HOST }}
+          username: ${{ secrets.AGENCEBIO_SSH_USERNAME }}
+          privateKey: ${{ secrets.AGENCEBIO_SSH_PRIVATE_KEY }}
+          command: |
+            docker pull ${{ needs.build.outputs.image }} \
+            && docker stop cartobio-api-staging || true \
+            && docker container rm cartobio-api-staging || true \
+            && docker run -d --restart always \
+              --network reseau_cartobio --ip 172.20.0.10 \
+              --env-file=.env.cartobio-api-staging \
+              --name cartobio-api-staging \
+              --init \
+              --volume /root/pdf:/usr/src/app/storage/pdf \
+              ${{ needs.build.outputs.image }}
   deploy-test:
     needs: [build]
     if: github.ref == 'refs/heads/test'
     environment: test
     runs-on: ubuntu-latest
     steps:
-    - uses: garygrossgarten/github-action-ssh@0.7.0
-      with:
-        host: ${{ secrets.AGENCEBIO_PREPROD_SSH_HOST }}
-        username: ${{ secrets.AGENCEBIO_SSH_USERNAME }}
-        privateKey: ${{ secrets.AGENCEBIO_SSH_PRIVATE_KEY }}
-        command: |
-          docker pull ${{ needs.build.outputs.image }} \
-          && docker stop cartobio-api-test || true \
-          && docker container rm cartobio-api-test || true \
-          && docker run -d --restart always \
-            --network reseau_cartobio --ip 172.20.0.11 \
-            --env-file=.env.cartobio-api-test \
-            --name cartobio-api-test \
-            --init \
-            --volume /root/pdf_test:/usr/src/app/storage/pdf \
-            ${{ needs.build.outputs.image }}
+      - uses: garygrossgarten/github-action-ssh@0.7.0
+        with:
+          host: ${{ secrets.AGENCEBIO_PREPROD_SSH_HOST }}
+          username: ${{ secrets.AGENCEBIO_SSH_USERNAME }}
+          privateKey: ${{ secrets.AGENCEBIO_SSH_PRIVATE_KEY }}
+          command: |
+            docker pull ${{ needs.build.outputs.image }} \
+            && docker stop cartobio-api-test || true \
+            && docker container rm cartobio-api-test || true \
+            && docker run -d --restart always \
+              --network reseau_cartobio --ip 172.20.0.11 \
+              --env-file=.env.cartobio-api-test \
+              --name cartobio-api-test \
+              --init \
+              --volume /root/pdf_test:/usr/src/app/storage/pdf \
+              ${{ needs.build.outputs.image }}
   deploy-production:
     needs: [build]
     if: startsWith(github.ref, 'refs/tags/')
     environment: production
     runs-on: ubuntu-latest
     steps:
-    - uses: garygrossgarten/github-action-ssh@0.7.0
-      with:
-        host: ${{ secrets.AGENCEBIO_SSH_HOST }}
-        username: ${{ secrets.AGENCEBIO_SSH_USERNAME }}
-        privateKey: ${{ secrets.AGENCEBIO_SSH_PRIVATE_KEY }}
-        command: |
-          docker pull ${{ needs.build.outputs.image }} \
-          && docker stop cartobio-api-production \
-          && docker container rm cartobio-api-production \
-          && docker run -d --restart always \
-            -p 127.0.0.1:8000:8000 \
-            --env-file=.env.cartobio-api-production \
-            --name cartobio-api-production \
-            --init \
-            --volume /root/pdf:/usr/src/app/storage/pdf \
-            ${{ needs.build.outputs.image }}
+      - uses: garygrossgarten/github-action-ssh@0.7.0
+        with:
+          host: ${{ secrets.AGENCEBIO_SSH_HOST }}
+          username: ${{ secrets.AGENCEBIO_SSH_USERNAME }}
+          privateKey: ${{ secrets.AGENCEBIO_SSH_PRIVATE_KEY }}
+          command: |
+            docker pull ${{ needs.build.outputs.image }} \
+            && docker stop cartobio-api-production \
+            && docker container rm cartobio-api-production \
+            && docker run -d --restart always \
+              -p 127.0.0.1:8000:8000 \
+              --env-file=.env.cartobio-api-production \
+              --name cartobio-api-production \
+              --init \
+              --volume /root/pdf:/usr/src/app/storage/pdf \
+              ${{ needs.build.outputs.image }}

@@ -1,5 +1,14 @@
 import type { Mock } from 'vitest'
-import { getOptimalZoom, getAllParcelles, calculateGlobalBoundingBox, formatDate, launchStyleTab, drawParcelleHighlightOnMap, drawAllParcellesOnMap, mergeAndAddFooter } from '../../../src/modules/exports/pdf-utils.js'
+import {
+  getOptimalZoom,
+  getAllParcelles,
+  calculateGlobalBoundingBox,
+  formatDate,
+  launchStyleTab,
+  drawParcelleHighlightOnMap,
+  drawAllParcellesOnMap,
+  mergeAndAddFooter
+} from '../../../src/modules/exports/pdf-utils.js'
 import fs from 'fs'
 import path from 'path'
 import pdflib from 'pdf-lib'
@@ -32,7 +41,14 @@ describe('calculateGlobalBoundingBox', () => {
     ]
     const bbox = calculateGlobalBoundingBox(parcelles)
     expect(bbox).toEqual({
-      minx: 1, miny: 1, maxx: 6, maxy: 7, centerx: 3.5, centery: 4, width: 5, height: 6
+      minx: 1,
+      miny: 1,
+      maxx: 6,
+      maxy: 7,
+      centerx: 3.5,
+      centery: 4,
+      width: 5,
+      height: 6
     })
   })
 })
@@ -77,7 +93,9 @@ describe('launchStyleTab', () => {
   it('devrait gérer une erreur lors du chargement', async () => {
     pageMock.goto!.mockRejectedValue(new Error('Page style'))
 
-    await expect(launchStyleTab(asBrowser(browserMock))).rejects.toThrow('Timeout lors du chargement de la page avec le style Page style')
+    await expect(launchStyleTab(asBrowser(browserMock))).rejects.toThrow(
+      'Timeout lors du chargement de la page avec le style Page style'
+    )
     expect(pageMock.close).toHaveBeenCalled()
   })
 })
@@ -148,7 +166,21 @@ describe('drawParcelleHighlightOnMap', () => {
 
   const parcelles = [
     buildPdfParcelle({ id: '1' }),
-    buildPdfParcelle({ id: '2', geojson: JSON.stringify({ type: 'Polygon', coordinates: [[[1, 1], [2, 1], [2, 2], [1, 2], [1, 1]]] }) })
+    buildPdfParcelle({
+      id: '2',
+      geojson: JSON.stringify({
+        type: 'Polygon',
+        coordinates: [
+          [
+            [1, 1],
+            [2, 1],
+            [2, 2],
+            [1, 2],
+            [1, 1]
+          ]
+        ]
+      })
+    })
   ]
 
   const highlight = { ...parcelles[0]!, name: 'Test', nbilot: '12', nbp: '34' }
@@ -235,7 +267,8 @@ describe('getAllParcelles', () => {
     const mockRow = {
       id: 'p1',
       name: 'Parcelle 1',
-      geojson: '{"type":"Polygon","coordinates":[[[4.979616538,47.353725228],[4.974457803,47.347718045],[4.979777749,47.346188835],[4.985742536,47.350994775],[4.979616538,47.353725228]]]}',
+      geojson:
+        '{"type":"Polygon","coordinates":[[[4.979616538,47.353725228],[4.974457803,47.347718045],[4.979777749,47.346188835],[4.985742536,47.350994775],[4.979616538,47.353725228]]]}',
       minX: 0,
       minY: 0,
       maxX: 1,
@@ -260,13 +293,14 @@ describe('getAllParcelles', () => {
     expect(result).toHaveLength(1)
     expect(result[0]).toMatchObject({
       id: 'p1',
-      geojson: '{"type":"Polygon","coordinates":[[[4.979616538,47.353725228],[4.974457803,47.347718045],[4.979777749,47.346188835],[4.985742536,47.350994775],[4.979616538,47.353725228]]]}',
+      geojson:
+        '{"type":"Polygon","coordinates":[[[4.979616538,47.353725228],[4.974457803,47.347718045],[4.979777749,47.346188835],[4.985742536,47.350994775],[4.979616538,47.353725228]]]}',
       name: 'Parcelle 1',
       superficie_totale_ha: 1.23
     })
   })
 
-  it('propage l\'erreur de la base', async () => {
+  it("propage l'erreur de la base", async () => {
     vi.mocked(findPdfParcelles).mockRejectedValueOnce(new Error('DB down'))
 
     await expect(getAllParcelles('fail-id')).rejects.toThrow('DB down')

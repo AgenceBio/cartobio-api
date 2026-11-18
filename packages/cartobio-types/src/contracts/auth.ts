@@ -2,16 +2,21 @@ import { z } from 'zod'
 import { operatorSchema } from './operators.js'
 
 export const ssoCallbackQuerySchema = z.looseObject({
-  state: z.string().meta({ description: 'État OAuth2 émis à l\'ouverture de la connexion' }),
-  code: z.string().optional().meta({ description: 'Code d\'autorisation OAuth2' })
+  state: z.string().meta({ description: "État OAuth2 émis à l'ouverture de la connexion" }),
+  code: z.string().optional().meta({ description: "Code d'autorisation OAuth2" })
 })
 
 export const logoutResponseSchema = z.object({
-  logoutUrl: z.string().meta({ description: 'URL de déconnexion du SSO Agence Bio vers laquelle rediriger l\'utilisateur' })
+  logoutUrl: z
+    .string()
+    .meta({ description: "URL de déconnexion du SSO Agence Bio vers laquelle rediriger l'utilisateur" })
 })
 
 export const externalExploitationParamsSchema = z.object({
-  numeroBio: z.string().regex(/^[1-9]\d*$/).meta({ description: 'Numéro bio de l\'opérateur' })
+  numeroBio: z
+    .string()
+    .regex(/^[1-9]\d*$/)
+    .meta({ description: "Numéro bio de l'opérateur" })
 })
 
 export const userGroupSchema = z.looseObject({
@@ -20,14 +25,14 @@ export const userGroupSchema = z.looseObject({
 })
 
 export const organismeCertificateurSchema = z.looseObject({
-  id: z.number().meta({ description: 'Identifiant de l\'OC' }),
-  nom: z.string().meta({ description: 'Nom de l\'OC' }),
+  id: z.number().meta({ description: "Identifiant de l'OC" }),
+  nom: z.string().meta({ description: "Nom de l'OC" }),
   numeroControleEu: z.string().optional().meta({ description: 'Numéro de contrôle européen' }),
-  numeroClient: z.string().optional().meta({ description: 'Numéro client de l\'opérateur chez l\'OC' })
+  numeroClient: z.string().optional().meta({ description: "Numéro client de l'opérateur chez l'OC" })
 })
 
 export const cartobioUserSchema = z.looseObject({
-  id: z.number().meta({ description: 'Identifiant de l\'utilisateur' }),
+  id: z.number().meta({ description: "Identifiant de l'utilisateur" }),
   nom: z.string(),
   prenom: z.string(),
   mainGroup: userGroupSchema.meta({ description: 'Groupe principal : `1` admin, `2` OC, `4` opérateur…' }),

@@ -76,15 +76,15 @@ npm run lint
 
 Les scripts npm sont regroupés par préfixe :
 
-| Préfixe | Usage |
-|---|---|
-| `build`, `build:*` | compilation (`dist/`), types partagés, fonds géographiques |
-| `start`, `dev` | démarrage en production / en développement |
-| `lint`, `format`, `typecheck` | qualité du code |
-| `test`, `test:*` | tests |
-| `db:*` | migrations de base de données |
-| `cron:*` | tâches planifiées (crontab des serveurs) |
-| `job:*` | scripts ponctuels |
+| Préfixe                       | Usage                                                      |
+| ----------------------------- | ---------------------------------------------------------- |
+| `build`, `build:*`            | compilation (`dist/`), types partagés, fonds géographiques |
+| `start`, `dev`                | démarrage en production / en développement                 |
+| `lint`, `format`, `typecheck` | qualité du code                                            |
+| `test`, `test:*`              | tests                                                      |
+| `db:*`                        | migrations de base de données                              |
+| `cron:*`                      | tâches planifiées (crontab des serveurs)                   |
+| `job:*`                       | scripts ponctuels                                          |
 
 Ouvrir :
 
@@ -160,13 +160,13 @@ npm run test:watch
 Le workflow [Docker Image CI](https://github.com/AgenceBio/cartobio-api/blob/main/.github/workflows/docker.yml) dispose de trois jobs :
 
 - `build`
-    - construit les images docker [agencebio/cartobio-api](https://hub.docker.com/r/agencebio/cartobio-api/tags)
+  - construit les images docker [agencebio/cartobio-api](https://hub.docker.com/r/agencebio/cartobio-api/tags)
 - `deploy-staging`
-    - déclenché par un nouveau commit dans la branche `main`
-    - déploie l'API de préproduction
+  - déclenché par un nouveau commit dans la branche `main`
+  - déploie l'API de préproduction
 - `deploy-production`
-    - déclenché par un nouvrau tag
-    - déploie l'API de production
+  - déclenché par un nouvrau tag
+  - déploie l'API de production
 
 Pour créer un tag :
 
@@ -197,37 +197,37 @@ L'authentification est assurée grâce à des [jetons JWT](https://jwt.io/), iss
 
 L'application lit les variables définies dans un fichier `.env`.
 
-| Variable                                    | Défaut                                                                | Description                                                                                                                         |
-| ------------------------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `PORT`                                      | `8000`                                                                | Port réseau sur lequel exposer l'application.                                                                                       |
-| `HOST`                                      | `127.0.0.1`                                                           | Interface réseau sur laquelle exposer l'application.                                                                                |
-| `NODE_ENV`                                  | `dev`                                                                 | Environnement d'exécution de l'application (`dev`, `production`, `test`).                                                           |
-| `APP_ENVIRONMENT`                           | `development`                                                         | Environnement fonctionnel de l'application (`development`, `staging`, `production`, `test`).                                        |
-| `FRONTEND_URL`                              | `https://cartobio.agencebio.org`                                      | URL de l'application frontend.                                                                                                      |
-| `TARGET_DATABASE_URL`                       | `postgresql://docker:docker@localhost:25432/cartobio`                 | URL de connexion à la base de données PostgreSQL/PostGIS.                                                                           |
-| `SOURCE_DATABASE_URL`                       | ``                                                                    | URL de l'ancienne base, lue uniquement par `npm run db:migrate:data`.                                                               |
-| `CARTOBIO_JWT_SECRET`                       | ``                                                                    | Secret utilisé pour signer et vérifier les JSON Web Tokens (JWT).                                                                   |
-| `DOUANES_BASE_URL`                          | `http://bdd-cartobio/ws`                                              | URL de base du service web des Douanes.                                                                                             |
-| `DOUANES_SOCKS_PROXY`                       | ``                                                                    | Proxy SOCKS5 utilisé pour accéder aux services des Douanes.                                                                         |
-| `GEOFOLIA_API_HOST`                         | `https://prod-geofolink.azure-api.net`                                | URL de base de l'API Geofolia.                                                                                                      |
-| `GEOFOLIA_API_SCOPE`                        | `https://b2cprodgeofolink.onmicrosoft.com/prod-geofolink/.default`    | Scope OAuth utilisé pour obtenir un jeton d'accès à l'API Geofolia.                                                                 |
-| `GEOFOLIA_API_SERVICE_CODE`                 | `FR-CARTOBIO-DATA-FIELDS`                                             | Code du service Geofolia utilisé pour les appels API.                                                                               |
-| `GEOFOLIA_API_SUBSCRIPTION_KEY`             | ``                                                                    | Clé d'abonnement (API Management) pour accéder à l'API Geofolia.                                                                    |
-| `GEOFOLIA_OAUTH_HOST`                       | `https://login.microsoftonline.com/`                                  | Hôte OAuth Microsoft Entra ID (Azure AD).                                                                                           |
-| `GEOFOLIA_OAUTH_TENANT`                     | ``                                                                    | Identifiant du tenant Microsoft Entra ID.                                                                                           |
-| `GEOFOLIA_OAUTH_CLIENT_ID`                  | ``                                                                    | Identifiant du client OAuth Geofolia.                                                                                               |
-| `GEOFOLIA_OAUTH_CLIENT_SECRET`              | ``                                                                    | Secret du client OAuth Geofolia.                                                                                                    |
-| `NOTIFICATIONS_AB_ENDPOINT`                 | `https://back.agencebio.org`                                          | Point d'accès au service de notifications de l'Agence Bio.                                                                          |
-| `NOTIFICATIONS_AB_ORIGIN`                   | ``                                                                    | Valeur de l'en-tête `Origin` envoyée au service de notifications.                                                                   |
-| `NOTIFICATIONS_AB_PUBLIC_KEY`               | ``                                                                    | Clé publique utilisée pour vérifier les notifications de l'Agence Bio.                                                              |
-| `NOTIFICATIONS_AB_SERVICE_TOKEN`            | ``                                                                    | Jeton de service utilisé pour authentifier les appels au service de notifications.                                                  |
-| `NOTIFICATIONS_AB_SSO_HOST`                 | `https://preprod-oauth.agencebio.org`                                 | URL du serveur SSO de l'Agence Bio.                                                                                                 |
-| `NOTIFICATIONS_AB_SSO_CLIENT_ID`            | ``                                                                    | Identifiant du client OAuth pour le SSO de l'Agence Bio.                                                                            |
-| `NOTIFICATIONS_AB_SSO_CLIENT_SECRET`        | ``                                                                    | Secret du client OAuth pour le SSO de l'Agence Bio.                                                                                 |
-| `NOTIFICATIONS_AB_SSO_AUTHORIZATION_METHOD` | `header`                                                              | Méthode d'envoi des identifiants OAuth (`header` ou `body`).                                                                        |
-| `NOTIFICATIONS_AB_SSO_CALLBACK_URI`         | `https://cartobio.agencebio.org/api/auth-provider/agencebio/callback` | URI de redirection après authentification auprès du SSO de l'Agence Bio.                                                            |
-| `ATTESTATIONS_PRODUCTIONS_DIRECTORY`        | `.`                                                                   | Répertoire dans lequel sont stockées les attestations de production.                                                                |
-| `MAIL_URL`                                  | `smtp://localhost:1025`                                               | URL de connexion au serveur SMTP utilisé pour l'envoi des e-mails.                                                                  |
+| Variable                                    | Défaut                                                                | Description                                                                                  |
+| ------------------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `PORT`                                      | `8000`                                                                | Port réseau sur lequel exposer l'application.                                                |
+| `HOST`                                      | `127.0.0.1`                                                           | Interface réseau sur laquelle exposer l'application.                                         |
+| `NODE_ENV`                                  | `dev`                                                                 | Environnement d'exécution de l'application (`dev`, `production`, `test`).                    |
+| `APP_ENVIRONMENT`                           | `development`                                                         | Environnement fonctionnel de l'application (`development`, `staging`, `production`, `test`). |
+| `FRONTEND_URL`                              | `https://cartobio.agencebio.org`                                      | URL de l'application frontend.                                                               |
+| `TARGET_DATABASE_URL`                       | `postgresql://docker:docker@localhost:25432/cartobio`                 | URL de connexion à la base de données PostgreSQL/PostGIS.                                    |
+| `SOURCE_DATABASE_URL`                       | ``                                                                    | URL de l'ancienne base, lue uniquement par `npm run db:migrate:data`.                        |
+| `CARTOBIO_JWT_SECRET`                       | ``                                                                    | Secret utilisé pour signer et vérifier les JSON Web Tokens (JWT).                            |
+| `DOUANES_BASE_URL`                          | `http://bdd-cartobio/ws`                                              | URL de base du service web des Douanes.                                                      |
+| `DOUANES_SOCKS_PROXY`                       | ``                                                                    | Proxy SOCKS5 utilisé pour accéder aux services des Douanes.                                  |
+| `GEOFOLIA_API_HOST`                         | `https://prod-geofolink.azure-api.net`                                | URL de base de l'API Geofolia.                                                               |
+| `GEOFOLIA_API_SCOPE`                        | `https://b2cprodgeofolink.onmicrosoft.com/prod-geofolink/.default`    | Scope OAuth utilisé pour obtenir un jeton d'accès à l'API Geofolia.                          |
+| `GEOFOLIA_API_SERVICE_CODE`                 | `FR-CARTOBIO-DATA-FIELDS`                                             | Code du service Geofolia utilisé pour les appels API.                                        |
+| `GEOFOLIA_API_SUBSCRIPTION_KEY`             | ``                                                                    | Clé d'abonnement (API Management) pour accéder à l'API Geofolia.                             |
+| `GEOFOLIA_OAUTH_HOST`                       | `https://login.microsoftonline.com/`                                  | Hôte OAuth Microsoft Entra ID (Azure AD).                                                    |
+| `GEOFOLIA_OAUTH_TENANT`                     | ``                                                                    | Identifiant du tenant Microsoft Entra ID.                                                    |
+| `GEOFOLIA_OAUTH_CLIENT_ID`                  | ``                                                                    | Identifiant du client OAuth Geofolia.                                                        |
+| `GEOFOLIA_OAUTH_CLIENT_SECRET`              | ``                                                                    | Secret du client OAuth Geofolia.                                                             |
+| `NOTIFICATIONS_AB_ENDPOINT`                 | `https://back.agencebio.org`                                          | Point d'accès au service de notifications de l'Agence Bio.                                   |
+| `NOTIFICATIONS_AB_ORIGIN`                   | ``                                                                    | Valeur de l'en-tête `Origin` envoyée au service de notifications.                            |
+| `NOTIFICATIONS_AB_PUBLIC_KEY`               | ``                                                                    | Clé publique utilisée pour vérifier les notifications de l'Agence Bio.                       |
+| `NOTIFICATIONS_AB_SERVICE_TOKEN`            | ``                                                                    | Jeton de service utilisé pour authentifier les appels au service de notifications.           |
+| `NOTIFICATIONS_AB_SSO_HOST`                 | `https://preprod-oauth.agencebio.org`                                 | URL du serveur SSO de l'Agence Bio.                                                          |
+| `NOTIFICATIONS_AB_SSO_CLIENT_ID`            | ``                                                                    | Identifiant du client OAuth pour le SSO de l'Agence Bio.                                     |
+| `NOTIFICATIONS_AB_SSO_CLIENT_SECRET`        | ``                                                                    | Secret du client OAuth pour le SSO de l'Agence Bio.                                          |
+| `NOTIFICATIONS_AB_SSO_AUTHORIZATION_METHOD` | `header`                                                              | Méthode d'envoi des identifiants OAuth (`header` ou `body`).                                 |
+| `NOTIFICATIONS_AB_SSO_CALLBACK_URI`         | `https://cartobio.agencebio.org/api/auth-provider/agencebio/callback` | URI de redirection après authentification auprès du SSO de l'Agence Bio.                     |
+| `ATTESTATIONS_PRODUCTIONS_DIRECTORY`        | `.`                                                                   | Répertoire dans lequel sont stockées les attestations de production.                         |
+| `MAIL_URL`                                  | `smtp://localhost:1025`                                               | URL de connexion au serveur SMTP utilisé pour l'envoi des e-mails.                           |
 
 ## Brancher au Webservice des Douanes
 

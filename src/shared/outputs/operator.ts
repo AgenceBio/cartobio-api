@@ -2,10 +2,13 @@ import type { AgenceBioNormalizedOperator } from '@agencebio/cartobio-types'
 import type { AgenceBioOperator, AgenceBioNotification } from '../../clients/agence-bio.types.js'
 import type { AgenceBioNormalizedOperatorWithFilterData } from '../../modules/operators/operators.types.js'
 
-function sortRecord (a: AgenceBioNormalizedOperatorWithFilterData, b: AgenceBioNormalizedOperatorWithFilterData, sortKey?: string | null): number {
+function sortRecord(
+  a: AgenceBioNormalizedOperatorWithFilterData,
+  b: AgenceBioNormalizedOperatorWithFilterData,
+  sortKey?: string | null
+): number {
   switch (sortKey) {
     case 'date-audit-ASC':
-       
       if (a.max_audit_date == b.max_audit_date) {
         break
       }
@@ -19,7 +22,6 @@ function sortRecord (a: AgenceBioNormalizedOperatorWithFilterData, b: AgenceBioN
       return new Date(a.max_audit_date).getTime() - new Date(b.max_audit_date).getTime()
 
     case 'date-audit-DESC':
-       
       if (a.max_audit_date == b.max_audit_date) {
         break
       }
@@ -67,15 +69,27 @@ function sortRecord (a: AgenceBioNormalizedOperatorWithFilterData, b: AgenceBioN
 /**
  * Always returns 9 digits PACAGE identifier
  */
-function formatPacage (numeroPacage: null | string | number): string | null {
+function formatPacage(numeroPacage: null | string | number): string | null {
   return numeroPacage ? String(numeroPacage).padStart(9, '0') : null
 }
 
 /**
  * Normalize an operator to be used in Cartobio
  */
-function normalizeOperator (operator: AgenceBioOperator): AgenceBioNormalizedOperator {
-  const { id, nom, denominationCourante, siret, numeroBio, numeroPacage, notifications, email, dateEngagement, datePremierEngagement, adressesOperateurs = [] } = operator
+function normalizeOperator(operator: AgenceBioOperator): AgenceBioNormalizedOperator {
+  const {
+    id,
+    nom,
+    denominationCourante,
+    siret,
+    numeroBio,
+    numeroPacage,
+    notifications,
+    email,
+    dateEngagement,
+    datePremierEngagement,
+    adressesOperateurs = []
+  } = operator
   const currentNotifications = notifications ? getNotification(notifications) : null
   const adresses = adressesOperateurs ?? []
   let organismeCertificateur = {}
@@ -98,7 +112,16 @@ function normalizeOperator (operator: AgenceBioOperator): AgenceBioNormalizedOpe
     dateEngagement,
     datePremierEngagement,
     organismeCertificateur,
-    adressesOperateurs: adresses.filter(({ active }) => active).map(({ lat, long, codeCommune, lieu, codePostal, ville }) => ({ lat, long, codeCommune, lieu, codePostal, ville })),
+    adressesOperateurs: adresses
+      .filter(({ active }) => active)
+      .map(({ lat, long, codeCommune, lieu, codePostal, ville }) => ({
+        lat,
+        long,
+        codeCommune,
+        lieu,
+        codePostal,
+        ville
+      })),
     codeCommune: adresses[0]?.codeCommune ?? null,
     departement: adresses[0]?.codeCommune?.slice(0, -3) ?? null,
     commune: adresses[0]?.ville ?? null,
@@ -111,19 +134,11 @@ function normalizeOperator (operator: AgenceBioOperator): AgenceBioNormalizedOpe
 /**
  * Get the best notifications
  */
-function getNotification (notifications: AgenceBioNotification[]): AgenceBioNotification | null {
-  const priorityOrder = [
-    'RETIREE',
-    'ENGAGEE',
-    'SUSPENDUE',
-    'ENGAGEE FUTUR',
-    'NON ENGAGEE',
-    'ARRETEE',
-    'BROUILLON'
-  ]
+function getNotification(notifications: AgenceBioNotification[]): AgenceBioNotification | null {
+  const priorityOrder = ['RETIREE', 'ENGAGEE', 'SUSPENDUE', 'ENGAGEE FUTUR', 'NON ENGAGEE', 'ARRETEE', 'BROUILLON']
 
-  const withOldOC = notifications.filter(obj => obj._oldOC)
-  const withoutOldOC = notifications.filter(obj => !obj._oldOC)
+  const withOldOC = notifications.filter((obj) => obj._oldOC)
+  const withoutOldOC = notifications.filter((obj) => !obj._oldOC)
 
   if (withoutOldOC.length > 0) {
     const sixMonthsAgo = new Date()
@@ -155,10 +170,16 @@ function getNotification (notifications: AgenceBioNotification[]): AgenceBioNoti
       group.sort((a, b) => {
         if (a.etatCertification === b.etatCertification) {
           if (a.etatCertification === 'ENGAGEE' || a.etatCertification === 'NON ENGAGEE') {
-            return new Date(b.dateDemarrage || b.dateArret || '').getTime() - new Date(a.dateDemarrage || a.dateArret || '').getTime()
+            return (
+              new Date(b.dateDemarrage || b.dateArret || '').getTime() -
+              new Date(a.dateDemarrage || a.dateArret || '').getTime()
+            )
           }
           if (a.etatCertification === 'ARRETEE') {
-            return new Date(b.dateArret || b.dateDemarrage || '').getTime() - new Date(b.dateArret || b.dateDemarrage || '').getTime()
+            return (
+              new Date(b.dateArret || b.dateDemarrage || '').getTime() -
+              new Date(b.dateArret || b.dateDemarrage || '').getTime()
+            )
           }
           return new Date(b.createdAt ?? '').getTime() - new Date(a.createdAt ?? '').getTime()
         }
@@ -167,31 +188,53 @@ function getNotification (notifications: AgenceBioNotification[]): AgenceBioNoti
     })
     return Object.values(groupedNotifications).flat()[0] ?? null
   } else if (withOldOC.length > 0) {
-    const [lastNotification] = withOldOC.sort((a, b) => new Date(b.changementDate ?? '').getTime() - new Date(a.changementDate ?? '').getTime())
+    const [lastNotification] = withOldOC.sort(
+      (a, b) => new Date(b.changementDate ?? '').getTime() - new Date(a.changementDate ?? '').getTime()
+    )
     if (!lastNotification) return null
     lastNotification.certification_state = 'ARRETEE'
     return lastNotification
   } else return null
 }
-function applyOperatorTextSearch (record: AgenceBioNormalizedOperator, input?: string): boolean {
-  const recordNom = record.nom ? record.nom.toLocaleLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : ''
-  const numClient = record.notifications && record.notifications.numeroClient ? record.notifications.numeroClient.toLocaleLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : ''
-  const recordDenominationCourante = record.denominationCourante ? record.denominationCourante.toLocaleLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : ''
+function applyOperatorTextSearch(record: AgenceBioNormalizedOperator, input?: string): boolean {
+  const recordNom = record.nom
+    ? record.nom
+        .toLocaleLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+    : ''
+  const numClient =
+    record.notifications && record.notifications.numeroClient
+      ? record.notifications.numeroClient
+          .toLocaleLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+      : ''
+  const recordDenominationCourante = record.denominationCourante
+    ? record.denominationCourante
+        .toLocaleLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+    : ''
   const recordSiret = record.siret ? record.siret.replace(' ', '') : ''
-  input = input ? input.toLocaleLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : ''
+  input = input
+    ? input
+        .toLocaleLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+    : ''
 
   if (!input) {
     return true
   }
 
-  if (input &&
-    (
-      recordNom.includes(input) ||
+  if (
+    input &&
+    (recordNom.includes(input) ||
       recordDenominationCourante.includes(input) ||
       numClient.includes(input) ||
       record.numeroBio.toString().includes(input) ||
-      recordSiret.includes(input)
-    )
+      recordSiret.includes(input))
   ) {
     return true
   }
@@ -199,25 +242,22 @@ function applyOperatorTextSearch (record: AgenceBioNormalizedOperator, input?: s
   return false
 }
 
-function filterOperatorForAutocomplete (record: AgenceBioNormalizedOperator, ocId: number): boolean {
+function filterOperatorForAutocomplete(record: AgenceBioNormalizedOperator, ocId: number): boolean {
   if (!record.notifications) return false
 
   if (record.notifications.status === 'BROUILLON') {
     return false
   }
 
-  if (record.notifications.etatCertification === 'NON ENGAGEE' ||
+  if (
+    record.notifications.etatCertification === 'NON ENGAGEE' ||
     record.notifications.etatCertification === 'ARRETEE' ||
     record.notifications.organismeCertificateurId !== ocId ||
-    record.notifications.etatCertification === 'RETIREE') {
+    record.notifications.etatCertification === 'RETIREE'
+  ) {
     return false
   }
   return true
 }
 
-export {
-  sortRecord,
-  normalizeOperator,
-  applyOperatorTextSearch,
-  filterOperatorForAutocomplete
-}
+export { sortRecord, normalizeOperator, applyOperatorTextSearch, filterOperatorForAutocomplete }

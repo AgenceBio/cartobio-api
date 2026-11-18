@@ -144,7 +144,12 @@ const STEPS: Step[] = [
         return null
       return {
         record_id: recordId,
-        source: metadataSources[String(meta.source ?? '').trim().toLowerCase()] ?? null,
+        source:
+          metadataSources[
+            String(meta.source ?? '')
+              .trim()
+              .toLowerCase()
+          ] ?? null,
         source_updated_at: meta.sourceLastUpdate,
         provenance: meta.provenance,
         campagne: matches(String(meta.campagne ?? ''), /^\d{4}$/),
@@ -234,14 +239,16 @@ const STEPS: Step[] = [
         const code = String(annotation.code)
         if (!isAnnotationCode(code)) return []
 
-        return [{
-          id: uniqueId(annotation.id, seen, UUID),
-          record_id: recordId,
-          parcelle_id: id,
-          type_annot: annotationCodes[code],
-          created_at: annotation.date ?? updatedAt,
-          metadata: annotation.metadata
-        }]
+        return [
+          {
+            id: uniqueId(annotation.id, seen, UUID),
+            record_id: recordId,
+            parcelle_id: id,
+            type_annot: annotationCodes[code],
+            created_at: annotation.date ?? updatedAt,
+            metadata: annotation.metadata
+          }
+        ]
       })
     }
   },

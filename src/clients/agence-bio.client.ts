@@ -7,8 +7,17 @@ import { normalizeOperator } from '../shared/outputs/operator.js'
 import config from '../config/env.js'
 import { organismeCertificateurSchema } from '@agencebio/cartobio-types'
 import type { AgenceBioNormalizedOperator, OrganismeCertificateur } from '@agencebio/cartobio-types'
-import { agenceBioOperateursPageSchema, agenceBioOperatorEmailsSchema, agenceBioOperatorSchema } from './agence-bio.types.js'
-import type { AgenceBioOperateursPage, AgenceBioOperator, AgenceBioOperatorEmails, AgenceBioNotification } from './agence-bio.types.js'
+import {
+  agenceBioOperateursPageSchema,
+  agenceBioOperatorEmailsSchema,
+  agenceBioOperatorSchema
+} from './agence-bio.types.js'
+import type {
+  AgenceBioOperateursPage,
+  AgenceBioOperator,
+  AgenceBioOperatorEmails,
+  AgenceBioNotification
+} from './agence-bio.types.js'
 import { parseApiResponse } from './clients.utils.js'
 import { z } from 'zod'
 const Origin = config.get('notifications.origin')
@@ -33,16 +42,20 @@ async function _getOperatorsByOc({
   oc: number
 }): Promise<AgenceBioNormalizedOperator[]> {
   const limit = 10000
-  const data = parseApiResponse(agenceBioOperateursPageSchema, await get(`${config.get('notifications.endpoint')}/api/oc/${oc}/operateurs`, {
-    headers: {
-      Authorization: serviceToken,
-      Origin
-    },
-    searchParams: {
-      limit,
-      orderBy: 'nom'
-    }
-  }).json(), 'l\'API Agence Bio')
+  const data = parseApiResponse(
+    agenceBioOperateursPageSchema,
+    await get(`${config.get('notifications.endpoint')}/api/oc/${oc}/operateurs`, {
+      headers: {
+        Authorization: serviceToken,
+        Origin
+      },
+      searchParams: {
+        limit,
+        orderBy: 'nom'
+      }
+    }).json(),
+    "l'API Agence Bio"
+  )
 
   if (data.nbTotal === data.operateurs.length) {
     return data.operateurs.map(normalizeOperator)
@@ -61,7 +74,9 @@ async function _getOperatorsByOc({
           page: page + 1,
           orderBy: 'nom'
         }
-      }).json().then((page) => parseApiResponse(agenceBioOperateursPageSchema, page, 'l\'API Agence Bio'))
+      })
+        .json()
+        .then((page) => parseApiResponse(agenceBioOperateursPageSchema, page, "l'API Agence Bio"))
     )
   }
 
@@ -78,18 +93,28 @@ async function _getOperatorsByOc({
 /**
  * Returs operators for admin profile
  */
-async function _getOperatorsForAdmin({ serviceToken, input = '' }: { serviceToken: string; input?: string }): Promise<AgenceBioNormalizedOperator[]> {
+async function _getOperatorsForAdmin({
+  serviceToken,
+  input = ''
+}: {
+  serviceToken: string
+  input?: string
+}): Promise<AgenceBioNormalizedOperator[]> {
   const limit = 10000
 
   type SearchParams = { nom?: string; numeroBio?: string; siret?: string; page?: number }
   const fetchPage = async (searchParams: SearchParams): Promise<AgenceBioOperateursPage> =>
-    parseApiResponse(agenceBioOperateursPageSchema, await get(`${config.get('notifications.endpoint')}/api/operateurs/cartobio`, {
-      headers: {
-        Authorization: serviceToken,
-        Origin
-      },
-      searchParams: { limit, ...searchParams }
-    }).json(), 'l\'API Agence Bio')
+    parseApiResponse(
+      agenceBioOperateursPageSchema,
+      await get(`${config.get('notifications.endpoint')}/api/operateurs/cartobio`, {
+        headers: {
+          Authorization: serviceToken,
+          Origin
+        },
+        searchParams: { limit, ...searchParams }
+      }).json(),
+      "l'API Agence Bio"
+    )
 
   const fetchAllPages = async (baseParams: SearchParams): Promise<AgenceBioOperator[]> => {
     const data = await fetchPage(baseParams)
@@ -144,12 +169,16 @@ const getOperatorsForAdmin = memo(_getOperatorsForAdmin, {
  * Returns operators for a given user
  */
 async function fetchUserOperators(userId: number): Promise<{ operators: AgenceBioNormalizedOperator[] }> {
-  const data = parseApiResponse(z.array(agenceBioOperatorSchema), await get(`${config.get('notifications.endpoint')}/api/utilisateur/${userId}/operateurs`, {
-    headers: {
-      Authorization: serviceToken,
-      Origin
-    }
-  }).json(), 'l\'API Agence Bio')
+  const data = parseApiResponse(
+    z.array(agenceBioOperatorSchema),
+    await get(`${config.get('notifications.endpoint')}/api/utilisateur/${userId}/operateurs`, {
+      headers: {
+        Authorization: serviceToken,
+        Origin
+      }
+    }).json(),
+    "l'API Agence Bio"
+  )
 
   return {
     operators: data.map(normalizeOperator)
@@ -165,33 +194,45 @@ async function fetchOperatorsForAdmin(input = ''): Promise<OperatorWithNotificat
 }
 
 async function fetchOperatorByNumeroBio(numeroBio: string): Promise<AgenceBioNormalizedOperator> {
-  const data = parseApiResponse(agenceBioOperatorSchema, await get(`${config.get('notifications.endpoint')}/api/operateur/${numeroBio}`, {
-    headers: {
-      Authorization: config.get('notifications.serviceToken'),
-      Origin
-    }
-  }).json(), 'l\'API Agence Bio')
+  const data = parseApiResponse(
+    agenceBioOperatorSchema,
+    await get(`${config.get('notifications.endpoint')}/api/operateur/${numeroBio}`, {
+      headers: {
+        Authorization: config.get('notifications.serviceToken'),
+        Origin
+      }
+    }).json(),
+    "l'API Agence Bio"
+  )
   return normalizeOperator(data)
 }
 
 async function fetchEmailForNumeroBio(numeroBio: string): Promise<AgenceBioOperatorEmails> {
-  const data = parseApiResponse(agenceBioOperatorEmailsSchema, await get(`${config.get('notifications.endpoint')}/api/operateur/${numeroBio}/utilisateurs-emails`, {
-    headers: {
-      Authorization: config.get('notifications.serviceToken'),
-      Origin
-    }
-  }).json(), 'l\'API Agence Bio')
+  const data = parseApiResponse(
+    agenceBioOperatorEmailsSchema,
+    await get(`${config.get('notifications.endpoint')}/api/operateur/${numeroBio}/utilisateurs-emails`, {
+      headers: {
+        Authorization: config.get('notifications.serviceToken'),
+        Origin
+      }
+    }).json(),
+    "l'API Agence Bio"
+  )
   return data
 }
 
 async function checkOcToken(token: string): Promise<OrganismeCertificateur> {
-  return parseApiResponse(organismeCertificateurSchema, await post(`${config.get('notifications.endpoint')}/api/oc/check-token`, {
-    headers: {
-      Authorization: serviceToken,
-      Origin
-    },
-    json: { token }
-  }).json(), 'l\'API Agence Bio')
+  return parseApiResponse(
+    organismeCertificateurSchema,
+    await post(`${config.get('notifications.endpoint')}/api/oc/check-token`, {
+      headers: {
+        Authorization: serviceToken,
+        Origin
+      },
+      json: { token }
+    }).json(),
+    "l'API Agence Bio"
+  )
 }
 
 function parsePacDetailsFromComment(commentaire?: string | null): {

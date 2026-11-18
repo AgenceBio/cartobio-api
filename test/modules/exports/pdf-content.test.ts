@@ -9,7 +9,9 @@ vi.mock('../../../src/modules/exports/pdf-utils.js', () => ({
   drawAllParcellesOnMap: vi.fn(),
   drawParcelleHighlightOnMap: vi.fn(),
   getAllParcelles: vi.fn(),
-  launchStyleTab: vi.fn().mockImplementation(() => { throw new Error('Test') })
+  launchStyleTab: vi.fn().mockImplementation(() => {
+    throw new Error('Test')
+  })
 }))
 
 describe('generateOperatorMapImages', () => {

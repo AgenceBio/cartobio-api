@@ -51,7 +51,7 @@ describe('normalizeOperator()', () => {
       numeroBio: '34857',
       codeCommune: '42210',
       numeroPacage: null,
-      organismeCertificateur: { },
+      organismeCertificateur: {},
       adressesOperateurs: [
         {
           lat: 45.470757,
@@ -85,7 +85,7 @@ describe('normalizeOperator()', () => {
       numeroBio: '34857',
       codeCommune: '42210',
       numeroPacage: null,
-      organismeCertificateur: { },
+      organismeCertificateur: {},
       adressesOperateurs: [
         {
           lat: 45.470757,

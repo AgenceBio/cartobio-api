@@ -1,7 +1,13 @@
 import { createVerifier, TokenError } from 'fast-jwt'
 
 import { checkOcToken, fetchUserOperators } from '../clients/agence-bio.client.js'
-import { ExpiredCredentialsApiError, InvalidCredentialsApiError, NotFoundApiError, UnauthorizedApiError, ForbiddenApiError } from './errors.js'
+import {
+  ExpiredCredentialsApiError,
+  InvalidCredentialsApiError,
+  NotFoundApiError,
+  UnauthorizedApiError,
+  ForbiddenApiError
+} from './errors.js'
 import { fetchOperatorByNumeroBio } from '../clients/agence-bio.client.js'
 import { BadGatewayApiError, PreconditionFailedApiError, getErrorCode, getResponseStatusCode } from './errors.js'
 import { getRecords } from './parcellaires/parcellaires.service.js'
@@ -22,10 +28,10 @@ const tokenExpirationErrorCodes: string[] = [
   TokenError.codes.invalidSignature
 ]
 
-function decodeUserToken ({ keys }: { keys: string[] }): onRequestHookHandler {
-  const verifiers = keys.map(key => createVerifier({ key: async () => key, cache: true }))
+function decodeUserToken({ keys }: { keys: string[] }): onRequestHookHandler {
+  const verifiers = keys.map((key) => createVerifier({ key: async () => key, cache: true }))
 
-  return async function decodeTokenMiddleware (request: FastifyRequest): Promise<void> {
+  return async function decodeTokenMiddleware(request: FastifyRequest): Promise<void> {
     let token = ''
 
     if (request.headers.authorization?.startsWith('Bearer ')) {
@@ -42,12 +48,14 @@ function decodeUserToken ({ keys }: { keys: string[] }): onRequestHookHandler {
     // We cycle through various verification methods until one succeeds
     // For example, a Bearer emitted by CartoBio could fail
     // whereas a Notification token via Public Key could be okay
-    const { user, error } = await Promise
-      .allSettled(verifiers.map(async (fn): Promise<CartoBioUser> => userTokenSchema.parse(await fn(token)) as CartoBioUser))
-      .then(results => ({
-        user: results.find((result): result is PromiseFulfilledResult<CartoBioUser> => result.status === 'fulfilled')?.value,
-        error: results.find((result): result is PromiseRejectedResult => result.status === 'rejected')?.reason as TokenError | undefined
-      }))
+    const { user, error } = await Promise.allSettled(
+      verifiers.map(async (fn): Promise<CartoBioUser> => userTokenSchema.parse(await fn(token)) as CartoBioUser)
+    ).then((results) => ({
+      user: results.find((result): result is PromiseFulfilledResult<CartoBioUser> => result.status === 'fulfilled')
+        ?.value,
+      error: results.find((result): result is PromiseRejectedResult => result.status === 'rejected')?.reason as
+        TokenError | undefined
+    }))
 
     // these errors will trigger a frontend disconnection
     // because they are bound to a signature change, or an expiry
@@ -60,7 +68,7 @@ function decodeUserToken ({ keys }: { keys: string[] }): onRequestHookHandler {
       throw new InvalidCredentialsApiError("nous n'avons pas réussi à vérifier le jeton d'authentification.")
     }
 
-    if (user && await isRevoked(token)) {
+    if (user && (await isRevoked(token))) {
       throw new InvalidCredentialsApiError('Le token a été révoqué')
     }
 
@@ -68,8 +76,11 @@ function decodeUserToken ({ keys }: { keys: string[] }): onRequestHookHandler {
   }
 }
 
-function enforceAnyFastifyDecorator (names: Array<'user' | 'organismeCertificateur'> = []): onRequestHookHandler {
-  return async function enforceAnyFastifyDecoratorMiddleware (request: FastifyRequest, reply: FastifyReply): Promise<void> {
+function enforceAnyFastifyDecorator(names: Array<'user' | 'organismeCertificateur'> = []): onRequestHookHandler {
+  return async function enforceAnyFastifyDecoratorMiddleware(
+    request: FastifyRequest,
+    reply: FastifyReply
+  ): Promise<void> {
     const isFound = names.some((decoratorName) => {
       return Object.hasOwn(request, decoratorName) && request[decoratorName]
     })
@@ -86,8 +97,8 @@ function enforceAnyFastifyDecorator (names: Array<'user' | 'organismeCertificate
  * Verify an Agence Bio provided token.
  * The header might already be populated, but it is not for us if it starts with 'Bearer'
  */
-function verifyAgenceBioToken (): onRequestHookHandler {
-  return async function verifyAgenceBioTokenMiddleware (request: FastifyRequest): Promise<void> {
+function verifyAgenceBioToken(): onRequestHookHandler {
+  return async function verifyAgenceBioTokenMiddleware(request: FastifyRequest): Promise<void> {
     const foundToken = request.headers.authorization || ''
 
     if (foundToken && !foundToken.startsWith('Bearer ')) {
@@ -98,24 +109,28 @@ function verifyAgenceBioToken (): onRequestHookHandler {
         }
       } catch (error) {
         if (getErrorCode(error)) {
-          throw new UnauthorizedApiError("un jeton d'API Agence Bio valide est nécessaire pour accéder à ce contenu.", { cause: error })
+          throw new UnauthorizedApiError("un jeton d'API Agence Bio valide est nécessaire pour accéder à ce contenu.", {
+            cause: error
+          })
         } else {
-          throw new BadGatewayApiError('Le portail d\'authentification de l\'Agence Bio n\'a pas pu être contacté.', { cause: error })
+          throw new BadGatewayApiError("Le portail d'authentification de l'Agence Bio n'a pas pu être contacté.", {
+            cause: error
+          })
         }
       }
     }
   }
 }
 
-function enforceOperator ({ param }: { param: string }) {
-  return async function enforceOperatorMiddleware (request: FastifyRequest): Promise<void> {
+function enforceOperator({ param }: { param: string }) {
+  return async function enforceOperatorMiddleware(request: FastifyRequest): Promise<void> {
     const numeroBio = (request.params as Record<string, string>)[param]
     if (numeroBio === undefined) throw new NotFoundApiError('Opérateur introuvable')
     const { user } = request
 
     try {
       if (user !== null && String(user.mainGroup.id) === '4') {
-        const op = (await fetchUserOperators(user.id)).operators.find(e => String(e.numeroBio) === numeroBio)
+        const op = (await fetchUserOperators(user.id)).operators.find((e) => String(e.numeroBio) === numeroBio)
         if (!op) {
           throw new ForbiddenApiError('Accès interdit')
         }
@@ -138,23 +153,32 @@ function enforceOperator ({ param }: { param: string }) {
  */
 type RecordQuery = (id: string, user?: CartoBioUser | null) => Promise<NormalizedRecord | null>
 
-function enforceRecordAndOperator ({ queryFn, param }: { queryFn: RecordQuery; param: string }): (request: FastifyRequest) => Promise<void> {
-  return async function enforceRecordAndOperatorMiddleware (request: FastifyRequest): Promise<void> {
+function enforceRecordAndOperator({
+  queryFn,
+  param
+}: {
+  queryFn: RecordQuery
+  param: string
+}): (request: FastifyRequest) => Promise<void> {
+  return async function enforceRecordAndOperatorMiddleware(request: FastifyRequest): Promise<void> {
     const id = (request.params as Record<string, string>)[param]
     if (id === undefined) throw new NotFoundApiError('Parcellaire introuvable')
     await loadRecordAndOperator(request, id, queryFn)
   }
 }
 
-async function loadRecordAndOperator (request: FastifyRequest, id: string, queryFn: RecordQuery): Promise<void> {
+async function loadRecordAndOperator(request: FastifyRequest, id: string, queryFn: RecordQuery): Promise<void> {
   const record = await queryFn(id, request.user)
 
   if (!record) {
     throw new NotFoundApiError('Parcellaire introuvable')
   }
 
-  if (request.headers['if-unmodified-since'] &&
-    new Date(request.headers['if-unmodified-since']).getTime() < new Date(new Date(record.updated_at).toUTCString()).getTime()) {
+  if (
+    request.headers['if-unmodified-since'] &&
+    new Date(request.headers['if-unmodified-since']).getTime() <
+      new Date(new Date(record.updated_at).toUTCString()).getTime()
+  ) {
     throw new PreconditionFailedApiError('Le contenu a été modifié depuis votre dernière requête.')
   }
 
@@ -166,7 +190,7 @@ async function loadRecordAndOperator (request: FastifyRequest, id: string, query
   try {
     if (user && String(user.mainGroup.id) === '4') {
       const { operators } = await fetchUserOperators(user.id)
-      if (!operators.some(e => String(e.numeroBio) === String(numeroBio))) {
+      if (!operators.some((e) => String(e.numeroBio) === String(numeroBio))) {
         throw new ForbiddenApiError('Accès interdit')
       }
     }
@@ -180,7 +204,12 @@ async function loadRecordAndOperator (request: FastifyRequest, id: string, query
   }
 
   // Record was created by another OC therefore, remove field current OC should not have access
-  if (request.operator && record && request.user?.organismeCertificateur && record.oc_id !== request.user.organismeCertificateur.id) {
+  if (
+    request.operator &&
+    record &&
+    request.user?.organismeCertificateur &&
+    record.oc_id !== request.user.organismeCertificateur.id
+  ) {
     record.audit_notes = null
   }
 
@@ -192,10 +221,17 @@ async function loadRecordAndOperator (request: FastifyRequest, id: string, query
   request.record = record
 }
 
-const operatorForbiddenRecordFields = ['audit_date', 'audit_notes', 'audit_demandes', 'certification_date_debut', 'certification_date_fin', 'mixite']
+const operatorForbiddenRecordFields = [
+  'audit_date',
+  'audit_notes',
+  'audit_demandes',
+  'certification_date_debut',
+  'certification_date_fin',
+  'mixite'
+]
 
-function haveRightToUpdate () {
-  return async function haveRightToUpdateAuditMiddleware (request: FastifyRequest): Promise<void> {
+function haveRightToUpdate() {
+  return async function haveRightToUpdateAuditMiddleware(request: FastifyRequest): Promise<void> {
     const { user, record } = request
     const patch = request.body as {
       properties?: { [s: string]: unknown }
@@ -208,10 +244,12 @@ function haveRightToUpdate () {
 
     const isOperator = String(user.mainGroup.id) === '4'
 
-    if (isOperator && patch && (
-      (patch.certification_state != null && patch.certification_state !== 'OPERATOR_DRAFT') ||
-      operatorForbiddenRecordFields.some((field) => patch[field] != null && patch[field] !== '')
-    )) {
+    if (
+      isOperator &&
+      patch &&
+      ((patch.certification_state != null && patch.certification_state !== 'OPERATOR_DRAFT') ||
+        operatorForbiddenRecordFields.some((field) => patch[field] != null && patch[field] !== ''))
+    ) {
       throw new ForbiddenApiError("vous n'êtes pas autorisé·e à modifier les informations d'audit ou de certification.")
     }
 
@@ -242,7 +280,10 @@ function haveRightToUpdate () {
   }
 }
 
-async function hasOperatorAccess (request: FastifyRequest, userOc: OrganismeCertificateur | null | undefined): Promise<boolean> {
+async function hasOperatorAccess(
+  request: FastifyRequest,
+  userOc: OrganismeCertificateur | null | undefined
+): Promise<boolean> {
   const { operator, record } = request
 
   if (!userOc || (!operator && !record)) {
@@ -252,8 +293,12 @@ async function hasOperatorAccess (request: FastifyRequest, userOc: OrganismeCert
   // test accounts do not have an OC id, thus we allow their access
   const operatorHasOc = Boolean(operator && Object.hasOwn(operator.organismeCertificateur, 'id'))
 
-  if (operator && operatorHasOc && userOc.id === operator.organismeCertificateur.id &&
-    (!operator.notifications || operator.notifications.etatCertification !== 'NON ENGAGEE')) {
+  if (
+    operator &&
+    operatorHasOc &&
+    userOc.id === operator.organismeCertificateur.id &&
+    (!operator.notifications || operator.notifications.etatCertification !== 'NON ENGAGEE')
+  ) {
     return true
   }
 
@@ -270,13 +315,13 @@ async function hasOperatorAccess (request: FastifyRequest, userOc: OrganismeCert
   return false
 }
 
-function getRequestOc (request: FastifyRequest): OrganismeCertificateur | null | undefined {
+function getRequestOc(request: FastifyRequest): OrganismeCertificateur | null | undefined {
   return request.organismeCertificateur ?? request.user?.organismeCertificateur
 }
 
-function enforceOperatorAccess () {
-  return async function enforceOperatorAccessMiddleware (request: FastifyRequest): Promise<void> {
-    if (!await hasOperatorAccess(request, getRequestOc(request))) {
+function enforceOperatorAccess() {
+  return async function enforceOperatorAccessMiddleware(request: FastifyRequest): Promise<void> {
+    if (!(await hasOperatorAccess(request, getRequestOc(request)))) {
       throw new UnauthorizedApiError("vous n'êtes pas autorisé·e à accéder à ce contenu avec vos identifiants.")
     }
   }
@@ -293,13 +338,19 @@ function enforceOperatorAccess () {
  * We can skip if:
  * - an operator is set, without OC (mostly test accounts)
  */
-function compareOperatorOutputAndToken (accessor: (request: FastifyRequest) => OrganismeCertificateur | null | undefined): preSerializationHookHandler {
-  return async function compareOperatorOutputAndTokenMiddleware (request: FastifyRequest, _: FastifyReply, payload: unknown) {
+function compareOperatorOutputAndToken(
+  accessor: (request: FastifyRequest) => OrganismeCertificateur | null | undefined
+): preSerializationHookHandler {
+  return async function compareOperatorOutputAndTokenMiddleware(
+    request: FastifyRequest,
+    _: FastifyReply,
+    payload: unknown
+  ) {
     const { operator, record } = request
     // userOC can be empty if a route has two credentials check
     const userOc = accessor(request)
 
-    if (!await hasOperatorAccess(request, userOc)) {
+    if (!(await hasOperatorAccess(request, userOc))) {
       throw new UnauthorizedApiError("vous n'êtes pas autorisé·e à accéder à ce contenu avec vos identifiants.")
     }
 
@@ -332,19 +383,22 @@ function compareOperatorOutputAndToken (accessor: (request: FastifyRequest) => O
   }
 }
 
-function checkCertification (request: FastifyRequest): void {
+function checkCertification(request: FastifyRequest): void {
   if (!request.user || !request.user.organismeCertificateur) {
     return
   }
 
   const currentStatut = request.operator?.notifications?.etatCertification
 
-  if (currentStatut === 'ARRETEE' || request.user.organismeCertificateur.id !== request.operator?.organismeCertificateur?.id) {
+  if (
+    currentStatut === 'ARRETEE' ||
+    request.user.organismeCertificateur.id !== request.operator?.organismeCertificateur?.id
+  ) {
     throw new UnauthorizedApiError("vous n'êtes pas autorisé·e à accéder à ce contenu avec vos identifiants.")
   }
 }
 
-function enforceAdminRole () {
+function enforceAdminRole() {
   return async function (request: FastifyRequest, reply: FastifyReply): Promise<void> {
     if (!(String(request.user?.mainGroup.id) === '1')) {
       reply.code(403)

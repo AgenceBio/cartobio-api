@@ -1,6 +1,11 @@
 import { sql } from 'drizzle-orm'
 import { db as drizzleDb } from '../src/database/database.js'
-import { ensureOrganismeCertificateur, insertEvent, upsertCultures, upsertMetadata } from '../src/shared/parcellaires/parcellaires.repository.js'
+import {
+  ensureOrganismeCertificateur,
+  insertEvent,
+  upsertCultures,
+  upsertMetadata
+} from '../src/shared/parcellaires/parcellaires.repository.js'
 import type { CultureInput, HistoryEntry } from '@agencebio/cartobio-types'
 import * as schema from '../src/database/schema/index.js'
 import records from './fixtures/providers/records.json' with { type: 'json' }
@@ -10,27 +15,37 @@ type FixtureRecord = Partial<Record<keyof (typeof records)[number], unknown>>
 type CertificationEtat = (typeof schema.parcellaires.certificationEtat.enumValues)[number]
 type ConversionNiveau = (typeof schema.conversionNiveau.enumValues)[number]
 
-export async function loadParcellairesFixture (data: typeof records = records, pinnedRecords: Array<string | number> = [], userId = 1): Promise<void> {
+export async function loadParcellairesFixture(
+  data: typeof records = records,
+  pinnedRecords: Array<string | number> = [],
+  userId = 1
+): Promise<void> {
   await drizzleDb
     .insert(schema.organismeCertificateur)
-    .values(data.filter((record) => record.oc_id != null).map((record) => ({ id: String(record.oc_id), label: record.oc_label })))
+    .values(
+      data
+        .filter((record) => record.oc_id != null)
+        .map((record) => ({ id: String(record.oc_id), label: record.oc_label }))
+    )
     .onConflictDoNothing()
 
-  await drizzleDb.insert(schema.parcellaires).values(data.map((record, i) => ({
-    recordId: record.record_id,
-    numeroBio: Number(record.numerobio),
-    ocId: record.oc_id == null ? null : String(record.oc_id),
-    certificationEtat: record.certification_state as CertificationEtat,
-    certificationDateDebut: record.certification_date_debut,
-    certificationDateFin: record.certification_date_fin,
-    auditDate: record.audit_date,
-    anneeReferenceControle: record.annee_reference_controle,
-    auditNotesCertif: record.audit_notes,
-    auditDemandesOperateur: record.audit_demandes,
-    versionNom: record.version_name,
-    createdAt: sql`now() + make_interval(mins => ${i})`,
-    updatedAt: sql`now() + make_interval(mins => ${i})`
-  })))
+  await drizzleDb.insert(schema.parcellaires).values(
+    data.map((record, i) => ({
+      recordId: record.record_id,
+      numeroBio: Number(record.numerobio),
+      ocId: record.oc_id == null ? null : String(record.oc_id),
+      certificationEtat: record.certification_state as CertificationEtat,
+      certificationDateDebut: record.certification_date_debut,
+      certificationDateFin: record.certification_date_fin,
+      auditDate: record.audit_date,
+      anneeReferenceControle: record.annee_reference_controle,
+      auditNotesCertif: record.audit_notes,
+      auditDemandesOperateur: record.audit_demandes,
+      versionNom: record.version_name,
+      createdAt: sql`now() + make_interval(mins => ${i})`,
+      updatedAt: sql`now() + make_interval(mins => ${i})`
+    }))
+  )
 
   if (pinnedRecords.length > 0) {
     await drizzleDb
@@ -39,23 +54,31 @@ export async function loadParcellairesFixture (data: typeof records = records, p
       .onConflictDoNothing()
   }
 
-  await drizzleDb.insert(schema.parcelles).values(data.flatMap((record) => parcelles.map((parcelle) => {
-    const geometry = sql`ST_GeomFromGeoJSON(${JSON.stringify(parcelle.geometry)})`
+  await drizzleDb.insert(schema.parcelles).values(
+    data.flatMap((record) =>
+      parcelles.map((parcelle) => {
+        const geometry = sql`ST_GeomFromGeoJSON(${JSON.stringify(parcelle.geometry)})`
 
-    return {
-      recordId: record.record_id,
-      id: parcelle.id,
-      geometry,
-      surfaceHa: sql`ST_Area(${geometry}::geography) / 10000`,
-      conversionNiveau: parcelle.conversion_niveau as ConversionNiveau | null,
-      engagementDate: parcelle.engagement_date,
-      numeroIlotPac: parcelle.numero_ilot_pac ? Number(parcelle.numero_ilot_pac) : null,
-      numeroParcellesPac: parcelle.numero_parcelle_pac ? Number(parcelle.numero_parcelle_pac) : null
-    }
-  })))
+        return {
+          recordId: record.record_id,
+          id: parcelle.id,
+          geometry,
+          surfaceHa: sql`ST_Area(${geometry}::geography) / 10000`,
+          conversionNiveau: parcelle.conversion_niveau as ConversionNiveau | null,
+          engagementDate: parcelle.engagement_date,
+          numeroIlotPac: parcelle.numero_ilot_pac ? Number(parcelle.numero_ilot_pac) : null,
+          numeroParcellesPac: parcelle.numero_parcelle_pac ? Number(parcelle.numero_parcelle_pac) : null
+        }
+      })
+    )
+  )
 }
 
-export async function loadRecordFixture (data: FixtureRecord[] = records, pinnedRecords: Array<string | number> = [], userId = 1) {
+export async function loadRecordFixture(
+  data: FixtureRecord[] = records,
+  pinnedRecords: Array<string | number> = [],
+  userId = 1
+) {
   await drizzleDb.delete(schema.parcelles)
   await drizzleDb.delete(schema.parcellaires)
   for (let i = 0; i < data.length; i++) {
@@ -107,12 +130,17 @@ export async function loadRecordFixture (data: FixtureRecord[] = records, pinned
         numeroParcellesPac: parcelle.numero_parcelle_pac ? Number(parcelle.numero_parcelle_pac) : null,
         commentaireOperateur: parcelle.commentaire
       })
-      await upsertCultures(drizzleDb, record.record_id as string, parcelle.id, parcelle.cultures as unknown as CultureInput[])
+      await upsertCultures(
+        drizzleDb,
+        record.record_id as string,
+        parcelle.id,
+        parcelle.cultures as unknown as CultureInput[]
+      )
     }
   }
 }
 
-function asStoredCultures (cultures: Array<Record<string, unknown>> | null | undefined): Array<Record<string, unknown>> {
+function asStoredCultures(cultures: Array<Record<string, unknown>> | null | undefined): Array<Record<string, unknown>> {
   return (cultures ?? []).map(({ surface, date_semis: dateSemis, ...culture }) => ({
     ...Object.fromEntries(Object.entries(culture).filter(([key, value]) => key !== 'id' && value !== '')),
     ...(surface != null && surface !== '' ? { surface: Number(surface) } : {}),
@@ -120,13 +148,23 @@ function asStoredCultures (cultures: Array<Record<string, unknown>> | null | und
   }))
 }
 
-export function asStoredParcelles<T extends { cultures?: Array<Record<string, unknown>> | null; historique_cultures?: Array<{ cultures?: Array<Record<string, unknown>> | null }> | null }> (items: T[]): T[] {
+export function asStoredParcelles<
+  T extends {
+    cultures?: Array<Record<string, unknown>> | null
+    historique_cultures?: Array<{ cultures?: Array<Record<string, unknown>> | null }> | null
+  }
+>(items: T[]): T[] {
   return items.map((parcelle) => ({
     ...parcelle,
     annotations: [],
     cultures: asStoredCultures(parcelle.cultures),
     ...(parcelle.historique_cultures
-      ? { historique_cultures: parcelle.historique_cultures.map((historique) => ({ ...historique, cultures: asStoredCultures(historique.cultures) })) }
+      ? {
+          historique_cultures: parcelle.historique_cultures.map((historique) => ({
+            ...historique,
+            cultures: asStoredCultures(historique.cultures)
+          }))
+        }
       : {})
   }))
 }

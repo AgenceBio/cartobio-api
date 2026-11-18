@@ -1,6 +1,19 @@
 import { createOrUpdateOperatorRecord, getRecord } from '../../src/shared/parcellaires/parcellaires.service.js'
-import { pinOperator, unpinOperator, consultOperator, searchControlBodyRecords, getPinnedOperators } from '../../src/modules/operators/operators.service.js'
-import { markFeatureControlled, markFeatureUncontrolled, updateAuditRecordState, deleteSingleFeature, updateFeature, addRecordFeature } from '../../src/modules/audits/audits.service.js'
+import {
+  pinOperator,
+  unpinOperator,
+  consultOperator,
+  searchControlBodyRecords,
+  getPinnedOperators
+} from '../../src/modules/operators/operators.service.js'
+import {
+  markFeatureControlled,
+  markFeatureUncontrolled,
+  updateAuditRecordState,
+  deleteSingleFeature,
+  updateFeature,
+  addRecordFeature
+} from '../../src/modules/audits/audits.service.js'
 import { get, HTTPError, TimeoutError } from '../got-mock.js'
 import { NotFoundApiError } from '../../src/shared/errors.js'
 import _records from '../fixtures/providers/records.json' with { type: 'json' }
@@ -25,21 +38,37 @@ import { randomUUID } from 'crypto'
 import { getConsultedOperators } from '../../src/modules/operators/operators.service.js'
 import * as mailer from '../../src/services/mailer/utils.js'
 import { fetchEmailForNumeroBio } from '../../src/clients/agence-bio.client.js'
-import type { AgenceBioNormalizedOperatorWithRecord, DeleteFeatureBody, FeaturePropertiesInput } from '@agencebio/cartobio-types'
-import { asDBRecordWithParcelles, asGotRequest, asNormalizedRecord, asRecordInput, buildOcUser, buildOperator, buildUser } from '../factories.js'
+import type {
+  AgenceBioNormalizedOperatorWithRecord,
+  DeleteFeatureBody,
+  FeaturePropertiesInput
+} from '@agencebio/cartobio-types'
+import {
+  asDBRecordWithParcelles,
+  asGotRequest,
+  asNormalizedRecord,
+  asRecordInput,
+  buildOcUser,
+  buildOperator,
+  buildUser
+} from '../factories.js'
 
 type FixtureFeature = { type: 'Feature'; id: unknown; geometry: unknown; properties: Record<string, unknown> }
 
 const user = buildOcUser()
 type WithMaxAuditDate = AgenceBioNormalizedOperatorWithRecord & { max_audit_date?: string | null }
 
-const normalizedRecord = normalizeRecord(asDBRecordWithParcelles({
-  ...record,
-  parcelles
-}))
+const normalizedRecord = normalizeRecord(
+  asDBRecordWithParcelles({
+    ...record,
+    parcelles
+  })
+)
 
 const xmlEvv = readFileSync(join(import.meta.dirname, '../fixtures/providers/cvi-evv.xml'), { encoding: 'utf8' })
-const xmlParcellaire = readFileSync(join(import.meta.dirname, '../fixtures/providers/cvi-parcellaire.xml'), { encoding: 'utf8' })
+const xmlParcellaire = readFileSync(join(import.meta.dirname, '../fixtures/providers/cvi-parcellaire.xml'), {
+  encoding: 'utf8'
+})
 
 vi.mock('../../src/services/mailer/utils.js', () => ({
   sendCertificationComplete: vi.fn()
@@ -138,7 +167,15 @@ describe('updateFeature', () => {
       numero_ilot_pac: '1',
       numero_parcelle_pac: '2'
     } as FeaturePropertiesInput
-    const result = await updateFeature({ featureId, record: normalizedRecord, user: null, operator: buildOperator({ organismeCertificateur: user.organismeCertificateur }) }, { properties })
+    const result = await updateFeature(
+      {
+        featureId,
+        record: normalizedRecord,
+        user: null,
+        operator: buildOperator({ organismeCertificateur: user.organismeCertificateur })
+      },
+      { properties }
+    )
 
     expect(result).toMatchObject({
       record_id: record.record_id,
@@ -213,7 +250,9 @@ describe('deleteSingleFeature', () => {
 
   test('throws an error when trying to remove a non-existing feature', async () => {
     const transaction = vi.spyOn(drizzleDb, 'transaction')
-    await expect(deleteSingleFeature({ featureId: 9999, record: normalizedRecord, user }, { reason })).rejects.toThrow(NotFoundApiError)
+    await expect(deleteSingleFeature({ featureId: 9999, record: normalizedRecord, user }, { reason })).rejects.toThrow(
+      NotFoundApiError
+    )
     expect(transaction).not.toHaveBeenCalled()
   })
 })
@@ -222,19 +261,38 @@ describe('addRecordFeature', () => {
   beforeEach(() => loadRecordFixture())
 
   const addedParcelle = async (coordinates: number[][][]) => {
-    const result = await addRecordFeature({ user, record: normalizedRecord }, { geometry: { type: 'Polygon', coordinates }, properties: { conversion_niveau: 'AB' } })
+    const result = await addRecordFeature(
+      { user, record: normalizedRecord },
+      { geometry: { type: 'Polygon', coordinates }, properties: { conversion_niveau: 'AB' } }
+    )
     const existingIds = normalizedRecord.parcelles.features.map(({ id }) => String(id))
     return result.parcelles.find(({ id }) => !existingIds.includes(String(id)))
   }
 
   test('computes the commune and sets the AB engagement date when missing', async () => {
-    const parcelle = await addedParcelle([[[4.85, 45.75], [4.851, 45.75], [4.851, 45.751], [4.85, 45.751], [4.85, 45.75]]])
+    const parcelle = await addedParcelle([
+      [
+        [4.85, 45.75],
+        [4.851, 45.75],
+        [4.851, 45.751],
+        [4.85, 45.751],
+        [4.85, 45.75]
+      ]
+    ])
 
     expect(parcelle).toMatchObject({ commune: '69387', etranger: false, engagement_date: '1900-01-01' })
   })
 
   test('flags a feature outside France as foreign, without commune', async () => {
-    const parcelle = await addedParcelle([[[-3.7, 40.41], [-3.699, 40.41], [-3.699, 40.411], [-3.7, 40.411], [-3.7, 40.41]]])
+    const parcelle = await addedParcelle([
+      [
+        [-3.7, 40.41],
+        [-3.699, 40.41],
+        [-3.699, 40.411],
+        [-3.7, 40.411],
+        [-3.7, 40.41]
+      ]
+    ])
 
     expect(parcelle).toMatchObject({ commune: null, etranger: true })
   })
@@ -246,32 +304,40 @@ describe('createOrUpdateOperatorRecord', () => {
   })
 
   afterEach(async () => {
-    await drizzleDb.delete(schema.parcellaires).where(eq(schema.parcellaires.numeroBio, Number(recordToUpdate.numerobio)))
+    await drizzleDb
+      .delete(schema.parcellaires)
+      .where(eq(schema.parcellaires.numeroBio, Number(recordToUpdate.numerobio)))
   })
 
   test('returns an explicit error code when a new feature has no geometry', async () => {
     const featureCollection = {
       type: 'FeatureCollection',
-      features: [{
-        type: 'Feature',
-        id: 'without-geometry',
-        geometry: null,
-        properties: {}
-      }]
+      features: [
+        {
+          type: 'Feature',
+          id: 'without-geometry',
+          geometry: null,
+          properties: {}
+        }
+      ]
     }
 
-    await expect(createOrUpdateOperatorRecord(
-      asRecordInput({ ...recordToUpdate, parcelles: featureCollection }),
-      { user },
-      drizzleDb
-    )).rejects.toMatchObject({ code: 'MISSING_GEOMETRY' })
+    await expect(
+      createOrUpdateOperatorRecord(
+        asRecordInput({ ...recordToUpdate, parcelles: featureCollection }),
+        { user },
+        drizzleDb
+      )
+    ).rejects.toMatchObject({ code: 'MISSING_GEOMETRY' })
   })
 
   test('successfully update a record without data from previous record', async () => {
     const record: Record<string, unknown> = recordToUpdate
 
     // Data we don't want to copy
-    await upsertCultures(drizzleDb, record.record_id as string, parcelles[0]!.id, [{"id": "1", "CPF": "123", "variete": "VARIETE DIFFERENTE"}])
+    await upsertCultures(drizzleDb, record.record_id as string, parcelles[0]!.id, [
+      { id: '1', CPF: '123', variete: 'VARIETE DIFFERENTE' }
+    ])
 
     const featureCollection = {
       type: 'FeatureCollection',
@@ -279,20 +345,22 @@ describe('createOrUpdateOperatorRecord', () => {
     }
 
     for (const parcelle of parcelles) {
-      featureCollection.features.push(/** @type {Feature} */{
-        type: 'Feature',
-        id: parcelle.id,
-        geometry: parcelle.geometry,
-        properties: {
+      featureCollection.features.push(
+        /** @type {Feature} */ {
+          type: 'Feature',
           id: parcelle.id,
-          BIO: 1,
-          cultures: parcelle.cultures,
-          conversion_niveau: EtatProduction.BIO,
-          NUMERO_I: '1',
-          NUMERO_P: '2',
-          PACAGE: ' 3'
+          geometry: parcelle.geometry,
+          properties: {
+            id: parcelle.id,
+            BIO: 1,
+            cultures: parcelle.cultures,
+            conversion_niveau: EtatProduction.BIO,
+            NUMERO_I: '1',
+            NUMERO_P: '2',
+            PACAGE: ' 3'
+          }
         }
-      })
+      )
     }
 
     featureCollection.features[0]!.properties.cultures = [
@@ -330,7 +398,10 @@ describe('createOrUpdateOperatorRecord', () => {
     // To avoid ON CONFLICT condition
     const pastDate = new Date()
     pastDate.setDate(pastDate.getDate() - 12)
-    await drizzleDb.update(schema.parcellaires).set({ auditDate: sql`${pastDate.toISOString()}::date`, createdAt: pastDate }).where(eq(schema.parcellaires.recordId, record.record_id as string))
+    await drizzleDb
+      .update(schema.parcellaires)
+      .set({ auditDate: sql`${pastDate.toISOString()}::date`, createdAt: pastDate })
+      .where(eq(schema.parcellaires.recordId, record.record_id as string))
 
     const featureCollection = {
       type: 'FeatureCollection',
@@ -361,7 +432,10 @@ describe('createOrUpdateOperatorRecord', () => {
     // To avoid ON CONFLICT condition
     const pastDate = new Date()
     pastDate.setDate(pastDate.getDate() - 12)
-    await drizzleDb.update(schema.parcellaires).set({ auditDate: sql`${pastDate.toISOString()}::date`, createdAt: pastDate }).where(eq(schema.parcellaires.recordId, record.record_id as string))
+    await drizzleDb
+      .update(schema.parcellaires)
+      .set({ auditDate: sql`${pastDate.toISOString()}::date`, createdAt: pastDate })
+      .where(eq(schema.parcellaires.recordId, record.record_id as string))
 
     const featureCollection = {
       type: 'FeatureCollection',
@@ -387,12 +461,17 @@ describe('createOrUpdateOperatorRecord', () => {
     const record: Record<string, unknown> = recordToUpdate
 
     // Data we want to copy
-    await upsertCultures(drizzleDb, record.record_id as string, parcelles[0]!.id, [{"id": "1", "CPF": "123", "variete": "VARIETE DIFFERENTE"}])
+    await upsertCultures(drizzleDb, record.record_id as string, parcelles[0]!.id, [
+      { id: '1', CPF: '123', variete: 'VARIETE DIFFERENTE' }
+    ])
 
     // To avoid ON CONFLICT condition
     const yesterday = new Date()
     yesterday.setDate(yesterday.getDate() - 1)
-    await drizzleDb.update(schema.parcellaires).set({ auditDate: sql`${yesterday.toISOString()}::date`, createdAt: yesterday }).where(eq(schema.parcellaires.recordId, record.record_id as string))
+    await drizzleDb
+      .update(schema.parcellaires)
+      .set({ auditDate: sql`${yesterday.toISOString()}::date`, createdAt: yesterday })
+      .where(eq(schema.parcellaires.recordId, record.record_id as string))
 
     const featureCollection = {
       type: 'FeatureCollection',
@@ -400,20 +479,22 @@ describe('createOrUpdateOperatorRecord', () => {
     }
 
     for (const parcelle of parcelles) {
-      featureCollection.features.push(/** @type {Feature} */{
-        type: 'Feature',
-        id: parcelle.id,
-        geometry: parcelle.geometry,
-        properties: {
+      featureCollection.features.push(
+        /** @type {Feature} */ {
+          type: 'Feature',
           id: parcelle.id,
-          BIO: 1,
-          cultures: parcelle.cultures,
-          conversion_niveau: EtatProduction.BIO,
-          NUMERO_I: '1',
-          NUMERO_P: '2',
-          PACAGE: ' 3'
+          geometry: parcelle.geometry,
+          properties: {
+            id: parcelle.id,
+            BIO: 1,
+            cultures: parcelle.cultures,
+            conversion_niveau: EtatProduction.BIO,
+            NUMERO_I: '1',
+            NUMERO_P: '2',
+            PACAGE: ' 3'
+          }
         }
-      })
+      )
     }
 
     featureCollection.features[0]!.properties.cultures = [
@@ -449,10 +530,15 @@ describe('createOrUpdateOperatorRecord', () => {
     // To avoid ON CONFLICT condition
     const yesterday = new Date()
     yesterday.setDate(yesterday.getDate() - 1)
-    await drizzleDb.update(schema.parcellaires).set({ auditDate: sql`${yesterday.toISOString()}::date`, createdAt: yesterday }).where(eq(schema.parcellaires.recordId, record.record_id as string))
+    await drizzleDb
+      .update(schema.parcellaires)
+      .set({ auditDate: sql`${yesterday.toISOString()}::date`, createdAt: yesterday })
+      .where(eq(schema.parcellaires.recordId, record.record_id as string))
 
     // Data we don't want to copy
-    await upsertCultures(drizzleDb, record.record_id as string, parcelles[0]!.id, [{"id": "1", "CPF": "123", "variete": "VARIETE DIFFERENTE"}])
+    await upsertCultures(drizzleDb, record.record_id as string, parcelles[0]!.id, [
+      { id: '1', CPF: '123', variete: 'VARIETE DIFFERENTE' }
+    ])
 
     const featureCollection = {
       type: 'FeatureCollection',
@@ -460,20 +546,22 @@ describe('createOrUpdateOperatorRecord', () => {
     }
 
     for (const parcelle of parcelles) {
-      featureCollection.features.push(/** @type {Feature} */{
-        type: 'Feature',
-        id: parcelle.id,
-        geometry: parcelle.geometry,
-        properties: {
+      featureCollection.features.push(
+        /** @type {Feature} */ {
+          type: 'Feature',
           id: parcelle.id,
-          BIO: 1,
-          cultures: parcelle.cultures,
-          conversion_niveau: EtatProduction.BIO,
-          NUMERO_I: '1',
-          NUMERO_P: '2',
-          PACAGE: ' 3'
+          geometry: parcelle.geometry,
+          properties: {
+            id: parcelle.id,
+            BIO: 1,
+            cultures: parcelle.cultures,
+            conversion_niveau: EtatProduction.BIO,
+            NUMERO_I: '1',
+            NUMERO_P: '2',
+            PACAGE: ' 3'
+          }
         }
-      })
+      )
     }
 
     featureCollection.features[0]!.properties.cultures = [
@@ -508,10 +596,19 @@ describe('createOrUpdateOperatorRecord', () => {
     const yesterday = new Date()
     yesterday.setDate(yesterday.getDate() - 1)
 
-    for (const { recordId } of await drizzleDb.select({ recordId: schema.parcelles.recordId }).from(schema.parcelles).where(eq(schema.parcelles.id, parcelles[0]!.id))) {
-      await upsertCultures(drizzleDb, recordId, parcelles[0]!.id, [{"id": "1", "CPF": "123", "variete": "VARIETE 1"}, {"id": "2", "CPF": "123", "variete": "VARIETE 2"}])
+    for (const { recordId } of await drizzleDb
+      .select({ recordId: schema.parcelles.recordId })
+      .from(schema.parcelles)
+      .where(eq(schema.parcelles.id, parcelles[0]!.id))) {
+      await upsertCultures(drizzleDb, recordId, parcelles[0]!.id, [
+        { id: '1', CPF: '123', variete: 'VARIETE 1' },
+        { id: '2', CPF: '123', variete: 'VARIETE 2' }
+      ])
     }
-    await drizzleDb.update(schema.parcellaires).set({ auditDate: sql`${yesterday.toISOString()}::date`, createdAt: yesterday }).where(eq(schema.parcellaires.recordId, record.record_id as string))
+    await drizzleDb
+      .update(schema.parcellaires)
+      .set({ auditDate: sql`${yesterday.toISOString()}::date`, createdAt: yesterday })
+      .where(eq(schema.parcellaires.recordId, record.record_id as string))
 
     const featureCollection = {
       type: 'FeatureCollection',
@@ -519,20 +616,22 @@ describe('createOrUpdateOperatorRecord', () => {
     }
 
     for (const parcelle of parcelles) {
-      featureCollection.features.push(/** @type {Feature} */{
-        type: 'Feature',
-        id: parcelle.id,
-        geometry: parcelle.geometry,
-        properties: {
+      featureCollection.features.push(
+        /** @type {Feature} */ {
+          type: 'Feature',
           id: parcelle.id,
-          BIO: 1,
-          cultures: parcelle.cultures,
-          conversion_niveau: EtatProduction.BIO,
-          NUMERO_I: '1',
-          NUMERO_P: '2',
-          PACAGE: ' 3'
+          geometry: parcelle.geometry,
+          properties: {
+            id: parcelle.id,
+            BIO: 1,
+            cultures: parcelle.cultures,
+            conversion_niveau: EtatProduction.BIO,
+            NUMERO_I: '1',
+            NUMERO_P: '2',
+            PACAGE: ' 3'
+          }
         }
-      })
+      )
     }
 
     featureCollection.features[0]!.properties.cultures = [
@@ -567,8 +666,11 @@ describe('createOrUpdateOperatorRecord', () => {
     const yesterday = new Date()
     yesterday.setDate(yesterday.getDate() - 1)
 
-    await upsertCultures(drizzleDb, record.record_id as string, parcelles[0]!.id, [{"id": "1", "CPF": "123"}])
-    await drizzleDb.update(schema.parcellaires).set({ auditDate: sql`${yesterday.toISOString()}::date`, createdAt: yesterday }).where(eq(schema.parcellaires.recordId, record.record_id as string))
+    await upsertCultures(drizzleDb, record.record_id as string, parcelles[0]!.id, [{ id: '1', CPF: '123' }])
+    await drizzleDb
+      .update(schema.parcellaires)
+      .set({ auditDate: sql`${yesterday.toISOString()}::date`, createdAt: yesterday })
+      .where(eq(schema.parcellaires.recordId, record.record_id as string))
 
     const featureCollection = {
       type: 'FeatureCollection',
@@ -576,20 +678,22 @@ describe('createOrUpdateOperatorRecord', () => {
     }
 
     for (const parcelle of parcelles) {
-      featureCollection.features.push(/** @type {Feature} */{
-        type: 'Feature',
-        id: parcelle.id,
-        geometry: parcelle.geometry,
-        properties: {
+      featureCollection.features.push(
+        /** @type {Feature} */ {
+          type: 'Feature',
           id: parcelle.id,
-          BIO: 1,
-          cultures: parcelle.cultures,
-          conversion_niveau: EtatProduction.BIO,
-          NUMERO_I: '1',
-          NUMERO_P: '2',
-          PACAGE: ' 3'
+          geometry: parcelle.geometry,
+          properties: {
+            id: parcelle.id,
+            BIO: 1,
+            cultures: parcelle.cultures,
+            conversion_niveau: EtatProduction.BIO,
+            NUMERO_I: '1',
+            NUMERO_P: '2',
+            PACAGE: ' 3'
+          }
         }
-      })
+      )
     }
 
     featureCollection.features[0]!.properties.cultures = [
@@ -628,38 +732,44 @@ describe('createOrUpdateOperatorRecord', () => {
     }
 
     for (const parcelle of parcelles) {
-      featureCollection.features.push(/** @type {Feature} */{
-        type: 'Feature',
-        id: parcelle.id,
-        geometry: parcelle.geometry,
-        properties: {
+      featureCollection.features.push(
+        /** @type {Feature} */ {
+          type: 'Feature',
           id: parcelle.id,
-          COMMUNE: null
+          geometry: parcelle.geometry,
+          properties: {
+            id: parcelle.id,
+            COMMUNE: null
+          }
         }
-      })
+      )
     }
 
     // Existing parcelle commune should not be overridden
-    featureCollection.features.push(/** @type {Feature} */{
-      type: 'Feature',
-      id: 1,
-      geometry: otherParcelles[0]!.geometry,
-      properties: {
-        id: 1,
-        COMMUNE: null
-      }
-    })
-
-    for (const parcelle of otherParcelles) {
-      featureCollection.features.push(/** @type {Feature} */{
+    featureCollection.features.push(
+      /** @type {Feature} */ {
         type: 'Feature',
-        id: parcelle.id,
-        geometry: parcelle.geometry,
+        id: 1,
+        geometry: otherParcelles[0]!.geometry,
         properties: {
-          id: parcelle.id,
+          id: 1,
           COMMUNE: null
         }
-      })
+      }
+    )
+
+    for (const parcelle of otherParcelles) {
+      featureCollection.features.push(
+        /** @type {Feature} */ {
+          type: 'Feature',
+          id: parcelle.id,
+          geometry: parcelle.geometry,
+          properties: {
+            id: parcelle.id,
+            COMMUNE: null
+          }
+        }
+      )
     }
 
     const result = await createOrUpdateOperatorRecord(
@@ -686,7 +796,9 @@ describe('createOrUpdateOperatorRecord', () => {
 
 describe('updateAuditRecordState', () => {
   afterEach(async () => {
-    await drizzleDb.delete(schema.parcellaires).where(eq(schema.parcellaires.numeroBio, Number(recordToUpdate.numerobio)))
+    await drizzleDb
+      .delete(schema.parcellaires)
+      .where(eq(schema.parcellaires.numeroBio, Number(recordToUpdate.numerobio)))
   })
 
   test('successfully update version name', async () => {
@@ -775,7 +887,11 @@ describe('updateAuditRecordState', () => {
     await loadRecordFixture([record])
 
     const result = await updateAuditRecordState(
-      { user: buildUser({ mainGroup: { id: '1', nom: 'Auditeur' } }), record: asNormalizedRecord(record), operator: buildOperator({ organismeCertificateur: { id: 10, nom: 'Test' } }) },
+      {
+        user: buildUser({ mainGroup: { id: '1', nom: 'Auditeur' } }),
+        record: asNormalizedRecord(record),
+        operator: buildOperator({ organismeCertificateur: { id: 10, nom: 'Test' } })
+      },
       { version_name: 'Attribution OC' }
     )
     expect(result).toMatchObject({
@@ -790,10 +906,9 @@ describe('updateAuditRecordState', () => {
 
     await loadRecordFixture([record])
 
-    await expect(updateAuditRecordState(
-      { user, record: asNormalizedRecord(record) },
-      { version_name: 'Attribution OC' }
-    )).rejects.toThrow()
+    await expect(
+      updateAuditRecordState({ user, record: asNormalizedRecord(record) }, { version_name: 'Attribution OC' })
+    ).rejects.toThrow()
   })
 })
 
@@ -809,7 +924,9 @@ describe('evvLookup', () => {
 
   test('operator not found', () => {
     expect.assertions(1)
-    vi.mocked(evvClient.get).mockReturnValueOnce(asGotRequest({ text: vi.fn().mockRejectedValue(new HTTPError({ statusCode: 404 })) }))
+    vi.mocked(evvClient.get).mockReturnValueOnce(
+      asGotRequest({ text: vi.fn().mockRejectedValue(new HTTPError({ statusCode: 404 })) })
+    )
 
     const result = evvLookup({ numeroEvv: '01234' })
     return expect(result).resolves.toEqual({ siret: undefined, libelle: '', numero: '01234' })
@@ -817,7 +934,9 @@ describe('evvLookup', () => {
 
   test('remote server down', () => {
     expect.assertions(1)
-    vi.mocked(evvClient.get).mockReturnValueOnce(asGotRequest({ text: vi.fn().mockRejectedValue(new TimeoutError({ message: 'Request timeout' })) }))
+    vi.mocked(evvClient.get).mockReturnValueOnce(
+      asGotRequest({ text: vi.fn().mockRejectedValue(new TimeoutError({ message: 'Request timeout' })) })
+    )
 
     const result = evvLookup({ numeroEvv: '01234' })
     return expect(result).rejects.toThrow("Impossible de communiquer avec l'API CVI.")
@@ -879,24 +998,26 @@ describe('evvParcelles', () => {
 describe('test search with filter', () => {
   beforeEach(async () => {
     await loadRecordFixture(
-      records.map(
-        (r, index) =>
-          (
-            {
-              ...r,
-              numerobio: index + 1,
-              annee_reference_controle: new Date().getFullYear()
-            }
-          )
-      ),
+      records.map((r, index) => ({
+        ...r,
+        numerobio: index + 1,
+        annee_reference_controle: new Date().getFullYear()
+      })),
       [1, 2, 3],
       1
     )
     get.mockReturnValueOnce({
-      async json () {
+      async json() {
         return {
           nbTotal: 11,
-          operateurs: agencebioOperatorsApiResults.map((o) => ({ ...o, notifications: o.notifications.map((n) => ({ ...n, dateDemarrage: new Date().toISOString(), updatedAt: new Date().toISOString() })) }))
+          operateurs: agencebioOperatorsApiResults.map((o) => ({
+            ...o,
+            notifications: o.notifications.map((n) => ({
+              ...n,
+              dateDemarrage: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            }))
+          }))
         }
       }
     })
@@ -946,100 +1067,330 @@ describe('test search with filter', () => {
   })
 
   test('filter on notifications states', async () => {
-    let res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { etatNotification: ['test'] } })
+    let res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { etatNotification: ['test'] }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 0 })
 
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { etatNotification: ['ENGAGEE'] } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { etatNotification: ['ENGAGEE'] }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 2 })
 
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: 'SARL', page: 1, limit: 1, filter: { etatNotification: ['ENGAGEE'] } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: 'SARL',
+      page: 1,
+      limit: 1,
+      filter: { etatNotification: ['ENGAGEE'] }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 3, total: 3 })
 
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { etatNotification: ['ENGAGEE', 'ENGAGEE FUTUR'] } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { etatNotification: ['ENGAGEE', 'ENGAGEE FUTUR'] }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 4 })
 
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { etatNotification: ['SUSPENDUE'] } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { etatNotification: ['SUSPENDUE'] }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 2 })
 
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { etatNotification: ['ARRETEE'] } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { etatNotification: ['ARRETEE'] }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 0 })
 
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { etatNotification: ['RETIREE'] } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { etatNotification: ['RETIREE'] }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 0 })
   })
 
   test('filter on etatCertification', async () => {
-    let res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { etatCertification: 'ALL' } })
+    let res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { etatCertification: 'ALL' }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 7 })
 
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { etatCertification: 'CERTIFIED', anneeReferenceCertification: new Date().getFullYear() } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { etatCertification: 'CERTIFIED', anneeReferenceCertification: new Date().getFullYear() }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 1 })
 
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, limit: 8, filter: { etatCertification: 'NO_CERTIFIED', anneeReferenceCertification: new Date().getFullYear() } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      limit: 8,
+      filter: { etatCertification: 'NO_CERTIFIED', anneeReferenceCertification: new Date().getFullYear() }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 6 })
 
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { etatCertification: 'CERTIFIED', anneeReferenceCertification: 1998 } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { etatCertification: 'CERTIFIED', anneeReferenceCertification: 1998 }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 0 })
   })
 
   test('filter on statutParcellaire', async () => {
-    let res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { statutParcellaire: [] } })
+    let res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { statutParcellaire: [] }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 7 })
 
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { statutParcellaire: ['NONE'] } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { statutParcellaire: ['NONE'] }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 4 })
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { statutParcellaire: ['NONE'], anneeReferenceCertification: new Date().getFullYear() } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { statutParcellaire: ['NONE'], anneeReferenceCertification: new Date().getFullYear() }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 4 })
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { statutParcellaire: ['NONE'], anneeReferenceCertification: 2001 } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { statutParcellaire: ['NONE'], anneeReferenceCertification: 2001 }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 0 })
 
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { statutParcellaire: ['PENDING_CERTIFICATION'] } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { statutParcellaire: ['PENDING_CERTIFICATION'] }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 1 })
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { statutParcellaire: ['PENDING_CERTIFICATION'], anneeReferenceCertification: new Date().getFullYear() } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { statutParcellaire: ['PENDING_CERTIFICATION'], anneeReferenceCertification: new Date().getFullYear() }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 1 })
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { statutParcellaire: ['PENDING_CERTIFICATION'], anneeReferenceCertification: 2001 } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { statutParcellaire: ['PENDING_CERTIFICATION'], anneeReferenceCertification: 2001 }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 0 })
 
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { statutParcellaire: ['OPERATOR_DRAFT'] } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { statutParcellaire: ['OPERATOR_DRAFT'] }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 1 })
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { statutParcellaire: ['OPERATOR_DRAFT'], anneeReferenceCertification: new Date().getFullYear() } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { statutParcellaire: ['OPERATOR_DRAFT'], anneeReferenceCertification: new Date().getFullYear() }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 1 })
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { statutParcellaire: ['OPERATOR_DRAFT'], anneeReferenceCertification: 2001 } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { statutParcellaire: ['OPERATOR_DRAFT'], anneeReferenceCertification: 2001 }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 0 })
 
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { statutParcellaire: ['AUDITED'] } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { statutParcellaire: ['AUDITED'] }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 0 })
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { statutParcellaire: ['AUDITED'], anneeReferenceCertification: new Date().getFullYear() } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { statutParcellaire: ['AUDITED'], anneeReferenceCertification: new Date().getFullYear() }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 0 })
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { statutParcellaire: ['AUDITED'], anneeReferenceCertification: 2001 } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { statutParcellaire: ['AUDITED'], anneeReferenceCertification: 2001 }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 0 })
 
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { statutParcellaire: ['CERTIFIED'] } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { statutParcellaire: ['CERTIFIED'] }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 1 })
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { statutParcellaire: ['CERTIFIED'], anneeReferenceCertification: new Date().getFullYear() } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { statutParcellaire: ['CERTIFIED'], anneeReferenceCertification: new Date().getFullYear() }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 1 })
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { statutParcellaire: ['CERTIFIED'], anneeReferenceCertification: 2001 } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { statutParcellaire: ['CERTIFIED'], anneeReferenceCertification: 2001 }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 0 })
 
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { statutParcellaire: ['CERTIFIED', 'AUDITED'] } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { statutParcellaire: ['CERTIFIED', 'AUDITED'] }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 1 })
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { statutParcellaire: ['CERTIFIED', 'AUDITED'], anneeReferenceCertification: new Date().getFullYear() } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { statutParcellaire: ['CERTIFIED', 'AUDITED'], anneeReferenceCertification: new Date().getFullYear() }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 1 })
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { statutParcellaire: ['CERTIFIED', 'AUDITED'], anneeReferenceCertification: 2001 } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { statutParcellaire: ['CERTIFIED', 'AUDITED'], anneeReferenceCertification: 2001 }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 0 })
 
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { statutParcellaire: ['CERTIFIED', 'AUDITED', 'PENDING_CERTIFICATION', 'OPERATOR_DRAFT'] } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { statutParcellaire: ['CERTIFIED', 'AUDITED', 'PENDING_CERTIFICATION', 'OPERATOR_DRAFT'] }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 3 })
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { statutParcellaire: ['CERTIFIED', 'AUDITED', 'PENDING_CERTIFICATION', 'OPERATOR_DRAFT'], anneeReferenceCertification: new Date().getFullYear() } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: {
+        statutParcellaire: ['CERTIFIED', 'AUDITED', 'PENDING_CERTIFICATION', 'OPERATOR_DRAFT'],
+        anneeReferenceCertification: new Date().getFullYear()
+      }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 3 })
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { statutParcellaire: ['CERTIFIED', 'AUDITED', 'PENDING_CERTIFICATION', 'OPERATOR_DRAFT'], anneeReferenceCertification: 2001 } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: {
+        statutParcellaire: ['CERTIFIED', 'AUDITED', 'PENDING_CERTIFICATION', 'OPERATOR_DRAFT'],
+        anneeReferenceCertification: 2001
+      }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 0 })
 
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { statutParcellaire: ['NONE', 'CERTIFIED', 'AUDITED', 'PENDING_CERTIFICATION', 'OPERATOR_DRAFT'] } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { statutParcellaire: ['NONE', 'CERTIFIED', 'AUDITED', 'PENDING_CERTIFICATION', 'OPERATOR_DRAFT'] }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 7 })
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { statutParcellaire: ['NONE', 'CERTIFIED', 'AUDITED', 'PENDING_CERTIFICATION', 'OPERATOR_DRAFT'], anneeReferenceCertification: new Date().getFullYear() } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: {
+        statutParcellaire: ['NONE', 'CERTIFIED', 'AUDITED', 'PENDING_CERTIFICATION', 'OPERATOR_DRAFT'],
+        anneeReferenceCertification: new Date().getFullYear()
+      }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 7 })
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { statutParcellaire: ['NONE', 'CERTIFIED', 'AUDITED', 'PENDING_CERTIFICATION', 'OPERATOR_DRAFT'], anneeReferenceCertification: 2001 } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: {
+        statutParcellaire: ['NONE', 'CERTIFIED', 'AUDITED', 'PENDING_CERTIFICATION', 'OPERATOR_DRAFT'],
+        anneeReferenceCertification: 2001
+      }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 0 })
   })
 
@@ -1050,7 +1401,13 @@ describe('test search with filter', () => {
     res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { departement: ['01'] } })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 3 })
 
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: 'SARL', page: 1, filter: { departement: ['01'] } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: 'SARL',
+      page: 1,
+      filter: { departement: ['01'] }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 4 })
 
     res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { departement: ['21'] } })
@@ -1059,7 +1416,13 @@ describe('test search with filter', () => {
     res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { departement: ['92'] } })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 1 })
 
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { departement: ['01', '21', '92'] } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { departement: ['01', '21', '92'] }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 5 })
 
     res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { departement: ['75'] } })
@@ -1080,7 +1443,13 @@ describe('test search with filter', () => {
     res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { engagement: ['MIXTE'] } })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 0 })
 
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { engagement: ['AB', 'ABCONV', 'MIXTE'] } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { engagement: ['AB', 'ABCONV', 'MIXTE'] }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 0 })
   })
 
@@ -1093,10 +1462,24 @@ describe('test search with filter', () => {
   })
 
   test('sort result', async () => {
-    const res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, limit: 10, filter: { sort: 'INVALIDE' } })
+    const res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      limit: 10,
+      filter: { sort: 'INVALIDE' }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 7 })
 
-    const resNomAsc = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, limit: 10, filter: { sort: 'nom-ASC' } })
+    const resNomAsc = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      limit: 10,
+      filter: { sort: 'nom-ASC' }
+    })
     expect(resNomAsc.pagination).toEqual({ page: 1, page_max: 1, total: 7 })
 
     expect(res).toMatchObject(resNomAsc)
@@ -1108,13 +1491,34 @@ describe('test search with filter', () => {
     expect(resNomAsc.records[5]!.nom).toEqual('- Joël')
     expect(resNomAsc.records[6]!.nom).toEqual('3Denise')
 
-    const resNomDesc = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, limit: 10, filter: { sort: 'nom-DESC' } })
+    const resNomDesc = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      limit: 10,
+      filter: { sort: 'nom-DESC' }
+    })
     expect(resNomAsc.records).toMatchObject(resNomDesc.records.reverse())
 
-    const resDateAuditDesc = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, limit: 10, filter: { sort: 'date-audit-DESC' } })
+    const resDateAuditDesc = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      limit: 10,
+      filter: { sort: 'date-audit-DESC' }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 7 })
 
-    const resDateAuditAsc = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, limit: 10, filter: { sort: 'date-audit-ASC' } })
+    const resDateAuditAsc = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      limit: 10,
+      filter: { sort: 'date-audit-ASC' }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 7 })
 
     expect((resDateAuditDesc.records as WithMaxAuditDate[])[0]!.max_audit_date).toEqual('2023-09-07')
@@ -1196,24 +1600,22 @@ describe('pin, unpin, and consult', () => {
 describe('control and un control', () => {
   beforeEach(async () => {
     await loadRecordFixture(
-      records.map(
-        (r, index) =>
-          (
-            {
-              ...r,
-              numerobio: index + 1,
-              annee_reference_controle: new Date().getFullYear()
-            }
-          )
-      ),
+      records.map((r, index) => ({
+        ...r,
+        numerobio: index + 1,
+        annee_reference_controle: new Date().getFullYear()
+      })),
       [1, 2, 3],
       1
     )
     get.mockReturnValueOnce({
-      async json () {
+      async json() {
         return {
           nbTotal: 11,
-          operateurs: agencebioOperatorsApiResults.map((o) => ({ ...o, notifications: o.notifications.map((n) => ({ ...n, dateDemarrage: new Date(), updatedAt: new Date() })) }))
+          operateurs: agencebioOperatorsApiResults.map((o) => ({
+            ...o,
+            notifications: o.notifications.map((n) => ({ ...n, dateDemarrage: new Date(), updatedAt: new Date() }))
+          }))
         }
       }
     })

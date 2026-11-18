@@ -5,7 +5,10 @@ export type ComparisonResult = 'r1_old_r2_new' | 'r2_old_r1_new'
 
 export type GeometryConflictStatus = 'inclusion' | 'overlap' | 'ok'
 
-export type ParcellaireDates = Pick<typeof parcellaires.$inferSelect, 'auditDate' | 'anneeReferenceControle' | 'createdAt'>
+export type ParcellaireDates = Pick<
+  typeof parcellaires.$inferSelect,
+  'auditDate' | 'anneeReferenceControle' | 'createdAt'
+>
 
 export type ParcelleLabel = Pick<typeof parcelles.$inferSelect, 'numeroIlotPac' | 'numeroParcellesPac' | 'name'>
 

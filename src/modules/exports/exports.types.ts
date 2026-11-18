@@ -104,5 +104,5 @@ export type MapImagesOptions = {
 
 export type OperatorMapImages = {
   global: { buffer: string | undefined } | null
-  parcelles: Array<{ id: string, buffer: string | undefined }>
+  parcelles: Array<{ id: string; buffer: string | undefined }>
 }

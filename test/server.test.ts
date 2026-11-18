@@ -22,11 +22,7 @@ import geofoliaParcelles from './fixtures/geofolia-parcelles.js'
 
 import { normalizeRecord } from '../src/shared/outputs/record.js'
 import { surfaceForFeatureCollection, recordToApi } from '../src/shared/outputs/api.js'
-import {
-  collectValidationResult,
-  createImportJob,
-  processFullJob
-} from '../src/modules/imports/imports.service.js'
+import { collectValidationResult, createImportJob, processFullJob } from '../src/modules/imports/imports.service.js'
 import { asStoredParcelles, loadRecordFixture, expectDeepCloseTo } from './utils.js'
 import { asAgenceBioOperator, asDBRecordWithParcelles } from './factories.js'
 
@@ -69,7 +65,9 @@ vi.mock('../src/modules/imports/imports.service.js', async (importOriginal) => (
 let apiRecordExpect: Awaited<ReturnType<typeof recordToApi>>
 // start and stop server
 beforeAll(async () => {
-  const returnRecordToApi = await recordToApi(normalizeRecord(asDBRecordWithParcelles({ parcelles: asStoredParcelles(parcelles), ...record })))
+  const returnRecordToApi = await recordToApi(
+    normalizeRecord(asDBRecordWithParcelles({ parcelles: asStoredParcelles(parcelles), ...record }))
+  )
   apiRecordExpect = expectDeepCloseTo<typeof returnRecordToApi>(JSON.parse(JSON.stringify(returnRecordToApi)))
   apiRecordExpect.parcellaire.features.forEach((f) => {
     delete f.properties.dateAjout
@@ -360,7 +358,9 @@ describe('GET /api/v2/audits/:recordId', () => {
       .set('Authorization', USER_DOC_AUTH_HEADER)
       .type('json')
 
-    const expectedRecord = normalizeRecord(asDBRecordWithParcelles({ parcelles: asStoredParcelles(parcelles), ...record }))
+    const expectedRecord = normalizeRecord(
+      asDBRecordWithParcelles({ parcelles: asStoredParcelles(parcelles), ...record })
+    )
 
     // we cleanup fixtures stuff
     delete (expectedRecord as Partial<typeof expectedRecord>).oc_id
@@ -1228,7 +1228,9 @@ describe('GET /api/v2/certification/parcellaires', () => {
       async (accPromise, record) => {
         const acc = await accPromise
 
-        const normalizedRecord = normalizeRecord(asDBRecordWithParcelles({ parcelles: asStoredParcelles(parcelles), ...record }))
+        const normalizedRecord = normalizeRecord(
+          asDBRecordWithParcelles({ parcelles: asStoredParcelles(parcelles), ...record })
+        )
         const apiRecord = await recordToApi(normalizedRecord)
         const expectedRecord = expectDeepCloseTo<typeof apiRecord>(JSON.parse(JSON.stringify(apiRecord)))
         expectedRecord.parcellaire.features.forEach((f) => {

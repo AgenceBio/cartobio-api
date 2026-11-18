@@ -3,9 +3,9 @@ import { pino, type Logger } from 'pino'
 import config from './env.js'
 
 class LoggerDev extends LogController {
-  incomingRequest (): void {}
+  incomingRequest(): void {}
 
-  requestCompleted (error: Error | null | undefined, request: FastifyRequest, reply: FastifyReply): void {
+  requestCompleted(error: Error | null | undefined, request: FastifyRequest, reply: FastifyReply): void {
     const details: Record<string, unknown> = {}
     if (request.params && Object.keys(request.params).length > 0) details.params = request.params
     if (request.query && Object.keys(request.query).length > 0) details.query = request.query
@@ -20,7 +20,7 @@ class LoggerDev extends LogController {
   }
 }
 
-function createLogger (env: string): Logger {
+function createLogger(env: string): Logger {
   if (env === 'test') return pino({ level: 'silent' })
   if (env !== 'dev') return pino()
 
@@ -40,7 +40,7 @@ function createLogger (env: string): Logger {
 
 export const logger = createLogger(config.get('env'))
 
-export function loggerOptions (): Pick<FastifyServerOptions, 'loggerInstance' | 'logController'> {
+export function loggerOptions(): Pick<FastifyServerOptions, 'loggerInstance' | 'logController'> {
   if (config.get('env') !== 'dev') return { loggerInstance: logger }
 
   return { loggerInstance: logger, logController: new LoggerDev() }

@@ -1,8 +1,28 @@
-import { checkCertification, enforceAdminRole, enforceAnyFastifyDecorator, enforceOperator, enforceOperatorAccess, enforceRecordAndOperator, haveRightToUpdate } from '../../src/shared/middlewares.js'
-import { ForbiddenApiError, InvalidCredentialsApiError, NotFoundApiError, UnauthorizedApiError } from '../../src/shared/errors.js'
+import {
+  checkCertification,
+  enforceAdminRole,
+  enforceAnyFastifyDecorator,
+  enforceOperator,
+  enforceOperatorAccess,
+  enforceRecordAndOperator,
+  haveRightToUpdate
+} from '../../src/shared/middlewares.js'
+import {
+  ForbiddenApiError,
+  InvalidCredentialsApiError,
+  NotFoundApiError,
+  UnauthorizedApiError
+} from '../../src/shared/errors.js'
 import { getRecords } from '../../src/shared/parcellaires/parcellaires.service.js'
 import { fetchOperatorByNumeroBio, fetchUserOperators } from '../../src/clients/agence-bio.client.js'
-import { asFastifyRequest, buildNormalizedRecord, buildNotification, buildOcUser, buildOperator, buildUser } from '../factories.js'
+import {
+  asFastifyRequest,
+  buildNormalizedRecord,
+  buildNotification,
+  buildOcUser,
+  buildOperator,
+  buildUser
+} from '../factories.js'
 import type { FastifyReply } from 'fastify'
 
 vi.mock('../../src/clients/agence-bio.client.js', async (importOriginal) => ({
@@ -136,7 +156,9 @@ describe('enforceAdminRole()', () => {
   const hook = enforceAdminRole()
 
   test('admin (group 1) → allowed', async () => {
-    await expect(hook(asFastifyRequest({ user: buildUser({ mainGroup: { id: '1', nom: 'Admin' } }) }), reply)).resolves.toBeUndefined()
+    await expect(
+      hook(asFastifyRequest({ user: buildUser({ mainGroup: { id: '1', nom: 'Admin' } }) }), reply)
+    ).resolves.toBeUndefined()
   })
 
   test('numeric group id 1 → allowed', async () => {
@@ -144,7 +166,9 @@ describe('enforceAdminRole()', () => {
   })
 
   test.each(['2', '4', '8'])('group %s → 403', async (id) => {
-    await expect(hook(asFastifyRequest({ user: buildUser({ mainGroup: { id, nom: '' } }) }), reply)).rejects.toThrow(UnauthorizedApiError)
+    await expect(hook(asFastifyRequest({ user: buildUser({ mainGroup: { id, nom: '' } }) }), reply)).rejects.toThrow(
+      UnauthorizedApiError
+    )
     expect(reply.code).toHaveBeenCalledWith(403)
   })
 
@@ -154,7 +178,10 @@ describe('enforceAdminRole()', () => {
 })
 
 describe('enforceAnyFastifyDecorator()', () => {
-  const hook = enforceAnyFastifyDecorator(['user', 'organismeCertificateur']) as (request: unknown, reply: unknown) => Promise<void>
+  const hook = enforceAnyFastifyDecorator(['user', 'organismeCertificateur']) as (
+    request: unknown,
+    reply: unknown
+  ) => Promise<void>
 
   test('user set → allowed', async () => {
     await expect(hook(asFastifyRequest({ user: buildUser() }), reply)).resolves.toBeUndefined()
@@ -162,7 +189,9 @@ describe('enforceAnyFastifyDecorator()', () => {
   })
 
   test('organismeCertificateur set → allowed', async () => {
-    await expect(hook(asFastifyRequest({ user: null, organismeCertificateur: { id: 1 } }), reply)).resolves.toBeUndefined()
+    await expect(
+      hook(asFastifyRequest({ user: null, organismeCertificateur: { id: 1 } }), reply)
+    ).resolves.toBeUndefined()
   })
 
   test('nothing set → rejected', async () => {
@@ -196,7 +225,9 @@ describe('enforceOperator()', () => {
   test('operator user (group 4) not owning the numeroBio → Forbidden', async () => {
     vi.mocked(fetchUserOperators).mockResolvedValue({ operators: [{ numeroBio: '11111' }] } as never)
 
-    await expect(hook(asFastifyRequest({ params: { numeroBio: '99999' }, user: buildUser() }))).rejects.toThrow(ForbiddenApiError)
+    await expect(hook(asFastifyRequest({ params: { numeroBio: '99999' }, user: buildUser() }))).rejects.toThrow(
+      ForbiddenApiError
+    )
     expect(fetchOperatorByNumeroBio).not.toHaveBeenCalled()
   })
 
@@ -212,7 +243,9 @@ describe('enforceOperator()', () => {
   test('unknown operator → NotFound', async () => {
     vi.mocked(fetchOperatorByNumeroBio).mockRejectedValue(notFound)
 
-    await expect(hook(asFastifyRequest({ params: { numeroBio: '99999' }, user: buildOcUser() }))).rejects.toThrow(NotFoundApiError)
+    await expect(hook(asFastifyRequest({ params: { numeroBio: '99999' }, user: buildOcUser() }))).rejects.toThrow(
+      NotFoundApiError
+    )
   })
 })
 
@@ -229,7 +262,9 @@ describe('enforceRecordAndOperator()', () => {
   test('unknown record → NotFound', async () => {
     queryFn.mockResolvedValue(null)
 
-    await expect(hook(asFastifyRequest({ params: { recordId: 'x' }, headers: {}, user: buildOcUser() }))).rejects.toThrow(NotFoundApiError)
+    await expect(
+      hook(asFastifyRequest({ params: { recordId: 'x' }, headers: {}, user: buildOcUser() }))
+    ).rejects.toThrow(NotFoundApiError)
   })
 
   test('passes the user to queryFn', async () => {
@@ -274,7 +309,9 @@ describe('enforceRecordAndOperator()', () => {
     queryFn.mockResolvedValue(buildNormalizedRecord())
     vi.mocked(fetchOperatorByNumeroBio).mockRejectedValue(notFound)
 
-    await expect(hook(asFastifyRequest({ params: { recordId: 'x' }, headers: {}, user: buildOcUser() }))).rejects.toThrow(NotFoundApiError)
+    await expect(
+      hook(asFastifyRequest({ params: { recordId: 'x' }, headers: {}, user: buildOcUser() }))
+    ).rejects.toThrow(NotFoundApiError)
   })
 })
 
@@ -287,21 +324,32 @@ describe('enforceOperatorAccess()', () => {
   })
 
   test('no OC (operator user) → allowed', async () => {
-    await expect(hook(asFastifyRequest({ user: buildUser(), operator: buildOperator({ organismeCertificateur: { id: 2 } }) }))).resolves.toBeUndefined()
+    await expect(
+      hook(asFastifyRequest({ user: buildUser(), operator: buildOperator({ organismeCertificateur: { id: 2 } }) }))
+    ).resolves.toBeUndefined()
   })
 
   test('OC of the operator → allowed', async () => {
-    await expect(hook(asFastifyRequest({ user: ocUser, operator: buildOperator({ organismeCertificateur: { id: 1 } }) }))).resolves.toBeUndefined()
+    await expect(
+      hook(asFastifyRequest({ user: ocUser, operator: buildOperator({ organismeCertificateur: { id: 1 } }) }))
+    ).resolves.toBeUndefined()
   })
 
   test('OC of the operator but NON ENGAGEE → rejected', async () => {
-    const operator = buildOperator({ organismeCertificateur: { id: 1 }, notifications: buildNotification({ etatCertification: 'NON ENGAGEE' }) })
+    const operator = buildOperator({
+      organismeCertificateur: { id: 1 },
+      notifications: buildNotification({ etatCertification: 'NON ENGAGEE' })
+    })
 
     await expect(hook(asFastifyRequest({ user: ocUser, operator }))).rejects.toThrow(UnauthorizedApiError)
   })
 
   test('OC of the record → allowed', async () => {
-    const request = asFastifyRequest({ user: ocUser, operator: buildOperator({ organismeCertificateur: { id: 2 } }), record: buildNormalizedRecord({ oc_id: 1 }) })
+    const request = asFastifyRequest({
+      user: ocUser,
+      operator: buildOperator({ organismeCertificateur: { id: 2 } }),
+      record: buildNormalizedRecord({ oc_id: 1 })
+    })
 
     await expect(hook(request)).resolves.toBeUndefined()
   })
@@ -309,15 +357,23 @@ describe('enforceOperatorAccess()', () => {
   test('previous OC of the operator → allowed', async () => {
     vi.mocked(getRecords).mockResolvedValue([buildNormalizedRecord({ oc_id: 1 })] as never)
 
-    await expect(hook(asFastifyRequest({ user: ocUser, operator: buildOperator({ organismeCertificateur: { id: 2 } }) }))).resolves.toBeUndefined()
+    await expect(
+      hook(asFastifyRequest({ user: ocUser, operator: buildOperator({ organismeCertificateur: { id: 2 } }) }))
+    ).resolves.toBeUndefined()
   })
 
   test('other OC → rejected', async () => {
-    await expect(hook(asFastifyRequest({ user: ocUser, operator: buildOperator({ organismeCertificateur: { id: 2 } }) }))).rejects.toThrow(UnauthorizedApiError)
+    await expect(
+      hook(asFastifyRequest({ user: ocUser, operator: buildOperator({ organismeCertificateur: { id: 2 } }) }))
+    ).rejects.toThrow(UnauthorizedApiError)
   })
 
   test('Agence Bio token OC takes precedence over user OC', async () => {
-    const request = asFastifyRequest({ organismeCertificateur: { id: 2 }, user: ocUser, operator: buildOperator({ organismeCertificateur: { id: 1 } }) })
+    const request = asFastifyRequest({
+      organismeCertificateur: { id: 2 },
+      user: ocUser,
+      operator: buildOperator({ organismeCertificateur: { id: 1 } })
+    })
 
     await expect(hook(request)).rejects.toThrow(UnauthorizedApiError)
   })
@@ -329,19 +385,34 @@ describe('checkCertification()', () => {
   })
 
   test('operator user (no OC) → allowed', () => {
-    expect(() => checkCertification(asFastifyRequest({ user: buildUser(), operator: buildOperator({ organismeCertificateur: { id: 2 } }) }))).not.toThrow()
+    expect(() =>
+      checkCertification(
+        asFastifyRequest({ user: buildUser(), operator: buildOperator({ organismeCertificateur: { id: 2 } }) })
+      )
+    ).not.toThrow()
   })
 
   test('OC of the operator → allowed', () => {
-    expect(() => checkCertification(asFastifyRequest({ user: buildOcUser(), operator: buildOperator({ organismeCertificateur: { id: 1 } }) }))).not.toThrow()
+    expect(() =>
+      checkCertification(
+        asFastifyRequest({ user: buildOcUser(), operator: buildOperator({ organismeCertificateur: { id: 1 } }) })
+      )
+    ).not.toThrow()
   })
 
   test('other OC → rejected', () => {
-    expect(() => checkCertification(asFastifyRequest({ user: buildOcUser(), operator: buildOperator({ organismeCertificateur: { id: 2 } }) }))).toThrow(UnauthorizedApiError)
+    expect(() =>
+      checkCertification(
+        asFastifyRequest({ user: buildOcUser(), operator: buildOperator({ organismeCertificateur: { id: 2 } }) })
+      )
+    ).toThrow(UnauthorizedApiError)
   })
 
   test('certification ARRETEE → rejected', () => {
-    const operator = buildOperator({ organismeCertificateur: { id: 1 }, notifications: buildNotification({ etatCertification: 'ARRETEE' }) })
+    const operator = buildOperator({
+      organismeCertificateur: { id: 1 },
+      notifications: buildNotification({ etatCertification: 'ARRETEE' })
+    })
 
     expect(() => checkCertification(asFastifyRequest({ user: buildOcUser(), operator }))).toThrow(UnauthorizedApiError)
   })

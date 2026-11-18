@@ -1,4 +1,8 @@
-import { parsePacDetailsFromComment, fetchOperatorByNumeroBio, fetchCustomersByOc } from '../../src/clients/agence-bio.client.js'
+import {
+  parsePacDetailsFromComment,
+  fetchOperatorByNumeroBio,
+  fetchCustomersByOc
+} from '../../src/clients/agence-bio.client.js'
 import { get } from '../got-mock.js'
 import agencebioOperator from '../fixtures/providers/agence-bio-operateur.json' with { type: 'json' }
 
@@ -28,7 +32,7 @@ describe('fetch function', () => {
 
   test('check that a numerobio is fetched', async () => {
     get.mockReturnValue({
-      async json () {
+      async json() {
         return agencebioOperator
       }
     })
@@ -39,7 +43,7 @@ describe('fetch function', () => {
 
   test('fetch with memoization', async () => {
     get.mockReturnValue({
-      async json () {
+      async json() {
         return { nbTotal: 1, operateurs: [agencebioOperator] }
       }
     })
@@ -52,7 +56,7 @@ describe('fetch function', () => {
 
   test('fetch without memoization', async () => {
     get.mockReturnValue({
-      async json () {
+      async json() {
         return { nbTotal: 1, operateurs: [agencebioOperator] }
       }
     })
@@ -65,7 +69,7 @@ describe('fetch function', () => {
 
   test('fetch paginated', async () => {
     get.mockReturnValue({
-      async json () {
+      async json() {
         return { nbTotal: 14500, operateurs: [agencebioOperator] }
       }
     })

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -10,17 +10,13 @@
         }
       }
     </script>
-    <link
-      href="https://unpkg.com/maplibre-gl@^4.7.1/dist/maplibre-gl.css"
-      rel="stylesheet"
-    />
+    <link href="https://unpkg.com/maplibre-gl@^4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
     <style>
       html,
       body {
         margin: 0;
         padding: 0;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
-          "Helvetica Neue", Arial, sans-serif;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
         font-size: 10px;
       }
 
@@ -44,22 +40,22 @@
     <div id="attribution">© Etalab © OpenMapTiles © OpenStreetMap contributors</div>
 
     <script type="module">
-      import * as M from "maplibre-gl";
+      import * as M from 'maplibre-gl'
 
       const map = new maplibregl.Map({
         hash: false,
         maxZoom: 20,
         attributionControl: false,
-        container: document.getElementById("map"),
+        container: document.getElementById('map'),
         center: [0, 0],
         zoom: 9,
-        interactive: false,
-      });
-      map.on("idle", () => {
-        document.body.classList.remove("loading");
-      });
+        interactive: false
+      })
+      map.on('idle', () => {
+        document.body.classList.remove('loading')
+      })
 
-      window.map = map;
+      window.map = map
     </script>
   </body>
 </html>

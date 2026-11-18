@@ -66,14 +66,15 @@ describe('populateWithMultipleCultures', () => {
     const expectation = {
       type: 'Feature',
       properties: {
-        cultures: [
-          { TYPE: 'PCL', CPF: '01.19.10.11', variete: 'abc', surface: 1.2 }
-        ]
+        cultures: [{ TYPE: 'PCL', CPF: '01.19.10.11', variete: 'abc', surface: 1.2 }]
       }
     }
 
     expect(populateWithMultipleCultures(feature)).toMatchObject(expectation)
-    expect(populateWithMultipleCultures(feature)).toHaveProperty('properties.cultures[0].id', expect.stringMatching(UUID_RE))
+    expect(populateWithMultipleCultures(feature)).toHaveProperty(
+      'properties.cultures[0].id',
+      expect.stringMatching(UUID_RE)
+    )
   })
 
   test('adds CPF codes whenever they are missing', () => {
@@ -131,9 +132,7 @@ describe('populateWithMultipleCultures', () => {
       geometry: null,
       properties: {
         TYPE: 'PCL',
-        cultures: [
-          { id: 'aaaa', CPF: '01.19.10.11', TYPE: 'PCL' }
-        ]
+        cultures: [{ id: 'aaaa', CPF: '01.19.10.11', TYPE: 'PCL' }]
       }
     }
 

@@ -12,7 +12,7 @@ import { logger } from '../../config/logger.js'
 /**
  * Lancer le navigateur
  */
-async function launchStyleTab (browser: Browser, timeout = 30000): Promise<Page> {
+async function launchStyleTab(browser: Browser, timeout = 30000): Promise<Page> {
   const page = await browser.newPage()
   const filePath = `file://${path.join(ASSETS_DIR, 'image-map/map.html')}`
 
@@ -28,41 +28,35 @@ async function launchStyleTab (browser: Browser, timeout = 30000): Promise<Page>
         else resolve(data)
       })
     })
-    await page.evaluate(
-      (style): Promise<void> => {
-        return new Promise<void>((resolve, reject): void => {
-          const styleObject = JSON.parse(style)
-           
-          map.setStyle(styleObject)
+    await page.evaluate((style): Promise<void> => {
+      return new Promise<void>((resolve, reject): void => {
+        const styleObject = JSON.parse(style)
 
-           
-          if (map.isStyleLoaded()) {
-            resolve()
-            return
-          }
+        map.setStyle(styleObject)
 
-           
-          map.once('style.load', (): void => {
-            resolve()
-          })
+        if (map.isStyleLoaded()) {
+          resolve()
+          return
+        }
 
-           
-          map.once('error', (e): void => {
-            reject(e.error)
-          })
-
-          // Timeout de sécurité
-          window.setTimeout((): void => {
-            reject(new Error('Timeout lors du chargement du style'))
-          }, 20000)
+        map.once('style.load', (): void => {
+          resolve()
         })
-      },
-      style
-    )
+
+        map.once('error', (e): void => {
+          reject(e.error)
+        })
+
+        // Timeout de sécurité
+        window.setTimeout((): void => {
+          reject(new Error('Timeout lors du chargement du style'))
+        }, 20000)
+      })
+    }, style)
     return page
   } catch (error) {
     await page.close()
-    throw new Error(`Timeout lors du chargement de la page avec le style ${getErrorMessage(error)}`,  {
+    throw new Error(`Timeout lors du chargement de la page avec le style ${getErrorMessage(error)}`, {
       cause: error
     })
   }
@@ -71,17 +65,17 @@ async function launchStyleTab (browser: Browser, timeout = 30000): Promise<Page>
 /**
  * Calculer le zoom optimal pour la parcelle
  */
-function getOptimalZoom (bboxWidth: number, bboxHeight: number, viewportWidth: number, viewportHeight: number): number {
+function getOptimalZoom(bboxWidth: number, bboxHeight: number, viewportWidth: number, viewportHeight: number): number {
   const WORLD_DIM = { width: 512, height: 512 }
   const ZOOM_MAX = 20
 
-  function latRad (lat: number): number {
+  function latRad(lat: number): number {
     const sin = Math.sin((lat * Math.PI) / 180)
     const result = Math.log((1 + sin) / (1 - sin)) / 2
     return result
   }
 
-  function zoom (mapPx: number, worldPx: number, fraction: number): number {
+  function zoom(mapPx: number, worldPx: number, fraction: number): number {
     return Math.floor(Math.log(mapPx / worldPx / fraction) / Math.LN2)
   }
 
@@ -98,14 +92,14 @@ function getOptimalZoom (bboxWidth: number, bboxHeight: number, viewportWidth: n
  * Récupère toutes les parcelles d'un opérateur
  * Avec `pac`, uniquement les parcelles PAC (numéro d'îlot et de parcelle)
  */
-async function getAllParcelles (recordId: string, pac: boolean = false): Promise<Array<PdfParcelle>> {
+async function getAllParcelles(recordId: string, pac: boolean = false): Promise<Array<PdfParcelle>> {
   return findPdfParcelles(recordId, pac)
 }
 
 /**
  * Calcule la bounding box englobant toutes les parcelles
  */
-function calculateGlobalBoundingBox (parcelles: Array<PdfParcelle>): BoundingBox | null {
+function calculateGlobalBoundingBox(parcelles: Array<PdfParcelle>): BoundingBox | null {
   if (parcelles.length === 0) return null
 
   let minX = Infinity
@@ -135,31 +129,33 @@ function calculateGlobalBoundingBox (parcelles: Array<PdfParcelle>): BoundingBox
 /**
  * Dessine toutes les parcelles sur la carte
  */
-async function drawAllParcellesOnMap (page: Page, parcelles: Array<PdfParcelle>, { width, height, center, zoom, timeout }: MapDrawOptions): Promise<MapDrawResult> {
+async function drawAllParcellesOnMap(
+  page: Page,
+  parcelles: Array<PdfParcelle>,
+  { width, height, center, zoom, timeout }: MapDrawOptions
+): Promise<MapDrawResult> {
   await page.setViewport({ width, height })
 
   await page.waitForSelector('body.loading', { hidden: true, timeout })
-   
+
   await page.waitForFunction(() => typeof map !== 'undefined' && map.isStyleLoaded(), { timeout })
 
   const error = await page.evaluate(
     ({ parcelles, center, zoom }) => {
       try {
-         
         map.jumpTo({ center, zoom })
-         
+
         if (map.getSource('parcelles')) {
-           
           map.removeLayer('parcelles-layer')
-           
+
           map.removeSource('parcelles')
         }
-        const features = parcelles.map(parcelle => ({
+        const features = parcelles.map((parcelle) => ({
           type: 'Feature',
           geometry: JSON.parse(parcelle.geojson),
           properties: { id: parcelle.id }
         }))
-         
+
         map.addSource('parcelles', {
           type: 'geojson',
           data: {
@@ -167,7 +163,7 @@ async function drawAllParcellesOnMap (page: Page, parcelles: Array<PdfParcelle>,
             features: features
           }
         })
-         
+
         map.addLayer({
           id: 'parcelles-layer',
           type: 'fill',
@@ -188,7 +184,7 @@ async function drawAllParcellesOnMap (page: Page, parcelles: Array<PdfParcelle>,
 
   try {
     await page.waitForSelector('body.loading', { hidden: true, timeout })
-     
+
     await page.waitForFunction(() => typeof map !== 'undefined' && map.isStyleLoaded(), { timeout })
   } catch (err) {
     logger.error({ err }, `Timeout exceeded (${timeout}ms)`)
@@ -202,37 +198,51 @@ async function drawAllParcellesOnMap (page: Page, parcelles: Array<PdfParcelle>,
 /**
  * Dessine toutes les parcelles avec une parcelle en surbrillance
  */
-async function drawParcelleHighlightOnMap (page: Page, parcelles: Array<PdfParcelle>, parcelleHighlight: PdfParcelle, { width, height, center, zoom, timeout }: MapDrawOptions): Promise<MapDrawResult> {
+async function drawParcelleHighlightOnMap(
+  page: Page,
+  parcelles: Array<PdfParcelle>,
+  parcelleHighlight: PdfParcelle,
+  { width, height, center, zoom, timeout }: MapDrawOptions
+): Promise<MapDrawResult> {
   await page.setViewport({ width, height })
-
 
   const error = await page.evaluate(
     ({ parcelles, parcelleHighlight, center, zoom }) => {
       try {
-         
         map.jumpTo({ center, zoom })
-         
+
         if (map.getSource('parcelles')) {
-           
           map.removeLayer('parcelles-highlight-layer')
-           
+
           map.removeLayer('parcelles-layer')
-           
+
           map.removeSource('parcelles')
         }
-        const autresParcelles = parcelles.filter(p => p.id !== parcelleHighlight.id)
-        const autresFeatures = autresParcelles.map(parcelle => ({
+        const autresParcelles = parcelles.filter((p) => p.id !== parcelleHighlight.id)
+        const autresFeatures = autresParcelles.map((parcelle) => ({
           type: 'Feature',
           geometry: JSON.parse(parcelle.geojson),
-          properties: { id: parcelle.id, highlight: false, NOM: parcelleHighlight.name, NUMERO_I: parcelleHighlight.nbilot, NUMERO_P: parcelleHighlight.nbp }
+          properties: {
+            id: parcelle.id,
+            highlight: false,
+            NOM: parcelleHighlight.name,
+            NUMERO_I: parcelleHighlight.nbilot,
+            NUMERO_P: parcelleHighlight.nbp
+          }
         }))
         const highlightFeature = {
           type: 'Feature',
           geometry: JSON.parse(parcelleHighlight.geojson),
-          properties: { id: parcelleHighlight.id, highlight: true, NOM: parcelleHighlight.name, NUMERO_I: parcelleHighlight.nbilot, NUMERO_P: parcelleHighlight.nbp }
+          properties: {
+            id: parcelleHighlight.id,
+            highlight: true,
+            NOM: parcelleHighlight.name,
+            NUMERO_I: parcelleHighlight.nbilot,
+            NUMERO_P: parcelleHighlight.nbp
+          }
         }
         const allFeatures = [...autresFeatures, highlightFeature]
-         
+
         map.addSource('parcelles', {
           type: 'geojson',
           data: {
@@ -240,7 +250,7 @@ async function drawParcelleHighlightOnMap (page: Page, parcelles: Array<PdfParce
             features: allFeatures
           }
         })
-         
+
         map.addLayer({
           id: 'parcelles-layer',
           type: 'fill',
@@ -251,7 +261,7 @@ async function drawParcelleHighlightOnMap (page: Page, parcelles: Array<PdfParce
             'fill-outline-color': 'blue'
           }
         })
-         
+
         map.addLayer({
           id: 'parcelles-highlight-layer',
           type: 'fill',
@@ -273,7 +283,7 @@ async function drawParcelleHighlightOnMap (page: Page, parcelles: Array<PdfParce
 
   try {
     await page.waitForSelector('body.loading', { hidden: true, timeout })
-     
+
     await page.waitForFunction(() => typeof map !== 'undefined' && map.isStyleLoaded(), { timeout })
   } catch (err) {
     return { error: `Timeout exceeded (${timeout}ms)`, err }
@@ -283,7 +293,11 @@ async function drawParcelleHighlightOnMap (page: Page, parcelles: Array<PdfParce
   return { buffer }
 }
 
-async function mergeAndAddFooter (pdfPaths: string[], name: string, deleteFilesAfter: boolean): Promise<pdflib.PDFDocument> {
+async function mergeAndAddFooter(
+  pdfPaths: string[],
+  name: string,
+  deleteFilesAfter: boolean
+): Promise<pdflib.PDFDocument> {
   const mergedPdf = await pdflib.PDFDocument.create()
   const copiedPages: Array<{ page: pdflib.PDFPage; docIndex: number }> = []
 
@@ -324,12 +338,12 @@ async function mergeAndAddFooter (pdfPaths: string[], name: string, deleteFilesA
   return mergedPdf
 }
 
-function formatDate (dateStr: string): string {
+function formatDate(dateStr: string): string {
   const [year, month, day] = dateStr.split('-')
   return `${day}/${month}/${year}`
 }
 
-function formatRefCad (enter: string): string {
+function formatRefCad(enter: string): string {
   // On retire les 5 premiers chiffres (code commune)
   const reste = enter.slice(5)
   // On sépare chiffres + lettres + chiffres

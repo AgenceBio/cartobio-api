@@ -15,7 +15,14 @@ import { certificationEtatEnumSchema } from '../../database/validations/parcella
 import { recordMetadata } from '../../shared/parcellaires/parcellaires.utils.js'
 import type { SQL } from 'drizzle-orm'
 import { numerosBioEntiers } from './operators.utils.js'
-import type { DashboardStateRow, ImportPacRow, NumeroBio, OperatorRecordRow, OperatorWithRecordData, AgenceBioNormalizedOperatorWithFilterData } from './operators.types.js'
+import type {
+  DashboardStateRow,
+  ImportPacRow,
+  NumeroBio,
+  OperatorRecordRow,
+  OperatorWithRecordData,
+  AgenceBioNormalizedOperatorWithFilterData
+} from './operators.types.js'
 
 const dateReference = sql`COALESCE(${parcellaires.certificationDateDebut}, ${parcellaires.auditDate}, ${parcellaires.createdAt})`
 
@@ -46,8 +53,11 @@ const recordFields = {
   )`
 }
 
-async function getFilterData (operators: AgenceBioNormalizedOperator[], mixite = false): Promise<AgenceBioNormalizedOperatorWithFilterData[]> {
-  operators = operators.sort((a, b) => (+a.numeroBio - +b.numeroBio))
+async function getFilterData(
+  operators: AgenceBioNormalizedOperator[],
+  mixite = false
+): Promise<AgenceBioNormalizedOperatorWithFilterData[]> {
+  operators = operators.sort((a, b) => +a.numeroBio - +b.numeroBio)
   const ids = numerosBioEntiers(operators.map(({ numeroBio }) => numeroBio))
 
   if (ids.length === 0) {
@@ -58,7 +68,11 @@ async function getFilterData (operators: AgenceBioNormalizedOperator[], mixite =
     db
       .select({
         numerobio: sql<string>`${parcellaires.numeroBio}::text`.as('numerobio'),
-        states: sql<Array<{ certification_state: string; annee_reference_controle: number }>>`JSON_AGG(JSON_BUILD_OBJECT('certification_state', ${parcellaires.certificationEtat}, 'annee_reference_controle', ${parcellaires.anneeReferenceControle}))`.as('states'),
+        states: sql<
+          Array<{ certification_state: string; annee_reference_controle: number }>
+        >`JSON_AGG(JSON_BUILD_OBJECT('certification_state', ${parcellaires.certificationEtat}, 'annee_reference_controle', ${parcellaires.anneeReferenceControle}))`.as(
+          'states'
+        ),
         list_oc_id: sql<number[]>`JSON_AGG(${parcellaires.ocId}::int)`.as('list_oc_id'),
         max_audit_date: max(parcellaires.auditDate).as('max_audit_date')
       })
@@ -74,32 +88,34 @@ async function getFilterData (operators: AgenceBioNormalizedOperator[], mixite =
         lastmixitestate: parcellaires.mixite
       })
       .from(parcellaires)
-      .where(and(
-        sql`${parcellaires.numeroBio} = ANY(${sql.param(ids)}::int[])`,
-        eq(parcellaires.certificationEtat, certificationEtatEnumSchema.enum.CERTIFIED),
-        isNull(parcellaires.deletedAt)
-      ))
+      .where(
+        and(
+          sql`${parcellaires.numeroBio} = ANY(${sql.param(ids)}::int[])`,
+          eq(parcellaires.certificationEtat, certificationEtatEnumSchema.enum.CERTIFIED),
+          isNull(parcellaires.deletedAt)
+        )
+      )
       .orderBy(parcellaires.numeroBio, sql`${parcellaires.certificationDateDebut} DESC NULLS LAST`)
   )
 
   const rows: Array<Partial<AgenceBioNormalizedOperatorWithFilterData> & { numerobio: string }> = mixite
     ? await db
-      .with(allParcellaire, lastCertifiedParcelle)
-      .select({
-        lastmixitestate: lastCertifiedParcelle.lastmixitestate,
-        numerobio: allParcellaire.numerobio,
-        states: allParcellaire.states,
-        list_oc_id: allParcellaire.list_oc_id,
-        max_audit_date: allParcellaire.max_audit_date
-      })
-      .from(allParcellaire)
-      .leftJoin(lastCertifiedParcelle, eq(allParcellaire.numerobio, lastCertifiedParcelle.numerobio))
-      .orderBy(sql`${allParcellaire.numerobio}::bigint ASC`)
+        .with(allParcellaire, lastCertifiedParcelle)
+        .select({
+          lastmixitestate: lastCertifiedParcelle.lastmixitestate,
+          numerobio: allParcellaire.numerobio,
+          states: allParcellaire.states,
+          list_oc_id: allParcellaire.list_oc_id,
+          max_audit_date: allParcellaire.max_audit_date
+        })
+        .from(allParcellaire)
+        .leftJoin(lastCertifiedParcelle, eq(allParcellaire.numerobio, lastCertifiedParcelle.numerobio))
+        .orderBy(sql`${allParcellaire.numerobio}::bigint ASC`)
     : await db
-      .with(allParcellaire)
-      .select()
-      .from(allParcellaire)
-      .orderBy(sql`${allParcellaire.numerobio}::bigint ASC`)
+        .with(allParcellaire)
+        .select()
+        .from(allParcellaire)
+        .orderBy(sql`${allParcellaire.numerobio}::bigint ASC`)
 
   const res: AgenceBioNormalizedOperatorWithFilterData[] = []
   let j = 0
@@ -128,7 +144,7 @@ async function getFilterData (operators: AgenceBioNormalizedOperator[], mixite =
   return res
 }
 
-async function addRecordData (operateur: AgenceBioNormalizedOperator): Promise<OperatorWithRecordData> {
+async function addRecordData(operateur: AgenceBioNormalizedOperator): Promise<OperatorWithRecordData> {
   const [numeroBio] = numerosBioEntiers([operateur.numeroBio])
 
   if (numeroBio === undefined) {
@@ -137,16 +153,23 @@ async function addRecordData (operateur: AgenceBioNormalizedOperator): Promise<O
 
   const operateurRecords = and(eq(parcellaires.numeroBio, numeroBio), isNull(parcellaires.deletedAt))
 
-  const latestRecord = (...conditions: SQL[]): Promise<OperatorRecordRow[]> => db
-    .select(recordFields)
-    .from(parcellaires)
-    .leftJoin(parcellairesMetadata, eq(parcellairesMetadata.recordId, parcellaires.recordId))
-    .where(and(operateurRecords, ...conditions))
-    .orderBy(desc(dateReference))
-    .limit(1)
+  const latestRecord = (...conditions: SQL[]): Promise<OperatorRecordRow[]> =>
+    db
+      .select(recordFields)
+      .from(parcellaires)
+      .leftJoin(parcellairesMetadata, eq(parcellairesMetadata.recordId, parcellaires.recordId))
+      .where(and(operateurRecords, ...conditions))
+      .orderBy(desc(dateReference))
+      .limit(1)
 
   const [latestByState, latestGlobal, [lastCertifiedParcelle]] = await Promise.all([
-    latestRecord(inArray(parcellaires.certificationEtat, [certificationEtatEnumSchema.enum.AUDITED, certificationEtatEnumSchema.enum.PENDING_CERTIFICATION, certificationEtatEnumSchema.enum.CERTIFIED])),
+    latestRecord(
+      inArray(parcellaires.certificationEtat, [
+        certificationEtatEnumSchema.enum.AUDITED,
+        certificationEtatEnumSchema.enum.PENDING_CERTIFICATION,
+        certificationEtatEnumSchema.enum.CERTIFIED
+      ])
+    ),
     latestRecord(),
     db
       .select({
@@ -170,7 +193,10 @@ async function addRecordData (operateur: AgenceBioNormalizedOperator): Promise<O
     }))
 
   matchingRows.sort((a, b) => {
-    return +(a.certification_state === certificationEtatEnumSchema.enum.OPERATOR_DRAFT) - +(b.certification_state === certificationEtatEnumSchema.enum.OPERATOR_DRAFT)
+    return (
+      +(a.certification_state === certificationEtatEnumSchema.enum.OPERATOR_DRAFT) -
+      +(b.certification_state === certificationEtatEnumSchema.enum.OPERATOR_DRAFT)
+    )
   })
   const [primaryRecord, ...otherRecords] = matchingRows
   if (!primaryRecord) {
@@ -186,7 +212,7 @@ async function addRecordData (operateur: AgenceBioNormalizedOperator): Promise<O
   }
 }
 
-async function findConsultedOperators (userId: number): Promise<number[]> {
+async function findConsultedOperators(userId: number): Promise<number[]> {
   const rows = await db
     .select({ numerobio: operateursConsultes.numeroBio })
     .from(operateursConsultes)
@@ -212,7 +238,10 @@ async function consultOperator(numeroBio: NumeroBio, userId: number): Promise<vo
   await db
     .insert(operateursConsultes)
     .values(createOperateurConsulteSchema.parse({ numeroBio: Number(numeroBio), userId: String(userId) }))
-    .onConflictDoUpdate({ target: [operateursConsultes.numeroBio, operateursConsultes.userId], set: { createdAt: sql`now()` } })
+    .onConflictDoUpdate({
+      target: [operateursConsultes.numeroBio, operateursConsultes.userId],
+      set: { createdAt: sql`now()` }
+    })
 }
 async function findImportPac(numeroBio: NumeroBio): Promise<ImportPacRow | null> {
   const [row] = await db
@@ -253,12 +282,18 @@ async function findDashboardStates(numeroBios: string[], anneeReferenceControle:
       numerobios: sql<string[]>`JSON_AGG(DISTINCT ${parcellaires.numeroBio}::text)`
     })
     .from(parcellaires)
-    .where(and(
-      inArray(parcellaires.numeroBio, numerosBioEntiers(numeroBios)),
-      isNull(parcellaires.deletedAt),
-      eq(parcellaires.anneeReferenceControle, anneeReferenceControle),
-      inArray(parcellaires.certificationEtat, [certificationEtatEnumSchema.enum.AUDITED, certificationEtatEnumSchema.enum.PENDING_CERTIFICATION, certificationEtatEnumSchema.enum.CERTIFIED])
-    ))
+    .where(
+      and(
+        inArray(parcellaires.numeroBio, numerosBioEntiers(numeroBios)),
+        isNull(parcellaires.deletedAt),
+        eq(parcellaires.anneeReferenceControle, anneeReferenceControle),
+        inArray(parcellaires.certificationEtat, [
+          certificationEtatEnumSchema.enum.AUDITED,
+          certificationEtatEnumSchema.enum.PENDING_CERTIFICATION,
+          certificationEtatEnumSchema.enum.CERTIFIED
+        ])
+      )
+    )
     .groupBy(sql`1`)
 }
 export {

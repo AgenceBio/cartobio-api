@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
@@ -9,7 +9,7 @@
         margin: 0;
         padding: 0;
         background-color: #f5f5f5;
-        font-family: "Marianne", sans-serif;
+        font-family: 'Marianne', sans-serif;
       }
 
       .page {
@@ -53,7 +53,7 @@
         left: 0;
         width: 1754px;
         height: 505px;
-        background-image: url("/img/background.png");
+        background-image: url('/img/background.png');
         background-size: cover;
       }
 
@@ -268,17 +268,16 @@
   </body>
   <script>
     function adjustFontSizeToFit(selector) {
-      const el = document.querySelector(selector);
-      let fontSize = parseFloat(getComputedStyle(el).fontSize);
+      const el = document.querySelector(selector)
+      let fontSize = parseFloat(getComputedStyle(el).fontSize)
 
       while (el.scrollWidth > el.clientWidth && fontSize > 10) {
-        fontSize -= 1;
-        el.style.fontSize = fontSize + 'px';
+        fontSize -= 1
+        el.style.fontSize = fontSize + 'px'
       }
     }
 
-    window.addEventListener('load', () => adjustFontSizeToFit('.org-name'));
-    window.addEventListener('resize', () => adjustFontSizeToFit('.org-name'));
+    window.addEventListener('load', () => adjustFontSizeToFit('.org-name'))
+    window.addEventListener('resize', () => adjustFontSizeToFit('.org-name'))
   </script>
-
 </html>

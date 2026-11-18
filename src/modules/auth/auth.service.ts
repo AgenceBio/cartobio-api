@@ -22,9 +22,13 @@ const oneHour = 60 * 60 * 1000
 type NotificationsDecodedToken = z.infer<typeof notificationsTokenSchema>
 
 async function fetchCertificationBodies(): Promise<OrganismeCertificateur[]> {
-  return parseApiResponse(z.array(organismeCertificateurSchema), await get(`${config.get('notifications.endpoint')}/api/oc`, {
-    headers: { Authorization: config.get('notifications.serviceToken'), Origin: origin }
-  }).json(), 'l\'API Agence Bio')
+  return parseApiResponse(
+    z.array(organismeCertificateurSchema),
+    await get(`${config.get('notifications.endpoint')}/api/oc`, {
+      headers: { Authorization: config.get('notifications.serviceToken'), Origin: origin }
+    }).json(),
+    "l'API Agence Bio"
+  )
 }
 
 const getCertificationBodies = memo(fetchCertificationBodies, { maxAge: 24 * oneHour })
@@ -33,7 +37,9 @@ async function getUserProfileById(userId: number): Promise<CartoBioUser> {
   const [userProfile, certificationBodies] = await Promise.all([
     get(`${config.get('notifications.endpoint')}/api/users/${userId}`, {
       headers: { Authorization: config.get('notifications.serviceToken'), Origin: origin }
-    }).json().then((data) => parseApiResponse(agenceBioUserProfileSchema, data, 'l\'API Agence Bio')),
+    })
+      .json()
+      .then((data) => parseApiResponse(agenceBioUserProfileSchema, data, "l'API Agence Bio")),
     getCertificationBodies()
   ])
 
@@ -42,7 +48,12 @@ async function getUserProfileById(userId: number): Promise<CartoBioUser> {
     prenom: userProfile.prenom ?? '',
     nom: userProfile.nom ?? '',
     ...(userProfile.organismeCertificateurId
-      ? { organismeCertificateur: { id: userProfile.organismeCertificateurId, nom: certificationBodies.find(({ id }) => userProfile.organismeCertificateurId === id)?.nom ?? '' } }
+      ? {
+          organismeCertificateur: {
+            id: userProfile.organismeCertificateurId,
+            nom: certificationBodies.find(({ id }) => userProfile.organismeCertificateurId === id)?.nom ?? ''
+          }
+        }
       : {}),
     groups: userProfile.groupes.map(({ id, nom }) => ({ id, nom })),
     mainGroup: { id: userProfile.groupes.at(0)?.id, nom: userProfile.groupes.at(0)?.nom }
@@ -65,13 +76,22 @@ async function getHistoryUser(userId: string | number, userRole: string | null):
 
 async function getUserProfileFromSSOToken(accessToken: string): Promise<CartoBioUser> {
   const { sub: email } = ssoAccessTokenSchema.parse(decode(accessToken))
-  const userProfile = parseApiResponse(agenceBioUserByEmailSchema, await get(`${config.get('notifications.endpoint')}/api/utilisateur/by-email`, {
-    headers: { Authorization: config.get('notifications.serviceToken'), Origin: origin }, searchParams: { email }
-  }).json(), 'l\'API Agence Bio')
+  const userProfile = parseApiResponse(
+    agenceBioUserByEmailSchema,
+    await get(`${config.get('notifications.endpoint')}/api/utilisateur/by-email`, {
+      headers: { Authorization: config.get('notifications.serviceToken'), Origin: origin },
+      searchParams: { email }
+    }).json(),
+    "l'API Agence Bio"
+  )
   return getUserProfileById(userProfile.id)
 }
 
-function verifyNotificationAuthorization(authorizationHeader: string | undefined): { decodedToken: NotificationsDecodedToken; token: string; error?: undefined } | { error: unknown; decodedToken?: undefined; token?: undefined } {
+function verifyNotificationAuthorization(
+  authorizationHeader: string | undefined
+):
+  | { decodedToken: NotificationsDecodedToken; token: string; error?: undefined }
+  | { error: unknown; decodedToken?: undefined; token?: undefined } {
   const token = (authorizationHeader ?? '').replace(/Bearer /i, '')
   try {
     return { decodedToken: notificationsTokenSchema.parse(verify(token)), token }

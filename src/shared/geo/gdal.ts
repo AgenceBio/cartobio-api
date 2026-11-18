@@ -21,22 +21,32 @@ import { jsonString } from '../validation.js'
 const emptyToUndefined = (value: unknown): unknown => value || undefined
 
 const featurePropertiesSchema = z.object({
-  COMMUNE: z.string().regex(/^[0-9]{5}$/u).nullable().optional(),
+  COMMUNE: z
+    .string()
+    .regex(/^[0-9]{5}$/u)
+    .nullable()
+    .optional(),
   COMMUNE_LABEL: z.string().nullable().optional(),
   cultures: z.preprocess(emptyToUndefined, jsonString(z.array(z.looseObject({}))).optional()),
   conversion_niveau: z.string().nullable().optional(),
-  engagement_date: z.looseObject({ year: z.int(), month: z.int(), day: z.int() }).nullable().optional()
-    .transform((date) => date ? `${date.year}-${date.month}-${date.day}` : undefined),
+  engagement_date: z
+    .looseObject({ year: z.int(), month: z.int(), day: z.int() })
+    .nullable()
+    .optional()
+    .transform((date) => (date ? `${date.year}-${date.month}-${date.day}` : undefined)),
   commentaires: z.string().nullable().optional(),
   auditeur_notes: z.string().nullable().optional(),
   annotations: z.preprocess(emptyToUndefined, jsonString(z.array(z.unknown())).optional()),
   NOM: z.string().nullable().optional(),
-  PACAGE: z.string().regex(/^([A-Z0-9]{8,9})|()$/u).nullable().optional(),
-  NUMERO_I: z.preprocess((value) => value ? Number(value) : undefined, z.int().optional()),
-  NUMERO_P: z.preprocess((value) => value ? Number(value) : undefined, z.int().optional()),
+  PACAGE: z
+    .string()
+    .regex(/^([A-Z0-9]{8,9})|()$/u)
+    .nullable()
+    .optional(),
+  NUMERO_I: z.preprocess((value) => (value ? Number(value) : undefined), z.int().optional()),
+  NUMERO_P: z.preprocess((value) => (value ? Number(value) : undefined), z.int().optional()),
   cadastre: z.array(z.string()).nullable().optional()
 })
-
 
 interface FileAnalysisResult {
   path: string | null
@@ -52,7 +62,10 @@ async function detectSrs(layer: gdal.Layer): Promise<gdal.SpatialReference> {
   }
 
   const firstGeometry = (await layer.features.firstAsync())?.getGeometry()
-  if (!firstGeometry) throw new InvalidRequestApiError('Impossible de déterminer la projection : la première parcelle n\'a pas de géométrie.')
+  if (!firstGeometry)
+    throw new InvalidRequestApiError(
+      "Impossible de déterminer la projection : la première parcelle n'a pas de géométrie."
+    )
   const geometry: Geometry = firstGeometry.toObject()
 
   // iterate over the various regions/projections to guess which one it is
@@ -62,7 +75,8 @@ async function detectSrs(layer: gdal.Layer): Promise<gdal.SpatialReference> {
 
     if (
       (geometry.type === 'Point' && pointInPolygon(toWgs84(geometry, projection), regionGeometry)) ||
-      ((geometry.type === 'Polygon' || geometry.type === 'MultiPolygon') && polygonInPolygon(toWgs84(geometry, projection), regionGeometry))
+      ((geometry.type === 'Polygon' || geometry.type === 'MultiPolygon') &&
+        polygonInPolygon(toWgs84(geometry, projection), regionGeometry))
     ) {
       return gdal.SpatialReference.fromProj4(projection)
     }
@@ -80,17 +94,24 @@ async function unzipGeographicalContent(buffer: Buffer): Promise<FileAnalysisRes
   try {
     zip = new AdmZip(buffer)
   } catch (error) {
-    throw new InvalidRequestApiError('L\'archive ZIP ne peut pas être lue. Provient-elle d\'une source de donnée authentique ?', { cause: error })
+    throw new InvalidRequestApiError(
+      "L'archive ZIP ne peut pas être lue. Provient-elle d'une source de donnée authentique ?",
+      { cause: error }
+    )
   }
 
-  const entries = zip.getEntries().filter(entry => /(.sh[xp]|.dbf|.kml|.geojson|.gpkg)$/.test(entry.entryName) && !entry.name.startsWith('.'))
+  const entries = zip
+    .getEntries()
+    .filter((entry) => /(.sh[xp]|.dbf|.kml|.geojson|.gpkg)$/.test(entry.entryName) && !entry.name.startsWith('.'))
   const toDir = await mkdtemp(join(tmpdir(), 'cartobio-anygeo-'))
 
   // extracts geo files but keep only the root .shp (.shx will be read as a companion file anyway)
-  const files = entries.map(entry => {
-    zip.extractEntryTo(entry, toDir, false, true, false)
-    return join(toDir, entry.name)
-  }).filter(filename => ['.dbf', '.shx'].includes(extname(filename)) === false)
+  const files = entries
+    .map((entry) => {
+      zip.extractEntryTo(entry, toDir, false, true, false)
+      return join(toDir, entry.name)
+    })
+    .filter((filename) => ['.dbf', '.shx'].includes(extname(filename)) === false)
 
   return {
     path: toDir,
@@ -129,7 +150,7 @@ async function identifyFiles(file: Promise<MultipartFile | undefined>): Promise<
     return {
       path: null,
       files: [buffer],
-      cleanup: async (): Promise<void> => { }
+      cleanup: async (): Promise<void> => {}
     }
   }
 
@@ -177,7 +198,9 @@ async function parseAnyGeographicalArchive(file: Promise<MultipartFile | undefin
             const parsedProperties = featurePropertiesSchema.safeParse(properties)
 
             if (!parsedProperties.success) {
-              throw new InvalidRequestApiError('Le fichier contient des propriétés invalides', { cause: parsedProperties.error })
+              throw new InvalidRequestApiError('Le fichier contient des propriétés invalides', {
+                cause: parsedProperties.error
+              })
             }
 
             if (geometry.name === 'POLYGON') {
@@ -193,7 +216,7 @@ async function parseAnyGeographicalArchive(file: Promise<MultipartFile | undefin
               // some tools outputs features as single polygon
               // and we don't deal with multipolygon because we want to distinguish each of them
             } else if (geometry.name === 'MULTIPOLYGON') {
-              (geometry.toObject() as MultiPolygon).coordinates.forEach((coordinates): void => {
+              ;(geometry.toObject() as MultiPolygon).coordinates.forEach((coordinates): void => {
                 const id = getRandomFeatureId()
 
                 featureCollection.features.push({

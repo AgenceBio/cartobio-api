@@ -1,27 +1,27 @@
 version: 2
 updates:
-  - package-ecosystem: "npm"
-    directory: "/"
+  - package-ecosystem: 'npm'
+    directory: '/'
     schedule:
-      interval: "weekly"
-    target-branch: "main"
+      interval: 'weekly'
+    target-branch: 'main'
     ignore:
-      - dependency-name: "file-type"
-      - dependency-name: "get-stream"
-      - dependency-name: "got"
-      - dependency-name: "p-memoize"
-      - dependency-name: "puppeteer"
-      - dependency-name: "socks-proxy-agent"
+      - dependency-name: 'file-type'
+      - dependency-name: 'get-stream'
+      - dependency-name: 'got'
+      - dependency-name: 'p-memoize'
+      - dependency-name: 'puppeteer'
+      - dependency-name: 'socks-proxy-agent'
 
-  - package-ecosystem: "npm"
-    directory: "/"
+  - package-ecosystem: 'npm'
+    directory: '/'
     schedule:
-      interval: "daily"
-    target-branch: "test"
+      interval: 'daily'
+    target-branch: 'test'
     ignore:
-      - dependency-name: "file-type"
-      - dependency-name: "get-stream"
-      - dependency-name: "got"
-      - dependency-name: "p-memoize"
-      - dependency-name: "puppeteer"
-      - dependency-name: "socks-proxy-agent"
+      - dependency-name: 'file-type'
+      - dependency-name: 'get-stream'
+      - dependency-name: 'got'
+      - dependency-name: 'p-memoize'
+      - dependency-name: 'puppeteer'
+      - dependency-name: 'socks-proxy-agent'

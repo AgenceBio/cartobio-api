@@ -1,7 +1,7 @@
 import { importJobResultEnumSchema } from '../../database/validations/imports.js'
 import type { StreakSuspecte } from './tableau-de-bord.types.js'
 
-function getTypeEnvoi (statut: string | null): 'success' | 'echec' | null {
+function getTypeEnvoi(statut: string | null): 'success' | 'echec' | null {
   if (statut === importJobResultEnumSchema.enum.VALID) {
     return 'success'
   }
@@ -15,7 +15,7 @@ function getTypeEnvoi (statut: string | null): 'success' | 'echec' | null {
 
 const NB_MINIMUM_STREAK = 4
 
-function getStreaksSuspectes<T extends { statut: string | null }> (envois: T[]): Array<StreakSuspecte<T>> {
+function getStreaksSuspectes<T extends { statut: string | null }>(envois: T[]): Array<StreakSuspecte<T>> {
   const streaks: Array<StreakSuspecte<T>> = []
   let streakStart = 0
 
@@ -25,8 +25,7 @@ function getStreaksSuspectes<T extends { statut: string | null }> (envois: T[]):
     const typeDebut = getTypeEnvoi(debut.statut)
 
     const suivant = envois[i]
-    const sameType =
-      suivant !== undefined && getTypeEnvoi(suivant.statut) === typeDebut && typeDebut !== null
+    const sameType = suivant !== undefined && getTypeEnvoi(suivant.statut) === typeDebut && typeDebut !== null
 
     if (!sameType) {
       const streakLength = i - streakStart

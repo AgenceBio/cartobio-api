@@ -5,12 +5,7 @@ import tseslint from 'typescript-eslint'
 import eslintConfigPrettier from 'eslint-config-prettier/flat'
 
 export default defineConfig([
-  globalIgnores([
-    '**/*.d.ts',
-    '**/dist/**',
-    'coverage/**',
-    'database/old_migrations/**/*.js'
-  ]),
+  globalIgnores(['**/*.d.ts', '**/dist/**', 'coverage/**', 'database/old_migrations/**/*.js']),
 
   js.configs.recommended,
 
@@ -35,7 +30,10 @@ export default defineConfig([
   {
     files: ['src/**/*.ts', 'bin/**/*.ts', 'packages/cartobio-types/src/**/*.ts'],
     rules: {
-      '@typescript-eslint/explicit-function-return-type': ['error', { allowExpressions: true, allowTypedFunctionExpressions: true }]
+      '@typescript-eslint/explicit-function-return-type': [
+        'error',
+        { allowExpressions: true, allowTypedFunctionExpressions: true }
+      ]
     }
   },
 

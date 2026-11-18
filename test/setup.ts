@@ -7,11 +7,12 @@ import { initTerritoires } from './init-territoires.js'
 
 const { Client } = pg
 
-type Commune = { code: string, nom: string, geometry: unknown }
+type Commune = { code: string; nom: string; geometry: unknown }
 
-async function loadCommunes (client: pg.Client): Promise<void> {
-  const communes = (JSON.parse(await readFile('data/generated/communes.json', 'utf8')) as Commune[])
-    .filter(({ code, nom, geometry }) => code.length <= 5 && nom !== '' && geometry)
+async function loadCommunes(client: pg.Client): Promise<void> {
+  const communes = (JSON.parse(await readFile('data/generated/communes.json', 'utf8')) as Commune[]).filter(
+    ({ code, nom, geometry }) => code.length <= 5 && nom !== '' && geometry
+  )
 
   for (let i = 0; i < communes.length; i += 1000) {
     await client.query(

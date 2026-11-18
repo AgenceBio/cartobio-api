@@ -12,18 +12,21 @@ import fs from 'fs'
 import { asPdfDocument, buildCulture, buildPdfParcelle } from '../../factories.js'
 import type { PdfParcelle, PdfRecord } from '../../../src/modules/exports/exports.types.js'
 
-const parcelles = parcellesJSON.map(p => buildPdfParcelle({
-  id: p.id,
-  name: 'test',
-  commune: p.commune,
-  conversion_niveau: p.conversion_niveau as PdfParcelle['conversion_niveau'],
-  engagement_date: p.engagement_date,
-  nbilot: p.numero_ilot_pac,
-  nbp: p.numero_parcelle_pac,
-  cultures: p.cultures.map(({ CPF, variete }) => buildCulture({ CPF, variete }))
-}))
+const parcelles = parcellesJSON.map((p) =>
+  buildPdfParcelle({
+    id: p.id,
+    name: 'test',
+    commune: p.commune,
+    conversion_niveau: p.conversion_niveau as PdfParcelle['conversion_niveau'],
+    engagement_date: p.engagement_date,
+    nbilot: p.numero_ilot_pac,
+    nbp: p.numero_parcelle_pac,
+    cultures: p.cultures.map(({ CPF, variete }) => buildCulture({ CPF, variete }))
+  })
+)
 const pdfRecord = agencebioOperator as unknown as PdfRecord
-const generatedPdf = () => asPdfDocument({ save: vi.fn().mockReturnValue('save'), saveAsBase64: vi.fn().mockReturnValue('save-as-base-64') })
+const generatedPdf = () =>
+  asPdfDocument({ save: vi.fn().mockReturnValue('save'), saveAsBase64: vi.fn().mockReturnValue('save-as-base-64') })
 
 vi.mock('../../../src/modules/exports/pdf-utils.js', () => ({
   getAllParcelles: vi.fn()
@@ -53,12 +56,11 @@ describe('Generation du PDF', () => {
     vi.mocked(repository.findValidAttestationProduction).mockResolvedValue(null)
     vi.mocked(repository.findPdfRecord).mockResolvedValue(pdfRecord)
     get.mockReturnValue({
-      async json () {
+      async json() {
         return agencebioOperator
       }
     })
-    vi.mocked(utils.getAllParcelles)
-      .mockResolvedValueOnce([])
+    vi.mocked(utils.getAllParcelles).mockResolvedValueOnce([])
     const UUID = randomUUID()
     let hasTrown = false
     try {
@@ -71,14 +73,26 @@ describe('Generation du PDF', () => {
 
     expect(hasTrown).toEqual(true)
 
-    expect(repository.findValidAttestationProduction).toHaveBeenNthCalledWith(1,
-      UUID, AttestationsProductionsType.COMPLET)
-    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(1,
-      UUID, AttestationsProductionsStatus.STARTED, AttestationsProductionsType.COMPLET, null)
-    expect(repository.findPdfRecord).toHaveBeenNthCalledWith(1,
-      UUID)
-    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(2,
-      UUID, AttestationsProductionsStatus.ERROR, AttestationsProductionsType.COMPLET, null)
+    expect(repository.findValidAttestationProduction).toHaveBeenNthCalledWith(
+      1,
+      UUID,
+      AttestationsProductionsType.COMPLET
+    )
+    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(
+      1,
+      UUID,
+      AttestationsProductionsStatus.STARTED,
+      AttestationsProductionsType.COMPLET,
+      null
+    )
+    expect(repository.findPdfRecord).toHaveBeenNthCalledWith(1, UUID)
+    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(
+      2,
+      UUID,
+      AttestationsProductionsStatus.ERROR,
+      AttestationsProductionsType.COMPLET,
+      null
+    )
 
     expect(repository.findValidAttestationProduction).toHaveBeenCalledTimes(1)
     expect(repository.updateAttestationsProductions).toHaveBeenCalledTimes(2)
@@ -89,15 +103,14 @@ describe('Generation du PDF', () => {
     vi.mocked(repository.findValidAttestationProduction).mockResolvedValue(null)
     vi.mocked(repository.findPdfRecord).mockResolvedValue(pdfRecord)
     get.mockReturnValue({
-      async json () {
+      async json() {
         return agencebioOperator
       }
     })
     const tmpParcelles = parcelles.map((p) => ({ ...p }))
 
     tmpParcelles[0]!.cultures = [buildCulture({ CPF: '' })]
-    vi.mocked(utils.getAllParcelles)
-      .mockResolvedValueOnce(tmpParcelles)
+    vi.mocked(utils.getAllParcelles).mockResolvedValueOnce(tmpParcelles)
     const UUID = randomUUID()
     let hasTrown = false
     try {
@@ -110,14 +123,26 @@ describe('Generation du PDF', () => {
 
     expect(hasTrown).toEqual(true)
 
-    expect(repository.findValidAttestationProduction).toHaveBeenNthCalledWith(1,
-      UUID, AttestationsProductionsType.COMPLET)
-    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(1,
-      UUID, AttestationsProductionsStatus.STARTED, AttestationsProductionsType.COMPLET, null)
-    expect(repository.findPdfRecord).toHaveBeenNthCalledWith(1,
-      UUID)
-    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(2,
-      UUID, AttestationsProductionsStatus.ERROR, AttestationsProductionsType.COMPLET, null)
+    expect(repository.findValidAttestationProduction).toHaveBeenNthCalledWith(
+      1,
+      UUID,
+      AttestationsProductionsType.COMPLET
+    )
+    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(
+      1,
+      UUID,
+      AttestationsProductionsStatus.STARTED,
+      AttestationsProductionsType.COMPLET,
+      null
+    )
+    expect(repository.findPdfRecord).toHaveBeenNthCalledWith(1, UUID)
+    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(
+      2,
+      UUID,
+      AttestationsProductionsStatus.ERROR,
+      AttestationsProductionsType.COMPLET,
+      null
+    )
 
     expect(repository.findValidAttestationProduction).toHaveBeenCalledTimes(1)
     expect(repository.updateAttestationsProductions).toHaveBeenCalledTimes(2)
@@ -128,14 +153,15 @@ describe('Generation du PDF', () => {
     vi.mocked(repository.findValidAttestationProduction).mockResolvedValue(null)
     vi.mocked(repository.findPdfRecord).mockResolvedValue(pdfRecord)
     get.mockReturnValue({
-      async json () {
+      async json() {
         return agencebioOperator
       }
     })
 
-    vi.mocked(utils.getAllParcelles)
-      .mockResolvedValueOnce(parcelles)
-    vi.mocked(generatePdfContent.createPdfContent).mockImplementation(() => { throw new Error('TEST') })
+    vi.mocked(utils.getAllParcelles).mockResolvedValueOnce(parcelles)
+    vi.mocked(generatePdfContent.createPdfContent).mockImplementation(() => {
+      throw new Error('TEST')
+    })
     const UUID = randomUUID()
     let hasTrown = false
     const gen = exportPdf.generatePDF('123', UUID)
@@ -150,14 +176,26 @@ describe('Generation du PDF', () => {
 
     expect(hasTrown).toEqual(true)
 
-    expect(repository.findValidAttestationProduction).toHaveBeenNthCalledWith(1,
-      UUID, AttestationsProductionsType.COMPLET)
-    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(1,
-      UUID, AttestationsProductionsStatus.STARTED, AttestationsProductionsType.COMPLET, null)
-    expect(repository.findPdfRecord).toHaveBeenNthCalledWith(1,
-      UUID)
-    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(2,
-      UUID, AttestationsProductionsStatus.ERROR, AttestationsProductionsType.COMPLET, null)
+    expect(repository.findValidAttestationProduction).toHaveBeenNthCalledWith(
+      1,
+      UUID,
+      AttestationsProductionsType.COMPLET
+    )
+    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(
+      1,
+      UUID,
+      AttestationsProductionsStatus.STARTED,
+      AttestationsProductionsType.COMPLET,
+      null
+    )
+    expect(repository.findPdfRecord).toHaveBeenNthCalledWith(1, UUID)
+    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(
+      2,
+      UUID,
+      AttestationsProductionsStatus.ERROR,
+      AttestationsProductionsType.COMPLET,
+      null
+    )
 
     expect(repository.findValidAttestationProduction).toHaveBeenCalledTimes(1)
     expect(repository.updateAttestationsProductions).toHaveBeenCalledTimes(2)
@@ -168,12 +206,11 @@ describe('Generation du PDF', () => {
     vi.mocked(repository.findValidAttestationProduction).mockResolvedValue(null)
     vi.mocked(repository.findPdfRecord).mockResolvedValue(pdfRecord)
     get.mockReturnValue({
-      async json () {
+      async json() {
         return agencebioOperator
       }
     })
-    vi.mocked(utils.getAllParcelles)
-      .mockResolvedValueOnce(parcelles)
+    vi.mocked(utils.getAllParcelles).mockResolvedValueOnce(parcelles)
 
     vi.spyOn(fs.promises, 'writeFile').mockResolvedValue(undefined)
     vi.mocked(generatePdfContent.createPdfContent).mockResolvedValue([generatedPdf()])
@@ -184,14 +221,26 @@ describe('Generation du PDF', () => {
     expect(count).toEqual(3)
     const res = (await gen.next()).value
 
-    expect(repository.findValidAttestationProduction).toHaveBeenNthCalledWith(1,
-      UUID, AttestationsProductionsType.COMPLET)
-    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(1,
-      UUID, AttestationsProductionsStatus.STARTED, AttestationsProductionsType.COMPLET, null)
-    expect(repository.findPdfRecord).toHaveBeenNthCalledWith(1,
-      UUID)
-    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(2,
-      UUID, AttestationsProductionsStatus.GENERATED, AttestationsProductionsType.COMPLET, expect.stringContaining(UUID))
+    expect(repository.findValidAttestationProduction).toHaveBeenNthCalledWith(
+      1,
+      UUID,
+      AttestationsProductionsType.COMPLET
+    )
+    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(
+      1,
+      UUID,
+      AttestationsProductionsStatus.STARTED,
+      AttestationsProductionsType.COMPLET,
+      null
+    )
+    expect(repository.findPdfRecord).toHaveBeenNthCalledWith(1, UUID)
+    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(
+      2,
+      UUID,
+      AttestationsProductionsStatus.GENERATED,
+      AttestationsProductionsType.COMPLET,
+      expect.stringContaining(UUID)
+    )
 
     expect(repository.findValidAttestationProduction).toHaveBeenCalledTimes(1)
     expect(repository.updateAttestationsProductions).toHaveBeenCalledTimes(2)
@@ -204,12 +253,11 @@ describe('Generation du PDF', () => {
     vi.mocked(repository.findValidAttestationProduction).mockResolvedValue({ path: 'test' })
     vi.mocked(repository.findPdfRecord).mockResolvedValue(pdfRecord)
     get.mockReturnValue({
-      async json () {
+      async json() {
         return agencebioOperator
       }
     })
-    vi.mocked(utils.getAllParcelles)
-      .mockResolvedValueOnce(parcelles)
+    vi.mocked(utils.getAllParcelles).mockResolvedValueOnce(parcelles)
 
     vi.spyOn(fs, 'readFileSync').mockReturnValue('test-file')
 
@@ -220,8 +268,11 @@ describe('Generation du PDF', () => {
     expect(count).toEqual(0)
     const res = (await gen.next()).value
 
-    expect(repository.findValidAttestationProduction).toHaveBeenNthCalledWith(1,
-      UUID, AttestationsProductionsType.COMPLET)
+    expect(repository.findValidAttestationProduction).toHaveBeenNthCalledWith(
+      1,
+      UUID,
+      AttestationsProductionsType.COMPLET
+    )
 
     expect(repository.findValidAttestationProduction).toHaveBeenCalledTimes(1)
     expect(repository.updateAttestationsProductions).toHaveBeenCalledTimes(0)
@@ -233,12 +284,11 @@ describe('Generation du PDF', () => {
   it('on regenere le pdf si le boolean force est a true', async () => {
     vi.mocked(repository.findPdfRecord).mockResolvedValue(pdfRecord)
     get.mockReturnValue({
-      async json () {
+      async json() {
         return agencebioOperator
       }
     })
-    vi.mocked(utils.getAllParcelles)
-      .mockResolvedValueOnce(parcelles)
+    vi.mocked(utils.getAllParcelles).mockResolvedValueOnce(parcelles)
 
     vi.spyOn(fs.promises, 'writeFile').mockResolvedValue(undefined)
     vi.mocked(generatePdfContent.createPdfContent).mockResolvedValue([generatedPdf()])
@@ -250,12 +300,21 @@ describe('Generation du PDF', () => {
     expect(count).toEqual(3)
     const res = (await gen.next()).value
 
-    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(1,
-      UUID, AttestationsProductionsStatus.STARTED, AttestationsProductionsType.COMPLET, null)
-    expect(repository.findPdfRecord).toHaveBeenNthCalledWith(1,
-      UUID)
-    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(2,
-      UUID, AttestationsProductionsStatus.GENERATED, AttestationsProductionsType.COMPLET, expect.stringContaining(UUID))
+    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(
+      1,
+      UUID,
+      AttestationsProductionsStatus.STARTED,
+      AttestationsProductionsType.COMPLET,
+      null
+    )
+    expect(repository.findPdfRecord).toHaveBeenNthCalledWith(1, UUID)
+    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(
+      2,
+      UUID,
+      AttestationsProductionsStatus.GENERATED,
+      AttestationsProductionsType.COMPLET,
+      expect.stringContaining(UUID)
+    )
 
     expect(repository.findValidAttestationProduction).toHaveBeenCalledTimes(0)
     expect(repository.updateAttestationsProductions).toHaveBeenCalledTimes(2)
@@ -268,16 +327,17 @@ describe('Generation du PDF', () => {
     vi.mocked(repository.findValidAttestationProduction).mockResolvedValue({ path: 'test' })
     vi.mocked(repository.findPdfRecord).mockResolvedValue(pdfRecord)
     get.mockReturnValue({
-      async json () {
+      async json() {
         return agencebioOperator
       }
     })
-    vi.mocked(utils.getAllParcelles)
-      .mockResolvedValueOnce(parcelles)
+    vi.mocked(utils.getAllParcelles).mockResolvedValueOnce(parcelles)
 
     vi.mocked(generatePdfContent.createPdfContent).mockResolvedValue([generatedPdf()])
     vi.spyOn(fs.promises, 'writeFile').mockResolvedValue(undefined)
-    vi.spyOn(fs, 'readFileSync').mockImplementation(() => { throw new Error('Erreur de test readFile') })
+    vi.spyOn(fs, 'readFileSync').mockImplementation(() => {
+      throw new Error('Erreur de test readFile')
+    })
 
     const UUID = randomUUID()
     const gen = exportPdf.generatePDF('123', UUID)
@@ -288,14 +348,26 @@ describe('Generation du PDF', () => {
     expect(regenerationCount).toEqual(3)
     const res = (await gen.next()).value
 
-    expect(repository.findValidAttestationProduction).toHaveBeenNthCalledWith(1,
-      UUID, AttestationsProductionsType.COMPLET)
-    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(1,
-      UUID, AttestationsProductionsStatus.STARTED, AttestationsProductionsType.COMPLET, null)
-    expect(repository.findPdfRecord).toHaveBeenNthCalledWith(1,
-      UUID)
-    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(2,
-      UUID, AttestationsProductionsStatus.GENERATED, AttestationsProductionsType.COMPLET, expect.stringContaining(UUID))
+    expect(repository.findValidAttestationProduction).toHaveBeenNthCalledWith(
+      1,
+      UUID,
+      AttestationsProductionsType.COMPLET
+    )
+    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(
+      1,
+      UUID,
+      AttestationsProductionsStatus.STARTED,
+      AttestationsProductionsType.COMPLET,
+      null
+    )
+    expect(repository.findPdfRecord).toHaveBeenNthCalledWith(1, UUID)
+    expect(repository.updateAttestationsProductions).toHaveBeenNthCalledWith(
+      2,
+      UUID,
+      AttestationsProductionsStatus.GENERATED,
+      AttestationsProductionsType.COMPLET,
+      expect.stringContaining(UUID)
+    )
 
     expect(repository.findValidAttestationProduction).toHaveBeenCalledTimes(1)
     expect(repository.updateAttestationsProductions).toHaveBeenCalledTimes(2)

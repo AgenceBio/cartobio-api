@@ -7,11 +7,9 @@ import { parcellaires, revokedTokens } from '../src/database/schema/index.js'
 /**
  * Script de nettoyage des parcellaires supprimés depuis plus de 6 mois
  */
-async function clearRecords (): Promise<void> {
+async function clearRecords(): Promise<void> {
   if (process.argv[2] === '-h' || process.argv[2] === '--help') {
-    console.log(
-      'Usage: node clean-records.js (-h|--help|--dry-run)+'
-    )
+    console.log('Usage: node clean-records.js (-h|--help|--dry-run)+')
     process.exit(0)
   }
   const dryRun = process.argv[2] === '--dry-run'
@@ -22,10 +20,12 @@ async function clearRecords (): Promise<void> {
 
   try {
     const countDeletedRecords = await db.transaction(async (tx): Promise<number> => {
-      const { count: countRecords } = firstRow(await tx
-        .select({ count: count(parcellaires.recordId) })
-        .from(parcellaires)
-        .where(expiredRecords))
+      const { count: countRecords } = firstRow(
+        await tx
+          .select({ count: count(parcellaires.recordId) })
+          .from(parcellaires)
+          .where(expiredRecords)
+      )
 
       if (countRecords === 0) {
         console.log('Aucun parcellaire a supprimer')
@@ -38,9 +38,7 @@ async function clearRecords (): Promise<void> {
         return 0
       }
 
-      const deleteRes = await tx
-        .delete(parcellaires)
-        .where(expiredRecords)
+      const deleteRes = await tx.delete(parcellaires).where(expiredRecords)
 
       return deleteRes.rowCount ?? 0
     })
@@ -59,6 +57,6 @@ async function clearRecords (): Promise<void> {
   }
 }
 
-(async function (): Promise<void> {
+;(async function (): Promise<void> {
   await clearRecords()
 })()

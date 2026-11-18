@@ -56,7 +56,13 @@ vi.mock('got')
 
 vi.mock('../src/modules/auth/auth.service.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../src/modules/auth/auth.service.js')>()),
-  getHistoryUser: vi.fn(async (userId: string | number, userRole: string | null) => ({ id: Number(userId), nom: '', prenom: '', groups: [], mainGroup: { nom: userRole } }))
+  getHistoryUser: vi.fn(async (userId: string | number, userRole: string | null) => ({
+    id: Number(userId),
+    nom: '',
+    prenom: '',
+    groups: [],
+    mainGroup: { nom: userRole }
+  }))
 }))
 
 vi.mock('../src/database/database.js', async () => {
@@ -73,13 +79,14 @@ vi.mock('../src/database/database.js', async () => {
   drizzleUrl.pathname = `/${testDatabaseName}`
   const drizzleClient = new pg.Client({ connectionString: drizzleUrl.toString() })
 
-  function transactionStatement (text: string): string | undefined {
+  function transactionStatement(text: string): string | undefined {
     if (/^begin\b/i.test(text)) return 'SAVEPOINT drizzle_test'
     if (/^commit$/i.test(text)) return 'RELEASE SAVEPOINT drizzle_test'
     if (/^rollback$/i.test(text)) return 'ROLLBACK TO SAVEPOINT drizzle_test'
   }
 
-  const { firstRow } = await vi.importActual<typeof import('../src/database/database.js')>('../src/database/database.js')
+  const { firstRow } =
+    await vi.importActual<typeof import('../src/database/database.js')>('../src/database/database.js')
 
   return {
     firstRow,

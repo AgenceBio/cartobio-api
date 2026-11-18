@@ -7,7 +7,11 @@ import { InvalidRequestApiError } from '../../shared/errors.js'
 import { parcelleUpdateSet } from '../../shared/parcellaires/parcellaires.utils.js'
 import { areaHa, wgs84FromGeoJSON } from '../../database/postgis.js'
 
-export function assertConversionNiveau (state: string | null | undefined, features: FeatureInput[], isCreation: boolean): void {
+export function assertConversionNiveau(
+  state: string | null | undefined,
+  features: FeatureInput[],
+  isCreation: boolean
+): void {
   if (!state || state === CertificationState.OPERATOR_DRAFT) return
   const isMissing = features.some(({ properties }) => {
     const value = properties?.conversion_niveau
@@ -16,11 +20,14 @@ export function assertConversionNiveau (state: string | null | undefined, featur
   if (isMissing) throw new InvalidRequestApiError('Le niveau de conversion est obligatoire.')
 }
 
-export function geometryInput (geometry: FeatureInput['geometry'] | null | undefined): SQL {
+export function geometryInput(geometry: FeatureInput['geometry'] | null | undefined): SQL {
   return geometry ? wgs84FromGeoJSON(geometry) : sql`NULL::geometry`
 }
 
-export function featureUpdateSet (properties: FeaturePropertiesInput, geometry: FeatureInput['geometry'] | null | undefined): Record<string, SQL> {
+export function featureUpdateSet(
+  properties: FeaturePropertiesInput,
+  geometry: FeatureInput['geometry'] | null | undefined
+): Record<string, SQL> {
   const geometrySql = geometryInput(geometry)
   const finalGeometry = sql`coalesce(${geometrySql}, ${parcelles.geometry})`
 

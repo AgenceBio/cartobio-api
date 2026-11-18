@@ -4,7 +4,7 @@ import { defaultServerConditions } from 'vite'
 export default defineConfig({
   ssr: {
     resolve: {
-      conditions: ['source', ...defaultServerConditions.filter(c => c !== 'module')]
+      conditions: ['source', ...defaultServerConditions.filter((c) => c !== 'module')]
     }
   },
   test: {

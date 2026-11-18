@@ -75,7 +75,10 @@ app.register(fastifyOauth, {
     })
     return state
   } as FastifyOAuth2Options['generateStateFunction'],
-  checkStateFunction: function ({ query }: FastifyRequest<{ Querystring: { state: string } }>, next: (err?: Error) => void): void {
+  checkStateFunction: function (
+    { query }: FastifyRequest<{ Querystring: { state: string } }>,
+    next: (err?: Error) => void
+  ): void {
     if (stateCache.has(query.state)) {
       return next()
     }

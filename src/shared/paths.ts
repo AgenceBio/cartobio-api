@@ -6,7 +6,7 @@ const isApiRoot = (dir: string): boolean => {
   return existsSync(file) && JSON.parse(readFileSync(file, 'utf8')).name === '@agencebio/cartobio-api'
 }
 
-function findRootDir (from: string): string {
+function findRootDir(from: string): string {
   let dir = from
   while (!isApiRoot(dir)) {
     const parent = dirname(dir)

@@ -18,53 +18,48 @@ export interface AuthRoutesOptions {
   sign: (payload: object) => string
 }
 
-export default async function authenticationRoutes (fastify: FastifyInstance, options: AuthRoutesOptions): Promise<void> {
+export default async function authenticationRoutes(
+  fastify: FastifyInstance,
+  options: AuthRoutesOptions
+): Promise<void> {
   const app = fastify.withTypeProvider<ZodTypeProvider>()
   const { stateCache, sign } = options
   const verifyIgnoringExpiration = createVerifier({ key: config.get('jwtSecret'), ignoreExpiration: true })
-  app.get(
-    '/api/v2/user/verify',
-    verifySchema,
-    async (request, reply) => {
-      const { user, organismeCertificateur } = request
+  app.get('/api/v2/user/verify', verifySchema, async (request, reply) => {
+    const { user, organismeCertificateur } = request
 
-      return reply.send(user ?? organismeCertificateur)
-    }
-  )
+    return reply.send(user ?? organismeCertificateur)
+  })
 
-  app.get(
-    '/api/v2/user/exchangeToken',
-    exchangeTokenSchema,
-    async (request, reply) => {
-      const { error, decodedToken } = service.verifyNotificationAuthorization(
-        request.headers.authorization
-      )
+  app.get('/api/v2/user/exchangeToken', exchangeTokenSchema, async (request, reply) => {
+    const { error, decodedToken } = service.verifyNotificationAuthorization(request.headers.authorization)
 
-      if (error || !decodedToken) {
-        throw new UnauthorizedApiError('impossible de vérifier ce jeton', {
-          cause: error
-        })
-      }
-
-      const [operator, userProfile] = await Promise.all([
-        service.fetchOperatorByNumeroBio(decodedToken.numeroBio),
-        service.getUserProfileById(decodedToken.userId)
-      ])
-
-      const sign = createSigner({
-        key: config.get('jwtSecret'),
-        expiresIn: DURATION_ONE_HOUR * 2
-      })
-
-      return reply.send({
-        operator,
-        // @todo use Notification pubkey and time based token to passthrough the requests to both Agence Bio and CartoBio APIs
-        token: sign(userProfile)
+    if (error || !decodedToken) {
+      throw new UnauthorizedApiError('impossible de vérifier ce jeton', {
+        cause: error
       })
     }
-  )
 
-  app.get('/auth-provider/agencebio/login', devLoginSchema, (_request, reply) => reply.redirect('/api/auth-provider/agencebio/login'))
+    const [operator, userProfile] = await Promise.all([
+      service.fetchOperatorByNumeroBio(decodedToken.numeroBio),
+      service.getUserProfileById(decodedToken.userId)
+    ])
+
+    const sign = createSigner({
+      key: config.get('jwtSecret'),
+      expiresIn: DURATION_ONE_HOUR * 2
+    })
+
+    return reply.send({
+      operator,
+      // @todo use Notification pubkey and time based token to passthrough the requests to both Agence Bio and CartoBio APIs
+      token: sign(userProfile)
+    })
+  })
+
+  app.get('/auth-provider/agencebio/login', devLoginSchema, (_request, reply) =>
+    reply.redirect('/api/auth-provider/agencebio/login')
+  )
   app.get('/api/auth-provider/agencebio/callback', ssoCallbackSchema, async (request, reply) => {
     // forwards to the UI the user-selected tab
     const state = stateCache.get(request.query.state)
@@ -81,7 +76,7 @@ export default async function authenticationRoutes (fastify: FastifyInstance, op
 
   app.post('/api/auth-provider/logout', logoutSchema, async (request, reply) => {
     const cartobioToken = request.headers.authorization?.split(' ')[1]
-    if (!cartobioToken) throw new UnauthorizedApiError('un jeton d\'API est nécessaire pour se déconnecter.')
+    if (!cartobioToken) throw new UnauthorizedApiError("un jeton d'API est nécessaire pour se déconnecter.")
     let payload: unknown
     try {
       payload = verifyIgnoringExpiration(cartobioToken)
@@ -100,5 +95,4 @@ export default async function authenticationRoutes (fastify: FastifyInstance, op
 
     return reply.code(200).send({ logoutUrl: logoutUrl.toString() })
   })
-
 }

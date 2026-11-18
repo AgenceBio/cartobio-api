@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 export const versionResponseSchema = z.object({
-  version: z.string().meta({ description: 'Version de l\'API déployée', examples: ['2.42.0'] })
+  version: z.string().meta({ description: "Version de l'API déployée", examples: ['2.42.0'] })
 })
 
 export const testResponseSchema = z.object({

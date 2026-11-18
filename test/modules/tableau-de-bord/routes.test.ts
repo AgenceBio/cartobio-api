@@ -23,9 +23,15 @@ const OC_TOKEN = 'aaaa-bbbb-cccc-dddd'
 beforeAll(() => app.ready())
 afterAll(() => app.close())
 beforeEach(() => {
-  got.post.mockReturnValue({ async json () { return fakeOc } })
+  got.post.mockReturnValue({
+    async json() {
+      return fakeOc
+    }
+  })
 })
-afterEach(() => { vi.clearAllMocks() })
+afterEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('GET /api/v3/tdb-api/*', () => {
   test('refuse une requête sans jeton', async () => {
@@ -63,17 +69,38 @@ describe('GET /api/v3/tdb-api/*', () => {
   const emptyPage = { data: [], meta: { total: 0, page: 1, limit: 20 } }
 
   test.each([
-    ['/tableau-errors', service.getTableauErreurs, () => vi.mocked(service.getTableauErreurs).mockResolvedValueOnce(emptyPage), emptyPage, {}],
-    ['/historique', service.getHistoriqueSpecificParcellaire, () => vi.mocked(service.getHistoriqueSpecificParcellaire).mockResolvedValueOnce([]), [], { numeroBio: '123' }],
-    ['/top-anomalies-grouped', service.getTopAnomaliesGrouped, () => vi.mocked(service.getTopAnomaliesGrouped).mockResolvedValueOnce([]), [], {}],
-    ['/repet-ano', service.getRepetErreurs, () => vi.mocked(service.getRepetErreurs).mockResolvedValueOnce(emptyPage), emptyPage, { from: '2026-01-01', to: '2026-01-31' }]
+    [
+      '/tableau-errors',
+      service.getTableauErreurs,
+      () => vi.mocked(service.getTableauErreurs).mockResolvedValueOnce(emptyPage),
+      emptyPage,
+      {}
+    ],
+    [
+      '/historique',
+      service.getHistoriqueSpecificParcellaire,
+      () => vi.mocked(service.getHistoriqueSpecificParcellaire).mockResolvedValueOnce([]),
+      [],
+      { numeroBio: '123' }
+    ],
+    [
+      '/top-anomalies-grouped',
+      service.getTopAnomaliesGrouped,
+      () => vi.mocked(service.getTopAnomaliesGrouped).mockResolvedValueOnce([]),
+      [],
+      {}
+    ],
+    [
+      '/repet-ano',
+      service.getRepetErreurs,
+      () => vi.mocked(service.getRepetErreurs).mockResolvedValueOnce(emptyPage),
+      emptyPage,
+      { from: '2026-01-01', to: '2026-01-31' }
+    ]
   ])('%s renvoie directement le résultat du service', async (path, fn, mockResult, expected, query) => {
     mockResult()
 
-    const response = await request(app.server)
-      .get(`/api/v3/tdb-api${path}`)
-      .query(query)
-      .set('Authorization', OC_TOKEN)
+    const response = await request(app.server).get(`/api/v3/tdb-api${path}`).query(query).set('Authorization', OC_TOKEN)
 
     expect(response.status).toEqual(200)
     expect(response.body).toEqual(expected)

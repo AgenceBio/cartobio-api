@@ -9,8 +9,14 @@ async function getStatsByOrganisme(organisme: string, start: Date, end: Date): P
     .select({
       organismeCertificateur: parcellaireImport.organismeCertificateur,
       totalRecu: count(),
-      totalAcceptes: sql<number>`COUNT(*) FILTER (WHERE ${eq(parcellaireImport.statutJob, importJobResultEnumSchema.enum.VALID)})`.mapWith(Number),
-      totalRefuses: sql<number>`COUNT(*) FILTER (WHERE ${inArray(parcellaireImport.statutJob, [importJobResultEnumSchema.enum.REJECTED, importJobResultEnumSchema.enum.ERROR])})`.mapWith(Number)
+      totalAcceptes:
+        sql<number>`COUNT(*) FILTER (WHERE ${eq(parcellaireImport.statutJob, importJobResultEnumSchema.enum.VALID)})`.mapWith(
+          Number
+        ),
+      totalRefuses:
+        sql<number>`COUNT(*) FILTER (WHERE ${inArray(parcellaireImport.statutJob, [importJobResultEnumSchema.enum.REJECTED, importJobResultEnumSchema.enum.ERROR])})`.mapWith(
+          Number
+        )
     })
     .from(parcellaireImport)
     .where(

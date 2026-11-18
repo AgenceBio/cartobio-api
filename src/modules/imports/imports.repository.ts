@@ -30,49 +30,90 @@ import type {
   OperatorRecordFilters
 } from './imports.types.js'
 
-async function completeImportJob ({ result, jobId, statutJob = null }: { result: unknown; jobId: string | number; statutJob?: ImportJobResult | null }): Promise<number> {
-  const { id } = firstRow(await db
-    .update(parcellaireImport)
-    .set({
-      ...updateImportJobSchema.parse({
-        resultJob: result,
-        status: importStatusEnumSchema.enum.DONE,
-        ...(statutJob ? { statutJob } : {})
-      }),
-      endedAt: sql`NOW()`
-    })
-    .where(eq(parcellaireImport.id, Number(jobId)))
-    .returning({ id: parcellaireImport.id }))
+async function completeImportJob({
+  result,
+  jobId,
+  statutJob = null
+}: {
+  result: unknown
+  jobId: string | number
+  statutJob?: ImportJobResult | null
+}): Promise<number> {
+  const { id } = firstRow(
+    await db
+      .update(parcellaireImport)
+      .set({
+        ...updateImportJobSchema.parse({
+          resultJob: result,
+          status: importStatusEnumSchema.enum.DONE,
+          ...(statutJob ? { statutJob } : {})
+        }),
+        endedAt: sql`NOW()`
+      })
+      .where(eq(parcellaireImport.id, Number(jobId)))
+      .returning({ id: parcellaireImport.id })
+  )
 
   return id
 }
 
-async function insertImportLog (importId: string | number, { numeroBio, idParcelle = null, nomParcelle = null, type, code, message }: { numeroBio?: string; idParcelle?: string | number | null; nomParcelle?: string | null; type: 'warning' | 'error'; code: string; message: string }): Promise<void> {
-  await db.insert(parcellaireImportLogs).values(createImportLogSchema.parse({
-    importId: Number(importId),
+async function insertImportLog(
+  importId: string | number,
+  {
     numeroBio,
-    parcelleId: idParcelle === null ? null : String(idParcelle),
-    parcelleName: nomParcelle,
+    idParcelle = null,
+    nomParcelle = null,
     type,
     code,
     message
-  }))
+  }: {
+    numeroBio?: string
+    idParcelle?: string | number | null
+    nomParcelle?: string | null
+    type: 'warning' | 'error'
+    code: string
+    message: string
+  }
+): Promise<void> {
+  await db.insert(parcellaireImportLogs).values(
+    createImportLogSchema.parse({
+      importId: Number(importId),
+      numeroBio,
+      parcelleId: idParcelle === null ? null : String(idParcelle),
+      parcelleName: nomParcelle,
+      type,
+      code,
+      message
+    })
+  )
 }
 
-async function createImportJob (organismeCertificateurId: number): Promise<number> {
-  const { id } = firstRow(await db
-    .insert(parcellaireImport)
-    .values(createImportJobSchema.parse({ status: importStatusEnumSchema.enum.CREATED, organismeCertificateur: String(organismeCertificateurId) }))
-    .returning({ id: parcellaireImport.id }))
+async function createImportJob(organismeCertificateurId: number): Promise<number> {
+  const { id } = firstRow(
+    await db
+      .insert(parcellaireImport)
+      .values(
+        createImportJobSchema.parse({
+          status: importStatusEnumSchema.enum.CREATED,
+          organismeCertificateur: String(organismeCertificateurId)
+        })
+      )
+      .returning({ id: parcellaireImport.id })
+  )
 
   return id
 }
 
-async function insertPayload (jobId: string | number, payload: unknown): Promise<void> {
-  await db.insert(parcellaireImportPayload).values(createImportPayloadSchema.parse({ id: randomUUID(), importId: Number(jobId), payload }))
+async function insertPayload(jobId: string | number, payload: unknown): Promise<void> {
+  await db
+    .insert(parcellaireImportPayload)
+    .values(createImportPayloadSchema.parse({ id: randomUUID(), importId: Number(jobId), payload }))
 }
 
-async function updateImportJobRecordInfos (jobId: string | number, { numeroBio, numeroClient, auditDate }: ImportJobRecordInfos): Promise<void> {
+async function updateImportJobRecordInfos(
+  jobId: string | number,
+  { numeroBio, numeroClient, auditDate }: ImportJobRecordInfos
+): Promise<void> {
   await db
     .update(parcellaireImport)
     .set(updateImportJobSchema.parse({ numeroBio, numeroClient, auditDate }))
@@ -83,41 +124,62 @@ async function updateImportJobRecordInfos (jobId: string | number, { numeroBio, 
  * Renseigne les informations du record et détermine s'il s'agit d'une création
  * ou de la mise à jour d'un parcellaire existant (colonne etat)
  */
-async function updateImportJobEtat (jobId: string | number, { numeroBio, numeroClient, auditDate }: ImportJobRecordInfos): Promise<void> {
-  const parcellaireExistant = numeroBio !== null && numeroClient !== null && auditDate !== null
-    ? await db.$count(parcellaires, and(
-      sql`${parcellaires.numeroBio}::text = ${numeroBio}`,
-      eq(parcellaires.auditDate, auditDate),
-      isNull(parcellaires.deletedAt)
-    )) > 0
-    : null
+async function updateImportJobEtat(
+  jobId: string | number,
+  { numeroBio, numeroClient, auditDate }: ImportJobRecordInfos
+): Promise<void> {
+  const parcellaireExistant =
+    numeroBio !== null && numeroClient !== null && auditDate !== null
+      ? (await db.$count(
+          parcellaires,
+          and(
+            sql`${parcellaires.numeroBio}::text = ${numeroBio}`,
+            eq(parcellaires.auditDate, auditDate),
+            isNull(parcellaires.deletedAt)
+          )
+        )) > 0
+      : null
 
   await db
     .update(parcellaireImport)
-    .set(updateImportJobSchema.parse({
-      numeroBio,
-      numeroClient,
-      auditDate,
-      etat: parcellaireExistant === null ? importJobEtatEnumSchema.enum.UNKNOWN : parcellaireExistant ? importJobEtatEnumSchema.enum.UPDATED : importJobEtatEnumSchema.enum.CREATED
-    }))
+    .set(
+      updateImportJobSchema.parse({
+        numeroBio,
+        numeroClient,
+        auditDate,
+        etat:
+          parcellaireExistant === null
+            ? importJobEtatEnumSchema.enum.UNKNOWN
+            : parcellaireExistant
+              ? importJobEtatEnumSchema.enum.UPDATED
+              : importJobEtatEnumSchema.enum.CREATED
+      })
+    )
     .where(eq(parcellaireImport.id, Number(jobId)))
 }
 
-async function updateImportJobResult (jobId: string | number, statutJob: ImportJobResult): Promise<void> {
-  await db.update(parcellaireImport).set(updateImportJobSchema.parse({ statutJob })).where(eq(parcellaireImport.id, Number(jobId)))
+async function updateImportJobResult(jobId: string | number, statutJob: ImportJobResult): Promise<void> {
+  await db
+    .update(parcellaireImport)
+    .set(updateImportJobSchema.parse({ statutJob }))
+    .where(eq(parcellaireImport.id, Number(jobId)))
 }
 
-async function failImportJob (jobId: string | number, result: { name: string; message: string }): Promise<void> {
+async function failImportJob(jobId: string | number, result: { name: string; message: string }): Promise<void> {
   await db
     .update(parcellaireImport)
     .set({
-      ...updateImportJobSchema.parse({ status: importStatusEnumSchema.enum.ERROR, statutJob: importJobResultEnumSchema.enum.ERROR, resultJob: result }),
+      ...updateImportJobSchema.parse({
+        status: importStatusEnumSchema.enum.ERROR,
+        statutJob: importJobResultEnumSchema.enum.ERROR,
+        resultJob: result
+      }),
       endedAt: sql`NOW()`
     })
     .where(eq(parcellaireImport.id, Number(jobId)))
 }
 
-async function findImportJob (id: string | number, organisme: number): Promise<ImportJobRow | null> {
+async function findImportJob(id: string | number, organisme: number): Promise<ImportJobRow | null> {
   const [job] = await db
     .select({
       status: parcellaireImport.status,
@@ -134,22 +196,42 @@ async function findImportJob (id: string | number, organisme: number): Promise<I
   return job ?? null
 }
 
-async function updateImportJobStatus (jobId: string | number, status: ImportStatus, result?: Record<string, unknown>): Promise<void> {
+async function updateImportJobStatus(
+  jobId: string | number,
+  status: ImportStatus,
+  result?: Record<string, unknown>
+): Promise<void> {
   await db
     .update(parcellaireImport)
     .set({
       ...updateImportJobSchema.parse({ status, resultJob: result ?? {} }),
-      ...(status === importStatusEnumSchema.enum.DONE || status === importStatusEnumSchema.enum.ERROR ? { endedAt: sql`NOW()` } : {})
+      ...(status === importStatusEnumSchema.enum.DONE || status === importStatusEnumSchema.enum.ERROR
+        ? { endedAt: sql`NOW()` }
+        : {})
     })
     .where(eq(parcellaireImport.id, Number(jobId)))
 }
 
-async function findImportList ({ status, organismeCertificateur: organisme, from, to, payload, withRejected, page, limit }: ImportListFilters): Promise<{ rows: ImportJobListRow[]; total: number }> {
+async function findImportList({
+  status,
+  organismeCertificateur: organisme,
+  from,
+  to,
+  payload,
+  withRejected,
+  page,
+  limit
+}: ImportListFilters): Promise<{ rows: ImportJobListRow[]; total: number }> {
   const conditions: SQL[] = []
 
   if (status) {
-    const statuts = status.split(',').map(value => value.trim().toUpperCase())
-    conditions.push(inArray(parcellaireImport.status, importStatusEnumSchema.options.filter(value => statuts.includes(value))))
+    const statuts = status.split(',').map((value) => value.trim().toUpperCase())
+    conditions.push(
+      inArray(
+        parcellaireImport.status,
+        importStatusEnumSchema.options.filter((value) => statuts.includes(value))
+      )
+    )
   }
 
   if (from) {
@@ -194,7 +276,11 @@ async function findImportList ({ status, organismeCertificateur: organisme, from
   return { rows, total }
 }
 
-async function findImportById (id: string | number, organisme: number, includePayload: boolean): Promise<ImportJobListRow | null> {
+async function findImportById(
+  id: string | number,
+  organisme: number,
+  includePayload: boolean
+): Promise<ImportJobListRow | null> {
   const query = db
     .select({ ...importJobColumns, started_at: parcellaireImport.startedAt, payload: payloadColumn(includePayload) })
     .from(parcellaireImport)
@@ -204,42 +290,57 @@ async function findImportById (id: string | number, organisme: number, includePa
     query.leftJoin(parcellaireImportPayload, eq(parcellaireImportPayload.importId, parcellaireImport.id))
   }
 
-  const [row] = await query.where(and(
-    eq(parcellaireImport.id, Number(id)),
-    eq(parcellaireImport.organismeCertificateur, String(organisme))
-  ))
+  const [row] = await query.where(
+    and(eq(parcellaireImport.id, Number(id)), eq(parcellaireImport.organismeCertificateur, String(organisme)))
+  )
 
   return row ?? null
 }
 
-async function findLastOperatorRecord (numeroBio: string | number, { anneeAudit = null, statut = null }: OperatorRecordFilters = {}): Promise<DBOperatorRecord | null> {
+async function findLastOperatorRecord(
+  numeroBio: string | number,
+  { anneeAudit = null, statut = null }: OperatorRecordFilters = {}
+): Promise<DBOperatorRecord | null> {
   const [record] = await db
     .select(operatorRecordColumns)
     .from(parcellaires)
     .leftJoin(organismeCertificateur, eq(organismeCertificateur.id, parcellaires.ocId))
     .leftJoin(parcellairesMetadata, eq(parcellairesMetadata.recordId, parcellaires.recordId))
-    .where(and(
-      eq(parcellaires.numeroBio, Number(numeroBio)),
-      isNull(parcellaires.deletedAt),
-      ...operatorRecordConditions({ anneeAudit, statut })
-    ))
+    .where(
+      and(
+        eq(parcellaires.numeroBio, Number(numeroBio)),
+        isNull(parcellaires.deletedAt),
+        ...operatorRecordConditions({ anneeAudit, statut })
+      )
+    )
     .orderBy(desc(parcellaires.updatedAt))
     .limit(1)
 
   return record ?? null
 }
 
-async function findOperatorLastRecords (ocId: number, { anneeAudit = null, statut = null, anneeReferenceControle = null, limit = null, start = null }: OperatorRecordFilters = {}): Promise<DBOperatorRecord[]> {
+async function findOperatorLastRecords(
+  ocId: number,
+  {
+    anneeAudit = null,
+    statut = null,
+    anneeReferenceControle = null,
+    limit = null,
+    start = null
+  }: OperatorRecordFilters = {}
+): Promise<DBOperatorRecord[]> {
   const query = db
     .selectDistinctOn([parcellaires.numeroBio], operatorRecordColumns)
     .from(parcellaires)
     .leftJoin(organismeCertificateur, eq(organismeCertificateur.id, parcellaires.ocId))
     .leftJoin(parcellairesMetadata, eq(parcellairesMetadata.recordId, parcellaires.recordId))
-    .where(and(
-      eq(parcellaires.ocId, String(ocId)),
-      isNull(parcellaires.deletedAt),
-      ...operatorRecordConditions({ anneeAudit, statut, anneeReferenceControle })
-    ))
+    .where(
+      and(
+        eq(parcellaires.ocId, String(ocId)),
+        isNull(parcellaires.deletedAt),
+        ...operatorRecordConditions({ anneeAudit, statut, anneeReferenceControle })
+      )
+    )
     .orderBy(asc(parcellaires.numeroBio), desc(parcellaires.updatedAt))
     .$dynamic()
 

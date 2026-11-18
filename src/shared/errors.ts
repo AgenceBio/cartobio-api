@@ -5,8 +5,11 @@ import { z, ZodError } from 'zod'
 import type { ApiError, ValidationIssue } from '@agencebio/cartobio-types'
 import config from '../config/env.js'
 
-
-const ExpiredCredentialsApiError = createError('EXPIRED_CREDENTIALS', 'Accès refusé : ce jeton n\'est plus valide (%s).', 401)
+const ExpiredCredentialsApiError = createError(
+  'EXPIRED_CREDENTIALS',
+  "Accès refusé : ce jeton n'est plus valide (%s).",
+  401
+)
 const InvalidCredentialsApiError = createError('INVALID_CREDENTIALS', 'Accès refusé : %s', 401)
 const InvalidRequestApiError = createError('INVALID_API_REQUEST', '%s', 400)
 const MissingGeometryApiError = createError('MISSING_GEOMETRY', '%s', 400)
@@ -14,12 +17,16 @@ const NotFoundApiError = createError('NOT_FOUND', '%s', 404)
 const UnauthorizedApiError = createError('UNAUTHORIZED', 'Accès refusé : %s', 401)
 const ForbiddenApiError = createError('FORBIDDEN', 'Accès refusé : %s', 403)
 const BadGatewayApiError = createError('BAD_GATEWAY', 'Erreur serveur : %s', 502)
-const PreconditionFailedApiError = createError('PRECONDITION_FAILED', 'La ressource a été modifiée depuis la dernière requête.', 412)
+const PreconditionFailedApiError = createError(
+  'PRECONDITION_FAILED',
+  'La ressource a été modifiée depuis la dernière requête.',
+  412
+)
 
 const hasProperty = <K extends string>(value: unknown, key: K): value is Record<K, unknown> =>
   typeof value === 'object' && value !== null && key in value
 
-const getErrorMessage = (error: unknown): string => error instanceof Error ? error.message : String(error)
+const getErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error))
 
 const getErrorCode = (error: unknown): unknown => {
   if (hasProperty(error, 'code')) return error.code
@@ -48,7 +55,7 @@ const validationErrorBody = (location: string, validation: { instancePath: strin
   }))
   const [first] = details
   const others = details.length - 1
-  const summary = first?.path ? `${first.path} : ${first.message}` : first?.message ?? 'Valeur invalide'
+  const summary = first?.path ? `${first.path} : ${first.message}` : (first?.message ?? 'Valeur invalide')
 
   return {
     statusCode: 400,
@@ -91,9 +98,11 @@ const errorHandler = (error: FastifyError, request: FastifyRequest, reply: Fasti
   request.log.error({ err: error }, error.message)
 
   // All other errors are internal server errors which should not be exposed to the client
-  return reply.send(new Error('Erreur serveur. Nous avons été informés et résoudrons ceci au plus vite.', {
-    cause: error.message
-  }))
+  return reply.send(
+    new Error('Erreur serveur. Nous avons été informés et résoudrons ceci au plus vite.', {
+      cause: error.message
+    })
+  )
 }
 
 export {

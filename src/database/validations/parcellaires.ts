@@ -1,48 +1,48 @@
-import { createInsertSchema, createUpdateSchema } from 'drizzle-orm/zod';
-import { z } from 'zod';
-import { certificationType } from '../schema/enums.js';
-import { parcellaires, parcellairesEvenements, parcellairesMetadata } from '../schema/parcellaires.js';
-import { emptyToNull } from './helpers.js';
+import { createInsertSchema, createUpdateSchema } from 'drizzle-orm/zod'
+import { z } from 'zod'
+import { certificationType } from '../schema/enums.js'
+import { parcellaires, parcellairesEvenements, parcellairesMetadata } from '../schema/parcellaires.js'
+import { emptyToNull } from './helpers.js'
 
-export const certificationEtatEnumSchema = z.enum(certificationType.enumValues);
+export const certificationEtatEnumSchema = z.enum(certificationType.enumValues)
 
-export type CertificationEtat = z.infer<typeof certificationEtatEnumSchema>;
+export type CertificationEtat = z.infer<typeof certificationEtatEnumSchema>
 
 export const createParcellaireSchema = createInsertSchema(parcellaires, {
   numeroBio: (schema) => schema.int().positive(),
   anneeReferenceControle: (schema) => schema.int().min(2020).max(2100),
   versionNom: (schema) => schema.trim().min(1).max(255),
   auditNotesCertif: () => emptyToNull(z.string().trim().max(10_000)),
-  auditDemandesOperateur: () => emptyToNull(z.string().trim().max(10_000)),
+  auditDemandesOperateur: () => emptyToNull(z.string().trim().max(10_000))
 })
   .omit({
     recordId: true,
     createdAt: true,
     updatedAt: true,
-    deletedAt: true,
+    deletedAt: true
   })
-  .strict();
+  .strict()
 
 export const updateParcellaireSchema = createUpdateSchema(parcellaires, {
   numeroBio: (schema) => schema.int().positive(),
   auditNotesCertif: () => emptyToNull(z.string().trim().max(10_000)),
-  auditDemandesOperateur: () => emptyToNull(z.string().trim().max(10_000)),
+  auditDemandesOperateur: () => emptyToNull(z.string().trim().max(10_000))
 })
   .omit({
     recordId: true,
     createdAt: true,
     updatedAt: true,
-    deletedAt: true,
+    deletedAt: true
   })
   .strict()
   .refine((data) => Object.keys(data).length > 0, {
-    message: 'Au moins un champ doit être fourni.',
-  });
+    message: 'Au moins un champ doit être fourni.'
+  })
 
 export const createParcellaireEvenementSchema = createInsertSchema(parcellairesEvenements)
   .omit({
-    id: true,
+    id: true
   })
-  .strict();
+  .strict()
 
-export const createParcellaireMetadataSchema = createInsertSchema(parcellairesMetadata).strict();
+export const createParcellaireMetadataSchema = createInsertSchema(parcellairesMetadata).strict()

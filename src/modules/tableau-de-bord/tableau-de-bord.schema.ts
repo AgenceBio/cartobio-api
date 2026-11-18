@@ -1,4 +1,13 @@
-import { generalKpiResponseSchema, historiqueResponseSchema, repetitionsResponseSchema, statsQuerySchema, tableauBilanResponseSchema, tableauErreursResponseSchema, topAnomaliesGroupedResponseSchema, topAnomaliesResponseSchema } from '@agencebio/cartobio-types'
+import {
+  generalKpiResponseSchema,
+  historiqueResponseSchema,
+  repetitionsResponseSchema,
+  statsQuerySchema,
+  tableauBilanResponseSchema,
+  tableauErreursResponseSchema,
+  topAnomaliesGroupedResponseSchema,
+  topAnomaliesResponseSchema
+} from '@agencebio/cartobio-types'
 import { apiError, commonErrorResponses, protectedWithToken, TAGS, withSchema } from '../../shared/routes.js'
 import type { CartobioExtendedRouteShorthandOptions } from '../../shared/routes.js'
 
@@ -12,7 +21,10 @@ export const generalKpiSchema = withSchema(tableauDeBordRoute(), {
   tags: [TAGS.SUIVI_API_PARCELLAIRE],
   summary: 'Indicateurs généraux des envois',
   querystring: statsQuerySchema.pick(periode),
-  response: { ...commonErrorResponses, 200: generalKpiResponseSchema.meta({ description: 'Indicateurs sur la période' }) }
+  response: {
+    ...commonErrorResponses,
+    200: generalKpiResponseSchema.meta({ description: 'Indicateurs sur la période' })
+  }
 })
 
 export const tableauBilanSchema = withSchema(tableauDeBordRoute(), {
@@ -21,7 +33,7 @@ export const tableauBilanSchema = withSchema(tableauDeBordRoute(), {
   summary: 'Bilan des envois',
   description: 'Liste paginée des envois, avec leur résultat et leur effet sur le parcellaire.',
   querystring: statsQuerySchema.pick({ ...paginationRecherche, statuts: true, etats: true, ordreDate: true }),
-  response: { ...commonErrorResponses, 200: tableauBilanResponseSchema.meta({ description: 'Page d\'envois' }) }
+  response: { ...commonErrorResponses, 200: tableauBilanResponseSchema.meta({ description: "Page d'envois" }) }
 })
 
 export const tableauErreursSchema = withSchema(tableauDeBordRoute(), {
@@ -29,17 +41,22 @@ export const tableauErreursSchema = withSchema(tableauDeBordRoute(), {
   tags: [TAGS.SUIVI_API_PARCELLAIRE],
   summary: 'Envois rejetés et leurs erreurs',
   querystring: statsQuerySchema.pick({ ...paginationRecherche, codes: true, ordreDate: true }),
-  response: { ...commonErrorResponses, 200: tableauErreursResponseSchema.meta({ description: 'Page d\'envois rejetés avec le détail des erreurs' }) }
+  response: {
+    ...commonErrorResponses,
+    200: tableauErreursResponseSchema.meta({ description: "Page d'envois rejetés avec le détail des erreurs" })
+  }
 })
 
 export const historiqueSchema = withSchema(tableauDeBordRoute(), {
   operationId: 'getParcellaireImportsHistory',
   tags: [TAGS.SUIVI_API_PARCELLAIRE],
-  summary: 'Historique des envois d\'un parcellaire',
-  description: 'Parcellaire identifié par le numéro bio ou le numéro client, et la date d\'audit.',
+  summary: "Historique des envois d'un parcellaire",
+  description: "Parcellaire identifié par le numéro bio ou le numéro client, et la date d'audit.",
   querystring: statsQuerySchema
     .pick({ numeroBio: true, numeroClient: true, auditDate: true })
-    .refine(({ numeroBio, numeroClient }) => numeroBio || numeroClient, { message: 'Le numéro bio ou le numéro client est obligatoire' }),
+    .refine(({ numeroBio, numeroClient }) => numeroBio || numeroClient, {
+      message: 'Le numéro bio ou le numéro client est obligatoire'
+    }),
   response: {
     ...commonErrorResponses,
     200: historiqueResponseSchema.meta({ description: 'Envois successifs du parcellaire' }),
@@ -61,7 +78,10 @@ export const topAnomaliesGroupedSchema = withSchema(tableauDeBordRoute(), {
   summary: 'Évolution des erreurs les plus fréquentes',
   description: 'Erreurs agrégées par jour ou par semaine selon la durée de la période.',
   querystring: statsQuerySchema.pick(periode),
-  response: { ...commonErrorResponses, 200: topAnomaliesGroupedResponseSchema.meta({ description: 'Séries d\'erreurs par code' }) }
+  response: {
+    ...commonErrorResponses,
+    200: topAnomaliesGroupedResponseSchema.meta({ description: "Séries d'erreurs par code" })
+  }
 })
 
 export const repetitionsSchema = withSchema(tableauDeBordRoute(), {
@@ -72,7 +92,7 @@ export const repetitionsSchema = withSchema(tableauDeBordRoute(), {
   querystring: statsQuerySchema.pick({ ...paginationRecherche, type: true }).required({ from: true, to: true }),
   response: {
     ...commonErrorResponses,
-    200: repetitionsResponseSchema.meta({ description: 'Page d\'alertes, une par série' }),
+    200: repetitionsResponseSchema.meta({ description: "Page d'alertes, une par série" }),
     400: apiError('Période `from` / `to` absente')
   }
 })

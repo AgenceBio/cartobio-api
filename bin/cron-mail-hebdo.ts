@@ -3,7 +3,7 @@
 import { sendRapportHebdo } from '../src/services/mailer/utils.js'
 import { getDestinatairesRapport } from '../src/services/mailer/repository.js'
 
-async function sendMail (): Promise<void> {
+async function sendMail(): Promise<void> {
   const ocList = await getDestinatairesRapport()
 
   if (!ocList.length) {
@@ -24,6 +24,6 @@ async function sendMail (): Promise<void> {
   process.exit(errors > 0 ? 1 : 0)
 }
 
-(async function (): Promise<void> {
+;(async function (): Promise<void> {
   await sendMail()
 })()

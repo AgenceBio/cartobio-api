@@ -19,7 +19,7 @@ if (xlsxPath === undefined || ocId === undefined) {
   process.exit(1)
 }
 
-(async (): Promise<void> => {
+;(async (): Promise<void> => {
   const workbook = xlsx.readFile(xlsxPath)
   const sheetName = workbook.SheetNames[0]
   const sheet = sheetName === undefined ? undefined : workbook.Sheets[sheetName]
@@ -29,7 +29,7 @@ if (xlsxPath === undefined || ocId === undefined) {
   }
   const rows = xlsx.utils.sheet_to_json<Record<string, unknown>>(sheet)
   const codesBio = rows
-    .map(r => r['Code bio'])
+    .map((r) => r['Code bio'])
     .filter(Boolean)
     .map(String)
 
@@ -52,10 +52,10 @@ if (xlsxPath === undefined || ocId === undefined) {
     process.exit(1)
   }
 
-  const operatorBioNumbers = new Set(operators.map(o => o.numeroBio.toString()))
+  const operatorBioNumbers = new Set(operators.map((o) => o.numeroBio.toString()))
 
-  const validCodesBio = codesBio.filter(nb => operatorBioNumbers.has(nb))
-  const invalidCodesBio = codesBio.filter(nb => !validCodesBio.includes(nb))
+  const validCodesBio = codesBio.filter((nb) => operatorBioNumbers.has(nb))
+  const invalidCodesBio = codesBio.filter((nb) => !validCodesBio.includes(nb))
 
   if (validCodesBio.length > 0) {
     console.log('Nombre de codes bios importées : ', validCodesBio.length)
@@ -74,8 +74,8 @@ if (xlsxPath === undefined || ocId === undefined) {
     .select({ record: importPac.record, numerobio: sql<string>`${importPac.numeroBio}` })
     .from(importPac)
     .where(and(inArray(importPac.numeroBio, validCodesBio), eq(importPac.imported, false)))
-  const numerobioACreer = parcellairesACreer.map(r => r.numerobio)
-  const parcellairesDejaImportes = validCodesBio.filter(nb => !numerobioACreer.includes(nb))
+  const numerobioACreer = parcellairesACreer.map((r) => r.numerobio)
+  const parcellairesDejaImportes = validCodesBio.filter((nb) => !numerobioACreer.includes(nb))
 
   if (parcellairesDejaImportes.length > 0) {
     console.warn('Codes bio déjà importés :', parcellairesDejaImportes.join(', '))

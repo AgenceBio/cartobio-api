@@ -49,14 +49,22 @@ const ONE_HOUR = 60 * 60 * 1000
  * @see https://github.com/sindresorhus/strip-bom/blob/main/index.js
  * @see https://en.wikipedia.org/wiki/Byte_order_mark
  */
-const stripBOM = (string: string): string => string.charCodeAt(0) === 0xFEFF ? string.slice(1) : string
+const stripBOM = (string: string): string => (string.charCodeAt(0) === 0xfeff ? string.slice(1) : string)
 
-const excludeFieldsWithoutMainGeometry = ({ Geography, PlotKind }: GeofoliaField): boolean => !(!Geography && PlotKind === PLOT_KIND_PRIMARY)
+const excludeFieldsWithoutMainGeometry = ({ Geography, PlotKind }: GeofoliaField): boolean =>
+  !(!Geography && PlotKind === PLOT_KIND_PRIMARY)
 
 const PLOT_KIND_PRIMARY = 1
 const PLOT_KIND_SECONDARY = 2
 
-function cultureFromField (Field: GeofoliaField): { id: string; CPF: string | undefined; GF: string; date_semis?: string; variete?: string; surface?: number } {
+function cultureFromField(Field: GeofoliaField): {
+  id: string
+  CPF: string | undefined
+  GF: string
+  date_semis?: string
+  variete?: string
+  surface?: number
+} {
   return {
     CPF: fromCodeGeofolia(Field.RNCropCode)?.code_cpf,
     GF: Field.RNCropCode,
@@ -67,40 +75,42 @@ function cultureFromField (Field: GeofoliaField): { id: string; CPF: string | un
   }
 }
 
-function convertGeofoliaFieldsToGeoJSON (data: { Fields: GeofoliaField[] }): FeatureCollection {
+function convertGeofoliaFieldsToGeoJSON(data: { Fields: GeofoliaField[] }): FeatureCollection {
   const fields = data.Fields.filter(excludeFieldsWithoutMainGeometry)
-  const mainFields = fields.filter((field): field is GeofoliaField & { Geography: string } => Boolean(field.Geography) && field.PlotKind === PLOT_KIND_PRIMARY)
+  const mainFields = fields.filter(
+    (field): field is GeofoliaField & { Geography: string } =>
+      Boolean(field.Geography) && field.PlotKind === PLOT_KIND_PRIMARY
+  )
   const secondaryCultures = data.Fields.filter(({ PlotKind }) => PlotKind === PLOT_KIND_SECONDARY)
 
-  return featureCollection(mainFields.map(Field => {
-    const id = getRandomFeatureId()
-    const secondaryFields = secondaryCultures.filter(({ MainPlotId }) => MainPlotId === Field.Id)
+  return featureCollection(
+    mainFields.map((Field) => {
+      const id = getRandomFeatureId()
+      const secondaryFields = secondaryCultures.filter(({ MainPlotId }) => MainPlotId === Field.Id)
 
-    return Feature(
-      parse(Field.Geography),
-      {
-        id,
-        remoteId: Field.Id,
-        COMMUNE: Field.CityNumber,
-        NOM: Field.Name,
-        cultures: [
-          cultureFromField(Field),
-          ...secondaryFields.map(cultureFromField)
-        ].filter(d => d),
-        NUMERO_I: Field.IsletNum,
-        NUMERO_P: Field.Code,
-        conversion_niveau: '',
-        commentaires: [Field, ...secondaryFields]
-          .map(({ Comment }) => Comment)
-          .filter(d => d)
-          .join('\n\n')
-      },
-      { id }
-    )
-  }))
+      return Feature(
+        parse(Field.Geography),
+        {
+          id,
+          remoteId: Field.Id,
+          COMMUNE: Field.CityNumber,
+          NOM: Field.Name,
+          cultures: [cultureFromField(Field), ...secondaryFields.map(cultureFromField)].filter((d) => d),
+          NUMERO_I: Field.IsletNum,
+          NUMERO_P: Field.Code,
+          conversion_niveau: '',
+          commentaires: [Field, ...secondaryFields]
+            .map(({ Comment }) => Comment)
+            .filter((d) => d)
+            .join('\n\n')
+        },
+        { id }
+      )
+    })
+  )
 }
 
-function fetchAuthToken (): Promise<string> {
+function fetchAuthToken(): Promise<string> {
   return post(`${config.get('geofolia.oauth.tenant')}/oauth2/v2.0/token`, {
     prefixUrl: config.get('geofolia.oauth.host'),
     form: {
@@ -111,16 +121,16 @@ function fetchAuthToken (): Promise<string> {
     }
   })
     .json()
-    .then((data) => parseApiResponse(geofoliaTokenSchema, data, 'l\'API Geofolia').access_token)
+    .then((data) => parseApiResponse(geofoliaTokenSchema, data, "l'API Geofolia").access_token)
 }
 
 /**
  * Authenticate a user based on environment variables
  * It is a good idea to memoize it for a few hours to save on API calls
  */
-const auth = memo(() => fetchAuthToken(), { maxAge: 0.90 * ONE_HOUR })
+const auth = memo(() => fetchAuthToken(), { maxAge: 0.9 * ONE_HOUR })
 
-async function geofoliaTriggerDataOrder (numeroSiret: string, year: number): Promise<unknown> {
+async function geofoliaTriggerDataOrder(numeroSiret: string, year: number): Promise<unknown> {
   const token = await auth()
 
   return post('flow/api/v1/data-orders', {
@@ -139,24 +149,30 @@ async function geofoliaTriggerDataOrder (numeroSiret: string, year: number): Pro
   }).json()
 }
 
-async function geofoliaRequestDataOrder (numeroSiret: string): Promise<{ id: string; identificationCodes: string[] } | undefined> {
+async function geofoliaRequestDataOrder(
+  numeroSiret: string
+): Promise<{ id: string; identificationCodes: string[] } | undefined> {
   const token = await auth()
 
-  const orders = parseApiResponse(geofoliaDataOrdersSchema, await get('flow/api/v1/flow-attributes', {
-    prefixUrl: config.get('geofolia.api.host'),
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Ocp-Apim-Subscription-Key': config.get('geofolia.api.subscriptionKey')
-    },
-    searchParams: {
-      serviceCode: config.get('geofolia.api.serviceCode')
-    }
-  }).json(), 'l\'API Geofolia')
+  const orders = parseApiResponse(
+    geofoliaDataOrdersSchema,
+    await get('flow/api/v1/flow-attributes', {
+      prefixUrl: config.get('geofolia.api.host'),
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Ocp-Apim-Subscription-Key': config.get('geofolia.api.subscriptionKey')
+      },
+      searchParams: {
+        serviceCode: config.get('geofolia.api.serviceCode')
+      }
+    }).json(),
+    "l'API Geofolia"
+  )
 
   return orders.find(({ identificationCodes }) => identificationCodes.includes(numeroSiret))
 }
 
-async function geofoliaLookup (numeroSiret: string, year: number): Promise<boolean> {
+async function geofoliaLookup(numeroSiret: string, year: number): Promise<boolean> {
   try {
     await geofoliaTriggerDataOrder(numeroSiret, year)
     return true
@@ -164,12 +180,12 @@ async function geofoliaLookup (numeroSiret: string, year: number): Promise<boole
     if (getResponseStatusCode(error) === 404) {
       return false
     } else {
-      throw new BadGatewayApiError('Impossible de communiquer avec l\'API Geofolia.', { cause: error })
+      throw new BadGatewayApiError("Impossible de communiquer avec l'API Geofolia.", { cause: error })
     }
   }
 }
 
-async function geofoliaFetchDataOrder (order: { id: string }): Promise<Buffer> {
+async function geofoliaFetchDataOrder(order: { id: string }): Promise<Buffer> {
   const token = await auth()
 
   return get(`flow/api/v1/flows/${order.id}`, {
@@ -184,7 +200,7 @@ async function geofoliaFetchDataOrder (order: { id: string }): Promise<Buffer> {
   }).buffer()
 }
 
-async function geofoliaParcellaire (numeroSiret: string): Promise<FeatureCollection | null> {
+async function geofoliaParcellaire(numeroSiret: string): Promise<FeatureCollection | null> {
   const order = await geofoliaRequestDataOrder(numeroSiret)
 
   if (!order) {
@@ -196,16 +212,20 @@ async function geofoliaParcellaire (numeroSiret: string): Promise<FeatureCollect
   return parseGeofoliaArchive(archive)
 }
 
-async function parseGeofoliaArchive (buffer: Buffer): Promise<FeatureCollection> {
+async function parseGeofoliaArchive(buffer: Buffer): Promise<FeatureCollection> {
   const zip = new AdmZip(buffer)
   const FieldFileEntry = await zip.getEntry('Field.Json')
 
-  const lambert93 = '+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs'
+  const lambert93 =
+    '+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs'
 
-  if (!FieldFileEntry) throw new InvalidRequestApiError('L\'archive Geofolia ne contient pas de fichier Field.Json.')
+  if (!FieldFileEntry) throw new InvalidRequestApiError("L'archive Geofolia ne contient pas de fichier Field.Json.")
 
   const parsedJSON = geofoliaFileSchema.safeParse(stripBOM(FieldFileEntry.getData().toString('utf8')))
-  if (!parsedJSON.success) throw new InvalidRequestApiError('Le fichier Field.Json de l\'archive Geofolia est invalide.', { cause: parsedJSON.error })
+  if (!parsedJSON.success)
+    throw new InvalidRequestApiError("Le fichier Field.Json de l'archive Geofolia est invalide.", {
+      cause: parsedJSON.error
+    })
   const geojson = convertGeofoliaFieldsToGeoJSON(parsedJSON.data)
 
   return toWgs84(geojson, lambert93)

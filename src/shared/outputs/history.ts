@@ -1,12 +1,11 @@
 import { CertificationState, EventType } from '@agencebio/cartobio-types'
 import type { CartoBioUser, NormalizedRecord, HistoryEntry } from '@agencebio/cartobio-types'
 
-
-function isAfterCertificationState (referenceState: CertificationState) {
+function isAfterCertificationState(referenceState: CertificationState) {
   const stateValues = Object.values(CertificationState)
   const lookupIndex = stateValues.indexOf(referenceState)
 
-  return function isCandidate (lookup: string | undefined) {
+  return function isCandidate(lookup: string | undefined) {
     return stateValues.indexOf(lookup as CertificationState) >= lookupIndex
   }
 }
@@ -28,23 +27,42 @@ const EventTypeRules: Array<(event: { eventType: EventType; record: NormalizedRe
   ({ eventType: type }) => type === EventType.CERTIFICATION_STATE_CHANGE,
   // [AUDITED] Changement sur le parcellaire
   ({ eventType: type, record }) => type === EventType.FEATURE_UPDATE && hasBeenAudited(record.certification_state),
-  ({ eventType: type, record }) => type === EventType.FEATURE_COLLECTION_UPDATE && hasBeenAudited(record.certification_state)
+  ({ eventType: type, record }) =>
+    type === EventType.FEATURE_COLLECTION_UPDATE && hasBeenAudited(record.certification_state)
 ]
 
 /**
  * Determine if a new HistoryEntry should be created
  */
-function shouldCreateHistoryEvent ({ record, eventType }: { record: NormalizedRecord; eventType: EventType }): boolean {
-  return EventTypeRules.some(rule => rule({ record, eventType }))
+function shouldCreateHistoryEvent({ record, eventType }: { record: NormalizedRecord; eventType: EventType }): boolean {
+  return EventTypeRules.some((rule) => rule({ record, eventType }))
 }
 
-type NewEventPayload = { description?: string; state?: string; metadata?: Record<string, unknown>; features?: Parameters<typeof collectFeatureIdsFromPayload>[0]; date?: Date }
+type NewEventPayload = {
+  description?: string
+  state?: string
+  metadata?: Record<string, unknown>
+  features?: Parameters<typeof collectFeatureIdsFromPayload>[0]
+  date?: Date
+}
 /**
  * Create a new Event if necessary
  */
-function createNewEvent (eventType: EventType, payload: NewEventPayload, context: { user?: CartoBioUser | null; record: null }): HistoryEntry
-function createNewEvent (eventType: EventType, payload: NewEventPayload, context: { user?: CartoBioUser | null; record: NormalizedRecord | null }): HistoryEntry | null
-function createNewEvent (eventType: EventType, payload: NewEventPayload, { user, record }: { user?: CartoBioUser | null; record: NormalizedRecord | null }): HistoryEntry | null {
+function createNewEvent(
+  eventType: EventType,
+  payload: NewEventPayload,
+  context: { user?: CartoBioUser | null; record: null }
+): HistoryEntry
+function createNewEvent(
+  eventType: EventType,
+  payload: NewEventPayload,
+  context: { user?: CartoBioUser | null; record: NormalizedRecord | null }
+): HistoryEntry | null
+function createNewEvent(
+  eventType: EventType,
+  payload: NewEventPayload,
+  { user, record }: { user?: CartoBioUser | null; record: NormalizedRecord | null }
+): HistoryEntry | null {
   const { features, date, ...event } = payload
   if (!record || !user || shouldCreateHistoryEvent({ record, eventType })) {
     return {
@@ -59,7 +77,9 @@ function createNewEvent (eventType: EventType, payload: NewEventPayload, { user,
   return null
 }
 
-function collectFeatureIdsFromPayload (payload: Array<{ id?: string | number }> | { features?: Array<{ id?: string | number }> } | null | undefined): Array<string | number | undefined> | null {
+function collectFeatureIdsFromPayload(
+  payload: Array<{ id?: string | number }> | { features?: Array<{ id?: string | number }> } | null | undefined
+): Array<string | number | undefined> | null {
   const features = Array.isArray(payload) ? payload : payload?.features
   return Array.isArray(features) ? features.map(({ id }) => id) : null
 }

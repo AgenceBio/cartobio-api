@@ -17,7 +17,7 @@ type CertificationMailRecord = {
 /**
  * Charge un template HTML et remplace les variables
  */
-function renderTemplate (templateName: string, variables: Record<string, unknown>): string {
+function renderTemplate(templateName: string, variables: Record<string, unknown>): string {
   const filePath = path.join(MAIL_TEMPLATES_DIR, `${templateName}.html`)
   let html = fs.readFileSync(filePath, 'utf-8')
 
@@ -55,7 +55,10 @@ const getLastWeekDates = (): { dateDebut: string; dateFin: string } => {
 /**
  * Envoie un email de certification complète.
  */
-async function sendCertificationComplete (record: CertificationMailRecord, recipientEmail: string): Promise<import('nodemailer').SentMessageInfo> {
+async function sendCertificationComplete(
+  record: CertificationMailRecord,
+  recipientEmail: string
+): Promise<import('nodemailer').SentMessageInfo> {
   const html = renderTemplate('CERTIFICATION', {
     version_name: record.version_name.toString(),
     url: `${config.get('frontendUrl')}/exploitations/${record.numerobio}/${record.record_id}`
@@ -71,7 +74,10 @@ async function sendCertificationComplete (record: CertificationMailRecord, recip
 /**
  * Envoie un email de certification complète modifié.
  */
-async function sendCertificationCompleteModifie (record: CertificationMailRecord, recipientEmail: string): Promise<import('nodemailer').SentMessageInfo> {
+async function sendCertificationCompleteModifie(
+  record: CertificationMailRecord,
+  recipientEmail: string
+): Promise<import('nodemailer').SentMessageInfo> {
   const html = renderTemplate('CERTIFICATION_MODIF', {
     version_name: record.version_name.toString(),
     url: `${config.get('frontendUrl')}/exploitations/${record.numerobio}/${record.record_id}`
@@ -87,13 +93,13 @@ async function sendCertificationCompleteModifie (record: CertificationMailRecord
 /**
  * Envoie un email de certification complète.
  */
-async function sendRapportHebdo (ocId: string, recipientEmail: string, labelOc: string): Promise<import('nodemailer').SentMessageInfo> {
+async function sendRapportHebdo(
+  ocId: string,
+  recipientEmail: string,
+  labelOc: string
+): Promise<import('nodemailer').SentMessageInfo> {
   const { dateDebut, dateFin } = getLastWeekDates()
-  const result = await getStatsByOrganisme(
-    ocId,
-    new Date(dateDebut),
-    new Date(`${dateFin}T23:59:59`)
-  )
+  const result = await getStatsByOrganisme(ocId, new Date(dateDebut), new Date(`${dateFin}T23:59:59`))
   const html = renderTemplate('RAPPORT_HEBDO_API', {
     date_debut: new Date(dateDebut).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
     date_fin: new Date(dateFin).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }),

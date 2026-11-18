@@ -1,19 +1,26 @@
-
 import { sql } from 'drizzle-orm'
 import { db, firstRow } from '../../database/database.js'
-import type { EtatProduction, NormalizedRecord, CartoBioFeature, CartoBioCulture, OutputApiRecord, OutputApiCulture, OutputApiParcelle } from '@agencebio/cartobio-types'
+import type {
+  EtatProduction,
+  NormalizedRecord,
+  CartoBioFeature,
+  CartoBioCulture,
+  OutputApiRecord,
+  OutputApiCulture,
+  OutputApiParcelle
+} from '@agencebio/cartobio-types'
 
-function cultureToApi (culture: CartoBioCulture): OutputApiCulture {
+function cultureToApi(culture: CartoBioCulture): OutputApiCulture {
   return {
     cpf: culture.CPF,
-    surface: (culture.surface && !Number.isNaN(culture.surface)) ? Number(culture.surface) : null,
+    surface: culture.surface && !Number.isNaN(culture.surface) ? Number(culture.surface) : null,
     unite: culture.unit === '%' ? '%' : 'ha',
     variete: culture.variete,
     dateSemis: culture.date_semis
   }
 }
 
-function parcelleToApi (parcelle: CartoBioFeature, surface: number): OutputApiParcelle {
+function parcelleToApi(parcelle: CartoBioFeature, surface: number): OutputApiParcelle {
   return {
     ...parcelle,
     properties: {
@@ -36,8 +43,10 @@ function parcelleToApi (parcelle: CartoBioFeature, surface: number): OutputApiPa
   }
 }
 
-async function recordsToApi (records: NormalizedRecord[]): Promise<OutputApiRecord[]> {
-  const surfaces = await legalProjectionSurfaces(records.flatMap((record) => record.parcelles.features.map((feature) => feature.geometry)))
+async function recordsToApi(records: NormalizedRecord[]): Promise<OutputApiRecord[]> {
+  const surfaces = await legalProjectionSurfaces(
+    records.flatMap((record) => record.parcelles.features.map((feature) => feature.geometry))
+  )
   let index = 0
 
   return records.map((record) => ({
@@ -52,15 +61,18 @@ async function recordsToApi (records: NormalizedRecord[]): Promise<OutputApiReco
       notesAudit: record.audit_notes,
       anneeReferenceControle: record.annee_reference_controle
     },
-    parcellaire: { type: 'FeatureCollection', features: record.parcelles.features.map((feature) => parcelleToApi(feature, surfaces[index++] ?? 0)) }
+    parcellaire: {
+      type: 'FeatureCollection',
+      features: record.parcelles.features.map((feature) => parcelleToApi(feature, surfaces[index++] ?? 0))
+    }
   }))
 }
 
-async function recordToApi (record: NormalizedRecord): Promise<OutputApiRecord> {
+async function recordToApi(record: NormalizedRecord): Promise<OutputApiRecord> {
   return firstRow(await recordsToApi([record]))
 }
 
-async function legalProjectionSurfaces (geometries: unknown[]): Promise<Array<number | null>> {
+async function legalProjectionSurfaces(geometries: unknown[]): Promise<Array<number | null>> {
   if (!geometries.length) return []
 
   const { rows } = await db.execute<{ surface: number | null }>(sql`
@@ -73,7 +85,9 @@ async function legalProjectionSurfaces (geometries: unknown[]): Promise<Array<nu
   return rows.map(({ surface }) => surface)
 }
 
-async function surfaceForFeatureCollection (featureCollection: { features: Array<{ geometry?: unknown }> }): Promise<number> {
+async function surfaceForFeatureCollection(featureCollection: {
+  features: Array<{ geometry?: unknown }>
+}): Promise<number> {
   const surfaces = await legalProjectionSurfaces(featureCollection.features.map((feature) => feature.geometry ?? null))
   return surfaces.reduce<number>((total, surface) => total + (surface || 0), 0)
 }

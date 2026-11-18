@@ -21,12 +21,22 @@ import {
 } from '@agencebio/cartobio-types'
 import { z } from 'zod'
 import type { FastifySchema, FastifySchemaCompiler } from 'fastify'
-import { apiError, commonErrorResponses, describedResponse, mergeSchemas, protectedWithToken, operatorFromNumeroBio, TAGS, withSchema } from '../../shared/routes.js'
+import {
+  apiError,
+  commonErrorResponses,
+  describedResponse,
+  mergeSchemas,
+  protectedWithToken,
+  operatorFromNumeroBio,
+  TAGS,
+  withSchema
+} from '../../shared/routes.js'
 import type { CartobioExtendedRouteShorthandOptions, ProtectedRoute } from '../../shared/routes.js'
 import { enforceOperatorAccess } from '../../shared/middlewares.js'
 
 const ocOrCartobio = (): ProtectedRoute => protectedWithToken({ cartobio: true, oc: true })
-const operatorRoute = (): CartobioExtendedRouteShorthandOptions => mergeSchemas(ocOrCartobio(), operatorFromNumeroBio, { preHandler: [enforceOperatorAccess()] })
+const operatorRoute = (): CartobioExtendedRouteShorthandOptions =>
+  mergeSchemas(ocOrCartobio(), operatorFromNumeroBio, { preHandler: [enforceOperatorAccess()] })
 
 const featureCollectionResponse = {
   ...commonErrorResponses,
@@ -58,23 +68,27 @@ export const convertAnyGeoSchema = withSchema(protectedWithToken(), {
   response: featureCollectionResponse
 })
 
-export const geofoliaLookupSchema = withSchema({ ...operatorRoute(), config: { swagger: { exposeHeadRoute: true } } }, {
-  operationId: 'requestGeofoliaParcellaire',
-  tags: [TAGS.IMPORT],
-  summary: 'Demander le parcellaire Geofolia d\'un opérateur',
-  description: 'Déclenche la commande des données auprès de Geofolia (via le SIRET de l\'opérateur), à récupérer ensuite avec le GET.',
-  params: numeroBioParamsSchema,
-  querystring: geofoliaQuerySchema,
-  response: {
-    204: describedResponse('Opérateur connu de Geofolia, commande lancée'),
-    404: describedResponse('Opérateur inconnu de Geofolia (corps vide)')
+export const geofoliaLookupSchema = withSchema(
+  { ...operatorRoute(), config: { swagger: { exposeHeadRoute: true } } },
+  {
+    operationId: 'requestGeofoliaParcellaire',
+    tags: [TAGS.IMPORT],
+    summary: "Demander le parcellaire Geofolia d'un opérateur",
+    description:
+      "Déclenche la commande des données auprès de Geofolia (via le SIRET de l'opérateur), à récupérer ensuite avec le GET.",
+    params: numeroBioParamsSchema,
+    querystring: geofoliaQuerySchema,
+    response: {
+      204: describedResponse('Opérateur connu de Geofolia, commande lancée'),
+      404: describedResponse('Opérateur inconnu de Geofolia (corps vide)')
+    }
   }
-})
+)
 
 export const geofoliaParcellaireSchema = withSchema(operatorRoute(), {
   operationId: 'getGeofoliaParcellaire',
   tags: [TAGS.IMPORT],
-  summary: 'Récupérer le parcellaire Geofolia d\'un opérateur',
+  summary: "Récupérer le parcellaire Geofolia d'un opérateur",
   params: numeroBioParamsSchema,
   response: {
     ...featureCollectionResponse,
@@ -85,8 +99,9 @@ export const geofoliaParcellaireSchema = withSchema(operatorRoute(), {
 export const evvSchema = withSchema(operatorRoute(), {
   operationId: 'getEvvParcellaire',
   tags: [TAGS.IMPORT],
-  summary: 'Parcellaire viticole d\'un numéro EVV',
-  description: 'Interroge le nCVI des Douanes après vérification que le SIRET de l\'EVV est celui de l\'opérateur. Les parcelles n\'ont pas de géométrie : la propriété `cadastre` donne les références à récupérer.',
+  summary: "Parcellaire viticole d'un numéro EVV",
+  description:
+    "Interroge le nCVI des Douanes après vérification que le SIRET de l'EVV est celui de l'opérateur. Les parcelles n'ont pas de géométrie : la propriété `cadastre` donne les références à récupérer.",
   params: evvParamsSchema,
   response: {
     ...featureCollectionResponse,
@@ -99,12 +114,15 @@ export const certificationParcellesSchema = {
     operationId: 'importParcellaires',
     tags: [TAGS.API_PARCELLAIRE],
     summary: 'Envoyer un parcellaire',
-    description: 'Valide le parcellaire reçu puis l\'enregistre de façon asynchrone. Suivre l\'avancement avec `GET /api/v3/import/jobs/{id}`.',
+    description:
+      "Valide le parcellaire reçu puis l'enregistre de façon asynchrone. Suivre l'avancement avec `GET /api/v3/import/jobs/{id}`.",
     body: inputApiRecordBodySchema,
     response: {
       ...commonErrorResponses,
       202: importReportSchema.meta({ description: 'Le parcellaire est accepté, enregistrement en cours' }),
-      400: z.union([importReportSchema, apiErrorSchema]).meta({ description: 'Le parcellaire est refusé (bilan de l\'envoi), ou corps illisible (erreur)' })
+      400: z
+        .union([importReportSchema, apiErrorSchema])
+        .meta({ description: "Le parcellaire est refusé (bilan de l'envoi), ou corps illisible (erreur)" })
     }
   }),
   validatorCompiler: (() => (data) => ({ value: data })) satisfies FastifySchemaCompiler<FastifySchema>,
@@ -114,7 +132,7 @@ export const certificationParcellesSchema = {
 export const importJobSchema = withSchema(protectedWithToken({ oc: true }), {
   operationId: 'getImportJob',
   tags: [TAGS.API_PARCELLAIRE],
-  summary: 'État d\'un envoi de parcellaires',
+  summary: "État d'un envoi de parcellaires",
   params: importIdParamsSchema,
   response: {
     ...commonErrorResponses,
@@ -127,7 +145,7 @@ export const importListSchema = withSchema(protectedWithToken({ oc: true }), {
   operationId: 'listImports',
   tags: [TAGS.API_PARCELLAIRE],
   summary: 'Historique des envois de parcellaires',
-  description: 'Envois de l\'OC, du plus récent au plus ancien, avec liens de pagination (`_links`).',
+  description: "Envois de l'OC, du plus récent au plus ancien, avec liens de pagination (`_links`).",
   querystring: importListQuerySchema,
   response: {
     ...commonErrorResponses,
@@ -138,7 +156,7 @@ export const importListSchema = withSchema(protectedWithToken({ oc: true }), {
 export const importDetailsSchema = withSchema(protectedWithToken({ oc: true }), {
   operationId: 'getImport',
   tags: [TAGS.API_PARCELLAIRE],
-  summary: 'Détail d\'un envoi de parcellaires',
+  summary: "Détail d'un envoi de parcellaires",
   params: importIdParamsSchema,
   querystring: importDetailsQuerySchema,
   response: {
@@ -150,8 +168,9 @@ export const importDetailsSchema = withSchema(protectedWithToken({ oc: true }), 
 export const certificationParcellairesSchema = withSchema(protectedWithToken({ oc: true }), {
   operationId: 'listOcParcellaires',
   tags: [TAGS.API_PARCELLAIRE],
-  summary: 'Derniers parcellaires des opérateurs de l\'OC',
-  description: 'Le dernier parcellaire de chaque opérateur, au format de l\'API parcellaire, avec liens de pagination (`_links`).',
+  summary: "Derniers parcellaires des opérateurs de l'OC",
+  description:
+    "Le dernier parcellaire de chaque opérateur, au format de l'API parcellaire, avec liens de pagination (`_links`).",
   querystring: certificationParcellairesQuerySchema,
   response: {
     ...commonErrorResponses,
@@ -159,17 +178,20 @@ export const certificationParcellairesSchema = withSchema(protectedWithToken({ o
   }
 })
 
-export const certificationParcellaireSchema = withSchema(mergeSchemas(protectedWithToken({ oc: true }), operatorFromNumeroBio), {
-  operationId: 'getOperatorLastParcellaire',
-  tags: [TAGS.API_PARCELLAIRE],
-  summary: 'Dernier parcellaire d\'un opérateur',
-  params: numeroBioParamsSchema,
-  querystring: certificationParcellaireQuerySchema,
-  response: {
-    ...commonErrorResponses,
-    200: outputApiRecordSchema.meta({ description: 'Parcellaire au format de l\'API parcellaire' }),
-    404: apiError('Opérateur ou parcellaire introuvable')
+export const certificationParcellaireSchema = withSchema(
+  mergeSchemas(protectedWithToken({ oc: true }), operatorFromNumeroBio),
+  {
+    operationId: 'getOperatorLastParcellaire',
+    tags: [TAGS.API_PARCELLAIRE],
+    summary: "Dernier parcellaire d'un opérateur",
+    params: numeroBioParamsSchema,
+    querystring: certificationParcellaireQuerySchema,
+    response: {
+      ...commonErrorResponses,
+      200: outputApiRecordSchema.meta({ description: "Parcellaire au format de l'API parcellaire" }),
+      404: apiError('Opérateur ou parcellaire introuvable')
+    }
   }
-})
+)
 
 export { mergeSchemas }

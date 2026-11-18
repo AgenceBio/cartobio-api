@@ -1,13 +1,13 @@
-import { cartobio } from "./cartobio.js";
+import { cartobio } from './cartobio.js'
 
 export const certificationType = cartobio.enum('certification_type', [
   'OPERATOR_DRAFT',
   'AUDITED',
   'PENDING_CERTIFICATION',
-  'CERTIFIED',
-]);
+  'CERTIFIED'
+])
 
-export const mixiteType = cartobio.enum('mixite_type', ['MIXTE', 'AB', 'ABCONV']);
+export const mixiteType = cartobio.enum('mixite_type', ['MIXTE', 'AB', 'ABCONV'])
 
 export const metadataSource = cartobio.enum('metadata_source', [
   'TELEPAC',
@@ -19,17 +19,10 @@ export const metadataSource = cartobio.enum('metadata_source', [
   'RPG',
   'MANUEL',
   'COPIE_VERSION',
-  'COPIE_CONFLIT',
-]);
+  'COPIE_CONFLIT'
+])
 
-export const conversionNiveau = cartobio.enum('conversion_niveau', [
-  'AB',
-  'AB?',
-  'C1',
-  'C2',
-  'C3',
-  'CONV',
-]);
+export const conversionNiveau = cartobio.enum('conversion_niveau', ['AB', 'AB?', 'C1', 'C2', 'C3', 'CONV'])
 
 export const annotationType = cartobio.enum('annotation_type', [
   'DOWNGRADED',
@@ -37,8 +30,8 @@ export const annotationType = cartobio.enum('annotation_type', [
   'REDUCED_CONVERSION_PERIOD',
   'RISKY',
   'SAMPLED',
-  'SURVEYED',
-]);
+  'SURVEYED'
+])
 
 export const parcellaireEventType = cartobio.enum('parcellaire_event_type', [
   'CERTIFICATION_STATE_CHANGE',
@@ -47,31 +40,27 @@ export const parcellaireEventType = cartobio.enum('parcellaire_event_type', [
   'FEATURE_COLLECTION_UPDATE',
   'FEATURE_CREATE',
   'FEATURE_DELETE',
-  'FEATURE_UPDATE',
-]);
+  'FEATURE_UPDATE'
+])
 
-export const statutImportGeom = cartobio.enum('statut_import_geom', [
-  'ACCEPTE',
-  'CORRIGE',
-  'ACCEPTE_NON_CORRIGE',
-]);
+export const statutImportGeom = cartobio.enum('statut_import_geom', ['ACCEPTE', 'CORRIGE', 'ACCEPTE_NON_CORRIGE'])
 
-export const importStatus = cartobio.enum('import_status', ['DONE', 'CREATED', 'ERROR', 'PENDING']);
+export const importStatus = cartobio.enum('import_status', ['DONE', 'CREATED', 'ERROR', 'PENDING'])
 
-export const importLogType = cartobio.enum('import_log_type', ['warning', 'error']);
+export const importLogType = cartobio.enum('import_log_type', ['warning', 'error'])
 
-export const importJobResult = cartobio.enum('import_job_result', ['REJECTED', 'VALID', 'ERROR']);
+export const importJobResult = cartobio.enum('import_job_result', ['REJECTED', 'VALID', 'ERROR'])
 
-export const importJobEtat = cartobio.enum('import_job_etat', ['UNKNOWN', 'UPDATED', 'CREATED']);
+export const importJobEtat = cartobio.enum('import_job_etat', ['UNKNOWN', 'UPDATED', 'CREATED'])
 
 export const productionAttestationType = cartobio.enum('production_attestation_type', [
   'complete',
   'pac-details',
-  'pac-complet',
-]);
+  'pac-complet'
+])
 
 export const productionAttestationStatus = cartobio.enum('production_attestation_status', [
   'started',
   'generated',
-  'error',
-]);
+  'error'
+])

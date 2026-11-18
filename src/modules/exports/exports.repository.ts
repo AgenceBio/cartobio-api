@@ -9,12 +9,21 @@ import {
   parcelleCultures,
   parcelles
 } from '../../database/schema/index.js'
-import type { AttestationsProductionsStatus, AttestationsProductionsType, CartoBioCulture } from '@agencebio/cartobio-types'
+import type {
+  AttestationsProductionsStatus,
+  AttestationsProductionsType,
+  CartoBioCulture
+} from '@agencebio/cartobio-types'
 import { createAttestationProductionSchema } from '../../database/validations/activites.js'
 import { sansDateParDefaut, surfaceHa } from './exports.utils.js'
 import type { AttestationProduction, ExportRow, PdfParcelle, PdfRecord } from './exports.types.js'
 
-async function updateAttestationsProductions (recordId: string, status: AttestationsProductionsStatus, type: AttestationsProductionsType, path: string | null = null): Promise<void> {
+async function updateAttestationsProductions(
+  recordId: string,
+  status: AttestationsProductionsStatus,
+  type: AttestationsProductionsType,
+  path: string | null = null
+): Promise<void> {
   await db
     .insert(attestationsProduction)
     .values(createAttestationProductionSchema.parse({ recordId, type, status, path }))
@@ -24,24 +33,31 @@ async function updateAttestationsProductions (recordId: string, status: Attestat
     })
 }
 
-async function findValidAttestationProduction (recordId: string, type: AttestationsProductionsType): Promise<AttestationProduction | null> {
+async function findValidAttestationProduction(
+  recordId: string,
+  type: AttestationsProductionsType
+): Promise<AttestationProduction | null> {
   const [production] = await db
     .select({ path: sql<string>`${attestationsProduction.path}` })
     .from(attestationsProduction)
     .innerJoin(parcellaires, eq(parcellaires.recordId, attestationsProduction.recordId))
-    .where(and(
-      eq(attestationsProduction.recordId, recordId),
-      gt(attestationsProduction.updatedAt, parcellaires.updatedAt),
-      eq(attestationsProduction.status, 'generated'),
-      eq(attestationsProduction.type, type)
-    ))
+    .where(
+      and(
+        eq(attestationsProduction.recordId, recordId),
+        gt(attestationsProduction.updatedAt, parcellaires.updatedAt),
+        eq(attestationsProduction.status, 'generated'),
+        eq(attestationsProduction.type, type)
+      )
+    )
 
   return production ?? null
 }
 
-async function findPdfRecord (recordId: string): Promise<PdfRecord | null> {
+async function findPdfRecord(recordId: string): Promise<PdfRecord | null> {
   const numerosPacage = db
-    .select({ numerosPacage: sql`STRING_AGG(DISTINCT ${parcelles.numeroPacage}, ', ' ORDER BY ${parcelles.numeroPacage})` })
+    .select({
+      numerosPacage: sql`STRING_AGG(DISTINCT ${parcelles.numeroPacage}, ', ' ORDER BY ${parcelles.numeroPacage})`
+    })
     .from(parcelles)
     .where(and(eq(parcelles.recordId, parcellaires.recordId), isNull(parcelles.deletedAt)))
 
@@ -63,7 +79,7 @@ async function findPdfRecord (recordId: string): Promise<PdfRecord | null> {
   return record ?? null
 }
 
-async function findExportRows (ocId: number, numeroBios: number[]): Promise<ExportRow[]> {
+async function findExportRows(ocId: number, numeroBios: number[]): Promise<ExportRow[]> {
   return db
     .select({
       record_id: parcellaires.recordId,
@@ -92,16 +108,18 @@ async function findExportRows (ocId: number, numeroBios: number[]): Promise<Expo
     .from(parcellaires)
     .leftJoin(parcellairesMetadata, eq(parcellairesMetadata.recordId, parcellaires.recordId))
     .leftJoin(parcelles, and(eq(parcelles.recordId, parcellaires.recordId), isNull(parcelles.deletedAt)))
-    .where(and(
-      eq(parcellaires.ocId, String(ocId)),
-      inArray(parcellaires.numeroBio, numeroBios),
-      isNull(parcellaires.deletedAt)
-    ))
+    .where(
+      and(
+        eq(parcellaires.ocId, String(ocId)),
+        inArray(parcellaires.numeroBio, numeroBios),
+        isNull(parcellaires.deletedAt)
+      )
+    )
     .groupBy(parcellaires.recordId, parcellairesMetadata.recordId)
     .orderBy(asc(parcellaires.numeroBio))
 }
 
-async function findPdfParcelles (recordId: string, pac: boolean): Promise<PdfParcelle[]> {
+async function findPdfParcelles(recordId: string, pac: boolean): Promise<PdfParcelle[]> {
   const cultures = db
     .select({
       cultures: sql<CartoBioCulture[]>`COALESCE(json_agg(json_build_object(
@@ -141,16 +159,15 @@ async function findPdfParcelles (recordId: string, pac: boolean): Promise<PdfPar
     })
     .from(parcelles)
     .leftJoin(communes, eq(communes.fid, parcelles.commune))
-    .where(and(
-      eq(parcelles.recordId, recordId),
-      isNull(parcelles.deletedAt),
-      pac
-        ? or(
-          and(ne(parcelles.numeroIlotPac, 0), ne(parcelles.numeroParcellesPac, 0)),
-          eq(parcelles.attentePac, true)
-        )
-        : undefined
-    ))
+    .where(
+      and(
+        eq(parcelles.recordId, recordId),
+        isNull(parcelles.deletedAt),
+        pac
+          ? or(and(ne(parcelles.numeroIlotPac, 0), ne(parcelles.numeroParcellesPac, 0)), eq(parcelles.attentePac, true))
+          : undefined
+      )
+    )
 }
 
 export {

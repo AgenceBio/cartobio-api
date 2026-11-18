@@ -6,7 +6,7 @@ export const got = gotModule.default as unknown as {
   post: Mock
   stream: Mock
   extend: Mock
-  __mocks: { get: Mock, post: Mock }
+  __mocks: { get: Mock; post: Mock }
 }
 
 type MockedErrorClass = new (...args: unknown[]) => Error & { response?: unknown }

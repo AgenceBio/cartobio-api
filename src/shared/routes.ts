@@ -1,10 +1,27 @@
-import { decodeUserToken, enforceAdminRole, enforceRecordAndOperator, enforceOperator, verifyAgenceBioToken, enforceAnyFastifyDecorator, compareOperatorOutputAndToken, checkCertification, haveRightToUpdate } from './middlewares.js'
+import {
+  decodeUserToken,
+  enforceAdminRole,
+  enforceRecordAndOperator,
+  enforceOperator,
+  verifyAgenceBioToken,
+  enforceAnyFastifyDecorator,
+  compareOperatorOutputAndToken,
+  checkCertification,
+  haveRightToUpdate
+} from './middlewares.js'
 import { getRecord } from './parcellaires/parcellaires.service.js'
 import config from '../config/env.js'
 import merge from 'deepmerge'
 import { apiErrorSchema, auditParamsSchema, numeroBioParamsSchema } from '@agencebio/cartobio-types'
 import { z } from 'zod'
-import type { RouteShorthandOptions, FastifySchema, FastifyRequest, FastifyReply, onRequestHookHandler, preSerializationHookHandler } from 'fastify'
+import type {
+  RouteShorthandOptions,
+  FastifySchema,
+  FastifyRequest,
+  FastifyReply,
+  onRequestHookHandler,
+  preSerializationHookHandler
+} from 'fastify'
 
 export interface CartobioExtendedRouteShorthandOptions extends RouteShorthandOptions {
   schema?: FastifySchema
@@ -24,11 +41,15 @@ export type ProtectedRoute = {
  * Deep merge with stacked merge of arrays
  * It then enable multiple schemas with same key (eg: preValidation) to combine middlewares
  */
-function mergeSchemas (...schemas: CartobioExtendedRouteShorthandOptions[]): CartobioExtendedRouteShorthandOptions {
+function mergeSchemas(...schemas: CartobioExtendedRouteShorthandOptions[]): CartobioExtendedRouteShorthandOptions {
   return merge.all(schemas, {
-    isMergeableObject: (value) => value !== null && typeof value === 'object' &&
-      !(value instanceof z.ZodType) && !(value instanceof RegExp) && !(value instanceof Date),
-    arrayMerge (target, source, options) {
+    isMergeableObject: (value) =>
+      value !== null &&
+      typeof value === 'object' &&
+      !(value instanceof z.ZodType) &&
+      !(value instanceof RegExp) &&
+      !(value instanceof Date),
+    arrayMerge(target, source, options) {
       if (!options) throw new Error('deepmerge : options absentes')
       const destination = target.slice()
 
@@ -47,32 +68,31 @@ function mergeSchemas (...schemas: CartobioExtendedRouteShorthandOptions[]): Car
   })
 }
 
-
-function withSchema<B extends CartobioExtendedRouteShorthandOptions, S extends FastifySchema> (base: B, schema: S): WithSchema<B, S> {
+function withSchema<B extends CartobioExtendedRouteShorthandOptions, S extends FastifySchema>(
+  base: B,
+  schema: S
+): WithSchema<B, S> {
   return { ...base, schema: { ...base.schema, ...schema } } as WithSchema<B, S>
 }
 
-
-function describedResponse (description: string): z.ZodUnknown {
+function describedResponse(description: string): z.ZodUnknown {
   return z.unknown().meta({ description })
 }
 
-
-function apiError (description: string): typeof apiErrorSchema {
+function apiError(description: string): typeof apiErrorSchema {
   return apiErrorSchema.meta({ description })
 }
 
 const commonErrorResponses = {
-  401: apiError('Jeton d\'accès absent, invalide, expiré ou sans droit sur cette ressource'),
+  401: apiError("Jeton d'accès absent, invalide, expiré ou sans droit sur cette ressource"),
   500: apiError('Erreur serveur')
 }
-
 
 const TAGS = {
   SYSTEME: 'Système',
   AUTH: 'Authentification',
   API_PARCELLAIRE: 'API parcellaire',
-  SUIVI_API_PARCELLAIRE: 'Suivi de l\'API parcellaire',
+  SUIVI_API_PARCELLAIRE: "Suivi de l'API parcellaire",
   OPERATEURS: 'Opérateurs',
   TABLEAU_DE_BORD: 'Tableau de bord',
   PARCELLAIRES: 'Parcellaires',
@@ -85,9 +105,7 @@ const TAGS = {
 
 const internalSchema: CartobioExtendedRouteShorthandOptions = {
   schema: {
-    security: [
-      { bearerAuth: [] }
-    ]
+    security: [{ bearerAuth: [] }]
   }
 }
 
@@ -100,7 +118,7 @@ const hiddenSchema: CartobioExtendedRouteShorthandOptions = {
 /**
  * Use to protect a route with one or more authentication methods
  */
-function protectedWithToken ({ oc = false, cartobio = true, admin = false } = {}): ProtectedRoute {
+function protectedWithToken({ oc = false, cartobio = true, admin = false } = {}): ProtectedRoute {
   const requiredDecorators: Array<'user' | 'organismeCertificateur'> = []
   const root: ProtectedRoute = {
     schema: { security: [] },
@@ -120,15 +138,17 @@ function protectedWithToken ({ oc = false, cartobio = true, admin = false } = {}
     const name = 'user'
     requiredDecorators.push(name)
     root.schema.security.push({ bearerAuth: [] })
-    root.onRequest.push(decodeUserToken({
-      keys: [
-        // this one if for the tokens we emit with this application
-        config.get('jwtSecret'),
-        // and this one if for tokens emitted by the Notification app
-        // we do not know their private key, so they share a public key we can verify against
-        config.get('notifications.publicKey')
-      ]
-    }))
+    root.onRequest.push(
+      decodeUserToken({
+        keys: [
+          // this one if for the tokens we emit with this application
+          config.get('jwtSecret'),
+          // and this one if for tokens emitted by the Notification app
+          // we do not know their private key, so they share a public key we can verify against
+          config.get('notifications.publicKey')
+        ]
+      })
+    )
     root.preSerialization.push(compareOperatorOutputAndToken((request) => request.user?.organismeCertificateur))
   }
 
@@ -136,15 +156,17 @@ function protectedWithToken ({ oc = false, cartobio = true, admin = false } = {}
     const name = 'user'
     if (!requiredDecorators.includes(name)) requiredDecorators.push(name)
     root.schema.security.push({ bearerAuth: [] })
-    root.onRequest.push(decodeUserToken({
-      keys: [
-        // this one if for the tokens we emit with this application
-        config.get('jwtSecret'),
-        // and this one if for tokens emitted by the Notification app
-        // we do not know their private key, so they share a public key we can verify against
-        config.get('notifications.publicKey')
-      ]
-    }))
+    root.onRequest.push(
+      decodeUserToken({
+        keys: [
+          // this one if for the tokens we emit with this application
+          config.get('jwtSecret'),
+          // and this one if for tokens emitted by the Notification app
+          // we do not know their private key, so they share a public key we can verify against
+          config.get('notifications.publicKey')
+        ]
+      })
+    )
     root.onRequest.push(enforceAdminRole())
   }
 
@@ -164,9 +186,7 @@ const operatorFromNumeroBio: CartobioExtendedRouteShorthandOptions = {
     params: numeroBioParamsSchema
   },
 
-  preValidation: [
-    enforceOperator({ param: 'numeroBio' })
-  ]
+  preValidation: [enforceOperator({ param: 'numeroBio' })]
 }
 
 const checkCertificationStatus = {
@@ -174,9 +194,7 @@ const checkCertificationStatus = {
     params: numeroBioParamsSchema
   },
 
-  preValidation: [
-    async (request: FastifyRequest): Promise<void> => checkCertification(request)
-  ]
+  preValidation: [async (request: FastifyRequest): Promise<void> => checkCertification(request)]
 }
 
 const operatorFromRecordId: CartobioExtendedRouteShorthandOptions = {
@@ -184,10 +202,7 @@ const operatorFromRecordId: CartobioExtendedRouteShorthandOptions = {
     params: auditParamsSchema
   },
 
-  preValidation: [
-    enforceRecordAndOperator({ queryFn: getRecord, param: 'recordId' }),
-    haveRightToUpdate()
-  ]
+  preValidation: [enforceRecordAndOperator({ queryFn: getRecord, param: 'recordId' }), haveRightToUpdate()]
 }
 
 export {

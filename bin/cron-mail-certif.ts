@@ -9,7 +9,7 @@ import { recordColumns } from '../src/shared/parcellaires/parcellaires.utils.js'
 import { sendCertificationCompleteModifie } from '../src/services/mailer/utils.js'
 import { fetchEmailForNumeroBio } from '../src/clients/agence-bio.client.js'
 
-async function sendMail (): Promise<void> {
+async function sendMail(): Promise<void> {
   try {
     const parcellaires = await db
       .select({
@@ -20,14 +20,19 @@ async function sendMail (): Promise<void> {
         version_name: recordColumns.version_name
       })
       .from(parcellairesTable)
-      .where(and(
-        eq(parcellairesTable.certificationEtat, certificationEtatEnumSchema.enum.CERTIFIED),
-        or(
-          gt(parcellairesTable.updatedAt, parcellairesTable.dateDerniereNotif),
-          and(isNull(parcellairesTable.dateDerniereNotif), gt(parcellairesTable.updatedAt, sql`now() - interval '7 days'`))
-        ),
-        isNull(parcellairesTable.deletedAt)
-      ))
+      .where(
+        and(
+          eq(parcellairesTable.certificationEtat, certificationEtatEnumSchema.enum.CERTIFIED),
+          or(
+            gt(parcellairesTable.updatedAt, parcellairesTable.dateDerniereNotif),
+            and(
+              isNull(parcellairesTable.dateDerniereNotif),
+              gt(parcellairesTable.updatedAt, sql`now() - interval '7 days'`)
+            )
+          ),
+          isNull(parcellairesTable.deletedAt)
+        )
+      )
 
     let errors = 0
     for (const parcellaire of parcellaires) {
@@ -52,6 +57,6 @@ async function sendMail (): Promise<void> {
   }
 }
 
-(async function (): Promise<void> {
+;(async function (): Promise<void> {
   await sendMail()
 })()

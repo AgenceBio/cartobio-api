@@ -31,11 +31,12 @@ async function fetchCommunesBoundaries(): Promise<void> {
     got.stream(SOURCE),
     createGunzip(),
     JSONStream.parse(['features', true]),
-    (source) => stream.Readable.from(source).map(feature => ({
-      code: feature.properties.code,
-      nom: feature.properties.nom,
-      geometry: feature.geometry
-    })),
+    (source) =>
+      stream.Readable.from(source).map((feature) => ({
+        code: feature.properties.code,
+        nom: feature.properties.nom,
+        geometry: feature.geometry
+      })),
     JSONStream.stringify('[\n', ',\n', '\n]'),
     createWriteStream(outFile)
   ])
@@ -58,7 +59,7 @@ function unionOf(regions: Region[]): Region {
 async function fetchRegionsBoundaries(): Promise<void> {
   // Skip if file already exists
   const files = ['metropole', 'antilles', 'guyane', 'reunion', 'mayotte']
-  if (files.every(name => fs.existsSync(join(generatedDataDirectory, `${name}.json`)))) {
+  if (files.every((name) => fs.existsSync(join(generatedDataDirectory, `${name}.json`)))) {
     console.log('Region boundaries files already exist, skipping')
     return
   }
@@ -91,10 +92,7 @@ async function fetchRegionsBoundaries(): Promise<void> {
   for (const [output, data] of Object.entries(outputs)) {
     console.log(`Writing ${output}.json`, data?.type)
     const outputFile = join(generatedDataDirectory, `${output}.json`)
-    await pipeline([
-      stream.Readable.from(JSON.stringify(data)),
-      createWriteStream(outputFile)
-    ])
+    await pipeline([stream.Readable.from(JSON.stringify(data)), createWriteStream(outputFile)])
   }
 }
 
@@ -113,11 +111,12 @@ async function fetchDepartementBoundaries(): Promise<void> {
     got.stream(SOURCE),
     createGunzip(),
     JSONStream.parse(['features', true]),
-    (source) => stream.Readable.from(source).map(feature => ({
-      code: feature.properties.code,
-      nom: feature.properties.nom,
-      geometry: feature.geometry
-    })),
+    (source) =>
+      stream.Readable.from(source).map((feature) => ({
+        code: feature.properties.code,
+        nom: feature.properties.nom,
+        geometry: feature.geometry
+      })),
     JSONStream.stringify('[\n', ',\n', '\n]'),
     createWriteStream(outFile)
   ])
@@ -134,23 +133,45 @@ async function fetchAtOnceRegionsBoundaries(): Promise<void> {
   const FILENAME = 'regions-50m.geojson.gz'
   const SOURCE = 'https://etalab-datasets.geo.data.gouv.fr/contours-administratifs/latest/geojson/' + FILENAME
 
-  const goodCodes = ['11', '24', '27', '28', '32', '44', '52', '53', '75', '76', '84', '93', '94', '01', '02', '03', '04', '06']
+  const goodCodes = [
+    '11',
+    '24',
+    '27',
+    '28',
+    '32',
+    '44',
+    '52',
+    '53',
+    '75',
+    '76',
+    '84',
+    '93',
+    '94',
+    '01',
+    '02',
+    '03',
+    '04',
+    '06'
+  ]
 
   return pipeline([
     got.stream(SOURCE),
     createGunzip(),
     JSONStream.parse(['features', true]),
-    (source) => stream.Readable.from(source).filter(feature => goodCodes.includes(feature.properties.code)).map(feature => ({
-      code: feature.properties.code,
-      nom: feature.properties.nom,
-      geometry: feature.geometry
-    })),
+    (source) =>
+      stream.Readable.from(source)
+        .filter((feature) => goodCodes.includes(feature.properties.code))
+        .map((feature) => ({
+          code: feature.properties.code,
+          nom: feature.properties.nom,
+          geometry: feature.geometry
+        })),
     JSONStream.stringify('[\n', ',\n', '\n]'),
     createWriteStream(outFile)
   ])
 }
 
-(async function (): Promise<void> {
+;(async function (): Promise<void> {
   await fetchCommunesBoundaries()
   await fetchRegionsBoundaries()
   await fetchDepartementBoundaries()

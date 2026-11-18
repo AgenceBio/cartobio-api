@@ -3,10 +3,10 @@ title: API d'envoi des parcellaires
 date: 2023-04-12
 updated_at: 2026-10-27
 contributors:
-- Laetita L (Ecocert)
-- Maud R (CartoBio)
-- Thomas P (CartoBio)
-- Hugo B (CartoBio)
+  - Laetita L (Ecocert)
+  - Maud R (CartoBio)
+  - Thomas P (CartoBio)
+  - Hugo B (CartoBio)
 ---
 
 # Mise en place d'une API Parcellaire
@@ -29,13 +29,13 @@ curl --data-binary '@/chemin/vers/parcellaire.json' \
 
 ### MAJ Mai 2026
 
-Afin de répondre à la problématique des traitements longs et coûteux en ressources, nous avons mis en place une architecture adaptée autour de deux mécanismes complémentaires :  
+Afin de répondre à la problématique des traitements longs et coûteux en ressources, nous avons mis en place une architecture adaptée autour de deux mécanismes complémentaires :
 
 1. **Polling pattern pour le suivi des traitements asynchrones**
-   - Lorsqu'un utilisateur envoie une requête, celle-ci n'est plus traitée immédiatement en mode synchrone.  
-   - À la place, un **job asynchrone** est créé et un identifiant unique est renvoyé au client.  
+   - Lorsqu'un utilisateur envoie une requête, celle-ci n'est plus traitée immédiatement en mode synchrone.
+   - À la place, un **job asynchrone** est créé et un identifiant unique est renvoyé au client.
    - L'utilisateur peut ensuite interroger régulièrement l'endpoint `/api/v3/import/jobs/{id}` pour récupérer l'état du traitement (`pending`, `error`, `done`, `created`) et accéder aux résultats dès qu'ils sont disponibles.
-   - Ce mécanisme évite les **timeouts**, améliore la **robustesse du système** et permet de mieux **gérer la charge serveur**.  
+   - Ce mécanisme évite les **timeouts**, améliore la **robustesse du système** et permet de mieux **gérer la charge serveur**.
 
 ### MAJ Octobre 2026
 
@@ -89,9 +89,7 @@ En cas de statut `202`, un objet représente le nombre d'objets traités.
   "nbObjetRecus": 1,
   "nbObjetAcceptes": 1,
   "nbObjetRefuses": 0,
-  "listeNumeroBioValides": [
-    "181932"
-  ]
+  "listeNumeroBioValides": ["181932"]
 }
 ```
 
@@ -252,15 +250,33 @@ Chaque objet dans le tableau `warnings` :
   "result": {
     "count": 3,
     "errors": [
-      {"numeroBio": "181934", "message": "cultures inconnues: 01.13.49.967565", "code" : "INVALID_CPF"},
+      {
+        "numeroBio": "181934",
+        "message": "cultures inconnues: 01.13.49.967565",
+        "code": "INVALID_CPF"
+      }
     ],
     "warning": [
-      ["181932", [
-        { "numeroBio": "181932", "code": "MISSING_GEOM", "message": "Parcelle 45742 n'a pas de géométrie" }
-      ]],
-      ["181933", [
-        { "numeroBio": "181933", "code": "GEOM_CORRECTED", "message": "Ces parcelles ont été corrigées : 45800, 45801" }
-      ]]
+      [
+        "181932",
+        [
+          {
+            "numeroBio": "181932",
+            "code": "MISSING_GEOM",
+            "message": "Parcelle 45742 n'a pas de géométrie"
+          }
+        ]
+      ],
+      [
+        "181933",
+        [
+          {
+            "numeroBio": "181933",
+            "code": "GEOM_CORRECTED",
+            "message": "Ces parcelles ont été corrigées : 45800, 45801"
+          }
+        ]
+      ]
     ],
     "numeroBioError": ["181934"],
     "numeroBioValid": [
@@ -318,9 +334,9 @@ Liste paginée des imports de l'OC authentifié.
         "count": 1,
         "errors": [
           {
-            "numeroBio":"181932",
-            "message":"cultures inconnues: 01.13.49.967565",
-            "code":"INVALID_CPF"
+            "numeroBio": "181932",
+            "message": "cultures inconnues: 01.13.49.967565",
+            "code": "INVALID_CPF"
           }
         ],
         "warning": [],
@@ -371,9 +387,9 @@ Retourne `404` si l'import n'existe pas.
     "count": 1,
     "errors": [
       {
-        "numeroBio":"181932",
-        "message":"cultures inconnues: 01.13.49.967565", 
-        "code":"INVALID_CPF"
+        "numeroBio": "181932",
+        "message": "cultures inconnues: 01.13.49.967565",
+        "code": "INVALID_CPF"
       }
     ],
     "warning": [],
@@ -434,77 +450,77 @@ Exemple de fichier JSON relatif à un audit de 2 parcelles. Elles comportent res
 ```json
 [
   {
-   "numeroBio": "110994",
-   "numeroClient": "100012",
-   "anneeReferenceControle": 2022,
-   "anneeAssolement": 2022,
-   "dateAudit": "2023-02-23",
-   "dateCertificationDebut": "2023-03-01",
-   "dateCertificationFin": "2024-12-31",
-   "numeroPacage": "084012821",
-   "commentaire": "",
-   "parcelles": [
-     {
-       "id": "45742",
-       "dateEngagement": "2018-01-01",
-       "etatProduction": "AB",
-       "numeroIlot": "28",
-       "numeroParcelle": "1",
-       "commentaire": "à revisiter l'année prochaine\nune autre ligne",
-       "geom": "[[[4.8740990843182042,44.255949709765304],[4.8739614029301244,44.255016135661734],[4.8736532263747678,44.255001848456033],[4.8738004728368587,44.255928756333255],[4.8740990843182042,44.255949709765304]]]",
-       "cultures": [
-         {
-           "codeCPF": "01.19.10.8",
-           "variete": "syrah",
-           "quantite": 0.25,
-           "unite": "ha"
-         }
-       ],
-       "nom": "test"
-    },
-    {
-       "id": "45743",
-       "dateEngagement": "2018-01-01",
-       "etatProduction": "C1",
-       "numeroIlot": "28",
-       "numeroParcelle": "2",
-       "cultures": [
-         {
-           "codeCPF": "01.21.12",
-           "variete": "syrah",
-           "quantite": 2,
-           "unite": "ha"
-         },
-         {
-           "codeCPF": "01.19.10.8",
-           "quantite": 0.5,
-           "unite": "ha",
-           "commentaire": "pâturé par des moutons en été"
-         }
-       ]
-    },
-    {
-       "id": "45744",
-       "etatProduction": "AB",
-       "numeroIlot": "28",
-       "numeroParcelle": "3",
-       "cultures": [
-         {
-           "codeCPF": "01.11.12",
-           "variete": "rieti, mottet blanc",
-           "dateSemis": "2023-10-10",
-           "quantite": 10,
-           "unite": "ha"
-         },
-         {
-           "codeCPF": "01.11.95",
-           "dateSemis": "2023-07-01",
-           "quantite": 10,
-           "unite": "ha"
-         }
-       ]
-    }
-   ]
+    "numeroBio": "110994",
+    "numeroClient": "100012",
+    "anneeReferenceControle": 2022,
+    "anneeAssolement": 2022,
+    "dateAudit": "2023-02-23",
+    "dateCertificationDebut": "2023-03-01",
+    "dateCertificationFin": "2024-12-31",
+    "numeroPacage": "084012821",
+    "commentaire": "",
+    "parcelles": [
+      {
+        "id": "45742",
+        "dateEngagement": "2018-01-01",
+        "etatProduction": "AB",
+        "numeroIlot": "28",
+        "numeroParcelle": "1",
+        "commentaire": "à revisiter l'année prochaine\nune autre ligne",
+        "geom": "[[[4.8740990843182042,44.255949709765304],[4.8739614029301244,44.255016135661734],[4.8736532263747678,44.255001848456033],[4.8738004728368587,44.255928756333255],[4.8740990843182042,44.255949709765304]]]",
+        "cultures": [
+          {
+            "codeCPF": "01.19.10.8",
+            "variete": "syrah",
+            "quantite": 0.25,
+            "unite": "ha"
+          }
+        ],
+        "nom": "test"
+      },
+      {
+        "id": "45743",
+        "dateEngagement": "2018-01-01",
+        "etatProduction": "C1",
+        "numeroIlot": "28",
+        "numeroParcelle": "2",
+        "cultures": [
+          {
+            "codeCPF": "01.21.12",
+            "variete": "syrah",
+            "quantite": 2,
+            "unite": "ha"
+          },
+          {
+            "codeCPF": "01.19.10.8",
+            "quantite": 0.5,
+            "unite": "ha",
+            "commentaire": "pâturé par des moutons en été"
+          }
+        ]
+      },
+      {
+        "id": "45744",
+        "etatProduction": "AB",
+        "numeroIlot": "28",
+        "numeroParcelle": "3",
+        "cultures": [
+          {
+            "codeCPF": "01.11.12",
+            "variete": "rieti, mottet blanc",
+            "dateSemis": "2023-10-10",
+            "quantite": 10,
+            "unite": "ha"
+          },
+          {
+            "codeCPF": "01.11.95",
+            "dateSemis": "2023-07-01",
+            "quantite": 10,
+            "unite": "ha"
+          }
+        ]
+      }
+    ]
   }
 ]
 ```
@@ -523,9 +539,10 @@ avec les nouvelles valeurs. Pour supprimer une valeur existante pour un champ, i
 ### Parcelles
 
 Le cas particulier des parcelles est traité de la manière suivante :
-* si une parcelle avec le même identifiant est déjà enregistrée pour un opérateur, elle est mise à jour avec les nouvelles valeurs
-* si aucune parcelle avec le même identifiant n'est pas déjà enregistrée pour un opérateur, elle est ajoutée
-* si une parcelle est déjà enregistrée pour un opérateur mais qu'aucune parcelle avec le même identifiant n'est présente dans les données envoyées, elle est supprimée
+
+- si une parcelle avec le même identifiant est déjà enregistrée pour un opérateur, elle est mise à jour avec les nouvelles valeurs
+- si aucune parcelle avec le même identifiant n'est pas déjà enregistrée pour un opérateur, elle est ajoutée
+- si une parcelle est déjà enregistrée pour un opérateur mais qu'aucune parcelle avec le même identifiant n'est présente dans les données envoyées, elle est supprimée
 
 ## Implémentation technique
 

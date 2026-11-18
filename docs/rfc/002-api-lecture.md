@@ -3,9 +3,9 @@ title: API de lecture des parcellaires
 date: 2023-12-05
 updated_at: 2025-10-02
 contributors:
-- Maud R (CartoBio)
-- Thomas P (CartoBio)
-- Hugo B (CartoBio)
+  - Maud R (CartoBio)
+  - Thomas P (CartoBio)
+  - Hugo B (CartoBio)
 ---
 
 # Mise en place d'une API de lecture des parcellaires
@@ -40,10 +40,10 @@ Il est possible de spécifier des filtres pour obtenir les données d'une versio
 
 | Paramètre    | Type     | Description                                                                                            | Numero bio | ALL |
 | ------------ | -------- | ------------------------------------------------------------------------------------------------------ | ---------- | --- |
-| `anneeAudit` | `string` | Année de l'audit                                                                                       | ✅          | ✅   |
-| `statut`     | `string` | Statut de certification ([cf. statuts de certification](#valeurs-possibles--statuts-de-certification)) | ✅          | ✅   |
-| `limit`      | `number` | Nombre de résultat à retourner                                                                         | ❌          | ✅   |
-| `start`      | `number` | Index du premier résultat à retourner (offset de pagination)                                           | ❌          | ✅   |
+| `anneeAudit` | `string` | Année de l'audit                                                                                       | ✅         | ✅  |
+| `statut`     | `string` | Statut de certification ([cf. statuts de certification](#valeurs-possibles--statuts-de-certification)) | ✅         | ✅  |
+| `limit`      | `number` | Nombre de résultat à retourner                                                                         | ❌         | ✅  |
+| `start`      | `number` | Index du premier résultat à retourner (offset de pagination)                                           | ❌         | ✅  |
 
 Les paramètres optionnels limit et start permettent de définir une pagination des résultats.
 
@@ -84,10 +84,10 @@ En cas de statut `200`, un objet JSON représentant l'opérateur, son parcellair
 
 La réponse est un objet JSON contenant deux clés principales :
 
-- **`data`** : un objet qui contient les champs décrits ci-dessous  
-- **`_links`** : un objet optionnel qui contient les URLs de pagination  
-  - `prev` : URL de la page précédente si disponible  
-  - `next` : URL de la page suivante si disponible  
+- **`data`** : un objet qui contient les champs décrits ci-dessous
+- **`_links`** : un objet optionnel qui contient les URLs de pagination
+  - `prev` : URL de la page précédente si disponible
+  - `next` : URL de la page suivante si disponible
 
 ##### Structure de `data`
 

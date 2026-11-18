@@ -20,7 +20,10 @@ export default {
   },
   'pub-key': {
     coerce: coerceMultiline,
-    validate: (x: string) => /^-----BEGIN PUBLIC KEY-----(\n|\r|\r\n)([0-9a-zA-Z+/=]{64}(\n|\r|\r\n))*([0-9a-zA-Z+/=]{1,63}(\n|\r|\r\n))?-----END PUBLIC KEY-----\n$/.test(x)
+    validate: (x: string) =>
+      /^-----BEGIN PUBLIC KEY-----(\n|\r|\r\n)([0-9a-zA-Z+/=]{64}(\n|\r|\r\n))*([0-9a-zA-Z+/=]{1,63}(\n|\r|\r\n))?-----END PUBLIC KEY-----\n$/.test(
+        x
+      )
   },
   url: {
     coerce,

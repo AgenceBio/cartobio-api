@@ -3,7 +3,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { healthSchema, testSchema, versionSchema } from './system.schema.js'
 import * as service from './system.service.js'
 
-export default async function rootRoutes (fastify: FastifyInstance): Promise<void> {
+export default async function rootRoutes(fastify: FastifyInstance): Promise<void> {
   const app = fastify.withTypeProvider<ZodTypeProvider>()
 
   app.get('/api/v2/test', testSchema, async () => ({ message: 'OK' }))

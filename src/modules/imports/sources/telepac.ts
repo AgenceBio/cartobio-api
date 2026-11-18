@@ -44,10 +44,12 @@ const telepacXmlSchema = z.looseObject({
   producteurs: z.looseObject({
     producteur: z.looseObject({
       '@_numero-pacage': z.string(),
-      rpg: z.looseObject({
-        ilot: z.array(telepacXmlIlotSchema).optional(),
-        ilots: z.looseObject({ ilot: z.array(telepacXmlIlotSchema) }).optional()
-      }).refine((rpg) => rpg.ilot ?? rpg.ilots, { message: 'Aucun îlot dans le fichier' })
+      rpg: z
+        .looseObject({
+          ilot: z.array(telepacXmlIlotSchema).optional(),
+          ilots: z.looseObject({ ilot: z.array(telepacXmlIlotSchema) }).optional()
+        })
+        .refine((rpg) => rpg.ilot ?? rpg.ilots, { message: 'Aucun îlot dans le fichier' })
     })
   })
 })
@@ -65,8 +67,7 @@ const telepacPropertiesSchema = z.looseObject({
 
 const removeEmptyElements = (item: unknown): unknown => item
 
-
-async function parseTelepacArchive (file: Promise<MultipartFile | undefined>): Promise<FeatureCollection> {
+async function parseTelepacArchive(file: Promise<MultipartFile | undefined>): Promise<FeatureCollection> {
   const data = await file
   if (!data) throw new InvalidRequestApiError('Aucun fichier transmis.')
   const stream = await FileType.stream(data.file)
@@ -86,7 +87,7 @@ async function parseTelepacArchive (file: Promise<MultipartFile | undefined>): P
 /**
  * Parse a Telepac Shapefile archive to GeoJSON
  */
-async function fromShapefileArchive (stream: FileType.ReadableStreamWithFileType): Promise<FeatureCollection> {
+async function fromShapefileArchive(stream: FileType.ReadableStreamWithFileType): Promise<FeatureCollection> {
   const { files, cleanup } = await unzipGeographicalContent(await getStream.buffer(stream))
   const featureCollection: FeatureCollection = {
     type: 'FeatureCollection',
@@ -95,7 +96,9 @@ async function fromShapefileArchive (stream: FileType.ReadableStreamWithFileType
 
   try {
     if (!files.length) {
-      throw new InvalidRequestApiError('Il ne s\'agit pas d\'un fichier Telepac "Parcelles déclarées" ou "Parcelles instruites".')
+      throw new InvalidRequestApiError(
+        'Il ne s\'agit pas d\'un fichier Telepac "Parcelles déclarées" ou "Parcelles instruites".'
+      )
     }
 
     // validateSchema(geojson.features)
@@ -118,7 +121,10 @@ async function fromShapefileArchive (stream: FileType.ReadableStreamWithFileType
             const properties = telepacPropertiesSchema.safeParse(feature.fields.toObject())
 
             if (!properties.success) {
-              throw new InvalidRequestApiError('Il ne s\'agit pas d\'un fichier Telepac "Parcelles déclarées" ou "Parcelles instruites".', { cause: properties.error })
+              throw new InvalidRequestApiError(
+                'Il ne s\'agit pas d\'un fichier Telepac "Parcelles déclarées" ou "Parcelles instruites".',
+                { cause: properties.error }
+              )
             }
 
             const { AGRIBIO, CAMPAGNE, CODE_VAR, COMMUNE, NUMERO_I, NUMERO_P, PACAGE, TYPE } = properties.data
@@ -160,20 +166,25 @@ async function fromShapefileArchive (stream: FileType.ReadableStreamWithFileType
   return featureCollection
 }
 
-function toGeoJSONCoordinates (gmlCoordinates: string): import('geojson').Position[] {
-  return gmlCoordinates.trim().replace(/\n/g, '').split(' ')
-    // clean tabular spacing
-    .filter(removeEmptyElements)
-    // we split the single unit of X,Y into array pairs of [X, Y]
-    .map(unit => unit.split(','))
-    // turn them into floats
-    .map(([X = '', Y = '']) => [parseFloat(X), parseFloat(Y)])
+function toGeoJSONCoordinates(gmlCoordinates: string): import('geojson').Position[] {
+  return (
+    gmlCoordinates
+      .trim()
+      .replace(/\n/g, '')
+      .split(' ')
+      // clean tabular spacing
+      .filter(removeEmptyElements)
+      // we split the single unit of X,Y into array pairs of [X, Y]
+      .map((unit) => unit.split(','))
+      // turn them into floats
+      .map(([X = '', Y = '']) => [parseFloat(X), parseFloat(Y)])
+  )
 }
 
 /**
  * @see https://datatracker.ietf.org/doc/html/rfc7946#section-3.1.6
  */
-function gmlGeometryToGeoJSONGeometry (gmlPolygon: GmlPolygon): import('geojson').Polygon {
+function gmlGeometryToGeoJSONGeometry(gmlPolygon: GmlPolygon): import('geojson').Polygon {
   return {
     type: 'Polygon',
     coordinates: [
@@ -191,53 +202,58 @@ function gmlGeometryToGeoJSONGeometry (gmlPolygon: GmlPolygon): import('geojson'
  * Parse a Telepac/MesParcelles XML export to GeoJSON
  * For now, it works only with Metropole projection
  */
-async function fromXMLFile (xmlContent: string): Promise<FeatureCollection> {
-  const parsed = telepacXmlSchema.safeParse(new XMLParser({
-    ignoreAttributes: false,
-    parseTagValue: false,
-    isArray: (name, _jpath, isLeafNode, isAttribute) => ['ilot', 'parcelle', 'gml:innerBoundaryIs'].includes(name) && !isAttribute && !isLeafNode
-  }).parse(xmlContent))
+async function fromXMLFile(xmlContent: string): Promise<FeatureCollection> {
+  const parsed = telepacXmlSchema.safeParse(
+    new XMLParser({
+      ignoreAttributes: false,
+      parseTagValue: false,
+      isArray: (name, _jpath, isLeafNode, isAttribute) =>
+        ['ilot', 'parcelle', 'gml:innerBoundaryIs'].includes(name) && !isAttribute && !isLeafNode
+    }).parse(xmlContent)
+  )
   if (!parsed.success) throw new InvalidRequestApiError('Le fichier Telepac XML est invalide.', { cause: parsed.error })
 
   const { producteur } = parsed.data.producteurs
   const PACAGE = producteur['@_numero-pacage']
   const ilots = producteur.rpg.ilot ?? producteur.rpg.ilots?.ilot ?? []
 
-  const geojson = featureCollection(ilots.flatMap(ilot => {
-    const { '@_numero-ilot': NUMERO_I, commune: COMMUNE } = ilot
+  const geojson = featureCollection(
+    ilots.flatMap((ilot) => {
+      const { '@_numero-ilot': NUMERO_I, commune: COMMUNE } = ilot
 
-    return ilot.parcelles.parcelle.map(parcelle => {
-      const id = getRandomFeatureId()
-      const props = parcelle['descriptif-parcelle']
-      const { '@_numero-parcelle': NUMERO_P } = props
-      const { '@_conduite-bio': AGRIBIO } = props['agri-bio'] ?? {}
-      const TYPE = props['culture-principale']['code-culture']
-      const CODE_VAR = props['culture-principale'].precision
+      return ilot.parcelles.parcelle.map((parcelle) => {
+        const id = getRandomFeatureId()
+        const props = parcelle['descriptif-parcelle']
+        const { '@_numero-parcelle': NUMERO_P } = props
+        const { '@_conduite-bio': AGRIBIO } = props['agri-bio'] ?? {}
+        const TYPE = props['culture-principale']['code-culture']
+        const CODE_VAR = props['culture-principale'].precision
 
-      return Feature(
-        gmlGeometryToGeoJSONGeometry(parcelle.geometrie['gml:Polygon']),
-        {
-          id,
-          remoteId: `${NUMERO_I}.${NUMERO_P}`,
-          COMMUNE,
-          cultures: [
-            {
-              id: randomUUID(),
-              CPF: fromCodePacStrict(TYPE, CODE_VAR)?.code_cpf,
-              TYPE
-            }
-          ],
-          NUMERO_I,
-          NUMERO_P,
-          PACAGE,
-          conversion_niveau: AGRIBIO === 'true' ? EtatProduction.BIO : EtatProduction.NB,
-          TYPE,
-          CODE_VAR
-        },
-        { id }
-      )
+        return Feature(
+          gmlGeometryToGeoJSONGeometry(parcelle.geometrie['gml:Polygon']),
+          {
+            id,
+            remoteId: `${NUMERO_I}.${NUMERO_P}`,
+            COMMUNE,
+            cultures: [
+              {
+                id: randomUUID(),
+                CPF: fromCodePacStrict(TYPE, CODE_VAR)?.code_cpf,
+                TYPE
+              }
+            ],
+            NUMERO_I,
+            NUMERO_P,
+            PACAGE,
+            conversion_niveau: AGRIBIO === 'true' ? EtatProduction.BIO : EtatProduction.NB,
+            TYPE,
+            CODE_VAR
+          },
+          { id }
+        )
+      })
     })
-  }))
+  )
 
   return toWgs84(geojson, LegalProjections.metropole)
 }

@@ -20,7 +20,7 @@ export const importJobColumns = {
   result_job: parcellaireImport.resultJob
 }
 
-export function payloadColumn (includePayload: boolean): SQL<ImportJobListRow['payload']> {
+export function payloadColumn(includePayload: boolean): SQL<ImportJobListRow['payload']> {
   return includePayload
     ? sql`json_build_object('id', ${parcellaireImportPayload.id}, 'payload', ${parcellaireImportPayload.payload})`
     : sql`NULL`
@@ -31,7 +31,7 @@ export const operatorRecordColumns = {
   oc_label: organismeCertificateur.label
 }
 
-export function operatorRecordConditions ({ anneeAudit, statut, anneeReferenceControle }: OperatorRecordFilters): SQL[] {
+export function operatorRecordConditions({ anneeAudit, statut, anneeReferenceControle }: OperatorRecordFilters): SQL[] {
   const conditions: SQL[] = []
 
   if (anneeAudit) {

@@ -4,7 +4,7 @@ import cors from '@fastify/cors'
 import multipart from '@fastify/multipart'
 import formBody from '@fastify/formbody'
 
-async function httpPlugin (app: FastifyInstance): Promise<void> {
+async function httpPlugin(app: FastifyInstance): Promise<void> {
   await app.register(cors, {
     origin: true,
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'],

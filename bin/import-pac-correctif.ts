@@ -20,7 +20,7 @@ import { CertificationState, EtatProduction, MetadataSource } from '@agencebio/c
 
 type CorrespondanceRow = Record<string, string> & { PACAGE: string; SIRET: string; NUMEROBIO: string }
 
-function parseCSV (text: string): CorrespondanceRow[] {
+function parseCSV(text: string): CorrespondanceRow[] {
   const [headerLine = '', ...lines] = text.trim().split('\n')
   const headers = headerLine.split(';').map((h) => h.trim())
   return lines.map((line) => {
@@ -29,15 +29,13 @@ function parseCSV (text: string): CorrespondanceRow[] {
   })
 }
 
-function groupByPACAGE (features: Iterable<gdal.Feature>): gdal.Feature[][] {
+function groupByPACAGE(features: Iterable<gdal.Feature>): gdal.Feature[][] {
   const groups = new Map<string, gdal.Feature[]>()
 
   for (const feature of features) {
     const pacage = feature.fields.get('PACAGE')
     if (!pacage) {
-      throw new Error(
-        `Feature without PACAGE: ${JSON.stringify(feature.fields.toObject())}`
-      )
+      throw new Error(`Feature without PACAGE: ${JSON.stringify(feature.fields.toObject())}`)
     }
 
     let group = groups.get(pacage)
@@ -57,13 +55,11 @@ function groupByPACAGE (features: Iterable<gdal.Feature>): gdal.Feature[][] {
 const [, , aspFile, csvFile] = process.argv
 
 if (aspFile === undefined || csvFile === undefined) {
-  console.error(
-    'Usage: node import-pac-correctif.js <fichier-zip-asp> <correspondance-correctif.csv>'
-  )
+  console.error('Usage: node import-pac-correctif.js <fichier-zip-asp> <correspondance-correctif.csv>')
   process.exit(1)
 }
 
-(async (): Promise<void> => {
+;(async (): Promise<void> => {
   const zipBuffer = await getStream.buffer(fs.createReadStream(aspFile))
   const { files, cleanup } = await unzipGeographicalContent(zipBuffer)
   const correspondance = parseCSV(fs.readFileSync(csvFile, 'utf8'))
@@ -90,9 +86,7 @@ if (aspFile === undefined || csvFile === undefined) {
             const [firstFeature] = featureGroup
             if (!firstFeature) continue
             const pacage = firstFeature.fields.get('PACAGE')
-            const siretMapping = correspondance.find(
-              (row) => row.PACAGE === pacage
-            )
+            const siretMapping = correspondance.find((row) => row.PACAGE === pacage)
 
             if (!siretMapping) {
               warningsCorrespondance.push(pacage)
@@ -137,8 +131,7 @@ if (aspFile === undefined || csvFile === undefined) {
                 await geometry.transformAsync(reproject)
 
                 const fields = feature.fields.toObject()
-                const { BIO, CODE_CULT, PRECISION, NUM_ILOT, NUM_PARCEL } =
-                  fields
+                const { BIO, CODE_CULT, PRECISION, NUM_ILOT, NUM_PARCEL } = fields
                 const id = names.includes('id') ? feature.fields.get('id') : getRandomFeatureId()
 
                 featureCollection.features.push({
@@ -155,8 +148,7 @@ if (aspFile === undefined || csvFile === undefined) {
                         CODE_CULT
                       }
                     ],
-                    conversion_niveau:
-                      BIO === 1 ? EtatProduction.BIO : EtatProduction.NB,
+                    conversion_niveau: BIO === 1 ? EtatProduction.BIO : EtatProduction.NB,
                     NUMERO_I: NUM_ILOT,
                     NUMERO_P: NUM_PARCEL,
                     TYPE: CODE_CULT,
@@ -192,7 +184,12 @@ if (aspFile === undefined || csvFile === undefined) {
                 .values(values)
                 .onConflictDoUpdate({
                   target: [importPac.numeroBio, importPac.pacage, importPac.siret],
-                  set: { nbParcelles: values.nbParcelles, size: values.size, record: values.record, updatedAt: sql`CURRENT_TIMESTAMP` }
+                  set: {
+                    nbParcelles: values.nbParcelles,
+                    size: values.size,
+                    record: values.record,
+                    updatedAt: sql`CURRENT_TIMESTAMP`
+                  }
                 })
 
               imported++
@@ -201,7 +198,6 @@ if (aspFile === undefined || csvFile === undefined) {
           }
         }
       }
-
     })
   } catch (error) {
     console.error(error)
@@ -221,9 +217,7 @@ if (aspFile === undefined || csvFile === undefined) {
     }
 
     if (warningsNumeroBioVide.length > 0) {
-      console.log(
-        '\n Warnings =>Numero BIO à vide pour les pacages et les sirets :'
-      )
+      console.log('\n Warnings =>Numero BIO à vide pour les pacages et les sirets :')
       for (const wsv of warningsNumeroBioVide) console.log(wsv)
     }
 
@@ -238,17 +232,12 @@ if (aspFile === undefined || csvFile === undefined) {
       warningsSiretVide,
       warningsNumeroBioVide
     }
-    fs.writeFile(
-      'resultat_correctif_csv.json',
-      JSON.stringify(json),
-      'utf8',
-      (err): void => {
-        if (err) {
-          console.error(err)
-        } else {
-          console.log('Warnings disponible dans le fichier resultat.json')
-        }
+    fs.writeFile('resultat_correctif_csv.json', JSON.stringify(json), 'utf8', (err): void => {
+      if (err) {
+        console.error(err)
+      } else {
+        console.log('Warnings disponible dans le fichier resultat.json')
       }
-    )
+    })
   }
 })()

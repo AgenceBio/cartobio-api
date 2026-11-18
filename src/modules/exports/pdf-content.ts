@@ -1,5 +1,14 @@
 import fs from 'fs'
-import { formatDate, getOptimalZoom, formatRefCad, calculateGlobalBoundingBox, launchStyleTab, drawParcelleHighlightOnMap, drawAllParcellesOnMap, mergeAndAddFooter } from './pdf-utils.js'
+import {
+  formatDate,
+  getOptimalZoom,
+  formatRefCad,
+  calculateGlobalBoundingBox,
+  launchStyleTab,
+  drawParcelleHighlightOnMap,
+  drawAllParcellesOnMap,
+  mergeAndAddFooter
+} from './pdf-utils.js'
 import path from 'path'
 import puppeteer from 'puppeteer'
 import { fromCodeCpf } from '@agencebio/rosetta-cultures'
@@ -15,7 +24,11 @@ import config from '../../config/env.js'
 /**
  * Génère une image de carte pour un opérateur et ses parcelles
  */
-async function generateOperatorMapImages (parcelles: PdfParcelle[], page: Page, options: MapImagesOptions = {}): Promise<OperatorMapImages> {
+async function generateOperatorMapImages(
+  parcelles: PdfParcelle[],
+  page: Page,
+  options: MapImagesOptions = {}
+): Promise<OperatorMapImages> {
   try {
     const globalBbox = calculateGlobalBoundingBox(parcelles)
     if (!globalBbox) throw new Error('Aucune parcelle pour générer la carte du parcellaire')
@@ -25,12 +38,7 @@ async function generateOperatorMapImages (parcelles: PdfParcelle[], page: Page, 
     const viewportHeight = options.height || 389
     const timeout = options.timeout || 30000
 
-    const globalZoom = getOptimalZoom(
-      globalBbox.width,
-      globalBbox.height,
-      viewportWidth,
-      viewportHeight
-    )
+    const globalZoom = getOptimalZoom(globalBbox.width, globalBbox.height, viewportWidth, viewportHeight)
 
     const globalResult = await drawAllParcellesOnMap(page, parcelles, {
       width: viewportWidth,
@@ -87,30 +95,37 @@ async function generateOperatorMapImages (parcelles: PdfParcelle[], page: Page, 
 
 let pdfQueue: Promise<unknown> = Promise.resolve()
 
-function createPdfContent (numeroBio: string, recordId: string, parcelles: Array<PdfParcelle>, currentOperator: AgenceBioNormalizedOperator & PdfRecord, pac: boolean): Promise<PDFDocument[]> {
+function createPdfContent(
+  numeroBio: string,
+  recordId: string,
+  parcelles: Array<PdfParcelle>,
+  currentOperator: AgenceBioNormalizedOperator & PdfRecord,
+  pac: boolean
+): Promise<PDFDocument[]> {
   const run = pdfQueue.then(() => renderPdfContent(numeroBio, recordId, parcelles, currentOperator, pac))
   pdfQueue = run.catch(() => undefined)
   return run
 }
 
-async function renderPdfContent (numeroBio: string, recordId: string, parcelles: Array<PdfParcelle>, currentOperator: AgenceBioNormalizedOperator & PdfRecord, pac: boolean): Promise<PDFDocument[]> {
+async function renderPdfContent(
+  numeroBio: string,
+  recordId: string,
+  parcelles: Array<PdfParcelle>,
+  currentOperator: AgenceBioNormalizedOperator & PdfRecord,
+  pac: boolean
+): Promise<PDFDocument[]> {
   const dateTraitement = new Date()
 
   const browser = await puppeteer.launch({
     executablePath: process.env.CHROME_BIN || undefined,
     headless: true,
-    args: [
-      '--headless',
-      '--hide-scrollbars',
-      '--mute-audio',
-      '--no-sandbox'
-    ]
+    args: ['--headless', '--hide-scrollbars', '--mute-audio', '--no-sandbox']
   })
   try {
     const pageMap = await launchStyleTab(browser)
     const result = await generateOperatorMapImages(parcelles, pageMap)
     const globalImage = result.global
-    if (!globalImage) throw new Error('La carte du parcellaire n\'a pas pu être générée')
+    if (!globalImage) throw new Error("La carte du parcellaire n'a pas pu être générée")
     const page = await browser.newPage()
     const fontPath = path.join(ASSETS_DIR, 'image-map/Marianne.woff2')
     const fontData = fs.readFileSync(fontPath, { encoding: 'base64' })
@@ -131,8 +146,8 @@ async function renderPdfContent (numeroBio: string, recordId: string, parcelles:
 
     const order = ['AB', 'C3', 'C2', 'C1', 'CONV', 'Non défini']
     Object.entries(groupedParcels).forEach(([niveau, parcels]): void => {
-      const avecProps = parcels.filter(p => p.nbilot && p.nbp)
-      const sansProps = parcels.filter(p => !p.nbilot || !p.nbp)
+      const avecProps = parcels.filter((p) => p.nbilot && p.nbp)
+      const sansProps = parcels.filter((p) => !p.nbilot || !p.nbp)
       avecProps.sort((a, b) => {
         if (a.nbilot !== b.nbilot) {
           return Number(a.nbilot) - Number(b.nbilot)
@@ -158,28 +173,25 @@ async function renderPdfContent (numeroBio: string, recordId: string, parcelles:
     })
 
     const sortedGroupedParcels = Object.fromEntries(
-      Object.entries(groupedParcels).sort(
-        (a, b) => order.indexOf(a[0]) - order.indexOf(b[0])
-      )
+      Object.entries(groupedParcels).sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0]))
     )
 
     const groupTotals: Record<string, number> = {}
     let totalHA = 0
     Object.entries(sortedGroupedParcels).forEach(([groupKey, parcels]): void => {
-      const groupSum = parcels.reduce(
-        (sum, parcel) => sum + (parcel.superficie_totale_ha || 0),
-        0
-      )
+      const groupSum = parcels.reduce((sum, parcel) => sum + (parcel.superficie_totale_ha || 0), 0)
       groupTotals[groupKey] = groupSum
       totalHA += groupSum
     })
 
-    const blocksHTML = Object.values(sortedGroupedParcels).map((parcels) =>
-      parcels.map(item => {
-        const parcelle = result.parcelles.find(e => e.id === item.id)
-        if (!parcelle) throw new Error(`Carte de la parcelle ${item.id} non générée`)
-        const imgSrc = `data:image/png;base64,${parcelle.buffer}`
-        const block = `
+    const blocksHTML = Object.values(sortedGroupedParcels)
+      .map((parcels) =>
+        parcels
+          .map((item) => {
+            const parcelle = result.parcelles.find((e) => e.id === item.id)
+            if (!parcelle) throw new Error(`Carte de la parcelle ${item.id} non générée`)
+            const imgSrc = `data:image/png;base64,${parcelle.buffer}`
+            const block = `
       <div class="block">
         <div class="container">
             <h3 class="header">${item.name ? 'Parcelle ' + escapeHtml(item.name) : ''}${item.name && item.nbilot ? ' - ' : ''}${item.nbilot ? 'Ilot ' + item.nbilot + (item.nbp ? ' parcelle ' + item.nbp : '') : ''}${!item.name && !item.nbilot && item.refcad ? item.refcad.map((e) => escapeHtml(formatRefCad(e))).join(' ; ') : ''}</h3>
@@ -198,22 +210,25 @@ async function renderPdfContent (numeroBio: string, recordId: string, parcelles:
                         <th class="row3">Date de semis</th>
                         <th class="row4">Surface</th>
                     </tr>
-                    ${item.cultures.map(e => {
-                      return `
+                    ${item.cultures
+                      .map((e) => {
+                        return `
                       <tr>
-                        <td>${e.CPF ? ((fromCodeCpf(e.CPF)?.libelle_code_cpf) + (e.CPF === 'ACT.Prod.Inc' ? ' *' : '')) : '-'}</td>
+                        <td>${e.CPF ? fromCodeCpf(e.CPF)?.libelle_code_cpf + (e.CPF === 'ACT.Prod.Inc' ? ' *' : '') : '-'}</td>
                         <td>${e.variete ? escapeHtml(e.variete) : '-'}</td>
                         <td>${e.date_semis ? formatDate(e.date_semis) : '-'}</td>
                         <td>${item.cultures.length === 1 && item.superficie_totale_ha ? item.superficie_totale_ha.toFixed(2).replace('.', ',') + ' ha' : e.surface ? Number(e.surface).toFixed(2).replace('.', ',') + ' ha' : '-'} </td>
                       </tr>
                       `
-                    }
-                    ).join('')}
+                      })
+                      .join('')}
                 </table>
-                ${item.cultures.some((e) => e.CPF === 'ACT.Prod.Inc') ?
-                  `
+                ${
+                  item.cultures.some((e) => e.CPF === 'ACT.Prod.Inc')
+                    ? `
                     <i class="font-10">* Culture non renseignée sur votre parcelle. Pour la mettre à jour, veuillez contacter votre organisme certificateur.</i>
-                  ` : ''
+                  `
+                    : ''
                 }
             </div>
         </div>
@@ -225,13 +240,13 @@ async function renderPdfContent (numeroBio: string, recordId: string, parcelles:
           </div>
         </div>
       </div>`
-        return block
-      })
-        .join('')).join('')
+            return block
+          })
+          .join('')
+      )
+      .join('')
 
-    const finalHTML = parcelles.length % 3 !== 0
-      ? blocksHTML + '</div>'
-      : blocksHTML
+    const finalHTML = parcelles.length % 3 !== 0 ? blocksHTML + '</div>' : blocksHTML
 
     const content = `
     <!doctypehtml>
@@ -266,7 +281,6 @@ async function renderPdfContent (numeroBio: string, recordId: string, parcelles:
     </html>`
     await page.setContent(content)
     await page.evaluate((fontData): void => {
-     
       const style = document.createElement('style')
       style.innerHTML = `
       @font-face {
@@ -275,12 +289,11 @@ async function renderPdfContent (numeroBio: string, recordId: string, parcelles:
         font-style: normal;
       }
     `
-       
+
       document.head.appendChild(style)
     }, fontData)
 
     await page.evaluate((): void => {
-     
       document.body.style.fontFamily = 'Marianne, sans-serif'
     })
 
@@ -619,9 +632,7 @@ async function renderPdfContent (numeroBio: string, recordId: string, parcelles:
               </defs>
             </svg>
             <div>
-              CERTIFIÉ | ${currentOperator.annee_reference_controle
-              ? currentOperator.annee_reference_controle
-              : '-'}
+              CERTIFIÉ | ${currentOperator.annee_reference_controle ? currentOperator.annee_reference_controle : '-'}
             </div>
           </div>
         </div>
@@ -646,24 +657,28 @@ async function renderPdfContent (numeroBio: string, recordId: string, parcelles:
                 </p>
                 <p>
                   <span class="title-header">Adresse&nbsp;:</span>
-                  ${currentOperator.adressesOperateurs[0]?.lieu
-                  ? escapeHtml(currentOperator.adressesOperateurs[0]?.lieu)
-                  : '-'}
+                  ${
+                    currentOperator.adressesOperateurs[0]?.lieu
+                      ? escapeHtml(currentOperator.adressesOperateurs[0]?.lieu)
+                      : '-'
+                  }
                   <br />
-                  ${currentOperator.adressesOperateurs[0]?.codePostal
-                  ? escapeHtml(currentOperator.adressesOperateurs[0]?.codePostal)
-                  : '-'}
-                  ${currentOperator.adressesOperateurs[0]?.ville
-                  ? escapeHtml(currentOperator.adressesOperateurs[0]?.ville)
-                  : '-'}
+                  ${
+                    currentOperator.adressesOperateurs[0]?.codePostal
+                      ? escapeHtml(currentOperator.adressesOperateurs[0]?.codePostal)
+                      : '-'
+                  }
+                  ${
+                    currentOperator.adressesOperateurs[0]?.ville
+                      ? escapeHtml(currentOperator.adressesOperateurs[0]?.ville)
+                      : '-'
+                  }
                 </p>
               </div>
               <div class="ligne-header">
                 <p>
                   <span class="title-header">Année réf. contrôle&nbsp;:</span>
-                  ${currentOperator.annee_reference_controle
-                  ? currentOperator.annee_reference_controle
-                  : '-'}
+                  ${currentOperator.annee_reference_controle ? currentOperator.annee_reference_controle : '-'}
                 </p>
                 <p>
                   <span class="title-header">Certifié par&nbsp;:</span>
@@ -671,23 +686,21 @@ async function renderPdfContent (numeroBio: string, recordId: string, parcelles:
                 </p>
                 <p>
                   <span class="title-header">Date d'audit&nbsp;:</span>
-                  ${currentOperator.audit_date
-                  ? formatDate(currentOperator.audit_date)
-                  : '-'}
+                  ${currentOperator.audit_date ? formatDate(currentOperator.audit_date) : '-'}
                 </p>
               </div>
               <div class="ligne-header">
                 <p>
                   <span class="title-header">Début de validité du certificat&nbsp;:</span>
-                  ${currentOperator.certification_date_debut
-                  ? formatDate(currentOperator.certification_date_debut)
-                  : '-'}
+                  ${
+                    currentOperator.certification_date_debut
+                      ? formatDate(currentOperator.certification_date_debut)
+                      : '-'
+                  }
                 </p>
                 <p>
                   <span class="title-header">Fin de validité du certificat&nbsp;:</span>
-                  ${currentOperator.certification_date_fin
-                  ? formatDate(currentOperator.certification_date_fin)
-                  : '-'}
+                  ${currentOperator.certification_date_fin ? formatDate(currentOperator.certification_date_fin) : '-'}
                 </p>
               </div>
               <div class="ligne-header">
@@ -735,52 +748,59 @@ async function renderPdfContent (numeroBio: string, recordId: string, parcelles:
           </tr>
         </thead>
         <tbody>
-          ${Object.entries(sortedGroupedParcels).map(([groupKey, parcels]) => `
-          ${parcels.map(parcel => `
+          ${Object.entries(sortedGroupedParcels)
+            .map(
+              ([groupKey, parcels]) => `
+          ${parcels
+            .map(
+              (parcel) => `
           <tr class="global-ligne">
             <td>${parcel.name ? escapeHtml(parcel.name) : '-'}</td>
             <td>
-              ${parcel.nbilot
-? `Ilot ${parcel.nbilot || '-'} - Parcelle
+              ${
+                parcel.nbilot
+                  ? `Ilot ${parcel.nbilot || '-'} - Parcelle
               ${parcel.nbp || ''}`
-: parcel.refcad
-? parcel.refcad.map((e) =>
-              escapeHtml(formatRefCad(e))).join(' ; ')
-: '-'}
+                  : parcel.refcad
+                    ? parcel.refcad.map((e) => escapeHtml(formatRefCad(e))).join(' ; ')
+                    : '-'
+              }
             </td>
             <td>
-              ${(parcel.cultures || []).map(c =>
-              (c.CPF ? fromCodeCpf(c.CPF)?.libelle_code_cpf : '-') + (c.CPF === 'ACT.Prod.Inc' ? ' *' : '')).join(', ') || ''}
+              ${
+                (parcel.cultures || [])
+                  .map(
+                    (c) => (c.CPF ? fromCodeCpf(c.CPF)?.libelle_code_cpf : '-') + (c.CPF === 'ACT.Prod.Inc' ? ' *' : '')
+                  )
+                  .join(', ') || ''
+              }
             </td>
             <td>
-              ${parcel.engagement_date
-? formatDate(parcel.engagement_date)
-              : '-'}
+              ${parcel.engagement_date ? formatDate(parcel.engagement_date) : '-'}
             </td>
             <td>
-              ${parcel.conversion_niveau === 'CONV'
-? 'Conventionnel'
-              : parcel.conversion_niveau || '-'}
+              ${parcel.conversion_niveau === 'CONV' ? 'Conventionnel' : parcel.conversion_niveau || '-'}
             </td>
             <td>${parcel.commune ? escapeHtml(parcel.commune) : '-'}</td>
             <td class="text-right">
-              ${(parcel.superficie_totale_ha || 0).toFixed(2).replace('.',
-              ',')} ha
+              ${(parcel.superficie_totale_ha || 0).toFixed(2).replace('.', ',')} ha
             </td>
           </tr>
-          `).join('')}
+          `
+            )
+            .join('')}
           <tr class="group-total">
             <td colspan="4">
-              Niveau de conversion ${groupKey === 'CONV'
-? 'conventionnel'
-              : groupKey}
+              Niveau de conversion ${groupKey === 'CONV' ? 'conventionnel' : groupKey}
             </td>
             <td class="text-right" colspan="2">Surface totale :</td>
             <td class="text-right">
               ${(groupTotals[groupKey] ?? 0).toFixed(2).replace('.', ',')} ha
             </td>
           </tr>
-          `).join('')}
+          `
+            )
+            .join('')}
           <tr class="last-line">
             <td class="text-right" colspan="6">
               Surface totale de l'exploitation :
@@ -791,10 +811,12 @@ async function renderPdfContent (numeroBio: string, recordId: string, parcelles:
           </tr>
         </tbody>
       </table>
-      ${hasUnknownCulture ?
-        `
+      ${
+        hasUnknownCulture
+          ? `
         <i class="legend">* Culture non renseignée sur votre parcelle. Pour la mettre à jour, veuillez contacter votre organisme certificateur.</i>
-        ` : ''
+        `
+          : ''
       }
     </div>
     </div>
@@ -820,7 +842,6 @@ async function renderPdfContent (numeroBio: string, recordId: string, parcelles:
 `
     await page.setContent(resumeHTML)
     await page.evaluate((fontData): void => {
-     
       const style = document.createElement('style')
       style.innerHTML = `
       @font-face {
@@ -830,12 +851,11 @@ async function renderPdfContent (numeroBio: string, recordId: string, parcelles:
         font-style: normal;
       }
     `
-       
+
       document.head.appendChild(style)
     }, fontData)
 
     await page.evaluate((): void => {
-     
       document.body.style.fontFamily = 'Marianne, sans-serif'
     })
     await page.pdf({

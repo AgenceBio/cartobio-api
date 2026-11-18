@@ -3,8 +3,24 @@ import { polygon } from '@turf/helpers'
 import bboxPolygon from '@turf/bbox-polygon'
 import polygonInPolygon from '@turf/boolean-intersects'
 import { fromCodeCpf } from '@agencebio/rosetta-cultures'
-import { CertificationState, EtatProduction, inputApiRecordBodySchema, MetadataSource, RegionBounds } from '@agencebio/cartobio-types'
-import type { AgenceBioNormalizedOperator, ImportJobStatusResponse, ImportSummary, CartoBioFeatureInput, FeaturePropertiesInput, InputApiParcelleBody, InputApiRecordBody, OrganismeCertificateur, RecordInfos } from '@agencebio/cartobio-types'
+import {
+  CertificationState,
+  EtatProduction,
+  inputApiRecordBodySchema,
+  MetadataSource,
+  RegionBounds
+} from '@agencebio/cartobio-types'
+import type {
+  AgenceBioNormalizedOperator,
+  ImportJobStatusResponse,
+  ImportSummary,
+  CartoBioFeatureInput,
+  FeaturePropertiesInput,
+  InputApiParcelleBody,
+  InputApiRecordBody,
+  OrganismeCertificateur,
+  RecordInfos
+} from '@agencebio/cartobio-types'
 import type { RecordInput } from '../../../shared/parcellaires/parcellaires.types.js'
 import type { Position } from 'geojson'
 import { getRandomFeatureId } from '../../../shared/outputs/features.js'
@@ -54,11 +70,11 @@ const ImportLogType = {
   PAC_PENDING_WITH_ILOT: 'PAC_PENDING_WITH_ILOT'
 }
 
-type ImportWarning = { numeroBio: string, message: string, code: string }
+type ImportWarning = { numeroBio: string; message: string; code: string }
 type ImportJobStatusResult = ImportJobStatusResponse | { status: 'error'; error: string }
-type ValidItem = { record: RecordInput & Pick<RecordInfos, 'numerobio'>, numeroBio: string, warnings: ImportWarning[] }
-type RecordError = { message: string, code: string }
-type FeatureError = RecordError & { idParcelle?: string | number | null, nomParcelle?: string | null }
+type ValidItem = { record: RecordInput & Pick<RecordInfos, 'numerobio'>; numeroBio: string; warnings: ImportWarning[] }
+type RecordError = { message: string; code: string }
+type FeatureError = RecordError & { idParcelle?: string | number | null; nomParcelle?: string | null }
 type ErrorItem = FeatureError & { numeroBio?: string }
 type ParsedRecord =
   | (ValidItem & { json: InputApiRecordBody; errors?: undefined })
@@ -67,7 +83,7 @@ type ParsedRecord =
 /**
  * Formate un préfixe d'identification de parcelle pour les messages d'erreur.
  */
-function formatParcelleName (parcelle: InputApiParcelleBody): string {
+function formatParcelleName(parcelle: InputApiParcelleBody): string {
   const ilot = parcelle.numeroIlot != null ? String(parcelle.numeroIlot) : null
   const num = parcelle.numeroParcelle != null ? String(parcelle.numeroParcelle) : null
   if (parcelle.nom) return `${parcelle.nom}`
@@ -80,7 +96,7 @@ function formatParcelleName (parcelle: InputApiParcelleBody): string {
 /**
  * Créer une erreur pour une feature.
  */
-function buildFeatureError (parcelle: InputApiParcelleBody, message: string, code: string): FeatureError {
+function buildFeatureError(parcelle: InputApiParcelleBody, message: string, code: string): FeatureError {
   return {
     code,
     message,
@@ -89,7 +105,10 @@ function buildFeatureError (parcelle: InputApiParcelleBody, message: string, cod
   }
 }
 
-async function parseAPIParcellaire (payload: InputApiRecordBody, { organismeCertificateur }: { organismeCertificateur: OrganismeCertificateur }): Promise<ParsedRecord> {
+async function parseAPIParcellaire(
+  payload: InputApiRecordBody,
+  { organismeCertificateur }: { organismeCertificateur: OrganismeCertificateur }
+): Promise<ParsedRecord> {
   const record = payload
   const parcelleWarnings: ImportWarning[] = []
   const recordErrors: RecordError[] = []
@@ -125,20 +144,14 @@ async function parseAPIParcellaire (payload: InputApiRecordBody, { organismeCert
     }
   }
 
-  if (
-    record.dateCertificationDebut &&
-    isNaN(Date.parse(record.dateCertificationDebut))
-  ) {
+  if (record.dateCertificationDebut && isNaN(Date.parse(record.dateCertificationDebut))) {
     recordErrors.push({
       message: 'champ dateCertificationDebut incorrect',
       code: ImportLogType.INVALID_DATE_CERTIFICATION_DEBUT
     })
   }
 
-  if (
-    record.dateCertificationFin &&
-    isNaN(Date.parse(record.dateCertificationFin))
-  ) {
+  if (record.dateCertificationFin && isNaN(Date.parse(record.dateCertificationFin))) {
     recordErrors.push({
       message: 'champ dateCertificationFin incorrect',
       code: ImportLogType.INVALID_DATE_CERTIFICATION_FIN
@@ -169,7 +182,11 @@ async function parseAPIParcellaire (payload: InputApiRecordBody, { organismeCert
       const numeroIlot = parseInt(String(parcelle.numeroIlot), 10)
       const numeroParcelle = parseInt(String(parcelle.numeroParcelle), 10)
 
-      if (!Number.isNaN(numeroIlot) && numeroIlot !== 0 && (parcelle.enAttentePac === true || parcelle.enAttentePac === 1)) {
+      if (
+        !Number.isNaN(numeroIlot) &&
+        numeroIlot !== 0 &&
+        (parcelle.enAttentePac === true || parcelle.enAttentePac === 1)
+      ) {
         parcelle.enAttentePac = false
         parcelleWarnings.push({
           numeroBio: String(record.numeroBio),
@@ -181,45 +198,39 @@ async function parseAPIParcellaire (payload: InputApiRecordBody, { organismeCert
       let conversionNiveau: EtatProduction | undefined
       try {
         conversionNiveau = parcelle.etatProduction
-          ? normalizeEtatProduction(parcelle.etatProduction, { strict: true }) as EtatProduction
+          ? (normalizeEtatProduction(parcelle.etatProduction, { strict: true }) as EtatProduction)
           : undefined
         if (
           conversionNiveau !== null &&
           [EtatProduction.C1, EtatProduction.C2, EtatProduction.C3].some((etat) => etat === conversionNiveau) &&
           !Date.parse(parcelle.dateEngagement ?? '')
         ) {
-          featureErrors.push(buildFeatureError(
-            parcelle,
-            "Champ date d'engagement obligatoire lorsque que la parcelle est en conversion",
-            ImportLogType.MISSING_DATE_ENGAGEMENT
-          ))
+          featureErrors.push(
+            buildFeatureError(
+              parcelle,
+              "Champ date d'engagement obligatoire lorsque que la parcelle est en conversion",
+              ImportLogType.MISSING_DATE_ENGAGEMENT
+            )
+          )
         }
       } catch (error) {
         logger.warn({ err: error }, 'champ etatProduction incorrect')
-        featureErrors.push(buildFeatureError(parcelle, 'champ etatProduction incorrect', ImportLogType.INVALID_ETAT_PRODUCTION))
+        featureErrors.push(
+          buildFeatureError(parcelle, 'champ etatProduction incorrect', ImportLogType.INVALID_ETAT_PRODUCTION)
+        )
       }
       const properties: FeaturePropertiesInput = {
         id,
-        cultures: cultures?.map(
-          ({ codeCPF, quantite, variete = '', dateSemis = '', unite }) => ({
-            id: randomUUID(),
-            CPF: codeCPF,
-            date_semis: dateSemis,
-            surface: parseFloat(String(quantite)),
-            unit: unite,
-            variete
-          })
-        ),
-        NUMERO_I: Number.isNaN(numeroIlot)
-          ? pac
-            ? pac.numeroIlot ?? null
-            : null
-          : String(numeroIlot),
-        NUMERO_P: Number.isNaN(numeroParcelle)
-          ? pac
-            ? pac.numeroParcelle ?? null
-            : null
-          : String(numeroParcelle),
+        cultures: cultures?.map(({ codeCPF, quantite, variete = '', dateSemis = '', unite }) => ({
+          id: randomUUID(),
+          CPF: codeCPF,
+          date_semis: dateSemis,
+          surface: parseFloat(String(quantite)),
+          unit: unite,
+          variete
+        })),
+        NUMERO_I: Number.isNaN(numeroIlot) ? (pac ? (pac.numeroIlot ?? null) : null) : String(numeroIlot),
+        NUMERO_P: Number.isNaN(numeroParcelle) ? (pac ? (pac.numeroParcelle ?? null) : null) : String(numeroParcelle),
         PACAGE: record.numeroPacage ? String(record.numeroPacage) : null,
         conversion_niveau: conversionNiveau ?? '',
         engagement_date: parcelle.dateEngagement ?? null,
@@ -232,28 +243,25 @@ async function parseAPIParcellaire (payload: InputApiRecordBody, { organismeCert
       }
 
       if (parcelle.dateEngagement && !Date.parse(parcelle.dateEngagement)) {
-        featureErrors.push(buildFeatureError(parcelle, 'champ dateEngagement incorrect', ImportLogType.INVALID_DATE_ENGAGEMENT))
+        featureErrors.push(
+          buildFeatureError(parcelle, 'champ dateEngagement incorrect', ImportLogType.INVALID_DATE_ENGAGEMENT)
+        )
       }
       if (!cultures?.length) {
         featureErrors.push(buildFeatureError(parcelle, 'cultures absentes', ImportLogType.MISSING_CULTURES))
       }
 
-      const invalidCodes = (cultures ?? [])
-        .filter((c) => !fromCodeCpf(c.codeCPF ?? ''))
-        .map((c) => c.codeCPF)
+      const invalidCodes = (cultures ?? []).filter((c) => !fromCodeCpf(c.codeCPF ?? '')).map((c) => c.codeCPF)
 
       if (invalidCodes.length > 0) {
-        featureErrors.push(buildFeatureError(parcelle, `cultures inconnues: ${invalidCodes.join(', ')}`, ImportLogType.INVALID_CPF))
+        featureErrors.push(
+          buildFeatureError(parcelle, `cultures inconnues: ${invalidCodes.join(', ')}`, ImportLogType.INVALID_CPF)
+        )
       }
 
       let coordinates: Position[][] = []
 
-      if (
-        parcelle.geom === null ||
-        parcelle.geom === undefined ||
-        parcelle.geom === '' ||
-        parcelle.geom === 'null'
-      ) {
+      if (parcelle.geom === null || parcelle.geom === undefined || parcelle.geom === '' || parcelle.geom === 'null') {
         parcelleWarnings.push({
           numeroBio: String(record.numeroBio),
           message: `Parcelle ${id ?? ''} n'a pas de géométrie`,
@@ -271,15 +279,11 @@ async function parseAPIParcellaire (payload: InputApiRecordBody, { organismeCert
               throw new Error('les coordonnées doivent être des nombres finis')
             }
             if (y > 90 || y < -90) {
-              throw new Error(
-                'la latitude doit être comprise entre 90 et -90'
-              )
+              throw new Error('la latitude doit être comprise entre 90 et -90')
             }
 
             if (x > 180 || x < -180) {
-              throw new Error(
-                'la longitude doit être comprise entre 180 et -180'
-              )
+              throw new Error('la longitude doit être comprise entre 180 et -180')
             }
           })
         )
@@ -356,7 +360,11 @@ async function parseAPIParcellaire (payload: InputApiRecordBody, { organismeCert
 /**
  * Seule passe de validation : le validItem retourné contient le record déjà parsé et prêt pour l'insert.
  */
-async function collectValidationResult (payload: unknown, { organismeCertificateur }: { organismeCertificateur: OrganismeCertificateur }, jobId: number): Promise<{ errors: ErrorItem[]; validItem: ValidItem | null }> {
+async function collectValidationResult(
+  payload: unknown,
+  { organismeCertificateur }: { organismeCertificateur: OrganismeCertificateur },
+  jobId: number
+): Promise<{ errors: ErrorItem[]; validItem: ValidItem | null }> {
   const parsed = inputApiRecordBodySchema.safeParse(payload)
   if (!parsed.success) {
     await repository.insertPayload(jobId, payload)
@@ -371,11 +379,16 @@ async function collectValidationResult (payload: unknown, { organismeCertificate
 
   const json = parsed.data
   await updateStatus(jobId, json)
-  const { record, numeroBio, errors: recordErrors, warnings } = await parseAPIParcellaire(json, { organismeCertificateur })
+  const {
+    record,
+    numeroBio,
+    errors: recordErrors,
+    warnings
+  } = await parseAPIParcellaire(json, { organismeCertificateur })
   await addPayload(json, jobId)
 
   if (recordErrors?.length || !record) {
-    return { errors: (recordErrors ?? []).map(err => ({ numeroBio, ...err })), validItem: null }
+    return { errors: (recordErrors ?? []).map((err) => ({ numeroBio, ...err })), validItem: null }
   }
 
   return { errors: [], validItem: { record, numeroBio, warnings: warnings ?? [] } }
@@ -386,12 +399,15 @@ async function collectValidationResult (payload: unknown, { organismeCertificate
  * Ne refait aucune validation métier : collecte uniquement les warnings post-insert
  * (corrections géométriques) et met à jour le job.
  */
-async function parcellaireValidItemToDb ({ record, numeroBio, warnings }: ValidItem, jobId: number): Promise<{
-    count: number
-    errors: Array<{ numeroBio?: string; code: string; message: string }>
-    warning: Array<[string, ImportWarning[]]>
-    numeroBioValid: Array<{ numeroBio: string; nbParcelles: number }>
-    numeroBioError: Array<string | undefined>
+async function parcellaireValidItemToDb(
+  { record, numeroBio, warnings }: ValidItem,
+  jobId: number
+): Promise<{
+  count: number
+  errors: Array<{ numeroBio?: string; code: string; message: string }>
+  warning: Array<[string, ImportWarning[]]>
+  numeroBioValid: Array<{ numeroBio: string; nbParcelles: number }>
+  numeroBioError: Array<string | undefined>
 }> {
   const count = 1
   const dbErrors: Array<{ numeroBio?: string; code: string; message: string }> = []
@@ -407,13 +423,13 @@ async function parcellaireValidItemToDb ({ record, numeroBio, warnings }: ValidI
     try {
       const { parcelles } = await createOrUpdateOperatorRecord(record, null, tx)
       const parcellesCorrigees = parcelles
-        .filter(f => f.statut_import_geom === 'CORRIGE')
-        .map(f => f.id)
+        .filter((f) => f.statut_import_geom === 'CORRIGE')
+        .map((f) => f.id)
         .filter(Boolean)
 
       const parcellesNonCorrigees = parcelles
-        .filter(f => f.statut_import_geom === 'ACCEPTENONCORRIGE')
-        .map(f => f.id)
+        .filter((f) => f.statut_import_geom === 'ACCEPTENONCORRIGE')
+        .map((f) => f.id)
         .filter(Boolean)
 
       const correctionWarnings: ImportWarning[] = []
@@ -478,20 +494,21 @@ async function parcellaireValidItemToDb ({ record, numeroBio, warnings }: ValidI
 /**
  * Crée un job d'import dans la table parcellaire_import pour tracer un import à exécuter.
  */
-async function createImportJob (organismeCertificateurId: number): Promise<number> {
+async function createImportJob(organismeCertificateurId: number): Promise<number> {
   return repository.createImportJob(organismeCertificateurId)
 }
 
 /**
  * Stocke le payload d'un job
  */
-async function addPayload (json: InputApiRecordBody, jobId: number): Promise<InputApiRecordBody> {
+async function addPayload(json: InputApiRecordBody, jobId: number): Promise<InputApiRecordBody> {
   await repository.insertPayload(jobId, json)
 
   await repository.updateImportJobRecordInfos(jobId, {
     numeroBio: json.numeroBio ? String(json.numeroBio) : null,
     numeroClient: json.numeroClient ? String(json.numeroClient) : null,
-    auditDate: json.dateAudit && !isNaN(Date.parse(json.dateAudit)) ? new Date(json.dateAudit).toISOString().slice(0, 10) : null
+    auditDate:
+      json.dateAudit && !isNaN(Date.parse(json.dateAudit)) ? new Date(json.dateAudit).toISOString().slice(0, 10) : null
   })
 
   return json
@@ -500,7 +517,7 @@ async function addPayload (json: InputApiRecordBody, jobId: number): Promise<Inp
 /**
  * Crée un log pour une erreur de l'API
  */
-async function addErrorJob (jobId: number, error: ErrorItem): Promise<void> {
+async function addErrorJob(jobId: number, error: ErrorItem): Promise<void> {
   await repository.insertImportLog(jobId, {
     numeroBio: error.numeroBio,
     idParcelle: error.idParcelle ?? null,
@@ -514,9 +531,21 @@ async function addErrorJob (jobId: number, error: ErrorItem): Promise<void> {
 /**
  * Met à jour le résultat d’un job d’import dans la table `parcellaire_import`.
  */
-async function updateJobError (numeroBioValid: Array<string | number>, numeroBioError: Array<{ numeroBio?: string | number }>, count: number, warning: Array<object> | null, jobId: string | number): Promise<string | number> {
+async function updateJobError(
+  numeroBioValid: Array<string | number>,
+  numeroBioError: Array<{ numeroBio?: string | number }>,
+  count: number,
+  warning: Array<object> | null,
+  jobId: string | number
+): Promise<string | number> {
   return repository.completeImportJob({
-    result: { count, errors: numeroBioError, warning, numeroBioValid, numeroBioError: [...new Set(numeroBioError.map(e => e.numeroBio))] },
+    result: {
+      count,
+      errors: numeroBioError,
+      warning,
+      numeroBioValid,
+      numeroBioError: [...new Set(numeroBioError.map((e) => e.numeroBio))]
+    },
     jobId,
     statutJob: importJobResultEnumSchema.enum.REJECTED
   })
@@ -525,7 +554,10 @@ async function updateJobError (numeroBioValid: Array<string | number>, numeroBio
 /**
  * Récupère l'état courant d'un job d'import.
  */
-async function getCurrentStatusJobs (id: number | string, organismeCertificateur: number): Promise<ImportJobStatusResult> {
+async function getCurrentStatusJobs(
+  id: number | string,
+  organismeCertificateur: number
+): Promise<ImportJobStatusResult> {
   const job = await repository.findImportJob(id, organismeCertificateur)
 
   if (!job) {
@@ -560,7 +592,11 @@ async function getCurrentStatusJobs (id: number | string, organismeCertificateur
 /**
  * Met à jour le statut et le résultat d'un job d'import.
  */
-async function updateImportJobStatus (jobId: number, status: ImportStatus, result?: Record<string, unknown>): Promise<void> {
+async function updateImportJobStatus(
+  jobId: number,
+  status: ImportStatus,
+  result?: Record<string, unknown>
+): Promise<void> {
   await repository.updateImportJobStatus(jobId, status, result)
 }
 
@@ -569,11 +605,14 @@ async function updateImportJobStatus (jobId: number, status: ImportStatus, resul
  * fait uniquement l'insert en base et collecte les warnings post-insert.
  * Appelé en fire-and-forget après la réponse au client.
  */
-async function processFullJob (jobId: number, validItem: ValidItem): Promise<void> {
+async function processFullJob(jobId: number, validItem: ValidItem): Promise<void> {
   await updateImportJobStatus(jobId, importStatusEnumSchema.enum.PENDING)
   try {
     const result = await parcellaireValidItemToDb(validItem, jobId)
-    await repository.updateImportJobResult(jobId, result.errors.length > 0 ? importJobResultEnumSchema.enum.REJECTED : importJobResultEnumSchema.enum.VALID)
+    await repository.updateImportJobResult(
+      jobId,
+      result.errors.length > 0 ? importJobResultEnumSchema.enum.REJECTED : importJobResultEnumSchema.enum.VALID
+    )
   } catch (error) {
     logger.error({ err: error }, `Traitement du job d'import ${jobId} en échec`)
     const message = error instanceof Error ? error.message : String(error)
@@ -586,7 +625,7 @@ async function processFullJob (jobId: number, validItem: ValidItem): Promise<voi
 /**
  * Return operator data from agencebio api
  */
-async function fetchOperator (numeroBio: string): Promise<AgenceBioNormalizedOperator | null> {
+async function fetchOperator(numeroBio: string): Promise<AgenceBioNormalizedOperator | null> {
   try {
     return await fetchOperatorByNumeroBio(numeroBio)
   } catch (error) {
@@ -595,8 +634,35 @@ async function fetchOperator (numeroBio: string): Promise<AgenceBioNormalizedOpe
   }
 }
 
-async function getImportList ({ status, organismeCertificateur, from, to, payload, withRejected, page, limit }: { status?: string; organismeCertificateur?: number; from?: string; to?: string; payload: boolean; withRejected: boolean; page: number; limit: number }): Promise<{ data: ImportSummary[]; meta: { total: number; page: number; limit: number } }> {
-  const { rows, total } = await repository.findImportList({ status, organismeCertificateur, from, to, payload, withRejected, page, limit })
+async function getImportList({
+  status,
+  organismeCertificateur,
+  from,
+  to,
+  payload,
+  withRejected,
+  page,
+  limit
+}: {
+  status?: string
+  organismeCertificateur?: number
+  from?: string
+  to?: string
+  payload: boolean
+  withRejected: boolean
+  page: number
+  limit: number
+}): Promise<{ data: ImportSummary[]; meta: { total: number; page: number; limit: number } }> {
+  const { rows, total } = await repository.findImportList({
+    status,
+    organismeCertificateur,
+    from,
+    to,
+    payload,
+    withRejected,
+    page,
+    limit
+  })
 
   return {
     data: rows.map(normalizeJobReturn),
@@ -608,7 +674,15 @@ async function getImportList ({ status, organismeCertificateur, from, to, payloa
   }
 }
 
-async function getImportById ({ id, payload, organismeCertificateur }: { id: string | number; payload: boolean; organismeCertificateur: number }): Promise<ImportSummary | null> {
+async function getImportById({
+  id,
+  payload,
+  organismeCertificateur
+}: {
+  id: string | number
+  payload: boolean
+  organismeCertificateur: number
+}): Promise<ImportSummary | null> {
   const row = await repository.findImportById(id, organismeCertificateur, payload)
   return row ? normalizeJobReturn(row) : null
 }
@@ -617,17 +691,21 @@ async function getImportById ({ id, payload, organismeCertificateur }: { id: str
  * Renseigne les métadonnées du job depuis le premier record reçu et détermine
  * s'il s'agit d'une création ou de la mise à jour d'un import existant.
  */
-async function updateStatus (jobId: number, record: Pick<InputApiRecordBody, 'numeroBio' | 'numeroClient' | 'dateAudit'>): Promise<void> {
+async function updateStatus(
+  jobId: number,
+  record: Pick<InputApiRecordBody, 'numeroBio' | 'numeroClient' | 'dateAudit'>
+): Promise<void> {
   const numeroBio = record?.numeroBio != null ? String(record.numeroBio) : null
   const numeroClient = record?.numeroClient != null ? String(record.numeroClient) : null
-  const auditDate = record?.dateAudit && !Number.isNaN(Date.parse(record.dateAudit))
-    ? new Date(record.dateAudit).toISOString().slice(0, 10)
-    : null
+  const auditDate =
+    record?.dateAudit && !Number.isNaN(Date.parse(record.dateAudit))
+      ? new Date(record.dateAudit).toISOString().slice(0, 10)
+      : null
 
   await repository.updateImportJobEtat(jobId, { numeroBio, numeroClient, auditDate })
 }
 
-function normalizeJobReturn (row: ImportJobListRow): ImportSummary {
+function normalizeJobReturn(row: ImportJobListRow): ImportSummary {
   return {
     jobId: row.jobid,
     status: row.status,

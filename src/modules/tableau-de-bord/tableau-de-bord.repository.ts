@@ -68,7 +68,12 @@ async function getErrorLogsByJobId(jobIds: number[]): Promise<Record<number, Err
       message: parcellaireImportLogs.message
     })
     .from(parcellaireImportLogs)
-    .where(and(sql`${parcellaireImportLogs.importId} = ANY(${sql.param(jobIds)}::int[])`, eq(parcellaireImportLogs.type, 'error')))
+    .where(
+      and(
+        sql`${parcellaireImportLogs.importId} = ANY(${sql.param(jobIds)}::int[])`,
+        eq(parcellaireImportLogs.type, 'error')
+      )
+    )
     .orderBy(asc(parcellaireImportLogs.id))
 
   const logsByJobId: Record<number, ErrorDetail[]> = {}
@@ -308,14 +313,19 @@ function getTruncate(from: string, to: string): 'day' | 'week' {
   return diffInDays <= 7 ? 'day' : 'week'
 }
 
-async function getTopAnomaliesRepo({ from, to, organismeCertificateur }: DateRange): Promise<TopAnomaliesResponse['data']> {
+async function getTopAnomaliesRepo({
+  from,
+  to,
+  organismeCertificateur
+}: DateRange): Promise<TopAnomaliesResponse['data']> {
   if (!from || !to) {
     return []
   }
 
-  const period = sql<Date>`date_trunc(${sql.raw(`'${getTruncate(from, to)}'`)}, ${parcellaireImport.createdAt})`.mapWith(
-    parcellaireImport.createdAt
-  )
+  const period =
+    sql<Date>`date_trunc(${sql.raw(`'${getTruncate(from, to)}'`)}, ${parcellaireImport.createdAt})`.mapWith(
+      parcellaireImport.createdAt
+    )
 
   const rows = await db
     .select({
@@ -338,7 +348,11 @@ async function getTopAnomaliesRepo({ from, to, organismeCertificateur }: DateRan
   return rows
 }
 
-async function getTopAnomaliesGroupedRepo({ from, to, organismeCertificateur }: DateRange): Promise<TopAnomaliesGroupedResponse> {
+async function getTopAnomaliesGroupedRepo({
+  from,
+  to,
+  organismeCertificateur
+}: DateRange): Promise<TopAnomaliesGroupedResponse> {
   if (!from || !to) {
     return []
   }
@@ -362,7 +376,10 @@ async function getTopAnomaliesGroupedRepo({ from, to, organismeCertificateur }: 
     db
       .select({
         period: periodOfImport.as('period'),
-        accepted: sql<number>`COUNT(*) FILTER (WHERE ${eq(parcellaireImport.statutJob, importJobResultEnumSchema.enum.VALID)})`.as('accepted'),
+        accepted:
+          sql<number>`COUNT(*) FILTER (WHERE ${eq(parcellaireImport.statutJob, importJobResultEnumSchema.enum.VALID)})`.as(
+            'accepted'
+          ),
         refused:
           sql<number>`COUNT(*) FILTER (WHERE ${inArray(parcellaireImport.statutJob, [importJobResultEnumSchema.enum.REJECTED, importJobResultEnumSchema.enum.ERROR])})`.as(
             'refused'

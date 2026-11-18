@@ -5,11 +5,5 @@
     "lib": ["es2023", "dom"],
     "types": ["node", "vitest/globals"]
   },
-  "include": [
-    "src/**/*.ts",
-    "bin/**/*.ts",
-    "test/**/*.ts",
-    "__mocks__/**/*.ts",
-    "vitest.config.ts"
-  ]
+  "include": ["src/**/*.ts", "bin/**/*.ts", "test/**/*.ts", "__mocks__/**/*.ts", "vitest.config.ts"]
 }

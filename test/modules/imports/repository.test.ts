@@ -1,7 +1,12 @@
 import { eq } from 'drizzle-orm'
 import { db } from '../../../src/database/database.js'
 import { parcellaireImport } from '../../../src/database/schema/index.js'
-import { parseAPIParcellaire, getCurrentStatusJobs, updateImportJobStatus, updateStatus } from '../../../src/modules/imports/imports.service.js'
+import {
+  parseAPIParcellaire,
+  getCurrentStatusJobs,
+  updateImportJobStatus,
+  updateStatus
+} from '../../../src/modules/imports/imports.service.js'
 
 import { fetchOperatorByNumeroBio } from '../../../src/clients/agence-bio.client.js'
 import { buildOperator } from '../../factories.js'
@@ -19,21 +24,23 @@ const mockFetchOperatorByNumeroBio = fetchOperatorByNumeroBio
 
 type ParsedItem = Awaited<ReturnType<typeof parseAPIParcellaire>>
 
-function recordOf (value: ParsedItem) {
+function recordOf(value: ParsedItem) {
   if (value && 'record' in value && value.record) return value.record
   throw new Error('aucun record valide renvoyé')
 }
 
-async function insertJob (job: Partial<typeof parcellaireImport.$inferInsert> = {}): Promise<number> {
-  const { id } = (await db
-    .insert(parcellaireImport)
-    .values({ organismeCertificateur: '1', ...job })
-    .returning({ id: parcellaireImport.id }))[0]!
+async function insertJob(job: Partial<typeof parcellaireImport.$inferInsert> = {}): Promise<number> {
+  const { id } = (
+    await db
+      .insert(parcellaireImport)
+      .values({ organismeCertificateur: '1', ...job })
+      .returning({ id: parcellaireImport.id })
+  )[0]!
 
   return id
 }
 
-async function findJob (id: number): Promise<typeof parcellaireImport.$inferSelect> {
+async function findJob(id: number): Promise<typeof parcellaireImport.$inferSelect> {
   const [job] = await db.select().from(parcellaireImport).where(eq(parcellaireImport.id, id))
   return job!
 }
@@ -54,27 +61,33 @@ describe('parseAPIParcellaire', () => {
       dateCertificationDebut: '2023-01-01',
       dateCertificationFin: '2025-03-31',
       numeroPacage: '084012821',
-      parcelles: [{
-        id: '45742',
-        dateEngagement: '2023-04-27',
-        etatProduction: 'AB',
-        geom: '[[[4.8740990843182042,44.255949709765304],[4.8739614029301244,44.255016135661734],[4.8736532263747678,44.255001848456033],[4.8738004728368587,44.255928756333255],[4.8740990843182042,44.255949709765304]]]',
-        culture: [{
-          codeCPF: '01.92',
-          quantite: 25,
-          unite: '%' as const
-        }]
-      }]
+      parcelles: [
+        {
+          id: '45742',
+          dateEngagement: '2023-04-27',
+          etatProduction: 'AB',
+          geom: '[[[4.8740990843182042,44.255949709765304],[4.8739614029301244,44.255016135661734],[4.8736532263747678,44.255001848456033],[4.8738004728368587,44.255928756333255],[4.8740990843182042,44.255949709765304]]]',
+          culture: [
+            {
+              codeCPF: '01.92',
+              quantite: 25,
+              unite: '%' as const
+            }
+          ]
+        }
+      ]
     }
 
-    vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(buildOperator({
-      isProduction: true,
-      organismeCertificateur: {
-        id: 1,
-        nom: 'Ecocert France',
-        numeroClient: '100012'
-      }
-    }))
+    vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(
+      buildOperator({
+        isProduction: true,
+        organismeCertificateur: {
+          id: 1,
+          nom: 'Ecocert France',
+          numeroClient: '100012'
+        }
+      })
+    )
 
     const result = await parseAPIParcellaire(validRecord, { organismeCertificateur })
 
@@ -115,14 +128,16 @@ describe('parseAPIParcellaire', () => {
       parcelles: []
     }
 
-    vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(buildOperator({
-      isProduction: false,
-      organismeCertificateur: {
-        id: 1,
-        nom: 'Ecocert France',
-        numeroClient: '100012'
-      }
-    }))
+    vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(
+      buildOperator({
+        isProduction: false,
+        organismeCertificateur: {
+          id: 1,
+          nom: 'Ecocert France',
+          numeroClient: '100012'
+        }
+      })
+    )
 
     const result = await parseAPIParcellaire(record, { organismeCertificateur })
 
@@ -145,14 +160,16 @@ describe('parseAPIParcellaire', () => {
       parcelles: []
     }
 
-    vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(buildOperator({
-      isProduction: true,
-      organismeCertificateur: {
-        id: 1,
-        nom: 'Ecocert France',
-        numeroClient: '100012'
-      }
-    }))
+    vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(
+      buildOperator({
+        isProduction: true,
+        organismeCertificateur: {
+          id: 1,
+          nom: 'Ecocert France',
+          numeroClient: '100012'
+        }
+      })
+    )
 
     const result = await parseAPIParcellaire(record, { organismeCertificateur })
 
@@ -172,27 +189,33 @@ describe('parseAPIParcellaire', () => {
       numeroBio: '101903',
       numeroClient: '110077',
       dateAudit: '2023-06-23',
-      parcelles: [{
-        id: 147079,
-        dateEngagement: '2010-05-14',
-        etatProduction: 'AB',
-        geom: '[[[6.2708156467808749,47.590451080690947],[6.27081300234578,47.590451955729122]',
-        cultures: [{
-          codeCPF: '01.21.12',
-          quantite: 1,
-          unite: 'ha' as const
-        }]
-      }]
+      parcelles: [
+        {
+          id: 147079,
+          dateEngagement: '2010-05-14',
+          etatProduction: 'AB',
+          geom: '[[[6.2708156467808749,47.590451080690947],[6.27081300234578,47.590451955729122]',
+          cultures: [
+            {
+              codeCPF: '01.21.12',
+              quantite: 1,
+              unite: 'ha' as const
+            }
+          ]
+        }
+      ]
     }
 
-    vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(buildOperator({
-      isProduction: true,
-      organismeCertificateur: {
-        id: 1,
-        nom: 'Ecocert France',
-        numeroClient: '110077'
-      }
-    }))
+    vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(
+      buildOperator({
+        isProduction: true,
+        organismeCertificateur: {
+          id: 1,
+          nom: 'Ecocert France',
+          numeroClient: '110077'
+        }
+      })
+    )
 
     const result = await parseAPIParcellaire(recordWithInvalidGeom, { organismeCertificateur })
 
@@ -212,27 +235,33 @@ describe('parseAPIParcellaire', () => {
       numeroBio: '101903',
       numeroClient: '110077',
       dateAudit: '2023-06-23',
-      parcelles: [{
-        id: 147079,
-        dateEngagement: '2010-05-14',
-        etatProduction: 'AB',
-        geom: '[[[null,47.590451],[6.270813,47.590451],[6.270813,47.590452],[null,47.590452],[null,47.590451]]]',
-        cultures: [{
-          codeCPF: '01.21.12',
-          quantite: 1,
-          unite: 'ha' as const
-        }]
-      }]
+      parcelles: [
+        {
+          id: 147079,
+          dateEngagement: '2010-05-14',
+          etatProduction: 'AB',
+          geom: '[[[null,47.590451],[6.270813,47.590451],[6.270813,47.590452],[null,47.590452],[null,47.590451]]]',
+          cultures: [
+            {
+              codeCPF: '01.21.12',
+              quantite: 1,
+              unite: 'ha' as const
+            }
+          ]
+        }
+      ]
     }
 
-    vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(buildOperator({
-      isProduction: true,
-      organismeCertificateur: {
-        id: 1,
-        nom: 'Ecocert France',
-        numeroClient: '110077'
-      }
-    }))
+    vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(
+      buildOperator({
+        isProduction: true,
+        organismeCertificateur: {
+          id: 1,
+          nom: 'Ecocert France',
+          numeroClient: '110077'
+        }
+      })
+    )
 
     const result = await parseAPIParcellaire(recordWithNaNGeom, { organismeCertificateur })
 
@@ -253,27 +282,33 @@ describe('parseAPIParcellaire', () => {
       numeroBio: '101903',
       numeroClient: '110077',
       dateAudit: '2023-06-23',
-      parcelles: [{
-        id: 147079,
-        dateEngagement: '2010-05-14',
-        etatProduction: 'AB',
-        geom: '[[[1e309,47.590451],[6.270813,47.590451],[6.270813,47.590452],[1e309,47.590452],[1e309,47.590451]]]',
-        cultures: [{
-          codeCPF: '01.21.12',
-          quantite: 1,
-          unite: 'ha' as const
-        }]
-      }]
+      parcelles: [
+        {
+          id: 147079,
+          dateEngagement: '2010-05-14',
+          etatProduction: 'AB',
+          geom: '[[[1e309,47.590451],[6.270813,47.590451],[6.270813,47.590452],[1e309,47.590452],[1e309,47.590451]]]',
+          cultures: [
+            {
+              codeCPF: '01.21.12',
+              quantite: 1,
+              unite: 'ha' as const
+            }
+          ]
+        }
+      ]
     }
 
-    vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(buildOperator({
-      isProduction: true,
-      organismeCertificateur: {
-        id: 1,
-        nom: 'Ecocert France',
-        numeroClient: '110077'
-      }
-    }))
+    vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(
+      buildOperator({
+        isProduction: true,
+        organismeCertificateur: {
+          id: 1,
+          nom: 'Ecocert France',
+          numeroClient: '110077'
+        }
+      })
+    )
 
     const result = await parseAPIParcellaire(recordWithInfinityGeom, { organismeCertificateur })
 
@@ -293,22 +328,26 @@ describe('parseAPIParcellaire', () => {
       numeroBio: '172301',
       numeroClient: '195931',
       dateAudit: '2023-03-30',
-      parcelles: [{
-        id: 124300,
-        dateEngagement: '2022-08-17',
-        etatProduction: 'C1',
-        culture: []
-      }]
+      parcelles: [
+        {
+          id: 124300,
+          dateEngagement: '2022-08-17',
+          etatProduction: 'C1',
+          culture: []
+        }
+      ]
     }
 
-    vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(buildOperator({
-      isProduction: true,
-      organismeCertificateur: {
-        id: 1,
-        nom: 'Ecocert France',
-        numeroClient: '195931'
-      }
-    }))
+    vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(
+      buildOperator({
+        isProduction: true,
+        organismeCertificateur: {
+          id: 1,
+          nom: 'Ecocert France',
+          numeroClient: '195931'
+        }
+      })
+    )
 
     const result = await parseAPIParcellaire(recordWithNoCultures, { organismeCertificateur })
 
@@ -328,26 +367,32 @@ describe('parseAPIParcellaire', () => {
       numeroBio: '77777',
       numeroClient: '100012',
       dateAudit: '2023-04-27',
-      parcelles: [{
-        id: '45742',
-        etatProduction: 'invalide',
-        geom: '[[[4.8740990843182042,44.255949709765304],[4.8739614029301244,44.255016135661734],[4.8736532263747678,44.255001848456033],[4.8738004728368587,44.255928756333255],[4.8740990843182042,44.255949709765304]]]',
-        culture: [{
-          codeCPF: '01.92',
-          quantite: 25,
-          unite: '%' as const
-        }]
-      }]
+      parcelles: [
+        {
+          id: '45742',
+          etatProduction: 'invalide',
+          geom: '[[[4.8740990843182042,44.255949709765304],[4.8739614029301244,44.255016135661734],[4.8736532263747678,44.255001848456033],[4.8738004728368587,44.255928756333255],[4.8740990843182042,44.255949709765304]]]',
+          culture: [
+            {
+              codeCPF: '01.92',
+              quantite: 25,
+              unite: '%' as const
+            }
+          ]
+        }
+      ]
     }
 
-    vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(buildOperator({
-      isProduction: true,
-      organismeCertificateur: {
-        id: 1,
-        nom: 'Ecocert France',
-        numeroClient: '100012'
-      }
-    }))
+    vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(
+      buildOperator({
+        isProduction: true,
+        organismeCertificateur: {
+          id: 1,
+          nom: 'Ecocert France',
+          numeroClient: '100012'
+        }
+      })
+    )
 
     const result = await parseAPIParcellaire(recordWithInvalidState, { organismeCertificateur })
 
@@ -367,27 +412,33 @@ describe('parseAPIParcellaire', () => {
       numeroBio: '172301',
       numeroClient: '195931',
       dateAudit: '2023-03-30',
-      parcelles: [{
-        id: 124300,
-        dateEngagement: null,
-        etatProduction: 'C1',
-        geom: '[[[4.8740990843182042,44.255949709765304],[4.8739614029301244,44.255016135661734],[4.8736532263747678,44.255001848456033],[4.8738004728368587,44.255928756333255],[4.8740990843182042,44.255949709765304]]]',
-        culture: [{
-          codeCPF: '01.92',
-          quantite: 25,
-          unite: '%' as const
-        }]
-      }]
+      parcelles: [
+        {
+          id: 124300,
+          dateEngagement: null,
+          etatProduction: 'C1',
+          geom: '[[[4.8740990843182042,44.255949709765304],[4.8739614029301244,44.255016135661734],[4.8736532263747678,44.255001848456033],[4.8738004728368587,44.255928756333255],[4.8740990843182042,44.255949709765304]]]',
+          culture: [
+            {
+              codeCPF: '01.92',
+              quantite: 25,
+              unite: '%' as const
+            }
+          ]
+        }
+      ]
     }
 
-    vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(buildOperator({
-      isProduction: true,
-      organismeCertificateur: {
-        id: 1,
-        nom: 'Ecocert France',
-        numeroClient: '195931'
-      }
-    }))
+    vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(
+      buildOperator({
+        isProduction: true,
+        organismeCertificateur: {
+          id: 1,
+          nom: 'Ecocert France',
+          numeroClient: '195931'
+        }
+      })
+    )
 
     const result = await parseAPIParcellaire(recordWithMissingDate, { organismeCertificateur })
 
@@ -409,18 +460,22 @@ describe('parseAPIParcellaire', () => {
       dateAudit: '2023-04-27',
       dateCertificationDebut: '2023-01-01',
       dateCertificationFin: '2025-03-31',
-      parcelles: [{
-        id: '45742',
-        etatProduction: 'AB',
-        geom: '[[[4.874099,44.255949],[4.873961,44.255016],[4.873653,44.255001],[4.874099,44.255949]]]',
-        culture: [{ codeCPF: '01.92', quantite: 25, unite: '%' as const }]
-      }]
+      parcelles: [
+        {
+          id: '45742',
+          etatProduction: 'AB',
+          geom: '[[[4.874099,44.255949],[4.873961,44.255016],[4.873653,44.255001],[4.874099,44.255949]]]',
+          culture: [{ codeCPF: '01.92', quantite: 25, unite: '%' as const }]
+        }
+      ]
     }
 
-    vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(buildOperator({
-      isProduction: true,
-      organismeCertificateur: { id: 1, nom: 'Ecocert France', numeroClient: '100012' }
-    }))
+    vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(
+      buildOperator({
+        isProduction: true,
+        organismeCertificateur: { id: 1, nom: 'Ecocert France', numeroClient: '100012' }
+      })
+    )
 
     const result = await parseAPIParcellaire(record, { organismeCertificateur })
     expect(recordOf(result).numerobio).toBe('99999')
@@ -432,29 +487,35 @@ describe('parseAPIParcellaire', () => {
       numeroBio: '77777',
       numeroClient: '100012',
       dateAudit: '2023-04-27',
-      parcelles: [{
-        id: '45742',
-        etatProduction: 'invalide',
-        geom: 'géométrie invalide'
-      }]
+      parcelles: [
+        {
+          id: '45742',
+          etatProduction: 'invalide',
+          geom: 'géométrie invalide'
+        }
+      ]
     }
 
-    vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(buildOperator({
-      isProduction: true,
-      organismeCertificateur: {
-        id: 1,
-        nom: 'Ecocert France',
-        numeroClient: '100012'
-      }
-    }))
+    vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(
+      buildOperator({
+        isProduction: true,
+        organismeCertificateur: {
+          id: 1,
+          nom: 'Ecocert France',
+          numeroClient: '100012'
+        }
+      })
+    )
 
     const result = await parseAPIParcellaire(record, { organismeCertificateur })
 
-    expect(result.errors).toEqual(expect.arrayContaining([
-      expect.objectContaining({ idParcelle: '45742', code: 'INVALID_ETAT_PRODUCTION' }),
-      expect.objectContaining({ idParcelle: '45742', code: 'MISSING_CULTURES' }),
-      expect.objectContaining({ idParcelle: '45742', code: 'INVALID_GEOM' })
-    ]))
+    expect(result.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ idParcelle: '45742', code: 'INVALID_ETAT_PRODUCTION' }),
+        expect.objectContaining({ idParcelle: '45742', code: 'MISSING_CULTURES' }),
+        expect.objectContaining({ idParcelle: '45742', code: 'INVALID_GEOM' })
+      ])
+    )
   })
 
   test('retourne aucune erreur avec le code cpf de culture inconnu', async () => {
@@ -465,27 +526,33 @@ describe('parseAPIParcellaire', () => {
       dateAudit: '2023-04-27',
       dateCertificationDebut: '2022-01-01',
       dateCertificationFin: '2052-01-01',
-      parcelles: [{
-        id: '45742',
-        dateEngagement: '2023-04-27',
-        etatProduction: 'AB',
-        geom: '[[[4.8740990843182042,44.255949709765304],[4.8739614029301244,44.255016135661734],[4.8736532263747678,44.255001848456033],[4.8738004728368587,44.255928756333255],[4.8740990843182042,44.255949709765304]]]',
-        culture: [{
-          codeCPF: 'ACT.Prod.Inc',
-          quantite: 25,
-          unite: '%' as const
-        }]
-      }]
+      parcelles: [
+        {
+          id: '45742',
+          dateEngagement: '2023-04-27',
+          etatProduction: 'AB',
+          geom: '[[[4.8740990843182042,44.255949709765304],[4.8739614029301244,44.255016135661734],[4.8736532263747678,44.255001848456033],[4.8738004728368587,44.255928756333255],[4.8740990843182042,44.255949709765304]]]',
+          culture: [
+            {
+              codeCPF: 'ACT.Prod.Inc',
+              quantite: 25,
+              unite: '%' as const
+            }
+          ]
+        }
+      ]
     }
 
-    vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(buildOperator({
-      isProduction: true,
-      organismeCertificateur: {
-        id: 1,
-        nom: 'Ecocert France',
-        numeroClient: '100012'
-      }
-    }))
+    vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(
+      buildOperator({
+        isProduction: true,
+        organismeCertificateur: {
+          id: 1,
+          nom: 'Ecocert France',
+          numeroClient: '100012'
+        }
+      })
+    )
 
     const result = await parseAPIParcellaire(record, { organismeCertificateur })
 
@@ -564,7 +631,11 @@ describe('updateImportJobStatus', () => {
 
     await updateImportJobStatus(id, 'ERROR', { error: 'failed' })
 
-    expect(await findJob(id)).toMatchObject({ status: 'ERROR', resultJob: { error: 'failed' }, endedAt: expect.any(Date) })
+    expect(await findJob(id)).toMatchObject({
+      status: 'ERROR',
+      resultJob: { error: 'failed' },
+      endedAt: expect.any(Date)
+    })
   })
 
   test('met à jour le job avec le statut PENDING', async () => {

@@ -24,7 +24,12 @@ const SIGNATURE_ATTACHMENT = {
 /**
  * Envoie un email.
  */
-async function sendMail (options: { to: string | string[]; subject: string; html: string; attachments?: Array<import('nodemailer/lib/mailer/index.js').Attachment> }): Promise<import('nodemailer').SentMessageInfo> {
+async function sendMail(options: {
+  to: string | string[]
+  subject: string
+  html: string
+  attachments?: Array<import('nodemailer/lib/mailer/index.js').Attachment>
+}): Promise<import('nodemailer').SentMessageInfo> {
   const { attachments = [], html, ...rest } = options
 
   attachments.push({

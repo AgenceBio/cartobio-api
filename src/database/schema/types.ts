@@ -1,9 +1,9 @@
-import { customType } from 'drizzle-orm/pg-core';
+import { customType } from 'drizzle-orm/pg-core'
 
 export const multiPolygon = customType<{ data: string; driverData: string }>({
-  dataType: () => 'geometry(MultiPolygon,4326)',
-});
+  dataType: () => 'geometry(MultiPolygon,4326)'
+})
 
 export const polygon = customType<{ data: string; driverData: string }>({
-  dataType: () => 'geometry(Polygon,4326)',
-});
+  dataType: () => 'geometry(Polygon,4326)'
+})

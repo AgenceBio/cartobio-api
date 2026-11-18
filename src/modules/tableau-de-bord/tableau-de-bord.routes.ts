@@ -1,13 +1,21 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
-import { generalKpiSchema, historiqueSchema, repetitionsSchema, tableauBilanSchema, tableauErreursSchema, topAnomaliesGroupedSchema, topAnomaliesSchema } from './tableau-de-bord.schema.js'
+import {
+  generalKpiSchema,
+  historiqueSchema,
+  repetitionsSchema,
+  tableauBilanSchema,
+  tableauErreursSchema,
+  topAnomaliesGroupedSchema,
+  topAnomaliesSchema
+} from './tableau-de-bord.schema.js'
 import * as service from './tableau-de-bord.service.js'
 
-function getOrganismeCertificateurId (request: FastifyRequest): number | undefined {
+function getOrganismeCertificateurId(request: FastifyRequest): number | undefined {
   return request.organismeCertificateur?.id ?? request.user?.organismeCertificateur?.id
 }
 
-export default async function tableauDeBordRoutes (fastify: FastifyInstance): Promise<void> {
+export default async function tableauDeBordRoutes(fastify: FastifyInstance): Promise<void> {
   const app = fastify.withTypeProvider<ZodTypeProvider>()
 
   app.get('/general-kpi', generalKpiSchema, async (request, reply) => {
@@ -24,7 +32,9 @@ export default async function tableauDeBordRoutes (fastify: FastifyInstance): Pr
   })
 
   app.get('/historique', historiqueSchema, async (request, reply) => {
-    return reply.send(await service.getHistoriqueSpecificParcellaire(request.query, getOrganismeCertificateurId(request)))
+    return reply.send(
+      await service.getHistoriqueSpecificParcellaire(request.query, getOrganismeCertificateurId(request))
+    )
   })
 
   app.get('/top-anomalies', topAnomaliesSchema, async (request, reply) => {

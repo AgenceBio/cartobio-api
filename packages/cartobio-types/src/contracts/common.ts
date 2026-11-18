@@ -12,11 +12,15 @@ const isExistingDay = (value: string): boolean => {
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === day && !Number.isNaN(Date.parse(value))
 }
 
-export const isoDateStringSchema = z.string()
+export const isoDateStringSchema = z
+  .string()
   .regex(/^\d{4}-\d{2}-\d{2}([T ][\d:.]+(Z|[+-]\d{2}:?\d{2})?)?$/)
   .refine(isExistingDay, { message: 'Date invalide' })
 
-export const optionalIsoDateQuerySchema = z.preprocess((value) => value === '' ? undefined : value, isoDateStringSchema.optional())
+export const optionalIsoDateQuerySchema = z.preprocess(
+  (value) => (value === '' ? undefined : value),
+  isoDateStringSchema.optional()
+)
 
 export const integerStringSchema = z.string().regex(/^\d+$/)
 
@@ -41,12 +45,18 @@ export const anyGeometrySchema = z.union([
   })
 ])
 
-export const positionSchema = z.array(z.number()).min(2).max(3).meta({ description: 'Position GeoJSON : [x, y] ou [x, y, z]' })
+export const positionSchema = z
+  .array(z.number())
+  .min(2)
+  .max(3)
+  .meta({ description: 'Position GeoJSON : [x, y] ou [x, y, z]' })
 
-export const geometrySchema = z.looseObject({
-  type: z.string(),
-  coordinates: z.array(z.unknown())
-}).meta({ description: 'Géométrie GeoJSON (validée finement par PostGIS)' })
+export const geometrySchema = z
+  .looseObject({
+    type: z.string(),
+    coordinates: z.array(z.unknown())
+  })
+  .meta({ description: 'Géométrie GeoJSON (validée finement par PostGIS)' })
 
 export const validationIssueSchema = z.object({
   location: z.string().meta({ description: 'Partie de la requête concernée : body, querystring, params ou headers' }),
@@ -59,7 +69,10 @@ export const apiErrorSchema = z.object({
   code: z.string().optional(),
   error: z.string().meta({ description: 'Libellé HTTP du statut' }),
   message: z.string(),
-  details: z.array(validationIssueSchema).optional().meta({ description: 'Champs en erreur, pour les erreurs de validation' })
+  details: z
+    .array(validationIssueSchema)
+    .optional()
+    .meta({ description: 'Champs en erreur, pour les erreurs de validation' })
 })
 
 export type ApiError = z.infer<typeof apiErrorSchema>

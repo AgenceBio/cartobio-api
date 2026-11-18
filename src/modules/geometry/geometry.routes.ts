@@ -3,12 +3,19 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { borderCutSchema, geometryEqualsSchema, addGeometrySchema } from './geometry.schema.js'
 import * as service from './geometry.service.js'
 
-export default async function geometryRoutes (fastify: FastifyInstance): Promise<void> {
+export default async function geometryRoutes(fastify: FastifyInstance): Promise<void> {
   const app = fastify.withTypeProvider<ZodTypeProvider>()
 
   app.post('/api/v3/geometry/border-cut', borderCutSchema, async (request, reply) => {
     const { geometry, distance, allBorder, isInverted, startBorderPoint, endBorderPoint } = request.body
-    const result = await service.calculateParcelBorder(geometry, distance, allBorder, isInverted, startBorderPoint, endBorderPoint)
+    const result = await service.calculateParcelBorder(
+      geometry,
+      distance,
+      allBorder,
+      isInverted,
+      startBorderPoint,
+      endBorderPoint
+    )
     return result || reply.code(400).send()
   })
 

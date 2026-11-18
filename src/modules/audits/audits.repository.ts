@@ -22,22 +22,29 @@ import type { AuditRecordChanges } from './audits.types.js'
 type FeatureId = string | number
 
 async function deleteRecord(recordId: string): Promise<void> {
-  await db.update(parcellaires).set({ deletedAt: sql`now()` }).where(eq(parcellaires.recordId, recordId))
+  await db
+    .update(parcellaires)
+    .set({ deletedAt: sql`now()` })
+    .where(eq(parcellaires.recordId, recordId))
 }
 async function markFeatureControlled(recordId: string, id: FeatureId, userId: number): Promise<void> {
   await db
     .insert(parcellesControles)
     .values(createParcelleControleSchema.parse({ recordId, parcelleId: String(id), userId: String(userId) }))
-    .onConflictDoNothing({ target: [parcellesControles.recordId, parcellesControles.parcelleId, parcellesControles.userId] })
+    .onConflictDoNothing({
+      target: [parcellesControles.recordId, parcellesControles.parcelleId, parcellesControles.userId]
+    })
 }
 async function markFeatureUncontrolled(recordId: string, id: FeatureId, userId: number): Promise<void> {
   await db
     .delete(parcellesControles)
-    .where(and(
-      eq(parcellesControles.recordId, recordId),
-      eq(parcellesControles.parcelleId, String(id)),
-      eq(parcellesControles.userId, String(userId))
-    ))
+    .where(
+      and(
+        eq(parcellesControles.recordId, recordId),
+        eq(parcellesControles.parcelleId, String(id)),
+        eq(parcellesControles.userId, String(userId))
+      )
+    )
 }
 async function updateAuditRecord(
   recordId: string,
@@ -53,7 +60,7 @@ async function updateAuditRecord(
     const isBlank = value != null && blankToNull(value) === null
     if (isBlank && column === 'versionNom') continue
     if (value instanceof SQL) set[column] = value
-    else values[column] = isBlank ? null : column === 'ocId' && value != null ? String(value) : value ?? null
+    else values[column] = isBlank ? null : column === 'ocId' && value != null ? String(value) : (value ?? null)
   }
   if (Object.keys(values).length > 0) {
     for (const [column, value] of Object.entries(updateParcellaireSchema.parse(values))) set[column] = sql`${value}`
@@ -94,7 +101,12 @@ async function setOperatorUpdatedAt(
   const record = await findRecord(recordId, tx)
   return record ? [record] : []
 }
-async function patchFeature(tx: NodePgDatabase, recordId: string, featureId: FeatureId, feature: FeatureInput): Promise<void> {
+async function patchFeature(
+  tx: NodePgDatabase,
+  recordId: string,
+  featureId: FeatureId,
+  feature: FeatureInput
+): Promise<void> {
   const properties = feature.properties ?? {}
   const updated = await tx
     .update(parcelles)
@@ -129,11 +141,26 @@ async function updateFeature(
 async function deleteFeature(tx: NodePgDatabase, recordId: string, featureId: FeatureId): Promise<void> {
   await tx.delete(parcelles).where(and(eq(parcelles.recordId, recordId), eq(parcelles.id, String(featureId))))
 }
-async function insertFeature(tx: NodePgDatabase, recordId: string, id: FeatureId, feature: FeatureInput, from: FeatureId[] | null): Promise<void> {
+async function insertFeature(
+  tx: NodePgDatabase,
+  recordId: string,
+  id: FeatureId,
+  feature: FeatureInput,
+  from: FeatureId[] | null
+): Promise<void> {
   const properties = feature.properties ?? {}
   await tx
     .insert(parcelles)
-    .values(parcelleInsertValues(recordId, String(id), properties, geometryInput(feature.geometry), sql`false`, from ? from.map(String) : null))
+    .values(
+      parcelleInsertValues(
+        recordId,
+        String(id),
+        properties,
+        geometryInput(feature.geometry),
+        sql`false`,
+        from ? from.map(String) : null
+      )
+    )
   await upsertCultures(tx, recordId, String(id), properties.cultures ?? [])
   await upsertAnnotations(tx, recordId, String(id), properties.annotations ?? [])
 }
