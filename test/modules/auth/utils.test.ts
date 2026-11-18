@@ -44,7 +44,10 @@ describe('encodeAuthState / decodeAuthState', () => {
 
 describe('rôles utilisateur', () => {
   const withGroups = (...ids: Array<string | number>) =>
-    buildUser({ groups: ids.map((id) => ({ id: String(id), nom: '' })), mainGroup: { id: undefined, nom: '' } })
+    buildUser({
+      groups: ids.map((id) => ({ id: String(id), nom: '' })),
+      mainGroup: { id: undefined, nom: '' }
+    })
 
   test.each([
     [
@@ -95,7 +98,10 @@ describe('rôles utilisateur', () => {
   })
 
   test('accepte des identifiants de groupe numériques', () => {
-    const user = buildUser({ groups: [{ id: 1 as unknown as string, nom: 'Admin' }], mainGroup: { nom: '' } })
+    const user = buildUser({
+      groups: [{ id: 1 as unknown as string, nom: 'Admin' }],
+      mainGroup: { nom: '' }
+    })
 
     expect(isAdmin(user)).toBe(true)
   })

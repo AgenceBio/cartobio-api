@@ -11,20 +11,41 @@ import agencebioOperator from '../fixtures/providers/agence-bio-operateur.json' 
 
 describe('parsePacDetailsFromComment', () => {
   test('detect Ilot et Parcelle from explicit naming', async () => {
-    expect(parsePacDetailsFromComment('parcelle 5 ilot 12')).toEqual({ numeroIlot: '12', numeroParcelle: '5' })
-    expect(parsePacDetailsFromComment('ilot 12 parcelle 5')).toEqual({ numeroIlot: '12', numeroParcelle: '5' })
+    expect(parsePacDetailsFromComment('parcelle 5 ilot 12')).toEqual({
+      numeroIlot: '12',
+      numeroParcelle: '5'
+    })
+    expect(parsePacDetailsFromComment('ilot 12 parcelle 5')).toEqual({
+      numeroIlot: '12',
+      numeroParcelle: '5'
+    })
   })
 
   test('detect Ilot et Parcelle from compact naming', async () => {
-    expect(parsePacDetailsFromComment('ilot-15-2')).toEqual({ numeroIlot: '15', numeroParcelle: '2' })
-    expect(parsePacDetailsFromComment('ILOT-15-2')).toEqual({ numeroIlot: '15', numeroParcelle: '2' })
+    expect(parsePacDetailsFromComment('ilot-15-2')).toEqual({
+      numeroIlot: '15',
+      numeroParcelle: '2'
+    })
+    expect(parsePacDetailsFromComment('ILOT-15-2')).toEqual({
+      numeroIlot: '15',
+      numeroParcelle: '2'
+    })
   })
 
   test('assume nothing', async () => {
     expect(parsePacDetailsFromComment('')).toEqual({ numeroIlot: null, numeroParcelle: null })
-    expect(parsePacDetailsFromComment('ilot-15-a')).toEqual({ numeroIlot: null, numeroParcelle: null })
-    expect(parsePacDetailsFromComment('ilot a parcelle 5')).toEqual({ numeroIlot: null, numeroParcelle: null })
-    expect(parsePacDetailsFromComment('ilot 12 parcelle a')).toEqual({ numeroIlot: null, numeroParcelle: null })
+    expect(parsePacDetailsFromComment('ilot-15-a')).toEqual({
+      numeroIlot: null,
+      numeroParcelle: null
+    })
+    expect(parsePacDetailsFromComment('ilot a parcelle 5')).toEqual({
+      numeroIlot: null,
+      numeroParcelle: null
+    })
+    expect(parsePacDetailsFromComment('ilot 12 parcelle a')).toEqual({
+      numeroIlot: null,
+      numeroParcelle: null
+    })
   })
 })
 
@@ -87,7 +108,10 @@ describe('fetch function', () => {
       })
       .mockReturnValueOnce({
         async json() {
-          return { nbTotal: 14500, operateurs: [{ ...agencebioOperator, id: 2, numeroBio: '88888' }] }
+          return {
+            nbTotal: 14500,
+            operateurs: [{ ...agencebioOperator, id: 2, numeroBio: '88888' }]
+          }
         }
       })
     const operators = await fetchCustomersByOc(301)
@@ -161,7 +185,10 @@ describe('fetchOperatorsForAdmin : pagination', () => {
       })
       .mockReturnValueOnce({
         async json() {
-          return { nbTotal: 10001, operateurs: [{ ...agencebioOperator, id: 3, numeroBio: '77777' }] }
+          return {
+            nbTotal: 10001,
+            operateurs: [{ ...agencebioOperator, id: 3, numeroBio: '77777' }]
+          }
         }
       })
 

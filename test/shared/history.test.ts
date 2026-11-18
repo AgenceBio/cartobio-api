@@ -166,7 +166,11 @@ describe('createNewEvent()', () => {
     expect(
       createNewEvent(
         EventType.CERTIFICATION_STATE_CHANGE,
-        { description: 'test', features: featureCollection.features, state: CertificationState.OPERATOR_DRAFT },
+        {
+          description: 'test',
+          features: featureCollection.features,
+          state: CertificationState.OPERATOR_DRAFT
+        },
         { user, record: { ...record, certification_state: CertificationState.AUDITED } }
       )
     ).toMatchObject({ ...expectation, type: EventType.CERTIFICATION_STATE_CHANGE })
@@ -217,7 +221,11 @@ describe('createNewEvent()', () => {
     expect(
       createNewEvent(
         EventType.CERTIFICATION_STATE_CHANGE,
-        { description: 'test', features: featureCollection.features, state: CertificationState.CERTIFIED },
+        {
+          description: 'test',
+          features: featureCollection.features,
+          state: CertificationState.CERTIFIED
+        },
         { user, record: { ...record, certification_state: CertificationState.AUDITED } }
       )
     ).toMatchObject({ ...expectation, type: EventType.CERTIFICATION_STATE_CHANGE })
@@ -239,7 +247,11 @@ describe('maskOcAgents()', () => {
         date: '2026-01-02',
         user: { id: 20, nom: 'Martin', prenom: 'Paul', organismeCertificateur: ancienOc }
       },
-      { type: EventType.FEATURE_UPDATE, date: '2026-01-03', user: { id: 30, nom: 'Exploitant', prenom: 'Jean' } }
+      {
+        type: EventType.FEATURE_UPDATE,
+        date: '2026-01-03',
+        user: { id: 30, nom: 'Exploitant', prenom: 'Jean' }
+      }
     ]
   }
   const operateur = { mainGroup: { id: 4 } } as never
@@ -248,7 +260,12 @@ describe('maskOcAgents()', () => {
     const [actuel, ancien, exploitant] = maskOcAgents(record, { user: operateur }, ocActuel.id).audit_history
 
     expect(actuel?.user).toMatchObject({ id: 10, nom: 'Durand', prenom: 'Léa' })
-    expect(ancien?.user).toMatchObject({ id: 0, nom: 'Ancien OC', prenom: '', organismeCertificateur: ancienOc })
+    expect(ancien?.user).toMatchObject({
+      id: 0,
+      nom: 'Ancien OC',
+      prenom: '',
+      organismeCertificateur: ancienOc
+    })
     expect(exploitant?.user).toMatchObject({ id: 30, nom: 'Exploitant' })
   })
 

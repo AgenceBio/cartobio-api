@@ -81,7 +81,10 @@ describe("pipeline d'import API", () => {
 
     const recordParcelles = await db.select().from(parcelles).where(eq(parcelles.recordId, records[0]!.recordId))
     expect(recordParcelles.map(({ id }) => id)).toEqual(['45742'])
-    expect(recordParcelles[0]).toMatchObject({ conversionNiveau: 'AB', engagementDate: '2023-04-27' })
+    expect(recordParcelles[0]).toMatchObject({
+      conversionNiveau: 'AB',
+      engagementDate: '2023-04-27'
+    })
 
     const cultures = await db.select().from(parcelleCultures).where(eq(parcelleCultures.recordId, records[0]!.recordId))
     expect(cultures).toHaveLength(1)
@@ -131,7 +134,11 @@ describe("pipeline d'import API", () => {
     expect(records).toHaveLength(1)
     const cultures = await db.select().from(parcelleCultures).where(eq(parcelleCultures.recordId, records[0]!.recordId))
     expect(cultures.map(({ cpf }) => cpf)).toEqual(['01.11.12'])
-    expect(await findJob(secondJob)).toMatchObject({ status: 'DONE', statutJob: 'VALID', etat: 'UPDATED' })
+    expect(await findJob(secondJob)).toMatchObject({
+      status: 'DONE',
+      statutJob: 'VALID',
+      etat: 'UPDATED'
+    })
   })
 
   test('rejette un payload mal formé sans créer de parcellaire, en conservant le payload', async () => {
@@ -252,7 +259,10 @@ describe("pipeline d'import API", () => {
       statutJob: 'REJECTED',
       resultJob: expect.objectContaining({
         errors: [
-          expect.objectContaining({ numeroBio: '99999', message: "Une géométrie n'est pas corrigeable (45742)" })
+          expect.objectContaining({
+            numeroBio: '99999',
+            message: "Une géométrie n'est pas corrigeable (45742)"
+          })
         ]
       })
     })

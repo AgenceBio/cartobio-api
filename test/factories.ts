@@ -225,7 +225,9 @@ export function buildAdresse(overrides: Partial<AgenceBioAdresses> = {}): Agence
 }
 
 export function buildFeature(
-  overrides: Omit<Partial<CartoBioFeature>, 'properties'> & { properties?: Partial<CartoBioFeatureProperties> } = {}
+  overrides: Omit<Partial<CartoBioFeature>, 'properties'> & {
+    properties?: Partial<CartoBioFeatureProperties>
+  } = {}
 ): CartoBioFeature {
   const { properties, ...feature } = overrides
   return {

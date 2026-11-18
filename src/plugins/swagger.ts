@@ -35,13 +35,19 @@ const swaggerConfig: SwaggerOptions = {
         name: TAGS.API_PARCELLAIRE,
         description: 'API publique des organismes certificateurs : envoi et consultation des parcellaires'
       },
-      { name: TAGS.SUIVI_API_PARCELLAIRE, description: "Statistiques et anomalies des envois de l'API parcellaire" },
+      {
+        name: TAGS.SUIVI_API_PARCELLAIRE,
+        description: "Statistiques et anomalies des envois de l'API parcellaire"
+      },
       { name: TAGS.OPERATEURS, description: 'Recherche, consultation et épinglage des opérateurs' },
       {
         name: TAGS.TABLEAU_DE_BORD,
         description: "Tableau de bord de l'application pour les organismes certificateurs"
       },
-      { name: TAGS.PARCELLAIRES, description: 'Création, modification et certification des parcellaires' },
+      {
+        name: TAGS.PARCELLAIRES,
+        description: 'Création, modification et certification des parcellaires'
+      },
       { name: TAGS.PARCELLES, description: "Édition des parcelles d'un parcellaire" },
       {
         name: TAGS.IMPORT,

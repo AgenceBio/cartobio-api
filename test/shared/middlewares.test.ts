@@ -194,7 +194,11 @@ describe('haveRightToUpdate()', () => {
     })
 
     test('record of another OC → read allowed', async () => {
-      const request = { method: 'GET', user: chargeCertification, record: { oc_id: 2, certification_state: 'AUDITED' } }
+      const request = {
+        method: 'GET',
+        user: chargeCertification,
+        record: { oc_id: 2, certification_state: 'AUDITED' }
+      }
 
       await expect(haveRightToUpdateAuditMiddleware(request)).resolves.toBeUndefined()
     })
@@ -295,7 +299,11 @@ describe('haveRightToUpdate() : transitions de certification_state', () => {
 
   test('OC : création directe en CERTIFIED → autorisé', async () => {
     await expect(
-      haveRightToUpdateAuditMiddleware({ user: ocUser, record: undefined, body: { certification_state: 'CERTIFIED' } })
+      haveRightToUpdateAuditMiddleware({
+        user: ocUser,
+        record: undefined,
+        body: { certification_state: 'CERTIFIED' }
+      })
     ).resolves.toBeUndefined()
   })
 
@@ -317,7 +325,10 @@ describe('enforceAdminRole()', () => {
     await expect(
       hook(
         asFastifyRequest({
-          user: buildUser({ mainGroup: { id: '1', nom: 'Admin' }, groups: [{ id: '1', nom: 'Admin' }] })
+          user: buildUser({
+            mainGroup: { id: '1', nom: 'Admin' },
+            groups: [{ id: '1', nom: 'Admin' }]
+          })
         })
       )
     ).resolves.toBeUndefined()
@@ -377,7 +388,10 @@ describe('enforceOperator()', () => {
 
   test('operator user (group 4) owning the numeroBio → allowed', async () => {
     vi.mocked(fetchUserOperators).mockResolvedValue({ operators: [{ numeroBio: 99999 }] } as never)
-    const request = asFastifyRequest({ params: { numeroBio: '99999' }, user: buildUser({ id: 42 }) })
+    const request = asFastifyRequest({
+      params: { numeroBio: '99999' },
+      user: buildUser({ id: 42 })
+    })
 
     await hook(request)
 
@@ -386,7 +400,9 @@ describe('enforceOperator()', () => {
   })
 
   test('operator user (group 4) not owning the numeroBio → Forbidden', async () => {
-    vi.mocked(fetchUserOperators).mockResolvedValue({ operators: [{ numeroBio: '11111' }] } as never)
+    vi.mocked(fetchUserOperators).mockResolvedValue({
+      operators: [{ numeroBio: '11111' }]
+    } as never)
 
     await expect(hook(asFastifyRequest({ params: { numeroBio: '99999' }, user: buildUser() }))).rejects.toThrow(
       ForbiddenApiError
@@ -442,7 +458,11 @@ describe('enforceRecordAndOperator()', () => {
 
   test('OC owning the record → keeps audit_notes', async () => {
     queryFn.mockResolvedValue(buildNormalizedRecord({ oc_id: 1, audit_notes: 'notes' }))
-    const request = asFastifyRequest({ params: { recordId: RECORD_ID }, headers: {}, user: buildOcUser() })
+    const request = asFastifyRequest({
+      params: { recordId: RECORD_ID },
+      headers: {},
+      user: buildOcUser()
+    })
 
     await hook(request)
 
@@ -452,7 +472,11 @@ describe('enforceRecordAndOperator()', () => {
 
   test('OC not owning the record → audit_notes removed', async () => {
     queryFn.mockResolvedValue(buildNormalizedRecord({ oc_id: 2, audit_notes: 'notes' }))
-    const request = asFastifyRequest({ params: { recordId: RECORD_ID }, headers: {}, user: buildOcUser() })
+    const request = asFastifyRequest({
+      params: { recordId: RECORD_ID },
+      headers: {},
+      user: buildOcUser()
+    })
 
     await hook(request)
 
@@ -462,7 +486,11 @@ describe('enforceRecordAndOperator()', () => {
   test('operator user (group 4) → audit_notes removed', async () => {
     queryFn.mockResolvedValue(buildNormalizedRecord({ oc_id: 1, audit_notes: 'notes' }))
     vi.mocked(fetchUserOperators).mockResolvedValue({ operators: [{ numeroBio: 99999 }] } as never)
-    const request = asFastifyRequest({ params: { recordId: RECORD_ID }, headers: {}, user: buildUser() })
+    const request = asFastifyRequest({
+      params: { recordId: RECORD_ID },
+      headers: {},
+      user: buildUser()
+    })
 
     await hook(request)
 
@@ -489,13 +517,23 @@ describe('enforceOperatorAccess()', () => {
 
   test('no OC (operator user) → allowed', async () => {
     await expect(
-      hook(asFastifyRequest({ user: buildUser(), operator: buildOperator({ organismeCertificateur: { id: 2 } }) }))
+      hook(
+        asFastifyRequest({
+          user: buildUser(),
+          operator: buildOperator({ organismeCertificateur: { id: 2 } })
+        })
+      )
     ).resolves.toBeUndefined()
   })
 
   test('OC of the operator → allowed', async () => {
     await expect(
-      hook(asFastifyRequest({ user: ocUser, operator: buildOperator({ organismeCertificateur: { id: 1 } }) }))
+      hook(
+        asFastifyRequest({
+          user: ocUser,
+          operator: buildOperator({ organismeCertificateur: { id: 1 } })
+        })
+      )
     ).resolves.toBeUndefined()
   })
 
@@ -522,13 +560,23 @@ describe('enforceOperatorAccess()', () => {
     vi.mocked(hasRecordForOc).mockResolvedValue(true)
 
     await expect(
-      hook(asFastifyRequest({ user: ocUser, operator: buildOperator({ organismeCertificateur: { id: 2 } }) }))
+      hook(
+        asFastifyRequest({
+          user: ocUser,
+          operator: buildOperator({ organismeCertificateur: { id: 2 } })
+        })
+      )
     ).resolves.toBeUndefined()
   })
 
   test('other OC → rejected', async () => {
     await expect(
-      hook(asFastifyRequest({ user: ocUser, operator: buildOperator({ organismeCertificateur: { id: 2 } }) }))
+      hook(
+        asFastifyRequest({
+          user: ocUser,
+          operator: buildOperator({ organismeCertificateur: { id: 2 } })
+        })
+      )
     ).rejects.toThrow(UnauthorizedApiError)
   })
 
@@ -551,7 +599,10 @@ describe('checkCertification()', () => {
   test('operator user (no OC) → allowed', () => {
     expect(() =>
       checkCertification(
-        asFastifyRequest({ user: buildUser(), operator: buildOperator({ organismeCertificateur: { id: 2 } }) })
+        asFastifyRequest({
+          user: buildUser(),
+          operator: buildOperator({ organismeCertificateur: { id: 2 } })
+        })
       )
     ).not.toThrow()
   })
@@ -559,7 +610,10 @@ describe('checkCertification()', () => {
   test('OC of the operator → allowed', () => {
     expect(() =>
       checkCertification(
-        asFastifyRequest({ user: buildOcUser(), operator: buildOperator({ organismeCertificateur: { id: 1 } }) })
+        asFastifyRequest({
+          user: buildOcUser(),
+          operator: buildOperator({ organismeCertificateur: { id: 1 } })
+        })
       )
     ).not.toThrow()
   })
@@ -567,7 +621,10 @@ describe('checkCertification()', () => {
   test('other OC → rejected', () => {
     expect(() =>
       checkCertification(
-        asFastifyRequest({ user: buildOcUser(), operator: buildOperator({ organismeCertificateur: { id: 2 } }) })
+        asFastifyRequest({
+          user: buildOcUser(),
+          operator: buildOperator({ organismeCertificateur: { id: 2 } })
+        })
       )
     ).toThrow(UnauthorizedApiError)
   })
@@ -614,13 +671,21 @@ describe('decodeUserToken()', () => {
   test('signale un jeton expiré', async () => {
     const request = bearer({ ...ocUser, exp: Math.floor(Date.now() / 1000) - 10 })
 
-    await expect(hook(request)).rejects.toMatchObject({ statusCode: 401, code: 'EXPIRED_CREDENTIALS' })
+    await expect(hook(request)).rejects.toMatchObject({
+      statusCode: 401,
+      code: 'EXPIRED_CREDENTIALS'
+    })
   })
 
   test('refuse un jeton signé avec une autre clé comme expiré pour déconnecter le front', async () => {
-    const request = { headers: { authorization: `Bearer ${createSigner({ key: 'autre' })(ocUser)}` } }
+    const request = {
+      headers: { authorization: `Bearer ${createSigner({ key: 'autre' })(ocUser)}` }
+    }
 
-    await expect(hook(request)).rejects.toMatchObject({ statusCode: 401, code: 'EXPIRED_CREDENTIALS' })
+    await expect(hook(request)).rejects.toMatchObject({
+      statusCode: 401,
+      code: 'EXPIRED_CREDENTIALS'
+    })
   })
 
   test('refuse un jeton malformé', async () => {
@@ -668,7 +733,10 @@ describe('decodeUserToken()', () => {
   })
 
   test('refuse un compte OC sans organisme certificateur', async () => {
-    vi.mocked(getCachedUserProfile).mockResolvedValue({ ...ocUser, organismeCertificateur: undefined })
+    vi.mocked(getCachedUserProfile).mockResolvedValue({
+      ...ocUser,
+      organismeCertificateur: undefined
+    })
 
     await expect(hook(bearer(ocUser))).rejects.toMatchObject({ statusCode: 403 })
   })
@@ -700,13 +768,17 @@ describe('verifyAgenceBioToken()', () => {
   test.each([400, 401, 403, 404])('refuse un jeton rejeté par le portail (%s)', async (statusCode) => {
     vi.mocked(checkOcToken).mockRejectedValue({ response: { statusCode } })
 
-    await expect(hook({ headers: { authorization: 'jeton-oc' } })).rejects.toMatchObject({ statusCode: 401 })
+    await expect(hook({ headers: { authorization: 'jeton-oc' } })).rejects.toMatchObject({
+      statusCode: 401
+    })
   })
 
   test('signale un portail en erreur', async () => {
     vi.mocked(checkOcToken).mockRejectedValue({ response: { statusCode: 500 } })
 
-    await expect(hook({ headers: { authorization: 'jeton-oc' } })).rejects.toMatchObject({ statusCode: 502 })
+    await expect(hook({ headers: { authorization: 'jeton-oc' } })).rejects.toMatchObject({
+      statusCode: 502
+    })
   })
 })
 
@@ -802,7 +874,9 @@ describe('haveRightToUpdate() : propriétés réservées aux OC', () => {
   })
 
   test('accepte une valeur inchangée et retire les annotations', async () => {
-    const body = { properties: { conversion_niveau: 'C1', annotations: [{ code: 'x' }] } as Record<string, unknown> }
+    const body = {
+      properties: { conversion_niveau: 'C1', annotations: [{ code: 'x' }] } as Record<string, unknown>
+    }
 
     await hook({ method: 'PATCH', user: buildUser(), record, params: { featureId: '1' }, body })
 

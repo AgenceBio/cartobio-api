@@ -94,7 +94,7 @@ describe('GET /api/v2/audits/:recordId/has-attestation-production', () => {
   })
 
   test('cherche une attestation PAC avec pac=true', async () => {
-    vi.mocked(findValidAttestationProduction).mockResolvedValueOnce({} as never)
+    vi.mocked(findValidAttestationProduction).mockResolvedValueOnce({ path: import.meta.filename })
 
     const response = await request(app.server)
       .get(`/api/v2/audits/${CERTIFIED}/has-attestation-production?pac=true`)
@@ -160,7 +160,10 @@ describe('PATCH /api/v2/audits/:recordId', () => {
 
     expect(response.status).toBe(200)
     expect(response.body).toMatchObject({ certification_state: 'AUDITED', audit_notes: 'RAS' })
-    expect(response.body.audit_history.at(-1)).toMatchObject({ type: 'CertificationStateChange', state: 'AUDITED' })
+    expect(response.body.audit_history.at(-1)).toMatchObject({
+      type: 'CertificationStateChange',
+      state: 'AUDITED'
+    })
   })
 
   test("refuse un changement d'état à un utilisateur sans le rôle requis", async () => {
@@ -221,7 +224,13 @@ describe('parcelles', () => {
     const response = await request(app.server)
       .post(`/api/v2/audits/${PENDING}/parcelles`)
       .set('Authorization', AUTH)
-      .send({ feature: { type: 'Feature', geometry: polygon, properties: { cultures: [], conversion_niveau: 'AB' } } })
+      .send({
+        feature: {
+          type: 'Feature',
+          geometry: polygon,
+          properties: { cultures: [], conversion_niveau: 'AB' }
+        }
+      })
 
     expect(response.status).toBe(200)
     expect(response.body.parcelles.features).toHaveLength(4)
@@ -276,7 +285,13 @@ describe('parcelles', () => {
       .put(`/api/v2/audits/${PENDING}/parcelles`)
       .set('Authorization', AUTH)
       .send({
-        features: [{ type: 'Feature', geometry: polygon, properties: { cultures: [], conversion_niveau: 'AB' } }],
+        features: [
+          {
+            type: 'Feature',
+            geometry: polygon,
+            properties: { cultures: [], conversion_niveau: 'AB' }
+          }
+        ],
         from: ['2', '3']
       })
 

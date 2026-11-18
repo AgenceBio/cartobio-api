@@ -42,7 +42,11 @@ describe('label', () => {
 describe('feature', () => {
   test('construit une Feature GeoJSON', () => {
     const geometry: Polygon = { type: 'Polygon', coordinates: [] }
-    expect(feature(geometry, { id: 1 })).toEqual({ type: 'Feature', properties: { id: 1 }, geometry })
+    expect(feature(geometry, { id: 1 })).toEqual({
+      type: 'Feature',
+      properties: { id: 1 },
+      geometry
+    })
     expect(feature(null, {})).toEqual({ type: 'Feature', properties: {}, geometry: null })
   })
 })

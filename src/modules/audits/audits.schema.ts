@@ -34,7 +34,9 @@ import { enforceOperatorAccess, haveRightToUpdate } from '../../shared/middlewar
 const operatorAccess = { preHandler: [enforceOperatorAccess()] }
 
 const recordRoute = (): WithSchema<CartobioExtendedRouteShorthandOptions, { params: typeof auditParamsSchema }> =>
-  withSchema(mergeSchemas(protectedWithToken(), operatorFromRecordId, operatorAccess), { params: auditParamsSchema })
+  withSchema(mergeSchemas(protectedWithToken(), operatorFromRecordId, operatorAccess), {
+    params: auditParamsSchema
+  })
 
 const recordErrorResponses = {
   ...commonErrorResponses,
@@ -64,7 +66,9 @@ export const attestationProductionSchema = withSchema(recordRoute(), {
   querystring: attestationProductionQuerySchema,
   response: {
     ...recordErrorResponses,
-    200: attestationProductionResponseSchema.meta({ description: "Présence d'une attestation de production" })
+    200: attestationProductionResponseSchema.meta({
+      description: "Présence d'une attestation de production"
+    })
   }
 })
 
@@ -96,7 +100,9 @@ export const getFeaturesSchema = withSchema(recordRoute(), {
   summary: "Parcelles d'un parcellaire",
   response: {
     ...recordErrorResponses,
-    200: recordFeatureCollectionSchema.meta({ description: 'FeatureCollection GeoJSON des parcelles' })
+    200: recordFeatureCollectionSchema.meta({
+      description: 'FeatureCollection GeoJSON des parcelles'
+    })
   }
 })
 

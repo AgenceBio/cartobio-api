@@ -3,7 +3,10 @@ import { mixiteSchema, opt, text, textOrNumber } from './helpers.js'
 import { CertificationState } from '../enums.js'
 import { isoDateSchema } from './common.js'
 
-const numeroBioDescription = { description: "Numéro bio de l'opérateur (Agence Bio)", examples: ['12345'] }
+const numeroBioDescription = {
+  description: "Numéro bio de l'opérateur (Agence Bio)",
+  examples: ['12345']
+}
 
 export const numeroBioParamsSchema = z.object({
   numeroBio: z.coerce.number().int().meta(numeroBioDescription)
@@ -21,11 +24,9 @@ export const operatorFilterSchema = z.object({
     description: '`CERTIFIED`, `NO_CERTIFIED` ou `ALL` : parcellaire certifié ou non pour `anneeReferenceCertification`'
   }),
   anneeReferenceCertification: z.number().nullable().optional().meta({ description: 'Année de référence du contrôle' }),
-  etatNotification: z
-    .array(z.string())
-    .nullable()
-    .optional()
-    .meta({ description: 'États de certification de la notification Agence Bio (etatCertification)' }),
+  etatNotification: z.array(z.string()).nullable().optional().meta({
+    description: 'États de certification de la notification Agence Bio (etatCertification)'
+  }),
   statutParcellaire: z
     .array(z.string())
     .nullable()
@@ -68,9 +69,9 @@ export const dashboardSummaryBodySchema = z.strictObject({
 
 export const dashboardSummaryResponseSchema = z.object({
   countCertifiees: z.number().meta({ description: "Opérateurs engagés dont le parcellaire de l'année est certifié" }),
-  countEnAttentes: z
-    .number()
-    .meta({ description: "Opérateurs engagés dont le parcellaire de l'année est audité mais pas encore certifié" }),
+  countEnAttentes: z.number().meta({
+    description: "Opérateurs engagés dont le parcellaire de l'année est audité mais pas encore certifié"
+  }),
   countNonAuditees: z.number().meta({ description: "Opérateurs engagés sans parcellaire audité pour l'année" })
 })
 

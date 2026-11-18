@@ -149,7 +149,10 @@ describe('dashboard service', () => {
   })
 
   it('découpe une liste de codes séparés par des virgules', async () => {
-    mockedRepo.findTableauErreurs.mockResolvedValue({ data: [], meta: { total: 0, page: 1, limit: 20 } })
+    mockedRepo.findTableauErreurs.mockResolvedValue({
+      data: [],
+      meta: { total: 0, page: 1, limit: 20 }
+    })
 
     await getTableauErreurs({ codes: ' E1, ,E2 ' }, 999)
 
@@ -157,7 +160,10 @@ describe('dashboard service', () => {
   })
 
   it("n'envoie pas de filtre de codes vide", async () => {
-    mockedRepo.findTableauErreurs.mockResolvedValue({ data: [], meta: { total: 0, page: 1, limit: 20 } })
+    mockedRepo.findTableauErreurs.mockResolvedValue({
+      data: [],
+      meta: { total: 0, page: 1, limit: 20 }
+    })
 
     await getTableauErreurs({ codes: ' , ' }, 999)
 

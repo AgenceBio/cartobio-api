@@ -72,7 +72,10 @@ describe('GET /api/v3/tdb-api/*', () => {
   })
 
   test('utilise l’OC de l’utilisateur CartoBio', async () => {
-    vi.mocked(service.getTableauBilan).mockResolvedValueOnce({ data: [], meta: { total: 0, page: 1, limit: 20 } })
+    vi.mocked(service.getTableauBilan).mockResolvedValueOnce({
+      data: [],
+      meta: { total: 0, page: 1, limit: 20 }
+    })
 
     const response = await request(app.server)
       .get('/api/v3/tdb-api/tableau?statuts=VALID')
@@ -133,6 +136,8 @@ describe('GET /api/v3/tdb-api/*', () => {
       .set('Authorization', OC_TOKEN)
 
     expect(response.status).toEqual(200)
-    expect(response.body).toEqual({ data: [{ period: '2026-01-01T00:00:00.000Z', code: 'E1', count: 2 }] })
+    expect(response.body).toEqual({
+      data: [{ period: '2026-01-01T00:00:00.000Z', code: 'E1', count: 2 }]
+    })
   })
 })

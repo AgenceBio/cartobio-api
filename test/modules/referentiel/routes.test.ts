@@ -27,7 +27,9 @@ afterAll(() => app.close())
 describe('GET /api/v2/departements', () => {
   test('retourne les départements groupés par région', async () => {
     vi.mocked(getCachedUserProfile).mockResolvedValue(user as unknown as CartoBioUser)
-    vi.mocked(service.getDepartement).mockResolvedValue({ Bretagne: [{ code: '56', nom: 'Morbihan' }] })
+    vi.mocked(service.getDepartement).mockResolvedValue({
+      Bretagne: [{ code: '56', nom: 'Morbihan' }]
+    })
 
     const response = await request(app.server).get('/api/v2/departements').set('Authorization', AUTH)
 

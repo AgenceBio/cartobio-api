@@ -189,7 +189,9 @@ async function geofoliaLookup(numeroSiret: string, year: number): Promise<boolea
     if (getResponseStatusCode(error) === 404) {
       return false
     } else {
-      throw new BadGatewayApiError("Impossible de communiquer avec l'API Geofolia.", { cause: error })
+      throw new BadGatewayApiError("Impossible de communiquer avec l'API Geofolia.", {
+        cause: error
+      })
     }
   }
 }

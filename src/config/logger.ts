@@ -25,7 +25,11 @@ function createLogger(env: string): Logger {
   if (env !== 'dev')
     return pino({
       serializers: {
-        req: (req: FastifyRequest) => ({ method: req.method, url: req.url.split('?')[0], remoteAddress: req.ip })
+        req: (req: FastifyRequest) => ({
+          method: req.method,
+          url: req.url.split('?')[0],
+          remoteAddress: req.ip
+        })
       }
     })
 

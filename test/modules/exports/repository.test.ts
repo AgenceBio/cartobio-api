@@ -26,7 +26,10 @@ const parcelles = parcellesJSON.map((p) =>
 )
 const pdfRecord = agencebioOperator as unknown as PdfRecord
 const generatedPdf = () =>
-  asPdfDocument({ save: vi.fn().mockReturnValue('save'), saveAsBase64: vi.fn().mockReturnValue('save-as-base-64') })
+  asPdfDocument({
+    save: vi.fn().mockReturnValue('save'),
+    saveAsBase64: vi.fn().mockReturnValue('save-as-base-64')
+  })
 
 vi.mock('../../../src/modules/exports/pdf-utils.js', () => ({
   getAllParcelles: vi.fn()

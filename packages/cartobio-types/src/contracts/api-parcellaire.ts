@@ -139,10 +139,9 @@ export const outputApiParcelleSchema = z.object({
 })
 
 export const outputApiCertificationSchema = z.looseObject({
-  statut: z
-    .string()
-    .optional()
-    .meta({ description: 'État du parcellaire : `OPERATOR_DRAFT`, `AUDITED`, `PENDING_CERTIFICATION` ou `CERTIFIED`' }),
+  statut: z.string().optional().meta({
+    description: 'État du parcellaire : `OPERATOR_DRAFT`, `AUDITED`, `PENDING_CERTIFICATION` ou `CERTIFIED`'
+  }),
   dateAudit: isoDateSchema.nullable().optional().meta({ description: "Date d'audit" }),
   dateDebut: isoDateSchema.nullable().optional().meta({ description: 'Début de validité de la certification' }),
   dateFin: isoDateSchema.nullable().optional().meta({ description: 'Fin de validité de la certification' }),

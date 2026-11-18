@@ -66,7 +66,9 @@ export const autocompleteSchema = withSchema(protectedWithToken(), {
   querystring: autocompleteQuerySchema,
   response: {
     ...commonErrorResponses,
-    200: operatorAutocompleteResponseSchema.meta({ description: 'Opérateurs correspondant à la recherche' })
+    200: operatorAutocompleteResponseSchema.meta({
+      description: 'Opérateurs correspondant à la recherche'
+    })
   }
 })
 
@@ -100,11 +102,16 @@ export const dashboardSummarySchema = withSchema(protectedWithToken({ oc: true, 
   description:
     "Compte les opérateurs engagés en production selon l'état de leur parcellaire pour l'année de référence.",
   body: dashboardSummaryBodySchema,
-  response: { ...commonErrorResponses, 200: dashboardSummaryResponseSchema.meta({ description: 'Compteurs par état' }) }
+  response: {
+    ...commonErrorResponses,
+    200: dashboardSummaryResponseSchema.meta({ description: 'Compteurs par état' })
+  }
 })
 
 const operatorRoute = (): WithSchema<CartobioExtendedRouteShorthandOptions, { params: typeof numeroBioParamsSchema }> =>
-  withSchema(mergeSchemas(protectedWithToken(), operatorFromNumeroBio), { params: numeroBioParamsSchema })
+  withSchema(mergeSchemas(protectedWithToken(), operatorFromNumeroBio), {
+    params: numeroBioParamsSchema
+  })
 
 export const getOperatorSchema = withSchema(operatorRoute(), {
   operationId: 'getOperator',
@@ -142,22 +149,33 @@ const operatorActionRoute = (): WithSchema<
   CartobioExtendedRouteShorthandOptions,
   { params: typeof numeroBioStringParamsSchema }
 > =>
-  withSchema(mergeSchemas(protectedWithToken(), operatorFromNumeroBio, { preHandler: [enforceOperatorAccess()] }), {
-    params: numeroBioStringParamsSchema
-  })
+  withSchema(
+    mergeSchemas(protectedWithToken(), operatorFromNumeroBio, {
+      preHandler: [enforceOperatorAccess()]
+    }),
+    {
+      params: numeroBioStringParamsSchema
+    }
+  )
 
 export const pinOperatorSchema = withSchema(operatorActionRoute(), {
   operationId: 'pinOperator',
   tags: [TAGS.OPERATEURS],
   summary: 'Épingler un opérateur',
-  response: { ...operatorErrorResponses, 200: pinResponseSchema.meta({ description: 'Opérateur épinglé' }) }
+  response: {
+    ...operatorErrorResponses,
+    200: pinResponseSchema.meta({ description: 'Opérateur épinglé' })
+  }
 })
 
 export const unpinOperatorSchema = withSchema(operatorActionRoute(), {
   operationId: 'unpinOperator',
   tags: [TAGS.OPERATEURS],
   summary: 'Désépingler un opérateur',
-  response: { ...operatorErrorResponses, 200: pinResponseSchema.meta({ description: 'Opérateur désépinglé' }) }
+  response: {
+    ...operatorErrorResponses,
+    200: pinResponseSchema.meta({ description: 'Opérateur désépinglé' })
+  }
 })
 
 export const consultOperatorSchema = withSchema(operatorActionRoute(), {

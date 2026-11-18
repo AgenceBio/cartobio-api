@@ -37,7 +37,13 @@ async function softDeleteRecord(recordId: string): Promise<void> {
 async function insertParcelleControle(recordId: string, id: FeatureId, userId: number): Promise<void> {
   await db
     .insert(parcellesControles)
-    .values(createParcelleControleSchema.parse({ recordId, parcelleId: String(id), userId: String(userId) }))
+    .values(
+      createParcelleControleSchema.parse({
+        recordId,
+        parcelleId: String(id),
+        userId: String(userId)
+      })
+    )
     .onConflictDoNothing({
       target: [parcellesControles.recordId, parcellesControles.parcelleId, parcellesControles.userId]
     })

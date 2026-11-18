@@ -203,7 +203,13 @@ describe('getGeometryEquals', () => {
     recordId: string,
     numeroBio: number,
     auditDate: string,
-    items: Array<{ id: string; geometry: Polygon; numeroIlotPac?: number; numeroParcellesPac?: number; name?: string }>
+    items: Array<{
+      id: string
+      geometry: Polygon
+      numeroIlotPac?: number
+      numeroParcellesPac?: number
+      name?: string
+    }>
   ): Promise<void> {
     await db.insert(parcellaires).values({
       recordId,
@@ -243,7 +249,13 @@ describe('getGeometryEquals', () => {
 
     expect(result[0]!.comparison_result).toBe('r1_old_r2_new')
     expect(summarize(result)).toEqual([
-      { status: 'modified', new_id: 'q1', old_id: 'p1', label: 'Ilot 1 Parcelle 2', old_label: 'Ilot 1 Parcelle 1' },
+      {
+        status: 'modified',
+        new_id: 'q1',
+        old_id: 'p1',
+        label: 'Ilot 1 Parcelle 2',
+        old_label: 'Ilot 1 Parcelle 1'
+      },
       { status: 'deleted', new_id: null, old_id: 'p2', label: 'Supprimée', old_label: null },
       { status: 'added', new_id: 'q4', old_id: null, label: 'Ajoutée', old_label: null }
     ])

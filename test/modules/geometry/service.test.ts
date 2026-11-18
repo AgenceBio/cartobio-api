@@ -31,7 +31,12 @@ describe('verifyGeometry', () => {
 
   test('propose des corrections pour les seules parcelles chevauchées', async () => {
     const corrections = [
-      { id: 'a', new_minus_intersection: null, existing_minus_intersection: null, intersection: null }
+      {
+        id: 'a',
+        new_minus_intersection: null,
+        existing_minus_intersection: null,
+        intersection: null
+      }
     ]
     mockedRepo.findGeometryConflicts.mockResolvedValue([
       { id: 'a', status: 'overlap' },

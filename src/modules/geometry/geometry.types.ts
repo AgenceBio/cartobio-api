@@ -20,7 +20,11 @@ export type ParcellaireComparable = ParcellaireDates & Pick<typeof parcellaires.
 type ParcelleComparee = Pick<typeof parcelles.$inferSelect, ParcelleColumnKey>
 
 export type ParcellesComparees = {
-  modified: Array<{ geometry: Geometry | null; ancienne: ParcelleComparee; nouvelle: ParcelleComparee }>
+  modified: Array<{
+    geometry: Geometry | null
+    ancienne: ParcelleComparee
+    nouvelle: ParcelleComparee
+  }>
   deleted: Array<ParcelleComparee & { geometry: Geometry | null }>
   added: Array<ParcelleComparee & { geometry: Geometry | null }>
 }

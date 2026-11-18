@@ -924,7 +924,12 @@ describe('GET /api/v2/certification/search', () => {
 
   describe('with search', () => {
     beforeEach(() => loadRecordFixture())
-    beforeEach(() => mockResultsOrder({ nbTotal: 1, operateurs: [{ ...agencebioOperator, siret: '12345678912345' }] }))
+    beforeEach(() =>
+      mockResultsOrder({
+        nbTotal: 1,
+        operateurs: [{ ...agencebioOperator, siret: '12345678912345' }]
+      })
+    )
     afterEach(() => getMock.mockReset())
 
     test('search numero bio', async () => {
@@ -962,7 +967,10 @@ describe('GET /api/v2/certification/search', () => {
         .set('Authorization', USER_DOC_AUTH_HEADER)
 
       expect(response.status).toBe(200)
-      expect(response.body).toMatchObject({ pagination: { total: 0, page: 1, page_max: 1 }, records: [] })
+      expect(response.body).toMatchObject({
+        pagination: { total: 0, page: 1, page_max: 1 },
+        records: []
+      })
     })
 
     test('search nom', () => {

@@ -19,14 +19,23 @@ import { unzipGeographicalContent, detectSrs, wgs84 } from '../src/shared/geo/gd
 import { getRandomFeatureId } from '../src/shared/outputs/features.js'
 import { CertificationState, EtatProduction, MetadataSource } from '@agencebio/cartobio-types'
 
-type CorrespondanceRow = Record<string, string> & { PACAGE: string; SIRET: string; NUMEROBIO: string }
+type CorrespondanceRow = Record<string, string> & {
+  PACAGE: string
+  SIRET: string
+  NUMEROBIO: string
+}
 
 function parseCSV(text: string): CorrespondanceRow[] {
   const [headerLine = '', ...lines] = text.trim().split('\n')
   const headers = headerLine.split(';').map((h) => h.trim())
   return lines.map((line) => {
     const values = line.split(';').map((v) => v.trim())
-    return { PACAGE: '', SIRET: '', NUMEROBIO: '', ...Object.fromEntries(headers.map((h, i) => [h, values[i] ?? ''])) }
+    return {
+      PACAGE: '',
+      SIRET: '',
+      NUMEROBIO: '',
+      ...Object.fromEntries(headers.map((h, i) => [h, values[i] ?? '']))
+    }
   })
 }
 
@@ -78,7 +87,12 @@ try {
       for await (const layer of dataset.layers) {
         const srs = await detectSrs(layer)
         const reproject = new gdal.CoordinateTransformation(srs, wgs84)
-        const tabCouplage: Array<{ siret: string; pacage: string; numeroBio: string; geom: gdal.Feature[] }> = []
+        const tabCouplage: Array<{
+          siret: string
+          pacage: string
+          numeroBio: string
+          geom: gdal.Feature[]
+        }> = []
         const group = groupByPACAGE(layer.features)
         for await (const featureGroup of group) {
           const [firstFeature] = featureGroup

@@ -20,14 +20,26 @@ export default async function authenticationRoutes(
 ): Promise<void> {
   const app = fastify.withTypeProvider<ZodTypeProvider>()
   const { sign } = options
-  const verifyIgnoringExpiration = createVerifier({ key: config.get('jwtSecret'), ignoreExpiration: true })
-  const signExchangeToken = createSigner({ key: config.get('jwtSecret'), expiresIn: DURATION_ONE_HOUR * 2 })
+  const verifyIgnoringExpiration = createVerifier({
+    key: config.get('jwtSecret'),
+    ignoreExpiration: true
+  })
+  const signExchangeToken = createSigner({
+    key: config.get('jwtSecret'),
+    expiresIn: DURATION_ONE_HOUR * 2
+  })
   app.get('/api/v2/user/verify', verifySchema, async (request, reply) => {
     const { user, organismeCertificateur } = request
     if (!user) return reply.send(organismeCertificateur)
 
     const { id, nom, prenom, mainGroup } = user
-    return reply.send({ id, nom, prenom, mainGroup, organismeCertificateur: user.organismeCertificateur })
+    return reply.send({
+      id,
+      nom,
+      prenom,
+      mainGroup,
+      organismeCertificateur: user.organismeCertificateur
+    })
   })
 
   app.get('/api/v2/user/exchangeToken', exchangeTokenSchema, async (request, reply) => {

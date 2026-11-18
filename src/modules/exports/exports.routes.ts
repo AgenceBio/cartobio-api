@@ -40,7 +40,12 @@ export default async function exportRoutes(fastify: FastifyInstance): Promise<vo
     const user = requireOcUser(request)
     const data = await service.exportDataOcId(user.organismeCertificateur.id, request.body.payload, user.id)
     request.log.info(
-      { audit: 'export-xlsx', userId: user.id, ocId: user.organismeCertificateur.id, count: data.length },
+      {
+        audit: 'export-xlsx',
+        userId: user.id,
+        ocId: user.organismeCertificateur.id,
+        count: data.length
+      },
       "Export des parcellaires de l'OC"
     )
     return reply.code(200).send(data)

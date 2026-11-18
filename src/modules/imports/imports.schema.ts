@@ -39,7 +39,9 @@ const operatorRoute = (): CartobioExtendedRouteShorthandOptions =>
 
 const featureCollectionResponse = {
   ...commonErrorResponses,
-  200: importedFeatureCollectionSchema.meta({ description: 'FeatureCollection GeoJSON à prévisualiser avant import' }),
+  200: importedFeatureCollectionSchema.meta({
+    description: 'FeatureCollection GeoJSON à prévisualiser avant import'
+  }),
   400: apiError('Fichier absent, illisible ou invalide')
 }
 
@@ -118,13 +120,17 @@ export const certificationParcellesSchema = {
     body: inputApiRecordBodySchema,
     response: {
       ...commonErrorResponses,
-      202: importReportSchema.meta({ description: 'Le parcellaire est accepté, enregistrement en cours' }),
-      400: z
-        .union([importReportSchema, apiErrorSchema])
-        .meta({ description: "Le parcellaire est refusé (bilan de l'envoi), ou corps illisible (erreur)" })
+      202: importReportSchema.meta({
+        description: 'Le parcellaire est accepté, enregistrement en cours'
+      }),
+      400: z.union([importReportSchema, apiErrorSchema]).meta({
+        description: "Le parcellaire est refusé (bilan de l'envoi), ou corps illisible (erreur)"
+      })
     }
   }),
-  validatorCompiler: (() => (data) => ({ value: data })) satisfies FastifySchemaCompiler<FastifySchema>,
+  validatorCompiler: (() => (data) => ({
+    value: data
+  })) satisfies FastifySchemaCompiler<FastifySchema>,
   bodyLimit: 50 * 1024 * 1024
 }
 
@@ -135,7 +141,9 @@ export const importJobSchema = withSchema(protectedWithToken({ oc: true }), {
   params: importIdParamsSchema,
   response: {
     ...commonErrorResponses,
-    200: importJobStatusResponseSchema.meta({ description: 'Statut du job, et son résultat une fois terminé' }),
+    200: importJobStatusResponseSchema.meta({
+      description: 'Statut du job, et son résultat une fois terminé'
+    }),
     404: importJobNotFoundResponseSchema.meta({ description: 'Job introuvable pour cet OC' })
   }
 })
@@ -173,7 +181,9 @@ export const certificationParcellairesSchema = withSchema(protectedWithToken({ o
   querystring: certificationParcellairesQuerySchema,
   response: {
     ...commonErrorResponses,
-    200: certificationParcellairesResponseSchema.meta({ description: 'Parcellaires et liens de pagination' })
+    200: certificationParcellairesResponseSchema.meta({
+      description: 'Parcellaires et liens de pagination'
+    })
   }
 })
 
@@ -187,7 +197,9 @@ export const certificationParcellaireSchema = withSchema(
     querystring: certificationParcellaireQuerySchema,
     response: {
       ...commonErrorResponses,
-      200: outputApiRecordSchema.meta({ description: "Parcellaire au format de l'API parcellaire" }),
+      200: outputApiRecordSchema.meta({
+        description: "Parcellaire au format de l'API parcellaire"
+      }),
       403: apiError('Route réservée aux organismes certificateurs et aux administrateurs'),
       404: apiError('Opérateur ou parcellaire introuvable')
     }

@@ -108,7 +108,11 @@ describe('findExportRows', () => {
     const row = rows.find(({ record_id }) => record_id === CERTIFIED)!
 
     expect(rows.every(({ numerobio }) => numerobio === 99999)).toBe(true)
-    expect(row).toMatchObject({ nombre_parcelles: 2, certification_state: 'CERTIFIED', audit_date: '2022-05-01' })
+    expect(row).toMatchObject({
+      nombre_parcelles: 2,
+      certification_state: 'CERTIFIED',
+      audit_date: '2022-05-01'
+    })
     expect(row.surface_ab_ha).toBeGreaterThan(0)
     expect(row.superficie_totale_ha).toBeGreaterThan(row.surface_ab_ha)
     expect([row.surface_c1_ha, row.surface_c2_ha, row.surface_c3_ha, row.surface_conventionnel_ha]).toEqual([

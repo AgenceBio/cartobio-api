@@ -54,7 +54,12 @@ import {
   buildUser
 } from '../factories.js'
 
-type FixtureFeature = { type: 'Feature'; id: unknown; geometry: unknown; properties: Record<string, unknown> }
+type FixtureFeature = {
+  type: 'Feature'
+  id: unknown
+  geometry: unknown
+  properties: Record<string, unknown>
+}
 
 const user = buildOcUser()
 type WithMaxAuditDate = AgenceBioNormalizedOperatorWithRecord & { max_audit_date?: string | null }
@@ -66,7 +71,9 @@ const normalizedRecord = normalizeRecord(
   })
 )
 
-const xmlEvv = readFileSync(join(import.meta.dirname, '../fixtures/providers/cvi-evv.xml'), { encoding: 'utf8' })
+const xmlEvv = readFileSync(join(import.meta.dirname, '../fixtures/providers/cvi-evv.xml'), {
+  encoding: 'utf8'
+})
 const xmlParcellaire = readFileSync(join(import.meta.dirname, '../fixtures/providers/cvi-parcellaire.xml'), {
   encoding: 'utf8'
 })
@@ -82,7 +89,9 @@ vi.mock('../../src/clients/agence-bio.client.js', async (importOriginal) => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(mailer.sendCertificationComplete).mockResolvedValue({ messageId: 'test' } as SentMessageInfo)
+  vi.mocked(mailer.sendCertificationComplete).mockResolvedValue({
+    messageId: 'test'
+  } as SentMessageInfo)
   vi.mocked(fetchEmailForNumeroBio).mockResolvedValue({
     numerobio: '123',
     utilisateurs: [{ email: 'test@test.fr' }]
@@ -282,7 +291,11 @@ describe('addRecordFeature', () => {
       ]
     ])
 
-    expect(parcelle).toMatchObject({ commune: '69387', etranger: false, engagement_date: '1900-01-01' })
+    expect(parcelle).toMatchObject({
+      commune: '69387',
+      etranger: false,
+      engagement_date: '1900-01-01'
+    })
   })
 
   test('flags a feature outside France as foreign, without commune', async () => {
@@ -347,13 +360,20 @@ describe('createOrUpdateOperatorRecord', () => {
 
     await expect(
       createOrUpdateOperatorRecord(asRecordInput({ ...recordToUpdate, parcelles: simpleFeatureCollection() }), { user })
-    ).rejects.toMatchObject({ statusCode: 400, message: "Une version certifiée existe déjà à cette date d'audit." })
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      message: "Une version certifiée existe déjà à cette date d'audit."
+    })
   })
 
   test("interdit à un opérateur de changer l'état de certification d'une version existante", async () => {
     await expect(
       createOrUpdateOperatorRecord(
-        asRecordInput({ ...recordToUpdate, certification_state: 'AUDITED', parcelles: simpleFeatureCollection() }),
+        asRecordInput({
+          ...recordToUpdate,
+          certification_state: 'AUDITED',
+          parcelles: simpleFeatureCollection()
+        }),
         { user: buildUser() }
       )
     ).rejects.toMatchObject({ statusCode: 403 })
@@ -361,7 +381,11 @@ describe('createOrUpdateOperatorRecord', () => {
 
   test("conserve l'état de la version existante quand un OC n'en précise pas", async () => {
     const result = await createOrUpdateOperatorRecord(
-      asRecordInput({ ...recordToUpdate, certification_state: undefined, parcelles: simpleFeatureCollection() }),
+      asRecordInput({
+        ...recordToUpdate,
+        certification_state: undefined,
+        parcelles: simpleFeatureCollection()
+      }),
       { user }
     )
 
@@ -379,7 +403,10 @@ describe('createOrUpdateOperatorRecord', () => {
         }),
         { user }
       )
-    ).rejects.toMatchObject({ statusCode: 400, message: 'Les dates de certification sont manquantes.' })
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      message: 'Les dates de certification sont manquantes.'
+    })
   })
 
   test('notifie une seule fois chaque adresse quand la version est certifiée', async () => {
@@ -1011,7 +1038,11 @@ describe('evvLookup', () => {
 
     const result = evvLookup({ numeroEvv: '01234' })
 
-    return expect(result).resolves.toEqual({ siret: '999999999', libelle: 'test viti', numero: '01234' })
+    return expect(result).resolves.toEqual({
+      siret: '999999999',
+      libelle: 'test viti',
+      numero: '01234'
+    })
   })
 
   test('operator not found', () => {
@@ -1027,7 +1058,9 @@ describe('evvLookup', () => {
   test('remote server down', () => {
     expect.assertions(1)
     vi.mocked(evvClient.get).mockReturnValueOnce(
-      asGotRequest({ text: vi.fn().mockRejectedValue(new TimeoutError({ message: 'Request timeout' })) })
+      asGotRequest({
+        text: vi.fn().mockRejectedValue(new TimeoutError({ message: 'Request timeout' }))
+      })
     )
 
     const result = evvLookup({ numeroEvv: '01234' })
@@ -1117,23 +1150,49 @@ describe('test search with filter', () => {
   })
 
   test('no filter, records with no notifications or production filtered', async () => {
-    const res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, limit: 5, filter: {} })
+    const res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      limit: 5,
+      filter: {}
+    })
     expect(res.records).toHaveLength(5)
     expect(res.pagination).toEqual({ page: 1, page_max: 2, total: 7 })
   })
 
   test('no filter, records with no notifications filtered, page 2', async () => {
-    const res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 2, limit: 5, filter: {} })
+    const res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 2,
+      limit: 5,
+      filter: {}
+    })
     expect(res.records).toHaveLength(2)
     expect(res.pagination).toEqual({ page: 2, page_max: 2, total: 7 })
   })
 
   test('records with no production not filter if text searc', async () => {
-    let res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '12345678912345', page: 1, filter: {} })
+    let res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '12345678912345',
+      page: 1,
+      filter: {}
+    })
     expect(res.records).toHaveLength(1)
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 1 })
 
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '12345678912345', page: 1, filter: {} })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '12345678912345',
+      page: 1,
+      filter: {}
+    })
     expect(res.records).toHaveLength(1)
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 1 })
 
@@ -1145,15 +1204,34 @@ describe('test search with filter', () => {
     expect(res.records).toHaveLength(1)
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 1 })
 
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: 'Texte a chercher SARL', page: 1, filter: {} })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: 'Texte a chercher SARL',
+      page: 1,
+      filter: {}
+    })
     expect(res.records).toHaveLength(1)
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 1 })
 
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: 'Texte a chercher', page: 1, filter: {} })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: 'Texte a chercher',
+      page: 1,
+      filter: {}
+    })
     expect(res.records).toHaveLength(1)
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 1 })
 
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: 'SARL', page: 1, filter: {}, limit: 5 })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: 'SARL',
+      page: 1,
+      filter: {},
+      limit: 5
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 2, total: 8 })
   })
 
@@ -1238,7 +1316,10 @@ describe('test search with filter', () => {
       userId: 1,
       input: '',
       page: 1,
-      filter: { etatCertification: 'CERTIFIED', anneeReferenceCertification: new Date().getFullYear() }
+      filter: {
+        etatCertification: 'CERTIFIED',
+        anneeReferenceCertification: new Date().getFullYear()
+      }
     })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 1 })
 
@@ -1248,7 +1329,10 @@ describe('test search with filter', () => {
       input: '',
       page: 1,
       limit: 8,
-      filter: { etatCertification: 'NO_CERTIFIED', anneeReferenceCertification: new Date().getFullYear() }
+      filter: {
+        etatCertification: 'NO_CERTIFIED',
+        anneeReferenceCertification: new Date().getFullYear()
+      }
     })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 6 })
 
@@ -1285,7 +1369,10 @@ describe('test search with filter', () => {
       userId: 1,
       input: '',
       page: 1,
-      filter: { statutParcellaire: ['NONE'], anneeReferenceCertification: new Date().getFullYear() }
+      filter: {
+        statutParcellaire: ['NONE'],
+        anneeReferenceCertification: new Date().getFullYear()
+      }
     })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 4 })
     res = await searchControlBodyRecords({
@@ -1310,7 +1397,10 @@ describe('test search with filter', () => {
       userId: 1,
       input: '',
       page: 1,
-      filter: { statutParcellaire: ['PENDING_CERTIFICATION'], anneeReferenceCertification: new Date().getFullYear() }
+      filter: {
+        statutParcellaire: ['PENDING_CERTIFICATION'],
+        anneeReferenceCertification: new Date().getFullYear()
+      }
     })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 1 })
     res = await searchControlBodyRecords({
@@ -1335,7 +1425,10 @@ describe('test search with filter', () => {
       userId: 1,
       input: '',
       page: 1,
-      filter: { statutParcellaire: ['OPERATOR_DRAFT'], anneeReferenceCertification: new Date().getFullYear() }
+      filter: {
+        statutParcellaire: ['OPERATOR_DRAFT'],
+        anneeReferenceCertification: new Date().getFullYear()
+      }
     })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 1 })
     res = await searchControlBodyRecords({
@@ -1360,7 +1453,10 @@ describe('test search with filter', () => {
       userId: 1,
       input: '',
       page: 1,
-      filter: { statutParcellaire: ['AUDITED'], anneeReferenceCertification: new Date().getFullYear() }
+      filter: {
+        statutParcellaire: ['AUDITED'],
+        anneeReferenceCertification: new Date().getFullYear()
+      }
     })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 0 })
     res = await searchControlBodyRecords({
@@ -1385,7 +1481,10 @@ describe('test search with filter', () => {
       userId: 1,
       input: '',
       page: 1,
-      filter: { statutParcellaire: ['CERTIFIED'], anneeReferenceCertification: new Date().getFullYear() }
+      filter: {
+        statutParcellaire: ['CERTIFIED'],
+        anneeReferenceCertification: new Date().getFullYear()
+      }
     })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 1 })
     res = await searchControlBodyRecords({
@@ -1410,7 +1509,10 @@ describe('test search with filter', () => {
       userId: 1,
       input: '',
       page: 1,
-      filter: { statutParcellaire: ['CERTIFIED', 'AUDITED'], anneeReferenceCertification: new Date().getFullYear() }
+      filter: {
+        statutParcellaire: ['CERTIFIED', 'AUDITED'],
+        anneeReferenceCertification: new Date().getFullYear()
+      }
     })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 1 })
     res = await searchControlBodyRecords({
@@ -1427,7 +1529,9 @@ describe('test search with filter', () => {
       userId: 1,
       input: '',
       page: 1,
-      filter: { statutParcellaire: ['CERTIFIED', 'AUDITED', 'PENDING_CERTIFICATION', 'OPERATOR_DRAFT'] }
+      filter: {
+        statutParcellaire: ['CERTIFIED', 'AUDITED', 'PENDING_CERTIFICATION', 'OPERATOR_DRAFT']
+      }
     })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 3 })
     res = await searchControlBodyRecords({
@@ -1458,7 +1562,9 @@ describe('test search with filter', () => {
       userId: 1,
       input: '',
       page: 1,
-      filter: { statutParcellaire: ['NONE', 'CERTIFIED', 'AUDITED', 'PENDING_CERTIFICATION', 'OPERATOR_DRAFT'] }
+      filter: {
+        statutParcellaire: ['NONE', 'CERTIFIED', 'AUDITED', 'PENDING_CERTIFICATION', 'OPERATOR_DRAFT']
+      }
     })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 7 })
     res = await searchControlBodyRecords({
@@ -1486,10 +1592,22 @@ describe('test search with filter', () => {
   })
 
   test('filter on departements', async () => {
-    let res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { departement: [] } })
+    let res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { departement: [] }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 7 })
 
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { departement: ['01'] } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { departement: ['01'] }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 3 })
 
     res = await searchControlBodyRecords({
@@ -1501,10 +1619,22 @@ describe('test search with filter', () => {
     })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 4 })
 
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { departement: ['21'] } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { departement: ['21'] }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 1 })
 
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { departement: ['92'] } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { departement: ['92'] }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 1 })
 
     res = await searchControlBodyRecords({
@@ -1516,24 +1646,54 @@ describe('test search with filter', () => {
     })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 5 })
 
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { departement: ['75'] } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { departement: ['75'] }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 0 })
   })
 
   test('filter on engagment', async () => {
     await drizzleDb.update(schema.parcellaires).set({ mixite: 'AB' }).where(eq(schema.parcellaires.numeroBio, 2))
 
-    let res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { engagement: [] } })
+    let res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { engagement: [] }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 7 })
 
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { engagement: ['AB'] } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { engagement: ['AB'] }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 1 })
     expect(res.records.map(({ numeroBio }) => String(numeroBio))).toEqual(['2'])
 
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { engagement: ['ABCONV'] } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { engagement: ['ABCONV'] }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 0 })
 
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { engagement: ['MIXTE'] } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { engagement: ['MIXTE'] }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 0 })
 
     res = await searchControlBodyRecords({
@@ -1547,10 +1707,22 @@ describe('test search with filter', () => {
   })
 
   test('filter on pinned status', async () => {
-    let res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { pinned: false } })
+    let res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { pinned: false }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 7 })
 
-    res = await searchControlBodyRecords({ ocId: 1, userId: 1, input: '', page: 1, filter: { pinned: true } })
+    res = await searchControlBodyRecords({
+      ocId: 1,
+      userId: 1,
+      input: '',
+      page: 1,
+      filter: { pinned: true }
+    })
     expect(res.pagination).toEqual({ page: 1, page_max: 1, total: 2 })
   })
 
@@ -1707,7 +1879,11 @@ describe('control and un control', () => {
           nbTotal: 11,
           operateurs: agencebioOperatorsApiResults.map((o) => ({
             ...o,
-            notifications: o.notifications.map((n) => ({ ...n, dateDemarrage: new Date(), updatedAt: new Date() }))
+            notifications: o.notifications.map((n) => ({
+              ...n,
+              dateDemarrage: new Date(),
+              updatedAt: new Date()
+            }))
           }))
         }
       }

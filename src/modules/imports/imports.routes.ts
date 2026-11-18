@@ -212,13 +212,20 @@ export default async function importRoutes(fastify: FastifyInstance): Promise<vo
 
     const apiRecords = await service.recordsToApi(records)
     request.log.info(
-      { audit: 'export-api', ocId: requireOrganismeCertificateur(request).id, count: apiRecords.length },
+      {
+        audit: 'export-api',
+        ocId: requireOrganismeCertificateur(request).id,
+        count: apiRecords.length
+      },
       "Lecture des parcellaires par l'API OC"
     )
     const links = {
       prev:
         finalStart > 0
-          ? pageUrl(request.url, { start: Math.max(0, finalStart - finalLimit), limit: finalLimit })
+          ? pageUrl(request.url, {
+              start: Math.max(0, finalStart - finalLimit),
+              limit: finalLimit
+            })
           : null,
       next:
         records.length === finalLimit

@@ -31,8 +31,12 @@ export const importIdParamsSchema = z.object({
 
 export const importListQuerySchema = z.object({
   status: optionalString('Statuts du job séparés par des virgules (`CREATED`, `PENDING`, `DONE`, `ERROR`)'),
-  from: optionalIsoDateQuerySchema.meta({ description: "Date de début d'envoi incluse (ISO 8601)" }),
-  to: optionalIsoDateQuerySchema.meta({ description: "Date de fin d'envoi incluse, jusqu'à 23:59:59 (ISO 8601)" }),
+  from: optionalIsoDateQuerySchema.meta({
+    description: "Date de début d'envoi incluse (ISO 8601)"
+  }),
+  to: optionalIsoDateQuerySchema.meta({
+    description: "Date de fin d'envoi incluse, jusqu'à 23:59:59 (ISO 8601)"
+  }),
   withPayload: booleanQuery('Inclure le corps JSON envoyé'),
   page: pageStringSchema.optional().meta({ description: 'Numéro de page, à partir de 1 (défaut 1)' }),
   limit: integerStringSchema

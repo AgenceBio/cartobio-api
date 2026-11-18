@@ -44,7 +44,10 @@ try {
             geometry: multiPolygon(geometry)
           }))
         )
-        .onConflictDoUpdate({ target: regions.code, set: { nom: sql`excluded.nom`, geometry: sql`excluded.geometry` } })
+        .onConflictDoUpdate({
+          target: regions.code,
+          set: { nom: sql`excluded.nom`, geometry: sql`excluded.geometry` }
+        })
     )
 
     await byBatch(zonesRegions, (batch) =>
@@ -80,7 +83,11 @@ try {
         )
         .onConflictDoUpdate({
           target: departements.fid,
-          set: { nom: sql`excluded.nom`, geometry: sql`excluded.geometry`, codeRegion: sql`excluded.code_region` }
+          set: {
+            nom: sql`excluded.nom`,
+            geometry: sql`excluded.geometry`,
+            codeRegion: sql`excluded.code_region`
+          }
         })
     )
 

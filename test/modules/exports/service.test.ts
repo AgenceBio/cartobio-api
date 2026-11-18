@@ -47,7 +47,9 @@ beforeEach(() => {
   vi.spyOn(config, 'get').mockImplementation(((key: string) =>
     key === 'attestationsProductions.directory' ? directory : get(key as never)) as typeof config.get)
   mockedRepo.findValidAttestationProduction.mockResolvedValue(null)
-  mockedRepo.findPdfRecord.mockResolvedValue({ annee_reference_controle: 2025 } as unknown as PdfRecord)
+  mockedRepo.findPdfRecord.mockResolvedValue({
+    annee_reference_controle: 2025
+  } as unknown as PdfRecord)
   vi.mocked(fetchOperatorByNumeroBio).mockResolvedValue(buildOperator({ numeroBio: '99999' }))
   vi.mocked(getAllParcelles).mockResolvedValue([validParcelle])
 })
@@ -95,7 +97,9 @@ describe('generatePDF', () => {
   })
 
   test("régénère si le fichier de l'attestation existante a disparu", async () => {
-    mockedRepo.findValidAttestationProduction.mockResolvedValue({ path: path.join(directory, 'absent.pdf') } as never)
+    mockedRepo.findValidAttestationProduction.mockResolvedValue({
+      path: path.join(directory, 'absent.pdf')
+    } as never)
     vi.mocked(createPdfContent).mockResolvedValue([pdf('nouveau')])
 
     const { result } = await run(generatePDF('99999', RECORD))
@@ -151,7 +155,10 @@ describe('generatePDF', () => {
   ])('refuse un parcellaire %s et marque la génération en erreur', async (_, parcelles, message) => {
     vi.mocked(getAllParcelles).mockResolvedValue(parcelles)
 
-    await expect(run(generatePDF('99999', RECORD))).rejects.toMatchObject({ statusCode: 400, message })
+    await expect(run(generatePDF('99999', RECORD))).rejects.toMatchObject({
+      statusCode: 400,
+      message
+    })
     expect(mockedRepo.updateAttestationsProductions).toHaveBeenLastCalledWith(
       RECORD,
       AttestationsProductionsStatus.ERROR,
@@ -225,7 +232,13 @@ describe('exportDataOcId', () => {
   test("complète les lignes avec les données de l'opérateur", async () => {
     vi.mocked(findControlBodyOperators).mockResolvedValue([
       {
-        ...buildOperator({ numeroBio: '20', nom: 'B', siret: '2', codePostal: '26000', commune: 'Valence' }),
+        ...buildOperator({
+          numeroBio: '20',
+          nom: 'B',
+          siret: '2',
+          codePostal: '26000',
+          commune: 'Valence'
+        }),
         notifications: { numeroClient: 'C-20' } as never,
         epingle: false
       },
@@ -238,7 +251,12 @@ describe('exportDataOcId', () => {
 
     const rows = await exportDataOcId(999, { input: 'x', filterForSearch: {} }, 1)
 
-    expect(findControlBodyOperators).toHaveBeenCalledWith({ ocId: 999, userId: 1, input: 'x', filter: {} })
+    expect(findControlBodyOperators).toHaveBeenCalledWith({
+      ocId: 999,
+      userId: 1,
+      input: 'x',
+      filter: {}
+    })
     expect(mockedRepo.findExportRows).toHaveBeenCalledWith(999, [10, 20])
     expect(rows).toEqual([
       expect.objectContaining({

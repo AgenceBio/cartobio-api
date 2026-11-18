@@ -50,7 +50,12 @@ export async function loadParcellairesFixture(
   if (pinnedRecords.length > 0) {
     await drizzleDb
       .insert(schema.operateursEpingles)
-      .values(pinnedRecords.map((numeroBio) => ({ numeroBio: Number(numeroBio), userId: String(userId) })))
+      .values(
+        pinnedRecords.map((numeroBio) => ({
+          numeroBio: Number(numeroBio),
+          userId: String(userId)
+        }))
+      )
       .onConflictDoNothing()
   }
 
@@ -108,7 +113,12 @@ export async function loadRecordFixture(
   if (pinnedRecords && pinnedRecords.length > 0) {
     await drizzleDb
       .insert(schema.operateursEpingles)
-      .values(pinnedRecords.map((numeroBio) => ({ numeroBio: Number(numeroBio), userId: String(userId) })))
+      .values(
+        pinnedRecords.map((numeroBio) => ({
+          numeroBio: Number(numeroBio),
+          userId: String(userId)
+        }))
+      )
       .onConflictDoNothing()
   }
 

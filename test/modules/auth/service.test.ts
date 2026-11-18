@@ -24,7 +24,10 @@ describe('canAccessOperator', () => {
   })
 
   test("autorise un administrateur sans consulter l'API", async () => {
-    const admin = buildUser({ groups: [{ id: '1', nom: 'Admin' }], mainGroup: { id: '1', nom: 'Admin' } })
+    const admin = buildUser({
+      groups: [{ id: '1', nom: 'Admin' }],
+      mainGroup: { id: '1', nom: 'Admin' }
+    })
 
     expect(await canAccessOperator(admin, buildOperator())).toBe(true)
     expect(fetchUserOperators).not.toHaveBeenCalled()
@@ -40,7 +43,9 @@ describe('canAccessOperator', () => {
   })
 
   test("refuse un opérateur sur un opérateur qui n'est pas le sien", async () => {
-    vi.mocked(fetchUserOperators).mockResolvedValue({ operators: [buildOperator({ numeroBio: '11111' })] })
+    vi.mocked(fetchUserOperators).mockResolvedValue({
+      operators: [buildOperator({ numeroBio: '11111' })]
+    })
 
     expect(await canAccessOperator(buildUser(), buildOperator({ numeroBio: '12345' }))).toBe(false)
   })
@@ -63,7 +68,10 @@ describe('canAccessOperator', () => {
   })
 
   test("refuse un utilisateur sans organisme certificateur même si l'opérateur n'en a pas", async () => {
-    const user = buildUser({ groups: [{ id: '8', nom: 'Auditeur' }], mainGroup: { id: '8', nom: 'Auditeur' } })
+    const user = buildUser({
+      groups: [{ id: '8', nom: 'Auditeur' }],
+      mainGroup: { id: '8', nom: 'Auditeur' }
+    })
 
     expect(await canAccessOperator(user, buildOperator({ organismeCertificateur: {} }))).toBe(false)
   })

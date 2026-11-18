@@ -324,7 +324,9 @@ async function findMatchingPreviousParcelles(
   const previousGeometry = sql`ST_MakeValid(${parcelles.geometry})`
   const intersection = sql`ST_area(ST_Intersection(${previousGeometry}, parcelle_geom))`
 
-  const result = await tx.execute<{ [K in keyof PreviousParcelle]: PreviousParcelle[K] | null }>(sql`
+  const result = await tx.execute<{
+    [K in keyof PreviousParcelle]: PreviousParcelle[K] | null
+  }>(sql`
     WITH input AS MATERIALIZED (
       SELECT i.ord, ST_MakeValid(ST_SetSRID(ST_GeomFromGeoJSON(i.value), 4326)) AS parcelle_geom
       FROM jsonb_array_elements(${JSON.stringify(geometries)}::jsonb) WITH ORDINALITY AS i(value, ord)

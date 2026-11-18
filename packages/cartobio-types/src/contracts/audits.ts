@@ -24,9 +24,9 @@ const smallintSchema = z.union([
     .refine((value) => Number(value) <= 32767)
 ])
 
-const conversionNiveauSchema = z
-  .enum(['AB', 'AB?', 'C1', 'C2', 'C3', 'CONV', ''])
-  .meta({ description: "Niveau de conversion : `CONV`, `AB?`, `C1`, `C2`, `C3`, `AB`, ou `''` pour l'effacer" })
+const conversionNiveauSchema = z.enum(['AB', 'AB?', 'C1', 'C2', 'C3', 'CONV', '']).meta({
+  description: "Niveau de conversion : `CONV`, `AB?`, `C1`, `C2`, `C3`, `AB`, ou `''` pour l'effacer"
+})
 
 const polygonSchema = z.object({
   type: z.literal('Polygon'),
@@ -188,7 +188,9 @@ export const createRecordBodySchema = recordInfosBodySchema.extend({
     .boolean()
     .nullish()
     .transform((importPrevious) => importPrevious ?? undefined)
-    .meta({ description: 'Recopie les données (cultures, conversion, nom…) des parcelles du parcellaire `recordId`' }),
+    .meta({
+      description: 'Recopie les données (cultures, conversion, nom…) des parcelles du parcellaire `recordId`'
+    }),
   recordId: z
     .string()
     .nullish()

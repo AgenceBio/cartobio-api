@@ -87,7 +87,11 @@ async function getValidOperator(tabCouplage: SiretPacage[]): Promise<ValidOperat
       },
       json: tabCouplage,
       timeout: { request: 10000 },
-      retry: { limit: 3, methods: ['GET', 'POST'], errorCodes: ['EPIPE', 'ECONNRESET', 'ETIMEDOUT'] }
+      retry: {
+        limit: 3,
+        methods: ['GET', 'POST'],
+        errorCodes: ['EPIPE', 'ECONNRESET', 'ETIMEDOUT']
+      }
     }).json<ValidOperatorsResponse>()
     return response
   } catch (e) {

@@ -42,13 +42,20 @@ describe('redactAuditNotes', () => {
       audit_demandes: 'demandes',
       parcelles: {
         type: 'FeatureCollection',
-        features: [buildFeature({ properties: { auditeur_notes: 'note', annotations: [{ code: 'x' }] as never } })]
+        features: [
+          buildFeature({
+            properties: { auditeur_notes: 'note', annotations: [{ code: 'x' }] as never }
+          })
+        ]
       }
     })
 
     const redacted = redactAuditNotes(record)
 
     expect(redacted).toMatchObject({ audit_notes: null, audit_demandes: null })
-    expect(redacted.parcelles.features[0]!.properties).toMatchObject({ auditeur_notes: null, annotations: [] })
+    expect(redacted.parcelles.features[0]!.properties).toMatchObject({
+      auditeur_notes: null,
+      annotations: []
+    })
   })
 })

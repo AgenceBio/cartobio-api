@@ -47,7 +47,13 @@ beforeEach(async () => {
       resultJob: { count: 1, numeroBioValid: [], numeroBioError: ['12345'] }
     })
     await db.insert(parcellaireImportLogs).values([
-      { importId: jobId, type: 'error', code: 'INVALID_GEOM', message: 'champ geom incorrect', parcelleId: '1' },
+      {
+        importId: jobId,
+        type: 'error',
+        code: 'INVALID_GEOM',
+        message: 'champ geom incorrect',
+        parcelleId: '1'
+      },
       { importId: jobId, type: 'warning', code: 'GEOM_CORRECTED', message: 'corrigée' }
     ])
   }
@@ -57,7 +63,11 @@ beforeEach(async () => {
     numeroBio: '67890',
     numeroClient: 'C2',
     auditDate: '2026-03-02',
-    resultJob: { count: 1, numeroBioValid: [{ numeroBio: '67890', nbParcelles: 1 }], numeroBioError: [] }
+    resultJob: {
+      count: 1,
+      numeroBioValid: [{ numeroBio: '67890', nbParcelles: 1 }],
+      numeroBioError: []
+    }
   })
   await insertJob({ status: 'PENDING', statutJob: null, endedAt: null })
   await insertJob({ statutJob: 'ERROR', numeroBio: null, numeroClient: null, auditDate: null })
@@ -90,7 +100,13 @@ test('le tableau des envois expose les cas limites avec des valeurs typées', as
   const statuts = response.body.data.map(({ statut }: { statut: string | null }) => statut)
   expect(statuts).toEqual(expect.arrayContaining(['REJECTED', 'VALID', 'ERROR', null]))
   expect(response.body.data).toContainEqual(
-    expect.objectContaining({ statut: 'ERROR', etat: 'UNKNOWN', numeroBio: null, numeroClient: null, auditDate: null })
+    expect.objectContaining({
+      statut: 'ERROR',
+      etat: 'UNKNOWN',
+      numeroBio: null,
+      numeroClient: null,
+      auditDate: null
+    })
   )
 })
 

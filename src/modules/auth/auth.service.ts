@@ -36,7 +36,9 @@ async function fetchCertificationBodies(): Promise<OrganismeCertificateur[]> {
   )
 }
 
-const getCertificationBodies = memo(fetchCertificationBodies, { cache: new ExpiryMap(24 * oneHour) })
+const getCertificationBodies = memo(fetchCertificationBodies, {
+  cache: new ExpiryMap(24 * oneHour)
+})
 
 async function getUserProfileById(userId: number): Promise<CartoBioUser> {
   const [userProfile, certificationBodies] = await Promise.all([
@@ -50,20 +52,22 @@ async function getUserProfileById(userId: number): Promise<CartoBioUser> {
     getCertificationBodies()
   ])
 
-  return {
+  const profile: CartoBioUser = {
     id: userProfile.id,
     prenom: userProfile.prenom ?? '',
     nom: userProfile.nom ?? '',
-    ...(userProfile.organismeCertificateurId
-      ? {
-          organismeCertificateur: {
-            id: userProfile.organismeCertificateurId,
-            nom: certificationBodies.find(({ id }) => userProfile.organismeCertificateurId === id)?.nom ?? ''
-          }
-        }
-      : {}),
     groups: userProfile.groupes.map(({ id, nom }) => ({ id, nom })),
     mainGroup: { id: userProfile.groupes.at(0)?.id, nom: userProfile.groupes.at(0)?.nom }
+  }
+
+  if (!userProfile.organismeCertificateurId || isAdmin(profile)) return profile
+
+  return {
+    ...profile,
+    organismeCertificateur: {
+      id: userProfile.organismeCertificateurId,
+      nom: certificationBodies.find(({ id }) => userProfile.organismeCertificateurId === id)?.nom ?? ''
+    }
   }
 }
 
@@ -74,11 +78,23 @@ async function getHistoryUser(userId: string | number, userRole: string | null):
     return await getCachedUserProfile(Number(userId))
   } catch (error) {
     if (error instanceof HTTPError && error.response.statusCode === 404) {
-      return { id: Number(userId), nom: 'Utilisateur supprimé', prenom: '', groups: [], mainGroup: { nom: userRole } }
+      return {
+        id: Number(userId),
+        nom: 'Utilisateur supprimé',
+        prenom: '',
+        groups: [],
+        mainGroup: { nom: userRole }
+      }
     }
 
     logger.warn({ err: error, userId }, "Profil de l'historique indisponible")
-    return { id: Number(userId), nom: 'Utilisateur inconnu', prenom: '', groups: [], mainGroup: { nom: userRole } }
+    return {
+      id: Number(userId),
+      nom: 'Utilisateur inconnu',
+      prenom: '',
+      groups: [],
+      mainGroup: { nom: userRole }
+    }
   }
 }
 

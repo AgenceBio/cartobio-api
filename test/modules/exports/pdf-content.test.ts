@@ -27,10 +27,35 @@ vi.mock('../../../src/modules/exports/pdf-utils.js', async (importOriginal) => (
 describe('generateOperatorMapImages', () => {
   const mockPage = {} as Page
   const sampleParcelles = [
-    buildPdfParcelle({ id: 'parcelle-1', minx: 1, miny: 1, maxx: 3, maxy: 3, centerx: 2, centery: 2 }),
-    buildPdfParcelle({ id: 'parcelle-2', minx: 2, miny: 2, maxx: 4, maxy: 4, centerx: 3, centery: 3 })
+    buildPdfParcelle({
+      id: 'parcelle-1',
+      minx: 1,
+      miny: 1,
+      maxx: 3,
+      maxy: 3,
+      centerx: 2,
+      centery: 2
+    }),
+    buildPdfParcelle({
+      id: 'parcelle-2',
+      minx: 2,
+      miny: 2,
+      maxx: 4,
+      maxy: 4,
+      centerx: 3,
+      centery: 3
+    })
   ]
-  const globalBbox = { minx: 0, miny: 0, maxx: 10, maxy: 10, centerx: 5, centery: 5, width: 10, height: 10 }
+  const globalBbox = {
+    minx: 0,
+    miny: 0,
+    maxx: 10,
+    maxy: 10,
+    centerx: 5,
+    centery: 5,
+    width: 10,
+    height: 10
+  }
 
   beforeEach(() => {
     vi.clearAllMocks()

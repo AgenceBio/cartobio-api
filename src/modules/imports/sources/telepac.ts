@@ -16,7 +16,9 @@ import { getRandomFeatureId } from '../../../shared/outputs/features.js'
 
 const { toWgs84 } = reproject
 
-const gmlLinearRingSchema = z.looseObject({ 'gml:LinearRing': z.looseObject({ 'gml:coordinates': z.string() }) })
+const gmlLinearRingSchema = z.looseObject({
+  'gml:LinearRing': z.looseObject({ 'gml:coordinates': z.string() })
+})
 
 const gmlPolygonSchema = z.looseObject({
   'gml:outerBoundaryIs': gmlLinearRingSchema,
@@ -29,7 +31,10 @@ const telepacXmlParcelleSchema = z.looseObject({
   'descriptif-parcelle': z.looseObject({
     '@_numero-parcelle': z.string(),
     'agri-bio': z.looseObject({ '@_conduite-bio': z.string().optional() }).optional(),
-    'culture-principale': z.looseObject({ 'code-culture': z.string(), precision: z.string().optional() })
+    'culture-principale': z.looseObject({
+      'code-culture': z.string(),
+      precision: z.string().optional()
+    })
   }),
   geometrie: z.looseObject({ 'gml:Polygon': gmlPolygonSchema })
 })
@@ -211,7 +216,10 @@ async function fromXMLFile(xmlContent: string): Promise<FeatureCollection> {
         ['ilot', 'parcelle', 'gml:innerBoundaryIs'].includes(name) && !isAttribute && !isLeafNode
     }).parse(xmlContent)
   )
-  if (!parsed.success) throw new InvalidRequestApiError('Le fichier Telepac XML est invalide.', { cause: parsed.error })
+  if (!parsed.success)
+    throw new InvalidRequestApiError('Le fichier Telepac XML est invalide.', {
+      cause: parsed.error
+    })
 
   const { producteur } = parsed.data.producteurs
   const PACAGE = producteur['@_numero-pacage']

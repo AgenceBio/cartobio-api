@@ -48,14 +48,19 @@ describe('GET /api/v2/user/exchangeToken', () => {
     expect(response.status).toBe(200)
     expect(response.body.operator).toMatchObject({ numeroBio: '99999' })
     const payload = verify(response.body.token)
-    expect(payload).toMatchObject({ id: user.id, organismeCertificateur: user.organismeCertificateur })
+    expect(payload).toMatchObject({
+      id: user.id,
+      organismeCertificateur: user.organismeCertificateur
+    })
     expect(payload.exp - payload.iat).toBe(2 * 60 * 60)
     expect(service.fetchOperatorByNumeroBio).toHaveBeenCalledWith('99999')
     expect(service.getUserProfileById).toHaveBeenCalledWith(1)
   })
 
   test('refuse un jeton invalide', async () => {
-    vi.mocked(service.verifyNotificationAuthorization).mockReturnValue({ error: new Error('signature') })
+    vi.mocked(service.verifyNotificationAuthorization).mockReturnValue({
+      error: new Error('signature')
+    })
 
     const response = await request(app.server).get('/api/v2/user/exchangeToken').set('Authorization', 'Bearer x')
 

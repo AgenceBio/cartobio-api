@@ -27,7 +27,10 @@ beforeEach(() => {
   vi.clearAllMocks()
   mockedRepo.updateAuditRecord.mockResolvedValue([dbRow])
   mockedRepo.setOperatorUpdatedAt.mockResolvedValue([dbRow])
-  vi.mocked(cartobio.joinRecordParcelles).mockImplementation(async (record) => ({ ...record, parcelles: [] }))
+  vi.mocked(cartobio.joinRecordParcelles).mockImplementation(async (record) => ({
+    ...record,
+    parcelles: []
+  }))
   vi.mocked(cartobio.withHistoryUsers).mockImplementation(async (record) => record)
   vi.mocked(cartobio.notifyCertificationComplete).mockResolvedValue(undefined)
   vi.spyOn(db, 'transaction').mockImplementation((async (cb: (t: NodePgDatabase) => unknown) =>
@@ -47,7 +50,10 @@ describe('updateAuditRecordState', () => {
         { user: buildOcUser(), record },
         { certification_state: CertificationState.CERTIFIED, ...dates }
       )
-    ).rejects.toMatchObject({ statusCode: 400, message: 'Les dates de certification sont manquantes.' })
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      message: 'Les dates de certification sont manquantes.'
+    })
     expect(mockedRepo.updateAuditRecord).not.toHaveBeenCalled()
   })
 
@@ -87,7 +93,10 @@ describe('updateAuditRecordState', () => {
 
     await updateAuditRecordState({ user: buildOcUser(), record }, { audit_notes: 'note' })
 
-    expect(mockedRepo.updateAuditRecord.mock.calls[0]![2]).toMatchObject({ oc_id: 1, oc_label: "CartoBi'OC" })
+    expect(mockedRepo.updateAuditRecord.mock.calls[0]![2]).toMatchObject({
+      oc_id: 1,
+      oc_label: "CartoBi'OC"
+    })
     expect(mockedRepo.updateAuditRecord.mock.calls[0]![3]).toBeNull()
   })
 
@@ -96,7 +105,10 @@ describe('updateAuditRecordState', () => {
     const operator = buildOperator({ organismeCertificateur: { id: 7, nom: 'OC opérateur' } })
 
     await updateAuditRecordState({ user, record: buildNormalizedRecord({ oc_id: null }), operator }, {})
-    expect(mockedRepo.updateAuditRecord.mock.calls[0]![2]).toMatchObject({ oc_id: 7, oc_label: 'OC opérateur' })
+    expect(mockedRepo.updateAuditRecord.mock.calls[0]![2]).toMatchObject({
+      oc_id: 7,
+      oc_label: 'OC opérateur'
+    })
 
     await updateAuditRecordState({ user, record: buildNormalizedRecord({ oc_id: 3 }), operator }, {})
     expect(mockedRepo.updateAuditRecord.mock.calls[1]![2]).not.toHaveProperty('oc_id')
@@ -134,7 +146,9 @@ describe('deleteRecord', () => {
 })
 
 describe('parcelle introuvable', () => {
-  const record = buildNormalizedRecord({ parcelles: { type: 'FeatureCollection', features: [buildFeature()] } })
+  const record = buildNormalizedRecord({
+    parcelles: { type: 'FeatureCollection', features: [buildFeature()] }
+  })
   const input = buildFeature() as unknown as FeatureInput
 
   test('updateFeature retourne une 404', async () => {

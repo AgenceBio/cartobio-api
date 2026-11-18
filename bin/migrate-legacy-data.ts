@@ -4,11 +4,14 @@ import 'dotenv/config'
 import { randomUUID } from 'node:crypto'
 import { writeFileSync } from 'node:fs'
 import pg from 'pg'
+import { sql } from 'drizzle-orm'
+import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres'
 import { annotationCodes, isAnnotationCode } from '../src/database/validations/parcelles.js'
 import { eventTypes } from '../src/shared/parcellaires/parcellaires.utils.js'
 import { scriptOutputPath } from '../src/shared/paths.js'
 
 type Row = Record<string, unknown>
+type Db = NodePgDatabase & { $client: pg.Client }
 
 interface Step {
   table: string
@@ -124,7 +127,10 @@ const STEPS: Step[] = [
         deleted_at::timestamptz AS deleted_at
       FROM ${RECORDS}
     `,
-    transform: (record) => ({ ...record, certification_etat: record.certification_etat ?? 'OPERATOR_DRAFT' })
+    transform: (record) => ({
+      ...record,
+      certification_etat: record.certification_etat ?? 'OPERATOR_DRAFT'
+    })
   },
   {
     table: 'parcellaires_metadata',
@@ -331,30 +337,29 @@ function progress(table: string, done: number, total: number): void {
   )
 }
 
-async function load(target: pg.Client, table: string, rows: Row[]): Promise<void> {
+async function load(target: Db, table: string, rows: Row[]): Promise<void> {
   const [first] = rows
   if (!first) return
   const columns = Object.keys(first)
     .map((column) => `"${column}"`)
     .join(', ')
-  await target.query(
-    `INSERT INTO "${table}" (${columns}) SELECT ${columns} FROM json_populate_recordset(null::"${table}", $1)`,
-    [JSON.stringify(rows)]
+  await target.execute(
+    sql`INSERT INTO ${sql.identifier(table)} (${sql.raw(columns)}) SELECT ${sql.raw(columns)} FROM json_populate_recordset(null::${sql.identifier(table)}, ${JSON.stringify(rows)})`
   )
 }
 
-async function run(source: pg.Client, target: pg.Client, step: Step): Promise<Row> {
+async function run(source: Db, target: Db, step: Step): Promise<Row> {
   const start = Date.now()
   const {
-    rows: [{ total }]
-  } = await source.query(`SELECT count(*)::int AS total FROM (${step.extract}) extract`)
+    rows: [{ total } = { total: 0 }]
+  } = await source.execute<{ total: number }>(`SELECT count(*)::int AS total FROM (${step.extract}) extract`)
   let read = 0
   let written = 0
 
-  await source.query(`DECLARE extract NO SCROLL CURSOR FOR ${step.extract}`)
+  await source.execute(`DECLARE extract NO SCROLL CURSOR FOR ${step.extract}`)
   progress(step.table, 0, total)
   while (true) {
-    const { rows } = await source.query<Row>(`FETCH ${BATCH_SIZE} FROM extract`)
+    const { rows } = await source.execute<Row>(`FETCH ${BATCH_SIZE} FROM extract`)
     if (rows.length === 0) break
     const transformed = rows
       .map(cleanRow)
@@ -365,13 +370,18 @@ async function run(source: pg.Client, target: pg.Client, step: Step): Promise<Ro
     written += transformed.length
     progress(step.table, read, total)
   }
-  await source.query('CLOSE extract')
+  await source.execute('CLOSE extract')
   process.stdout.write('\n')
 
-  return { table: step.table, lues: read, écrites: written, durée: `${((Date.now() - start) / 1000).toFixed(1)} s` }
+  return {
+    table: step.table,
+    lues: read,
+    écrites: written,
+    durée: `${((Date.now() - start) / 1000).toFixed(1)} s`
+  }
 }
 
-async function lossReport(source: pg.Client): Promise<Row[]> {
+async function lossReport(source: Db): Promise<Row[]> {
   const checks: Array<[string, string]> = [
     [
       'parcelles sans id ou sans polygone (ignorées)',
@@ -388,8 +398,8 @@ async function lossReport(source: pg.Client): Promise<Row[]> {
   return Promise.all(
     checks.map(async ([perte, condition]) => {
       const {
-        rows: [{ total }]
-      } = await source.query(
+        rows: [{ total } = { total: 0 }]
+      } = await source.execute<{ total: number }>(
         `SELECT count(*)::int AS total FROM cartobio_parcelles p JOIN ${RECORDS} USING (record_id) WHERE ${condition}`
       )
       return { perte, lignes: total }
@@ -397,8 +407,8 @@ async function lossReport(source: pg.Client): Promise<Row[]> {
   )
 }
 
-async function truncatedParcellesReport(source: pg.Client): Promise<string | null> {
-  const { rows } = await source.query<Row>(`
+async function truncatedParcellesReport(source: Db): Promise<string | null> {
+  const { rows } = await source.execute<Row>(`
     SELECT record_id, o.numerobio, p.id, ST_NumGeometries(polygons) AS polygones,
       round((ST_Area(polygons::geography) / 10000)::numeric, 4) AS surface_totale_ha,
       round((ST_Area(largest.polygon::geography) / 10000)::numeric, 4) AS surface_conservee_ha,
@@ -428,37 +438,42 @@ const sourceUrl = process.env.SOURCE_DATABASE_URL
 const targetUrl = process.env.TARGET_DATABASE_URL
 if (!sourceUrl || !targetUrl) throw new Error('SOURCE_DATABASE_URL et TARGET_DATABASE_URL sont obligatoires')
 
-const source = new pg.Client({ connectionString: sourceUrl })
-const target = new pg.Client({ connectionString: targetUrl, options: '-c search_path=cartobio,public' })
-await source.connect()
-await target.connect()
+const source = drizzle({ client: new pg.Client({ connectionString: sourceUrl }) })
+const target = drizzle({
+  client: new pg.Client({
+    connectionString: targetUrl,
+    options: '-c search_path=cartobio,public'
+  })
+})
+await source.$client.connect()
+await target.$client.connect()
 
 try {
   if (process.argv.includes('--reset')) {
-    await target.query(`TRUNCATE ${STEPS.map(({ table }) => `"${table}"`).join(', ')} CASCADE`)
-  } else if ((await target.query('SELECT 1 FROM parcellaires LIMIT 1')).rowCount !== 0) {
+    await target.execute(`TRUNCATE ${STEPS.map(({ table }) => `"${table}"`).join(', ')} CASCADE`)
+  } else if ((await target.execute<Row>('SELECT 1 FROM parcellaires LIMIT 1')).rowCount !== 0) {
     throw new Error('La base cible contient déjà des données, relancer avec --reset pour la vider')
   }
 
   console.log('Copie des données…')
-  await source.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY')
-  await target.query('BEGIN')
+  await source.execute('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY')
+  await target.execute('BEGIN')
   console.table(await lossReport(source))
   const truncatedFile = await truncatedParcellesReport(source)
   if (truncatedFile) console.log(`Parcelles multi-polygones tronquées : ${truncatedFile}`)
   const report: Row[] = []
   for (const step of STEPS) report.push(await run(source, target, step))
-  await target.query(
+  await target.execute(
     "SELECT setval(pg_get_serial_sequence('parcellaire_import', 'id'), coalesce(max(id), 0) + 1, false) FROM parcellaire_import"
   )
-  await target.query('COMMIT')
-  await source.query('COMMIT')
+  await target.execute('COMMIT')
+  await source.execute('COMMIT')
 
   console.table(report)
 } catch (error) {
-  await target.query('ROLLBACK')
+  await target.execute('ROLLBACK')
   throw error
 } finally {
-  await source.end()
-  await target.end()
+  await source.$client.end()
+  await target.$client.end()
 }

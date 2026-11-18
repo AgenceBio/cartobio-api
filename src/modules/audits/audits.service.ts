@@ -63,7 +63,12 @@ async function updateAuditRecordState(
     record,
     operator,
     ifUnmodifiedSince
-  }: { user: AuditUser; record: NormalizedRecord; operator?: OptionalOperator; ifUnmodifiedSince?: string },
+  }: {
+    user: AuditUser
+    record: NormalizedRecord
+    operator?: OptionalOperator
+    ifUnmodifiedSince?: string
+  },
   patch: RecordInfosBody & { certification_state?: CertificationState }
 ): Promise<DBOperatorRecordWithParcelles> {
   const { certification_state: state } = patch
@@ -206,7 +211,10 @@ async function addRecordFeature(
   const id = getRandomFeatureId()
   const historyEntry = createNewEvent(
     EventType.FEATURE_CREATE,
-    { features: [{ ...feature, id }], description: `Parcelle ${feature.properties?.cadastre} ajoutée` },
+    {
+      features: [{ ...feature, id }],
+      description: `Parcelle ${feature.properties?.cadastre} ajoutée`
+    },
     { user, record }
   )
   const updatedRecord = await db.transaction(async (tx) => {

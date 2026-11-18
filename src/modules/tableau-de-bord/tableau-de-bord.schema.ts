@@ -32,8 +32,16 @@ export const tableauBilanSchema = withSchema(tableauDeBordRoute(), {
   tags: [TAGS.SUIVI_API_PARCELLAIRE],
   summary: 'Bilan des envois',
   description: 'Liste paginée des envois, avec leur résultat et leur effet sur le parcellaire.',
-  querystring: statsQuerySchema.pick({ ...paginationRecherche, statuts: true, etats: true, ordreDate: true }),
-  response: { ...commonErrorResponses, 200: tableauBilanResponseSchema.meta({ description: "Page d'envois" }) }
+  querystring: statsQuerySchema.pick({
+    ...paginationRecherche,
+    statuts: true,
+    etats: true,
+    ordreDate: true
+  }),
+  response: {
+    ...commonErrorResponses,
+    200: tableauBilanResponseSchema.meta({ description: "Page d'envois" })
+  }
 })
 
 export const tableauErreursSchema = withSchema(tableauDeBordRoute(), {
@@ -43,7 +51,9 @@ export const tableauErreursSchema = withSchema(tableauDeBordRoute(), {
   querystring: statsQuerySchema.pick({ ...paginationRecherche, codes: true, ordreDate: true }),
   response: {
     ...commonErrorResponses,
-    200: tableauErreursResponseSchema.meta({ description: "Page d'envois rejetés avec le détail des erreurs" })
+    200: tableauErreursResponseSchema.meta({
+      description: "Page d'envois rejetés avec le détail des erreurs"
+    })
   }
 })
 

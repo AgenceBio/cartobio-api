@@ -120,7 +120,11 @@ describe('normalizeOperator()', () => {
 
     expect(normalizeOperator(operator)).toMatchObject({
       organismeCertificateur: { id: 999, nom: 'FR-BIO-999', numeroClient: 'CLIENT-1' },
-      notifications: { etatCertification: 'ENGAGEE', organismeCertificateurId: 999, numeroClient: 'CLIENT-1' }
+      notifications: {
+        etatCertification: 'ENGAGEE',
+        organismeCertificateurId: 999,
+        numeroClient: 'CLIENT-1'
+      }
     })
   })
 
@@ -128,14 +132,22 @@ describe('normalizeOperator()', () => {
     const operator = {
       ...baseOperator,
       notifications: [
-        buildNotification({ id: 1, etatCertification: 'ENGAGEE', organismeCertificateurId: null, organisme: 'OC' })
+        buildNotification({
+          id: 1,
+          etatCertification: 'ENGAGEE',
+          organismeCertificateurId: null,
+          organisme: 'OC'
+        })
       ]
     }
 
     const normalized = normalizeOperator(operator)
 
     expect(normalized.organismeCertificateur).toEqual({})
-    expect(normalized.notifications).toMatchObject({ etatCertification: 'ENGAGEE', organismeCertificateurId: null })
+    expect(normalized.notifications).toMatchObject({
+      etatCertification: 'ENGAGEE',
+      organismeCertificateurId: null
+    })
   })
 
   it('should assume no organismeCertificateur otherwise (not super usual)', () => {
@@ -161,9 +173,12 @@ describe('populateWithRecords()', () => {
   const operators = [normalizedOperator]
 
   it('should expand an AgenceBioOperator with a matching database value', async () => {
-    await db
-      .insert(parcellaires)
-      .values({ numeroBio: 34857, certificationEtat: 'OPERATOR_DRAFT', versionNom: 'v1', anneeReferenceControle: 2001 })
+    await db.insert(parcellaires).values({
+      numeroBio: 34857,
+      certificationEtat: 'OPERATOR_DRAFT',
+      versionNom: 'v1',
+      anneeReferenceControle: 2001
+    })
 
     const result = await findFilterData(operators, false)
 
@@ -279,7 +294,12 @@ describe('normalizeOperator() : choix de la notification', () => {
           organismeCertificateurId: 1,
           dateArret: '2023-01-01'
         }),
-        buildNotification({ id: 2, etatCertification: 'ARRETEE', organismeCertificateurId: 1, dateArret: '2024-06-01' })
+        buildNotification({
+          id: 2,
+          etatCertification: 'ARRETEE',
+          organismeCertificateurId: 1,
+          dateArret: '2024-06-01'
+        })
       )
     ).toMatchObject({ dateArret: '2024-06-01' })
   })
@@ -298,7 +318,12 @@ describe('normalizeOperator() : choix de la notification', () => {
     ).toMatchObject({ etatCertification: 'ARRETEE' })
     expect(
       pick(
-        buildNotification({ id: 1, etatCertification: 'NON ENGAGEE', organismeCertificateurId: 1, updatedAt: recent }),
+        buildNotification({
+          id: 1,
+          etatCertification: 'NON ENGAGEE',
+          organismeCertificateurId: 1,
+          updatedAt: recent
+        }),
         buildNotification({ id: 2, etatCertification: 'ARRETEE', organismeCertificateurId: 1 })
       )
     ).toMatchObject({ etatCertification: 'NON ENGAGEE' })
@@ -376,7 +401,9 @@ describe('sortRecord()', () => {
 
 describe('filterOperatorForAutocomplete()', () => {
   const withNotification = (notifications: object | null) =>
-    buildOperator({ notifications: notifications as ReturnType<typeof buildOperator>['notifications'] })
+    buildOperator({
+      notifications: notifications as ReturnType<typeof buildOperator>['notifications']
+    })
 
   test("garde un opérateur engagé chez l'OC", () => {
     expect(

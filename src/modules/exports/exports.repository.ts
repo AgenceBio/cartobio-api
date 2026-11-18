@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm'
+import { and, asc, eq, gt, inArray, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm'
 import { db } from '../../database/database.js'
 import {
   attestationsProduction,
@@ -62,7 +62,9 @@ async function failInterruptedAttestationsProductions(): Promise<number> {
   const { rowCount } = await db
     .update(attestationsProduction)
     .set({
-      ...updateAttestationProductionSchema.parse({ status: productionAttestationStatusEnumSchema.enum.error }),
+      ...updateAttestationProductionSchema.parse({
+        status: productionAttestationStatusEnumSchema.enum.error
+      }),
       updatedAt: sql`now()`
     })
     .where(
@@ -72,6 +74,23 @@ async function failInterruptedAttestationsProductions(): Promise<number> {
       )
     )
   return rowCount ?? 0
+}
+
+async function findKeptAttestationsPaths(): Promise<string[]> {
+  const rows = await db
+    .select({ path: sql<string>`${attestationsProduction.path}` })
+    .from(attestationsProduction)
+    .innerJoin(parcellaires, eq(parcellaires.recordId, attestationsProduction.recordId))
+    .where(
+      and(
+        isNotNull(attestationsProduction.path),
+        eq(attestationsProduction.status, productionAttestationStatusEnumSchema.enum.generated),
+        gt(attestationsProduction.updatedAt, parcellaires.updatedAt),
+        gt(attestationsProduction.updatedAt, sql`now() - interval '2 months'`)
+      )
+    )
+
+  return rows.map(({ path }) => path)
 }
 
 async function deleteAttestationsProductions(recordId: string): Promise<void> {
@@ -186,6 +205,7 @@ async function findPdfParcelles(recordId: string, pac: boolean): Promise<PdfParc
 export {
   updateAttestationsProductions,
   findValidAttestationProduction,
+  findKeptAttestationsPaths,
   deleteAttestationsProductions,
   failInterruptedAttestationsProductions,
   findPdfRecord,

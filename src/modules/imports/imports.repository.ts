@@ -178,7 +178,10 @@ async function failInterruptedImportJobs(): Promise<number> {
       ...updateImportJobSchema.parse({
         status: importStatusEnumSchema.enum.ERROR,
         statutJob: importJobResultEnumSchema.enum.ERROR,
-        resultJob: { name: 'InterruptedJob', message: "Le traitement de l'import a été interrompu." }
+        resultJob: {
+          name: 'InterruptedJob',
+          message: "Le traitement de l'import a été interrompu."
+        }
       }),
       endedAt: sql`now()`
     })
@@ -294,7 +297,11 @@ async function findImportById(
   includePayload: boolean
 ): Promise<ImportJobListRow | null> {
   const query = db
-    .select({ ...importJobColumns, started_at: parcellaireImport.startedAt, payload: payloadColumn(includePayload) })
+    .select({
+      ...importJobColumns,
+      started_at: parcellaireImport.startedAt,
+      payload: payloadColumn(includePayload)
+    })
     .from(parcellaireImport)
     .$dynamic()
 

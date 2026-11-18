@@ -18,7 +18,9 @@ import {
 import { enforceOperatorAccess } from '../../shared/middlewares.js'
 
 export const exportPdfSchema = withSchema(
-  mergeSchemas(protectedWithToken(), operatorFromRecordId, { preHandler: [enforceOperatorAccess()] }),
+  mergeSchemas(protectedWithToken(), operatorFromRecordId, {
+    preHandler: [enforceOperatorAccess()]
+  }),
   {
     operationId: 'exportAttestationProduction',
     tags: [TAGS.EXPORTS],

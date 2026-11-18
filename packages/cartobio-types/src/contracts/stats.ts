@@ -23,17 +23,23 @@ export const statsQuerySchema = z.object({
     .meta({ description: `Nombre de lignes par page (défaut 20, ${STATS_MAX_LIMIT} maximum)` }),
   numeroBio: optionalString("Numéro bio de l'opérateur"),
   numeroClient: optionalString("Numéro client de l'opérateur chez l'OC"),
-  auditDate: optionalIsoDateQuerySchema.meta({ description: "Date d'audit du parcellaire (YYYY-MM-DD)" }),
+  auditDate: optionalIsoDateQuerySchema.meta({
+    description: "Date d'audit du parcellaire (YYYY-MM-DD)"
+  }),
   recherche: optionalString('Recherche partielle sur le numéro bio ou le numéro client'),
   statuts: csvListSchema
     .pipe(z.array(z.enum(['VALID', 'REJECTED', 'ERROR'])))
     .optional()
-    .meta({ description: 'Résultats du job séparés par des virgules (`VALID`, `REJECTED`, `ERROR`)' }),
+    .meta({
+      description: 'Résultats du job séparés par des virgules (`VALID`, `REJECTED`, `ERROR`)'
+    }),
   codes: optionalString("Codes d'erreur séparés par des virgules"),
   etats: csvListSchema
     .pipe(z.array(z.enum(['CREATED', 'UPDATED', 'UNKNOWN'])))
     .optional()
-    .meta({ description: 'Effets sur le parcellaire séparés par des virgules (`CREATED`, `UPDATED`, `UNKNOWN`)' }),
+    .meta({
+      description: 'Effets sur le parcellaire séparés par des virgules (`CREATED`, `UPDATED`, `UNKNOWN`)'
+    }),
   type: z.enum(['envois', 'refus']).optional().catch(undefined).meta({
     description:
       'Type de série suspecte (au moins 4 envois consécutifs de même issue) : `envois` (acceptés) ou `refus` (rejetés ou en erreur). Toute autre valeur : les deux'
@@ -64,10 +70,9 @@ export const importErrorDetailSchema = z.looseObject({
 
 const envoiSchema = z.looseObject({
   jobId: z.number().meta({ description: "Identifiant du job d'import" }),
-  statut: z
-    .enum(ImportJobResult)
-    .nullable()
-    .meta({ description: 'Résultat du job : `VALID`, `REJECTED` ou `ERROR`, `null` tant que le job est en cours' }),
+  statut: z.enum(ImportJobResult).nullable().meta({
+    description: 'Résultat du job : `VALID`, `REJECTED` ou `ERROR`, `null` tant que le job est en cours'
+  }),
   etat: z.enum(ImportJobEtat).meta({ description: 'Effet sur le parcellaire : `CREATED`, `UPDATED` ou `UNKNOWN`' }),
   createdAt: isoDateTimeSchema.meta({ description: "Date de l'envoi" })
 })

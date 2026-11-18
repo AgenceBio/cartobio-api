@@ -207,7 +207,12 @@ async function parseAPIParcellaire(
           message: `Parcelle ${id ?? ''} n'a pas de géométrie`,
           code: ImportLogCode.MISSING_GEOM
         })
-        const featureSansGeometrie: CartoBioFeatureInput = { type: 'Feature', id, geometry: null, properties }
+        const featureSansGeometrie: CartoBioFeatureInput = {
+          type: 'Feature',
+          id,
+          geometry: null,
+          properties
+        }
         return featureSansGeometrie
       }
 
@@ -279,7 +284,10 @@ async function parseAPIParcellaire(
       certification_state: CertificationState.CERTIFIED,
       oc_id: organismeCertificateur.id,
       oc_label: organismeCertificateur.nom,
-      parcelles: { type: 'FeatureCollection' as const, features: features.filter((f) => f !== null) },
+      parcelles: {
+        type: 'FeatureCollection' as const,
+        features: features.filter((f) => f !== null)
+      },
       audit_notes: record.commentaire,
       certification_date_debut: record.dateCertificationDebut,
       certification_date_fin: record.dateCertificationFin,
@@ -302,7 +310,9 @@ async function fetchOperator(numeroBio: string): Promise<AgenceBioNormalizedOper
     return await fetchOperatorByNumeroBio(numeroBio)
   } catch (error) {
     if (getResponseStatusCode(error) !== 404) {
-      throw new BadGatewayApiError("Le portail de l'Agence Bio n'a pas pu être contacté.", { cause: error })
+      throw new BadGatewayApiError("Le portail de l'Agence Bio n'a pas pu être contacté.", {
+        cause: error
+      })
     }
     logger.error({ err: error }, `Opérateur ${numeroBio} introuvable`)
     return null

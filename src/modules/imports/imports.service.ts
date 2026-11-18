@@ -140,7 +140,12 @@ async function parcellaireValidItemToDb(
   })
 
   for (const { numeroBio, message, code } of dbErrors) {
-    await repository.insertImportLog(importId, { numeroBio, type: importLogTypeEnumSchema.enum.error, code, message })
+    await repository.insertImportLog(importId, {
+      numeroBio,
+      type: importLogTypeEnumSchema.enum.error,
+      code,
+      message
+    })
   }
 
   for (const [numeroBio, ws] of warning) {
@@ -270,7 +275,10 @@ async function getImportList({
   withRejected,
   page,
   limit
-}: ImportListFilters): Promise<{ data: ImportSummary[]; meta: { total: number; page: number; limit: number } }> {
+}: ImportListFilters): Promise<{
+  data: ImportSummary[]
+  meta: { total: number; page: number; limit: number }
+}> {
   const { rows, total } = await repository.findImportList({
     status,
     organismeCertificateur,

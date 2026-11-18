@@ -168,7 +168,11 @@ describe('GET /api/v2/operators', () => {
     const response = await request(app.server).get('/api/v2/operators').set('Authorization', OPERATOR)
 
     expect(response.status).toBe(200)
-    expect(service.listUserOperators).toHaveBeenCalledWith(2, { search: undefined, limit: 100, offset: 0 })
+    expect(service.listUserOperators).toHaveBeenCalledWith(2, {
+      search: undefined,
+      limit: 100,
+      offset: 0
+    })
   })
 
   test('convertit les paramètres de pagination', async () => {
@@ -176,7 +180,11 @@ describe('GET /api/v2/operators', () => {
 
     await request(app.server).get('/api/v2/operators?search=a&limit=10&offset=20').set('Authorization', OPERATOR)
 
-    expect(service.listUserOperators).toHaveBeenCalledWith(2, { search: 'a', limit: 10, offset: 20 })
+    expect(service.listUserOperators).toHaveBeenCalledWith(2, {
+      search: 'a',
+      limit: 10,
+      offset: 20
+    })
   })
 
   test.each(['limit=0', 'limit=1001', 'offset=-1'])('refuse %s', async (query) => {
@@ -188,7 +196,10 @@ describe('GET /api/v2/operators', () => {
 
 describe('tableau de bord', () => {
   test("GET /api/v2/operators/dashboard utilise l'OC de l'utilisateur", async () => {
-    vi.mocked(service.getOperatorsDashboard).mockResolvedValue({ pinnedOperators: [], consultedOperators: [] })
+    vi.mocked(service.getOperatorsDashboard).mockResolvedValue({
+      pinnedOperators: [],
+      consultedOperators: []
+    })
 
     const response = await request(app.server).get('/api/v2/operators/dashboard').set('Authorization', OC)
 

@@ -8,7 +8,9 @@ const { Pool, types: pgTypes } = pg
 // local node process tz which is stupid
 pgTypes.setTypeParser(pgTypes.builtins.DATE, (value) => value)
 
-export const db = drizzle({ client: new Pool({ connectionString: config.get('drizzleDatabaseUrl') }) })
+export const db = drizzle({
+  client: new Pool({ connectionString: config.get('drizzleDatabaseUrl') })
+})
 
 export function firstRow<T>(rows: T[]): T {
   const [row] = rows

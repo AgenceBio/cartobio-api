@@ -5,9 +5,9 @@ export const borderCutBodySchema = z
   .strictObject({
     geometry: geometrySchema,
     distance: z.number().meta({ description: 'Largeur de la bordure, en mètres' }),
-    allBorder: z
-      .boolean()
-      .meta({ description: 'Toute la bordure, ou seulement entre `startBorderPoint` et `endBorderPoint`' }),
+    allBorder: z.boolean().meta({
+      description: 'Toute la bordure, ou seulement entre `startBorderPoint` et `endBorderPoint`'
+    }),
     isInverted: z.boolean().meta({ description: 'Inverse le côté de la bordure entre les deux points' }),
     startBorderPoint: positionSchema
       .optional()
@@ -65,11 +65,9 @@ export const geometryEqualsResponseSchema = z.array(
             geometry: anyGeometrySchema.nullable(),
             properties: z
               .looseObject({
-                status: z
-                  .string()
-                  .nullable()
-                  .optional()
-                  .meta({ description: 'Nature de la différence : ajout, suppression ou modification' }),
+                status: z.string().nullable().optional().meta({
+                  description: 'Nature de la différence : ajout, suppression ou modification'
+                }),
                 new_id: z.union([z.string(), z.number()]).nullable().optional(),
                 old_id: z.union([z.string(), z.number()]).nullable().optional(),
                 label: z.string().nullable().optional(),

@@ -62,7 +62,10 @@ afterEach(() => {
 
 describe('POST /api/v3/geometry/border-cut', () => {
   test('retourne la bordure calculée', async () => {
-    vi.mocked(service.calculateParcelBorder).mockResolvedValue({ parcelleSansBordure: polygon, bordure: null } as never)
+    vi.mocked(service.calculateParcelBorder).mockResolvedValue({
+      parcelleSansBordure: polygon,
+      bordure: null
+    } as never)
 
     const response = await request(app.server)
       .post('/api/v3/geometry/border-cut')

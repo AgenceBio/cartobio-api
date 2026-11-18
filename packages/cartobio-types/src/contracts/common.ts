@@ -74,7 +74,9 @@ export const geometrySchema = z
 
 export const validationIssueSchema = z.object({
   location: z.string().meta({ description: 'Partie de la requête concernée : body, querystring, params ou headers' }),
-  path: z.string().meta({ description: 'Chemin du champ en erreur, ex. parcelles.features.0.properties.NUMERO_I' }),
+  path: z.string().meta({
+    description: 'Chemin du champ en erreur, ex. parcelles.features.0.properties.NUMERO_I'
+  }),
   message: z.string()
 })
 

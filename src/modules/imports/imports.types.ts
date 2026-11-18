@@ -22,13 +22,22 @@ export type ValidItem = {
 
 export type RecordError = { message: string; code: ImportLogCode }
 
-export type FeatureError = RecordError & { idParcelle?: string | number | null; nomParcelle?: string | null }
+export type FeatureError = RecordError & {
+  idParcelle?: string | number | null
+  nomParcelle?: string | null
+}
 
 export type ErrorItem = FeatureError & { numeroBio?: string }
 
 export type ParsedRecord =
   | (ValidItem & { json: InputApiRecordBody; errors?: undefined })
-  | { numeroBio: string; errors: FeatureError[]; json: InputApiRecordBody; record?: undefined; warnings?: undefined }
+  | {
+      numeroBio: string
+      errors: FeatureError[]
+      json: InputApiRecordBody
+      record?: undefined
+      warnings?: undefined
+    }
 
 export type ImportJobRow = {
   status: ImportStatus

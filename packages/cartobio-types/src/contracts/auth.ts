@@ -7,9 +7,9 @@ export const ssoCallbackQuerySchema = z.looseObject({
 })
 
 export const logoutResponseSchema = z.object({
-  logoutUrl: z
-    .string()
-    .meta({ description: "URL de déconnexion du SSO Agence Bio vers laquelle rediriger l'utilisateur" })
+  logoutUrl: z.string().meta({
+    description: "URL de déconnexion du SSO Agence Bio vers laquelle rediriger l'utilisateur"
+  })
 })
 
 export const externalExploitationParamsSchema = z.object({
@@ -35,7 +35,9 @@ export const cartobioUserSchema = z.looseObject({
   id: z.number().meta({ description: "Identifiant de l'utilisateur" }),
   nom: z.string(),
   prenom: z.string(),
-  mainGroup: userGroupSchema.meta({ description: 'Groupe principal : `1` admin, `2` OC, `4` opérateur…' }),
+  mainGroup: userGroupSchema.meta({
+    description: 'Groupe principal : `1` admin, `2` OC, `4` opérateur…'
+  }),
   groups: z.array(userGroupSchema),
   organismeCertificateur: organismeCertificateurSchema.optional()
 })

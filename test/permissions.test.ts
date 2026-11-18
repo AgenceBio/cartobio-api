@@ -21,9 +21,27 @@ const sign = createSigner({ key: config.get('jwtSecret') })
 const ocProprietaire = { id: 999, nom: 'CartobiOC', numeroControleEu: 'FR-BIO-999' }
 const autreOc = { id: 1111, nom: 'Certificator', numeroControleEu: 'FR-BIO-1111' }
 const users = {
-  1: { id: 1, prenom: 'Tonio', nom: 'Est', organismeCertificateur: ocProprietaire, mainGroup: { id: 2 } },
-  2: { id: 2, prenom: 'Tania', nom: 'Ouest', organismeCertificateur: autreOc, mainGroup: { id: 2 } },
-  3: { id: 3, prenom: 'Paul', nom: 'Nord', mainGroup: { id: 4 }, groups: [{ id: 4, nom: 'Opérateur' }] }
+  1: {
+    id: 1,
+    prenom: 'Tonio',
+    nom: 'Est',
+    organismeCertificateur: ocProprietaire,
+    mainGroup: { id: 2 }
+  },
+  2: {
+    id: 2,
+    prenom: 'Tania',
+    nom: 'Ouest',
+    organismeCertificateur: autreOc,
+    mainGroup: { id: 2 }
+  },
+  3: {
+    id: 3,
+    prenom: 'Paul',
+    nom: 'Nord',
+    mainGroup: { id: 4 },
+    groups: [{ id: 4, nom: 'Opérateur' }]
+  }
 } as unknown as Record<string, CartoBioUser>
 vi.mocked(getCachedUserProfile).mockImplementation(async (id) => users[id]!)
 
@@ -146,7 +164,10 @@ describe("contrôle d'accès des routes d'un parcellaire ou d'un opérateur", ()
 
     for (const [method, url, body] of routes) {
       const response = await send(method, url, body, bearer(userId))
-      expect({ route: `${method.toUpperCase()} ${url}`, refused: [401, 403].includes(response.status) }).toEqual({
+      expect({
+        route: `${method.toUpperCase()} ${url}`,
+        refused: [401, 403].includes(response.status)
+      }).toEqual({
         route: `${method.toUpperCase()} ${url}`,
         refused: true
       })
@@ -203,7 +224,10 @@ describe('isolation des imports entre organismes certificateurs', () => {
 })
 
 describe('déconnexion', () => {
-  const signWithExpiration = createSigner({ key: config.get('jwtSecret'), expiresIn: 60 * 60 * 1000 })
+  const signWithExpiration = createSigner({
+    key: config.get('jwtSecret'),
+    expiresIn: 60 * 60 * 1000
+  })
 
   test("révoque le jeton : il n'est plus accepté par l'API", async () => {
     const token = `Bearer ${signWithExpiration(users[1]!)}`

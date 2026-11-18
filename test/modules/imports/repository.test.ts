@@ -610,7 +610,10 @@ describe('parseAPIParcellaire : contrôles complémentaires', () => {
 
   test('signale un opérateur certifié par un autre OC', async () => {
     vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValue(
-      buildOperator({ isProduction: true, organismeCertificateur: { id: 2, nom: 'Autre', numeroClient: '100012' } })
+      buildOperator({
+        isProduction: true,
+        organismeCertificateur: { id: 2, nom: 'Autre', numeroClient: '100012' }
+      })
     )
 
     expect(codes(await parseAPIParcellaire(record(), { organismeCertificateur }))).toEqual(['OC_MISMATCH'])
@@ -621,7 +624,9 @@ describe('parseAPIParcellaire : contrôles complémentaires', () => {
       Object.assign(new Error('boom'), { response: { statusCode: 500 } })
     )
 
-    await expect(parseAPIParcellaire(record(), { organismeCertificateur })).rejects.toMatchObject({ statusCode: 502 })
+    await expect(parseAPIParcellaire(record(), { organismeCertificateur })).rejects.toMatchObject({
+      statusCode: 502
+    })
   })
 
   test.each([
@@ -656,7 +661,10 @@ describe('parseAPIParcellaire : contrôles complémentaires', () => {
     })
 
     expect(result.errors).toEqual([
-      expect.objectContaining({ code: 'INVALID_GEOM', message: `champ geom incorrect : ${message}` })
+      expect.objectContaining({
+        code: 'INVALID_GEOM',
+        message: `champ geom incorrect : ${message}`
+      })
     ])
   })
 
@@ -687,7 +695,9 @@ describe('parseAPIParcellaire : contrôles complémentaires', () => {
 
   test('avertit pour une parcelle hors des régions autorisées', async () => {
     const result = await parseAPIParcellaire(
-      record({ parcelles: [parcelle({ geom: '[[[-40,10],[-39.99,10],[-39.99,10.01],[-40,10]]]' })] }),
+      record({
+        parcelles: [parcelle({ geom: '[[[-40,10],[-39.99,10],[-39.99,10.01],[-40,10]]]' })]
+      }),
       { organismeCertificateur }
     )
 
@@ -714,7 +724,10 @@ describe('parseAPIParcellaire : contrôles complémentaires', () => {
       organismeCertificateur
     })
 
-    expect(recordOf(result).parcelles.features[0]!.properties).toMatchObject({ attente_pac: true, NUMERO_I: null })
+    expect(recordOf(result).parcelles.features[0]!.properties).toMatchObject({
+      attente_pac: true,
+      NUMERO_I: null
+    })
     expect(result.warnings).toEqual([])
   })
 
@@ -775,7 +788,10 @@ describe('getCurrentStatusJobs', () => {
   test("ne retourne pas le job d'un autre organisme certificateur", async () => {
     const id = await insertJob({ status: 'DONE', resultJob: { ok: true }, endedAt: new Date() })
 
-    expect(await getCurrentStatusJobs(id, 2)).toEqual({ status: 'error', error: "Aucun job n'a cet id" })
+    expect(await getCurrentStatusJobs(id, 2)).toEqual({
+      status: 'error',
+      error: "Aucun job n'a cet id"
+    })
   })
 
   test('retourne un job en statut DONE', async () => {
@@ -788,7 +804,11 @@ describe('getCurrentStatusJobs', () => {
 
     const result = await getCurrentStatusJobs(id, 1)
 
-    expect(result).toMatchObject({ status: 'DONE', result: { ok: true }, ended: toIsoDateTime(mockDate) })
+    expect(result).toMatchObject({
+      status: 'DONE',
+      result: { ok: true },
+      ended: toIsoDateTime(mockDate)
+    })
   })
 
   test('retourne un job en statut PENDING', async () => {
@@ -813,7 +833,11 @@ describe('getCurrentStatusJobs', () => {
 
     const result = await getCurrentStatusJobs(id, 1)
 
-    expect(result).toMatchObject({ status: 'ERROR', error: 'Something went wrong', ended: toIsoDateTime(mockDate) })
+    expect(result).toMatchObject({
+      status: 'ERROR',
+      error: 'Something went wrong',
+      ended: toIsoDateTime(mockDate)
+    })
   })
 })
 
@@ -827,7 +851,11 @@ describe('updateImportJobStatus', () => {
 
     await updateImportJobStatus(id, 'DONE', { foo: 'bar' })
 
-    expect(await findJob(id)).toMatchObject({ status: 'DONE', resultJob: { foo: 'bar' }, endedAt: expect.any(Date) })
+    expect(await findJob(id)).toMatchObject({
+      status: 'DONE',
+      resultJob: { foo: 'bar' },
+      endedAt: expect.any(Date)
+    })
   })
 
   test('met à jour le job avec le statut ERROR', async () => {
@@ -847,7 +875,11 @@ describe('updateImportJobStatus', () => {
 
     await updateImportJobStatus(id, 'PENDING', { progress: 50 })
 
-    expect(await findJob(id)).toMatchObject({ status: 'PENDING', resultJob: { progress: 50 }, endedAt: null })
+    expect(await findJob(id)).toMatchObject({
+      status: 'PENDING',
+      resultJob: { progress: 50 },
+      endedAt: null
+    })
   })
 })
 
@@ -890,7 +922,11 @@ describe('updateStatus', () => {
     })
     const id = await insertJob()
 
-    await updateStatus(id, { numeroBio: '12345', numeroClient: 'CLIENT-1', dateAudit: '2026-09-01' })
+    await updateStatus(id, {
+      numeroBio: '12345',
+      numeroClient: 'CLIENT-1',
+      dateAudit: '2026-09-01'
+    })
 
     expect(await findJob(id)).toMatchObject({ etat: 'UPDATED' })
   })
@@ -905,7 +941,11 @@ describe('updateStatus', () => {
     })
     const id = await insertJob()
 
-    await updateStatus(id, { numeroBio: '12345', numeroClient: 'CLIENT-1', dateAudit: '2026-09-01' })
+    await updateStatus(id, {
+      numeroBio: '12345',
+      numeroClient: 'CLIENT-1',
+      dateAudit: '2026-09-01'
+    })
 
     expect(await findJob(id)).toMatchObject({ etat: 'CREATED' })
   })
@@ -915,7 +955,11 @@ describe('updateStatus', () => {
     const dateInvalide = await insertJob()
 
     await updateStatus(sansClient, { numeroBio: '12345', dateAudit: '2026-09-01' })
-    await updateStatus(dateInvalide, { numeroBio: '12345', numeroClient: 'CLIENT-1', dateAudit: 'pas une date' })
+    await updateStatus(dateInvalide, {
+      numeroBio: '12345',
+      numeroClient: 'CLIENT-1',
+      dateAudit: 'pas une date'
+    })
 
     expect(await findJob(sansClient)).toMatchObject({ etat: 'UNKNOWN', numeroClient: null })
     expect(await findJob(dateInvalide)).toMatchObject({ etat: 'UNKNOWN', auditDate: null })
@@ -941,20 +985,40 @@ describe('getImportList / getImportById', () => {
       numeroBio: '2',
       createdAt: new Date('2026-01-15T20:00:00Z')
     })
-    pending = await insertJob({ status: 'PENDING', numeroBio: '3', createdAt: new Date('2026-01-20T10:00:00Z') })
-    await insertJob({ status: 'DONE', organismeCertificateur: 2, createdAt: new Date('2026-01-12T10:00:00Z') })
+    pending = await insertJob({
+      status: 'PENDING',
+      numeroBio: '3',
+      createdAt: new Date('2026-01-20T10:00:00Z')
+    })
+    await insertJob({
+      status: 'DONE',
+      organismeCertificateur: 2,
+      createdAt: new Date('2026-01-12T10:00:00Z')
+    })
     await db.insert(parcellaireImportPayload).values({ id: 'p-done', importId: done, payload: { numeroBio: '1' } })
   })
 
   const list = (filters: Partial<Parameters<typeof getImportList>[0]> = {}) =>
-    getImportList({ organismeCertificateur: 1, payload: false, withRejected: false, page: 1, limit: 10, ...filters })
+    getImportList({
+      organismeCertificateur: 1,
+      payload: false,
+      withRejected: false,
+      page: 1,
+      limit: 10,
+      ...filters
+    })
 
   test("liste les imports de l'OC du plus récent au plus ancien", async () => {
     const { data, meta } = await list()
 
     expect(data.map(({ jobId }) => jobId)).toEqual([pending, rejected, done])
     expect(meta).toEqual({ total: 3, page: 1, limit: 10 })
-    expect(data[0]).toMatchObject({ status: 'PENDING', numeroBio: '3', endedAt: null, payload: null })
+    expect(data[0]).toMatchObject({
+      status: 'PENDING',
+      numeroBio: '3',
+      endedAt: null,
+      payload: null
+    })
   })
 
   test('filtre par statuts, sans tenir compte de la casse', async () => {
@@ -981,7 +1045,10 @@ describe('getImportList / getImportById', () => {
   test('joint la charge utile sur demande', async () => {
     const { data } = await list({ payload: true })
 
-    expect(data.find(({ jobId }) => jobId === done)?.payload).toEqual({ id: 'p-done', payload: { numeroBio: '1' } })
+    expect(data.find(({ jobId }) => jobId === done)?.payload).toEqual({
+      id: 'p-done',
+      payload: { numeroBio: '1' }
+    })
   })
 
   test("retrouve un import de l'OC par son identifiant", async () => {
@@ -996,13 +1063,19 @@ describe('getImportList / getImportById', () => {
 describe('failInterruptedImportJobs', () => {
   test("passe en erreur les imports bloqués depuis plus d'une heure", async () => {
     await db.delete(parcellaireImport)
-    const old = await insertJob({ status: 'PENDING', createdAt: sql`now() - interval '2 hours'` as unknown as Date })
+    const old = await insertJob({
+      status: 'PENDING',
+      createdAt: sql`now() - interval '2 hours'` as unknown as Date
+    })
     const oldCreated = await insertJob({
       status: 'CREATED',
       createdAt: sql`now() - interval '2 hours'` as unknown as Date
     })
     const recent = await insertJob({ status: 'PENDING' })
-    const finished = await insertJob({ status: 'DONE', createdAt: sql`now() - interval '2 hours'` as unknown as Date })
+    const finished = await insertJob({
+      status: 'DONE',
+      createdAt: sql`now() - interval '2 hours'` as unknown as Date
+    })
 
     expect(await failInterruptedImportJobs()).toBe(2)
 

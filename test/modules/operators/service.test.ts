@@ -16,7 +16,9 @@ vi.mock('../../../src/modules/operators/operators.repository.js')
 vi.mock('../../../src/shared/parcellaires/parcellaires.service.js')
 
 const mockedRepo = vi.mocked(repository)
-type OperatorWithNotification = AgenceBioNormalizedOperator & { notifications: AgenceBioNotification }
+type OperatorWithNotification = AgenceBioNormalizedOperator & {
+  notifications: AgenceBioNotification
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -76,7 +78,10 @@ describe('getOperatorRecordsForUser', () => {
   })
 
   test("l'administrateur voit tout sans anonymisation", async () => {
-    const admin = buildUser({ groups: [{ id: '1', nom: 'Admin' }], mainGroup: { id: '1', nom: 'Admin' } })
+    const admin = buildUser({
+      groups: [{ id: '1', nom: 'Admin' }],
+      mainGroup: { id: '1', nom: 'Admin' }
+    })
 
     const records = await getOperatorRecordsForUser('99999', admin, operator)
 

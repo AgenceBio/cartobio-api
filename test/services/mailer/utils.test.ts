@@ -111,8 +111,16 @@ describe('sendMail', () => {
     expect(sent.html).toContain('cid:signature')
     expect(sent.html).toContain(`href=${config.get('frontendUrl')}`)
     expect(sent.attachments).toEqual([
-      { filename: 'logo.png', path: path.join(MAIL_TEMPLATES_DIR, 'assets/banniere_agence_bio.png'), cid: 'logo' },
-      { filename: 'signature.png', path: path.join(MAIL_TEMPLATES_DIR, 'assets/signature.png'), cid: 'signature' }
+      {
+        filename: 'logo.png',
+        path: path.join(MAIL_TEMPLATES_DIR, 'assets/banniere_agence_bio.png'),
+        cid: 'logo'
+      },
+      {
+        filename: 'signature.png',
+        path: path.join(MAIL_TEMPLATES_DIR, 'assets/signature.png'),
+        cid: 'signature'
+      }
     ])
   })
 

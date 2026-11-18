@@ -75,7 +75,10 @@ describe('errorHandler', () => {
       cause: { constraint: 'parcelles_commune_communes_fid_fkey' }
     })
 
-    expect(handle(dbError).sent).toMatchObject({ statusCode: 400, message: 'Code commune inconnu.' })
+    expect(handle(dbError).sent).toMatchObject({
+      statusCode: 400,
+      message: 'Code commune inconnu.'
+    })
   })
 
   test('expose une erreur gérée avec son statut', () => {

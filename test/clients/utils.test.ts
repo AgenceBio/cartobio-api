@@ -11,7 +11,10 @@ describe('parseApiResponse', () => {
 
   test('transforme une réponse invalide en erreur 502', () => {
     expect(() => parseApiResponse(schema, { id: 'a' }, "l'API Test")).toThrow(
-      expect.objectContaining({ statusCode: 502, message: "Erreur serveur : réponse inattendue de l'API Test" })
+      expect.objectContaining({
+        statusCode: 502,
+        message: "Erreur serveur : réponse inattendue de l'API Test"
+      })
     )
   })
 })

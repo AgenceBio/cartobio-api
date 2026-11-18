@@ -467,7 +467,10 @@ async function getOperatorsDashboard(
       .filter((numeroBio) => findOperator(numeroBio))
       .map(
         (numeroBio) =>
-          ({ ...findOperator(numeroBio), epingle: true }) as AgenceBioNormalizedOperatorWithRecord & {
+          ({
+            ...findOperator(numeroBio),
+            epingle: true
+          }) as AgenceBioNormalizedOperatorWithRecord & {
             epingle: boolean
           }
       ),

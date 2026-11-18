@@ -52,14 +52,18 @@ export const geometryEqualsSchema = withSchema(
     body: geometryEqualsBodySchema,
     response: {
       ...commonErrorResponses,
-      200: geometryEqualsResponseSchema.meta({ description: 'Résultat de la comparaison et différences en GeoJSON' }),
+      200: geometryEqualsResponseSchema.meta({
+        description: 'Résultat de la comparaison et différences en GeoJSON'
+      }),
       404: apiError('Parcellaire ou opérateur introuvable')
     }
   }
 )
 
 export const addGeometrySchema = withSchema(
-  mergeSchemas(protectedWithToken(), operatorFromRecordId, { preHandler: [enforceOperatorAccess()] }),
+  mergeSchemas(protectedWithToken(), operatorFromRecordId, {
+    preHandler: [enforceOperatorAccess()]
+  }),
   {
     operationId: 'checkParcelleGeometry',
     tags: [TAGS.GEOMETRIE],
@@ -70,7 +74,9 @@ export const addGeometrySchema = withSchema(
     body: addGeometryBodySchema,
     response: {
       ...commonErrorResponses,
-      200: addGeometryResponseSchema.meta({ description: 'Validité de la géométrie et corrections proposées' }),
+      200: addGeometryResponseSchema.meta({
+        description: 'Validité de la géométrie et corrections proposées'
+      }),
       404: apiError('Parcellaire ou opérateur introuvable')
     }
   }

@@ -1,12 +1,9 @@
 import validator from 'validator'
+import type { NodePgClient, NodePgDatabase } from 'drizzle-orm/node-postgres'
 import { db } from '../src/database/database.js'
 import type { Client, QueryConfig } from 'pg'
 
-const drizzleClient = db.$client as unknown as {
-  _query: (text: string) => Promise<unknown>
-  _connect: () => Promise<void>
-  _end: () => Promise<void>
-}
+const rawDb = (db.$client as NodePgClient & { _raw: NodePgDatabase & { $client: Client } })._raw
 
 expect.extend({
   stringMatchingISODate(actual) {
@@ -97,26 +94,24 @@ vi.mock('../src/database/database.js', async () => {
           return statement ? drizzleClient.query(statement) : drizzleClient.query(queryConfig, values)
         },
         end: vi.fn(async (): Promise<void> => {}),
-        _query: (text: string) => drizzleClient.query(text),
-        _connect: drizzleClient.connect.bind(drizzleClient),
-        _end: drizzleClient.end.bind(drizzleClient)
+        _raw: drizzle({ client: drizzleClient })
       } as unknown as Client
     })
   }
 })
 
 beforeAll(async () => {
-  await drizzleClient._connect()
+  await rawDb.$client.connect()
 })
 
 beforeEach(async () => {
-  await drizzleClient._query('BEGIN')
+  await rawDb.execute('BEGIN')
 })
 
 afterEach(async () => {
-  await drizzleClient._query('ROLLBACK')
+  await rawDb.execute('ROLLBACK')
 })
 
 afterAll(async () => {
-  await drizzleClient._end()
+  await rawDb.$client.end()
 })

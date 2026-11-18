@@ -187,7 +187,10 @@ async function prepareFeatures(
   const withGeometry = prepared.filter((feature) => feature.geometry)
   const analyses = await repository.analyzeGeometries(
     tx,
-    withGeometry.map((feature) => ({ geometry: feature.geometry as Polygon, commune: feature.properties.COMMUNE }))
+    withGeometry.map((feature) => ({
+      geometry: feature.geometry as Polygon,
+      commune: feature.properties.COMMUNE
+    }))
   )
   const analysisByFeature = new Map(withGeometry.map((feature, index) => [feature, analyses[index]]))
 

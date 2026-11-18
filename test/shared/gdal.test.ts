@@ -21,7 +21,11 @@ const ring = (x: number, y: number, size = 0.001, z?: number) =>
   ].map((point) => (z === undefined ? point : [...point, z]))
 
 const geojson = (features: object[]) => JSON.stringify({ type: 'FeatureCollection', features })
-const feature = (geometry: object | null, properties: object = {}) => ({ type: 'Feature', geometry, properties })
+const feature = (geometry: object | null, properties: object = {}) => ({
+  type: 'Feature',
+  geometry,
+  properties
+})
 
 function zip(files: Record<string, Buffer | string>): Buffer {
   const archive = new AdmZip()
@@ -43,7 +47,10 @@ describe('parseAnyGeographicalArchive', () => {
         geojson([
           feature({ type: 'Polygon', coordinates: [ring(2, 47)] }, { id: 'p1', NOM: 'Champ', NUMERO_I: '3' }),
           feature(
-            { type: 'MultiPolygon', coordinates: [[ring(2.01, 47, 0.001, 120)], [ring(2.02, 47, 0.001, 130)]] },
+            {
+              type: 'MultiPolygon',
+              coordinates: [[ring(2.01, 47, 0.001, 120)], [ring(2.02, 47, 0.001, 130)]]
+            },
             { NOM: 'Double' }
           )
         ])
@@ -51,7 +58,10 @@ describe('parseAnyGeographicalArchive', () => {
     )
 
     expect(result.features).toHaveLength(3)
-    expect(result.features[0]).toMatchObject({ id: 'p1', properties: { id: 'p1', NOM: 'Champ', NUMERO_I: 3 } })
+    expect(result.features[0]).toMatchObject({
+      id: 'p1',
+      properties: { id: 'p1', NOM: 'Champ', NUMERO_I: 3 }
+    })
     const [, first, second] = result.features
     expect(first!.properties).toMatchObject({ NOM: 'Double' })
     expect(first!.id).not.toBe(second!.id)
@@ -82,7 +92,10 @@ describe('parseAnyGeographicalArchive', () => {
       parseAnyGeographicalArchive(
         upload(geojson([feature({ type: 'Polygon', coordinates: [ring(2, 47)] }), feature(null)]))
       )
-    ).rejects.toMatchObject({ statusCode: 400, message: 'Le fichier contient une parcelle sans géométrie.' })
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      message: 'Le fichier contient une parcelle sans géométrie.'
+    })
   })
 
   test('refuse des propriétés invalides', async () => {
@@ -90,7 +103,10 @@ describe('parseAnyGeographicalArchive', () => {
       parseAnyGeographicalArchive(
         upload(geojson([feature({ type: 'Polygon', coordinates: [ring(2, 47)] }, { COMMUNE: '123' })]))
       )
-    ).rejects.toMatchObject({ statusCode: 400, message: 'Le fichier contient des propriétés invalides' })
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      message: 'Le fichier contient des propriétés invalides'
+    })
   })
 
   test("refuse un XML qui n'est pas du KML", async () => {

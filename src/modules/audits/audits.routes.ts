@@ -1,3 +1,4 @@
+import { access } from 'node:fs/promises'
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import {
@@ -39,7 +40,9 @@ export default async function auditRoutes(fastify: FastifyInstance): Promise<voi
         pac ? AttestationsProductionsType.PACCOMPLET : AttestationsProductionsType.COMPLET
       )
 
-      return reply.code(200).send({ hasAttestationProduction: !!attestation })
+      const fileExists = attestation ? await access(attestation.path).then(() => true, () => false) : false
+
+      return reply.code(200).send({ hasAttestationProduction: fileExists })
     }
   )
 
@@ -103,7 +106,12 @@ export default async function auditRoutes(fastify: FastifyInstance): Promise<voi
     const { user, operator } = request
 
     const record = await service.addRecordFeature(
-      { user, record: requireRecord(request), operator, ifUnmodifiedSince: request.headers['if-unmodified-since'] },
+      {
+        user,
+        record: requireRecord(request),
+        operator,
+        ifUnmodifiedSince: request.headers['if-unmodified-since']
+      },
       feature
     )
     return reply.code(200).send(outputRecord(request.user, record, request.operator))
@@ -117,7 +125,12 @@ export default async function auditRoutes(fastify: FastifyInstance): Promise<voi
     const { body: featureCollection, user, operator } = request
 
     const record = await service.patchFeatureCollection(
-      { user, record: requireRecord(request), operator, ifUnmodifiedSince: request.headers['if-unmodified-since'] },
+      {
+        user,
+        record: requireRecord(request),
+        operator,
+        ifUnmodifiedSince: request.headers['if-unmodified-since']
+      },
       featureCollection.features ?? []
     )
     return reply.code(200).send(outputRecord(request.user, record, request.operator))

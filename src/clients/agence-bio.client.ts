@@ -28,7 +28,9 @@ const ONE_MINUTE = 60 * 1000
 const endpoint = (path: string): string => `${config.get('notifications.endpoint')}${path}`
 const requestOptions = { timeout: HTTP_TIMEOUT, headers: { Authorization: serviceToken, Origin } }
 
-type OperatorWithNotification = AgenceBioNormalizedOperator & { notifications: AgenceBioNotification }
+type OperatorWithNotification = AgenceBioNormalizedOperator & {
+  notifications: AgenceBioNotification
+}
 
 function hasNotification(operator: AgenceBioNormalizedOperator): operator is OperatorWithNotification {
   return operator.notifications != null
@@ -195,7 +197,10 @@ function parsePacDetailsFromComment(commentaire?: string | null): {
   numeroIlot: string | null
   numeroParcelle: string | null
 } {
-  let result: { numeroIlot: string | null; numeroParcelle: string | null } = { numeroIlot: null, numeroParcelle: null }
+  let result: { numeroIlot: string | null; numeroParcelle: string | null } = {
+    numeroIlot: null,
+    numeroParcelle: null
+  }
 
   const RE = /ilot\s+(?<numeroIlot>\d+)\s+parcelle\s+(?<numeroParcelle>\d+)/i
   const RE_INVERTED = /parcelle\s+(?<numeroParcelle>\d+)\s+ilot\s+(?<numeroIlot>\d+)/i
@@ -204,7 +209,10 @@ function parsePacDetailsFromComment(commentaire?: string | null): {
   for (const REG of [RE, RE_INVERTED, RE_COMPACT]) {
     const groups = commentaire ? REG.exec(commentaire)?.groups : undefined
     if (groups) {
-      result = { numeroIlot: groups.numeroIlot ?? null, numeroParcelle: groups.numeroParcelle ?? null }
+      result = {
+        numeroIlot: groups.numeroIlot ?? null,
+        numeroParcelle: groups.numeroParcelle ?? null
+      }
     }
   }
 

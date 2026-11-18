@@ -70,8 +70,17 @@ try {
 
     const { id: ocId, nom: ocLabel } = oc
     const record = await createOrUpdateOperatorRecord(
-      { numerobio: parcelle.numerobio, oc_id: ocId, oc_label: ocLabel, ...(parcelle.record as RecordInput) },
-      { user: null, copyParcellesData: previousRecordId != null, previousRecordId: previousRecordId ?? undefined }
+      {
+        numerobio: parcelle.numerobio,
+        oc_id: ocId,
+        oc_label: ocLabel,
+        ...(parcelle.record as RecordInput)
+      },
+      {
+        user: null,
+        copyParcellesData: previousRecordId != null,
+        previousRecordId: previousRecordId ?? undefined
+      }
     )
 
     if (record.numerobio !== parcelle.numerobio) {
