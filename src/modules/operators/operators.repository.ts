@@ -104,7 +104,7 @@ export async function findFilterData(
         max_audit_date: max(parcellaires.auditDate).as('max_audit_date')
       })
       .from(parcellaires)
-      .where(and(inArray(parcellaires.numeroBio, ids), isNull(parcellaires.deletedAt)))
+      .where(and(sql`${parcellaires.numeroBio} = ANY(${sql.param(ids)}::int[])`, isNull(parcellaires.deletedAt)))
       .groupBy(parcellaires.numeroBio)
   )
 
@@ -117,7 +117,7 @@ export async function findFilterData(
       .from(parcellaires)
       .where(
         and(
-          inArray(parcellaires.numeroBio, ids),
+          sql`${parcellaires.numeroBio} = ANY(${sql.param(ids)}::int[])`,
           eq(parcellaires.certificationEtat, certificationEtatEnumSchema.enum.CERTIFIED),
           isNull(parcellaires.deletedAt)
         )
