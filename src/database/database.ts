@@ -1,4 +1,5 @@
 import pg from 'pg'
+import { drizzle } from 'drizzle-orm/node-postgres'
 import config from '../config/env.js'
 
 const { Pool, types: pgTypes } = pg
@@ -13,4 +14,8 @@ pgTypes.setTypeParser(
 const connectionString = config.get('databaseUrl')
 
 // the exported variable will be shared across all imports
-export default new Pool({ connectionString })
+const pool = new Pool({ connectionString })
+
+export const db = drizzle({ client: pool })
+
+export default pool
