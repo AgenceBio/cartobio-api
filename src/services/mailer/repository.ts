@@ -1,25 +1,26 @@
 import { and, count, eq, gte, inArray, lte, sql } from 'drizzle-orm'
 import { db } from '../../database/database.js'
-import { organismeCertificateur, parcellairesImport } from '../../database/schema/index.js'
+import { organismeCertificateur, parcellaireImport } from '../../database/schema/index.js'
+import { importJobResultEnumSchema } from '../../database/validations/imports.js'
 import type { DestinataireRapport, StatsOrganisme } from './types.js'
 
 async function getStatsByOrganisme(organisme: string, start: Date, end: Date): Promise<StatsOrganisme | null> {
   const [stats] = await db
     .select({
-      organismeCertificateur: parcellairesImport.organismeCertificateur,
+      organismeCertificateur: parcellaireImport.organismeCertificateur,
       totalRecu: count(),
-      totalAcceptes: sql<number>`COUNT(*) FILTER (WHERE ${eq(parcellairesImport.statutJob, 'VALID')})`.mapWith(Number),
-      totalRefuses: sql<number>`COUNT(*) FILTER (WHERE ${inArray(parcellairesImport.statutJob, ['REJECTED', 'ERROR'])})`.mapWith(Number)
+      totalAcceptes: sql<number>`COUNT(*) FILTER (WHERE ${eq(parcellaireImport.statutJob, importJobResultEnumSchema.enum.VALID)})`.mapWith(Number),
+      totalRefuses: sql<number>`COUNT(*) FILTER (WHERE ${inArray(parcellaireImport.statutJob, [importJobResultEnumSchema.enum.REJECTED, importJobResultEnumSchema.enum.ERROR])})`.mapWith(Number)
     })
-    .from(parcellairesImport)
+    .from(parcellaireImport)
     .where(
       and(
-        eq(parcellairesImport.organismeCertificateur, organisme),
-        gte(parcellairesImport.endedAt, start),
-        lte(parcellairesImport.endedAt, end)
+        eq(parcellaireImport.organismeCertificateur, organisme),
+        gte(parcellaireImport.endedAt, start),
+        lte(parcellaireImport.endedAt, end)
       )
     )
-    .groupBy(parcellairesImport.organismeCertificateur)
+    .groupBy(parcellaireImport.organismeCertificateur)
 
   return stats ?? null
 }

@@ -1,11 +1,8 @@
-import stripBom from 'strip-bom-stream'
-import { PassThrough } from 'node:stream'
 import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import {
   certificationParcellaireSchema, certificationParcellairesSchema, certificationParcellesSchema, convertAnyGeoSchema, convertGeofoliaSchema,
-  convertTelepacSchema, evvSchema, geofoliaLookupSchema, geofoliaParcellaireSchema, importDetailsSchema, importJobSchema, importListSchema,
-  mergeSchemas, pacageSchema
+  convertTelepacSchema, evvSchema, geofoliaLookupSchema, geofoliaParcellaireSchema, importDetailsSchema, importJobSchema, importListSchema
 } from './imports.schema.js'
 import { InvalidRequestApiError, NotFoundApiError, UnauthorizedApiError } from '../../shared/errors.js'
 import { requireOperator, requireOrganismeCertificateur } from '../../shared/request.js'
@@ -42,18 +39,6 @@ export default async function importRoutes (fastify: FastifyInstance): Promise<v
     async (request, reply) => {
       return service.parseAnyGeographicalArchive(request.file()).then((geojson) =>
         reply.send(geojson)
-      )
-    }
-  )
-
-  app.get(
-    '/api/v2/import/pacage/:numeroPacage',
-    pacageSchema,
-    async (request, reply) => {
-      const { numeroPacage } = request.params
-
-      return service.pacageLookup({ numeroPacage }).then((featureCollection) =>
-        reply.send(featureCollection)
       )
     }
   )
@@ -123,78 +108,45 @@ export default async function importRoutes (fastify: FastifyInstance): Promise<v
     }
   )
 
-  app.post('/api/v2/certification/parcelles', mergeSchemas(certificationParcellesSchema, {
-    preParsing: async (request, reply, payload) => {
-      const stream = payload.pipe(stripBom())
+  app.post('/api/v2/certification/parcelles', certificationParcellesSchema, async (request, reply) => {
+    const organismeCertificateur = requireOrganismeCertificateur(request)
+    const jobId = await service.createImportJob(organismeCertificateur.id)
 
-      request.originalPayload = stream
-      request.headers['content-length'] = '2'
-      return new PassThrough().end('{}')
-    }
-  }), async (request, reply) => {
-    const stream = request.originalPayload
-    if (!stream) throw new InvalidRequestApiError('Le corps de la requête est vide.')
-    const jobId = await service.createImportJob(requireOrganismeCertificateur(request).id)
+    const { errors, validItem } = await service.collectValidationResult(request.body, { organismeCertificateur }, jobId)
 
-    const { errors, validItems } = await service.collectFullValidationResults(stream, {
-      organismeCertificateur: requireOrganismeCertificateur(request)
-    }, jobId)
+    if (!validItem) {
+      const listeProblemes = errors.map(({ numeroBio, message, code, idParcelle, nomParcelle }) => ({
+        ...(numeroBio ? { numeroBio } : {}),
+        code,
+        message,
+        ...(idParcelle && nomParcelle
+          ? { idParcelle, nomParcelle }
+          : {})
+      }))
 
-    const validRecords = validItems.map(v => v.numeroBio)
-    const invalidRecords = errors.map(({ numeroBio, message, code, idParcelle, nomParcelle }) => ({
-      ...(numeroBio ? { numeroBio } : {}),
-      code,
-      message,
-      ...(idParcelle && nomParcelle
-        ? { idParcelle, nomParcelle }
-        : {})
-    }))
-
-    const numeroBioError = [
-      ...new Set(
-        errors
-          .map(error => error.numeroBio)
-          .filter(Boolean)
-      )
-    ]
-
-    if (numeroBioError.length > 0) {
       for (const error of errors) {
         await service.addErrorJob(jobId, error)
       }
-    }
 
-    if (numeroBioError.length > 0 && validRecords.length === 0) {
-      await service.updateJobError(validRecords, invalidRecords, numeroBioError.length, [], jobId)
+      await service.updateJobError([], listeProblemes, 1, [], jobId)
       return reply.code(400).send({
         jobId,
-        nbObjetRecus: numeroBioError.length,
+        nbObjetRecus: 1,
         nbObjetAcceptes: 0,
-        nbObjetRefuses: numeroBioError.length,
-        listeProblemes: invalidRecords
+        nbObjetRefuses: 1,
+        listeProblemes
       })
     }
 
-    service.processFullJob(jobId, validItems, errors)
+    service.processFullJob(jobId, validItem)
       .catch((err): void => request.log.error({ err }, 'service.processFullJob error'))
 
-    if (numeroBioError.length === 0) {
-      return reply.code(202).send({
-        jobId,
-        nbObjetRecus: validRecords.length,
-        nbObjetAcceptes: validRecords.length,
-        nbObjetRefuses: 0,
-        listeNumeroBioValides: validRecords
-      })
-    }
-
-    return reply.code(207).send({
+    return reply.code(202).send({
       jobId,
-      nbObjetRecus: validRecords.length + numeroBioError.length,
-      nbObjetAcceptes: validRecords.length,
-      nbObjetRefuses: numeroBioError.length,
-      listeNumeroBioValides: validRecords,
-      listeProblemes: invalidRecords
+      nbObjetRecus: 1,
+      nbObjetAcceptes: 1,
+      nbObjetRefuses: 0,
+      listeNumeroBioValides: [validItem.numeroBio]
     })
   })
 

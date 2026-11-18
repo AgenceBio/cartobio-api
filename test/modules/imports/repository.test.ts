@@ -1,38 +1,51 @@
-import pool from '../../../src/database/database.js'
-import { parseAPIParcellaireStream, getCurrentStatusJobs, updateImportJobStatus, updateStatus } from '../../../src/modules/imports/imports.service.js'
+import { eq } from 'drizzle-orm'
+import { db } from '../../../src/database/database.js'
+import { parcellaireImport } from '../../../src/database/schema/index.js'
+import { parseAPIParcellaire, getCurrentStatusJobs, updateImportJobStatus, updateStatus } from '../../../src/modules/imports/imports.service.js'
 
 import { fetchOperatorByNumeroBio } from '../../../src/clients/agence-bio.client.js'
-import { buildOperator, mockedQuery, queryResult } from '../../factories.js'
+import { buildOperator } from '../../factories.js'
 
 vi.mock('../../../src/clients/agence-bio.client.js')
-vi.mock('../../../src/database/database.js')
 vi.mock('../../../src/shared/parcellaires/parcellaires.service.js')
-vi.mock('jsonstream-next')
 vi.mock('../../../src/modules/imports/imports.service.js', async (importOriginal) => ({
   ...(await importOriginal()),
-  collectFullValidationResults: vi.fn(),
+  collectValidationResult: vi.fn(),
   createImportJob: vi.fn(),
   processFullJob: vi.fn()
 }))
 
 const mockFetchOperatorByNumeroBio = fetchOperatorByNumeroBio
 
-type ParsedItem = Awaited<ReturnType<ReturnType<typeof parseAPIParcellaireStream>['next']>>['value']
+type ParsedItem = Awaited<ReturnType<typeof parseAPIParcellaire>>
 
 function recordOf (value: ParsedItem) {
   if (value && 'record' in value && value.record) return value.record
   throw new Error('aucun record valide renvoyé')
 }
-const mockPool = pool
 
-describe('parseAPIParcellaireStream', () => {
+async function insertJob (job: Partial<typeof parcellaireImport.$inferInsert> = {}): Promise<number> {
+  const [{ id }] = await db
+    .insert(parcellaireImport)
+    .values({ organismeCertificateur: '1', ...job })
+    .returning({ id: parcellaireImport.id })
+
+  return id
+}
+
+async function findJob (id: number): Promise<typeof parcellaireImport.$inferSelect> {
+  const [job] = await db.select().from(parcellaireImport).where(eq(parcellaireImport.id, id))
+  return job
+}
+
+describe('parseAPIParcellaire', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
   test('traite un enregistrement valide avec succès', async () => {
     const organismeCertificateur = { id: 1, nom: 'Ecocert France' }
-    const validRecord = [{
+    const validRecord = {
       numeroBio: '99999',
       numeroClient: '100012',
       anneeReferenceControle: 2022,
@@ -52,7 +65,7 @@ describe('parseAPIParcellaireStream', () => {
           unite: '%'
         }]
       }]
-    }]
+    }
 
     vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(buildOperator({
       isProduction: true,
@@ -63,29 +76,27 @@ describe('parseAPIParcellaireStream', () => {
       }
     }))
 
-    const generator = parseAPIParcellaireStream(validRecord, { organismeCertificateur })
-    const result = await generator.next()
+    const result = await parseAPIParcellaire(validRecord, { organismeCertificateur })
 
-    expect(result.value).toHaveProperty('record')
-    expect(recordOf(result.value).numerobio).toBe('99999')
-    expect(recordOf(result.value).parcelles.features).toHaveLength(1)
+    expect(result).toHaveProperty('record')
+    expect(recordOf(result).numerobio).toBe('99999')
+    expect(recordOf(result).parcelles.features).toHaveLength(1)
   })
 
   test('gère un numeroBio inconnu', async () => {
     const organismeCertificateur = { id: 1, nom: 'Ecocert France' }
-    const recordWithUnknownBio = [{
+    const recordWithUnknownBio = {
       numeroBio: 'UNKNOWN',
       numeroClient: '100012',
       dateAudit: '2023-04-27',
       parcelles: []
-    }]
+    }
 
     vi.mocked(mockFetchOperatorByNumeroBio).mockRejectedValueOnce(new Error('Numéro bio inconnu'))
 
-    const generator = parseAPIParcellaireStream(recordWithUnknownBio, { organismeCertificateur })
-    const result = await generator.next()
+    const result = await parseAPIParcellaire(recordWithUnknownBio, { organismeCertificateur })
 
-    expect(result.value).toMatchObject({
+    expect(result).toMatchObject({
       numeroBio: 'UNKNOWN',
       errors: expect.arrayContaining([
         expect.objectContaining({
@@ -97,12 +108,12 @@ describe('parseAPIParcellaireStream', () => {
 
   test('gère un opérateur sans activité de production', async () => {
     const organismeCertificateur = { id: 1, nom: 'Ecocert France' }
-    const record = [{
+    const record = {
       numeroBio: '12345',
       numeroClient: '100012',
       dateAudit: '2023-04-27',
       parcelles: []
-    }]
+    }
 
     vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(buildOperator({
       isProduction: false,
@@ -113,10 +124,9 @@ describe('parseAPIParcellaireStream', () => {
       }
     }))
 
-    const generator = parseAPIParcellaireStream(record, { organismeCertificateur })
-    const result = await generator.next()
+    const result = await parseAPIParcellaire(record, { organismeCertificateur })
 
-    expect(result.value).toMatchObject({
+    expect(result).toMatchObject({
       numeroBio: '12345',
       errors: expect.arrayContaining([
         expect.objectContaining({
@@ -128,12 +138,12 @@ describe('parseAPIParcellaireStream', () => {
 
   test('gère un numéro client différent', async () => {
     const organismeCertificateur = { id: 1, nom: 'Ecocert France' }
-    const record = [{
+    const record = {
       numeroBio: '99999',
       numeroClient: 'WRONG_CLIENT',
       dateAudit: '2023-04-27',
       parcelles: []
-    }]
+    }
 
     vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(buildOperator({
       isProduction: true,
@@ -144,10 +154,9 @@ describe('parseAPIParcellaireStream', () => {
       }
     }))
 
-    const generator = parseAPIParcellaireStream(record, { organismeCertificateur })
-    const result = await generator.next()
+    const result = await parseAPIParcellaire(record, { organismeCertificateur })
 
-    expect(result.value).toMatchObject({
+    expect(result).toMatchObject({
       numeroBio: '99999',
       errors: expect.arrayContaining([
         expect.objectContaining({
@@ -159,7 +168,7 @@ describe('parseAPIParcellaireStream', () => {
 
   test('gère une géométrie invalide', async () => {
     const organismeCertificateur = { id: 1, nom: 'Ecocert France' }
-    const recordWithInvalidGeom = [{
+    const recordWithInvalidGeom = {
       numeroBio: '101903',
       numeroClient: '110077',
       dateAudit: '2023-06-23',
@@ -174,7 +183,7 @@ describe('parseAPIParcellaireStream', () => {
           unite: 'ha'
         }]
       }]
-    }]
+    }
 
     vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(buildOperator({
       isProduction: true,
@@ -185,10 +194,9 @@ describe('parseAPIParcellaireStream', () => {
       }
     }))
 
-    const generator = parseAPIParcellaireStream(recordWithInvalidGeom, { organismeCertificateur })
-    const result = await generator.next()
+    const result = await parseAPIParcellaire(recordWithInvalidGeom, { organismeCertificateur })
 
-    expect(result.value).toMatchObject({
+    expect(result).toMatchObject({
       numeroBio: '101903',
       errors: expect.arrayContaining([
         expect.objectContaining({
@@ -200,7 +208,7 @@ describe('parseAPIParcellaireStream', () => {
 
   test('gère des coordonnées NaN dans la géométrie', async () => {
     const organismeCertificateur = { id: 1, nom: 'Ecocert France' }
-    const recordWithNaNGeom = [{
+    const recordWithNaNGeom = {
       numeroBio: '101903',
       numeroClient: '110077',
       dateAudit: '2023-06-23',
@@ -215,7 +223,7 @@ describe('parseAPIParcellaireStream', () => {
           unite: 'ha'
         }]
       }]
-    }]
+    }
 
     vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(buildOperator({
       isProduction: true,
@@ -226,10 +234,9 @@ describe('parseAPIParcellaireStream', () => {
       }
     }))
 
-    const generator = parseAPIParcellaireStream(recordWithNaNGeom, { organismeCertificateur })
-    const result = await generator.next()
+    const result = await parseAPIParcellaire(recordWithNaNGeom, { organismeCertificateur })
 
-    expect(result.value).toMatchObject({
+    expect(result).toMatchObject({
       numeroBio: '101903',
       errors: expect.arrayContaining([
         expect.objectContaining({
@@ -242,7 +249,7 @@ describe('parseAPIParcellaireStream', () => {
   test('gère des coordonnées Infinity dans la géométrie', async () => {
     const organismeCertificateur = { id: 1, nom: 'Ecocert France' }
     // JSON.parse ne peut pas sérialiser Infinity, on passe par une string JSON custom
-    const recordWithInfinityGeom = [{
+    const recordWithInfinityGeom = {
       numeroBio: '101903',
       numeroClient: '110077',
       dateAudit: '2023-06-23',
@@ -257,7 +264,7 @@ describe('parseAPIParcellaireStream', () => {
           unite: 'ha'
         }]
       }]
-    }]
+    }
 
     vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(buildOperator({
       isProduction: true,
@@ -268,10 +275,9 @@ describe('parseAPIParcellaireStream', () => {
       }
     }))
 
-    const generator = parseAPIParcellaireStream(recordWithInfinityGeom, { organismeCertificateur })
-    const result = await generator.next()
+    const result = await parseAPIParcellaire(recordWithInfinityGeom, { organismeCertificateur })
 
-    expect(result.value).toMatchObject({
+    expect(result).toMatchObject({
       numeroBio: '101903',
       errors: expect.arrayContaining([
         expect.objectContaining({
@@ -283,7 +289,7 @@ describe('parseAPIParcellaireStream', () => {
 
   test('gère des cultures absentes', async () => {
     const organismeCertificateur = { id: 1, nom: 'Ecocert France' }
-    const recordWithNoCultures = [{
+    const recordWithNoCultures = {
       numeroBio: '172301',
       numeroClient: '195931',
       dateAudit: '2023-03-30',
@@ -293,7 +299,7 @@ describe('parseAPIParcellaireStream', () => {
         etatProduction: 'C1',
         culture: []
       }]
-    }]
+    }
 
     vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(buildOperator({
       isProduction: true,
@@ -304,10 +310,9 @@ describe('parseAPIParcellaireStream', () => {
       }
     }))
 
-    const generator = parseAPIParcellaireStream(recordWithNoCultures, { organismeCertificateur })
-    const result = await generator.next()
+    const result = await parseAPIParcellaire(recordWithNoCultures, { organismeCertificateur })
 
-    expect(result.value).toMatchObject({
+    expect(result).toMatchObject({
       numeroBio: '172301',
       errors: expect.arrayContaining([
         expect.objectContaining({
@@ -319,7 +324,7 @@ describe('parseAPIParcellaireStream', () => {
 
   test('gère un etatProduction invalide', async () => {
     const organismeCertificateur = { id: 1, nom: 'Ecocert France' }
-    const recordWithInvalidState = [{
+    const recordWithInvalidState = {
       numeroBio: '77777',
       numeroClient: '100012',
       dateAudit: '2023-04-27',
@@ -333,7 +338,7 @@ describe('parseAPIParcellaireStream', () => {
           unite: '%'
         }]
       }]
-    }]
+    }
 
     vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(buildOperator({
       isProduction: true,
@@ -344,10 +349,9 @@ describe('parseAPIParcellaireStream', () => {
       }
     }))
 
-    const generator = parseAPIParcellaireStream(recordWithInvalidState, { organismeCertificateur })
-    const result = await generator.next()
+    const result = await parseAPIParcellaire(recordWithInvalidState, { organismeCertificateur })
 
-    expect(result.value).toMatchObject({
+    expect(result).toMatchObject({
       numeroBio: '77777',
       errors: expect.arrayContaining([
         expect.objectContaining({
@@ -359,7 +363,7 @@ describe('parseAPIParcellaireStream', () => {
 
   test('gère une dateEngagement manquante pour une parcelle en conversion', async () => {
     const organismeCertificateur = { id: 1, nom: 'Ecocert France' }
-    const recordWithMissingDate = [{
+    const recordWithMissingDate = {
       numeroBio: '172301',
       numeroClient: '195931',
       dateAudit: '2023-03-30',
@@ -374,7 +378,7 @@ describe('parseAPIParcellaireStream', () => {
           unite: '%'
         }]
       }]
-    }]
+    }
 
     vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(buildOperator({
       isProduction: true,
@@ -385,10 +389,9 @@ describe('parseAPIParcellaireStream', () => {
       }
     }))
 
-    const generator = parseAPIParcellaireStream(recordWithMissingDate, { organismeCertificateur })
-    const result = await generator.next()
+    const result = await parseAPIParcellaire(recordWithMissingDate, { organismeCertificateur })
 
-    expect(result.value).toMatchObject({
+    expect(result).toMatchObject({
       numeroBio: '172301',
       errors: expect.arrayContaining([
         expect.objectContaining({
@@ -419,13 +422,13 @@ describe('parseAPIParcellaireStream', () => {
       organismeCertificateur: { id: 1, nom: 'Ecocert France', numeroClient: '100012' }
     }))
 
-    const result = await parseAPIParcellaireStream(record, { organismeCertificateur }).next()
-    expect(recordOf(result.value).numerobio).toBe('99999')
+    const result = await parseAPIParcellaire(record, { organismeCertificateur })
+    expect(recordOf(result).numerobio).toBe('99999')
   })
 
   test('retourne toutes les erreurs d’une même parcelle', async () => {
     const organismeCertificateur = { id: 1, nom: 'Ecocert France' }
-    const record = [{
+    const record = {
       numeroBio: '77777',
       numeroClient: '100012',
       dateAudit: '2023-04-27',
@@ -434,7 +437,7 @@ describe('parseAPIParcellaireStream', () => {
         etatProduction: 'invalide',
         geom: 'géométrie invalide'
       }]
-    }]
+    }
 
     vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(buildOperator({
       isProduction: true,
@@ -445,10 +448,9 @@ describe('parseAPIParcellaireStream', () => {
       }
     }))
 
-    const generator = parseAPIParcellaireStream(record, { organismeCertificateur })
-    const result = await generator.next()
+    const result = await parseAPIParcellaire(record, { organismeCertificateur })
 
-    expect(result.value?.errors).toEqual(expect.arrayContaining([
+    expect(result.errors).toEqual(expect.arrayContaining([
       expect.objectContaining({ idParcelle: '45742', code: 'INVALID_ETAT_PRODUCTION' }),
       expect.objectContaining({ idParcelle: '45742', code: 'MISSING_CULTURES' }),
       expect.objectContaining({ idParcelle: '45742', code: 'INVALID_GEOM' })
@@ -457,7 +459,7 @@ describe('parseAPIParcellaireStream', () => {
 
   test('retourne aucune erreur avec le code cpf de culture inconnu', async () => {
     const organismeCertificateur = { id: 1, nom: 'Ecocert France' }
-    const record = [{
+    const record = {
       numeroBio: '77777',
       numeroClient: '100012',
       dateAudit: '2023-04-27',
@@ -474,7 +476,7 @@ describe('parseAPIParcellaireStream', () => {
           unite: '%'
         }]
       }]
-    }]
+    }
 
     vi.mocked(mockFetchOperatorByNumeroBio).mockResolvedValueOnce(buildOperator({
       isProduction: true,
@@ -485,10 +487,9 @@ describe('parseAPIParcellaireStream', () => {
       }
     }))
 
-    const generator = parseAPIParcellaireStream(record, { organismeCertificateur })
-    const result = await generator.next()
+    const result = await parseAPIParcellaire(record, { organismeCertificateur })
 
-    expect(result.value?.errors).toEqual(undefined)
+    expect(result.errors).toEqual(undefined)
   })
 })
 
@@ -498,8 +499,6 @@ describe('getCurrentStatusJobs', () => {
   })
 
   test("retourne une erreur si aucun job n'est trouvé", async () => {
-    mockedQuery().mockResolvedValueOnce(queryResult([]))
-
     const result = await getCurrentStatusJobs(99, 1)
 
     expect(result).toEqual({
@@ -510,38 +509,38 @@ describe('getCurrentStatusJobs', () => {
 
   test('retourne un job en statut DONE', async () => {
     const mockDate = new Date()
-    mockedQuery().mockResolvedValueOnce(queryResult([{
-        status: 'DONE',
-        result_job: { ok: true },
-        ended_at: mockDate
-      }]))
+    const id = await insertJob({
+      status: 'DONE',
+      resultJob: { ok: true },
+      endedAt: mockDate
+    })
 
-    const result = await getCurrentStatusJobs(1, 1)
+    const result = await getCurrentStatusJobs(id, 1)
 
     expect(result).toMatchObject({ status: 'DONE', result: { ok: true }, ended: mockDate })
   })
 
   test('retourne un job en statut PENDING', async () => {
     const mockDate = new Date()
-    mockedQuery().mockResolvedValueOnce(queryResult([{
-        status: 'PENDING',
-        created_at: mockDate
-      }]))
+    const id = await insertJob({
+      status: 'PENDING',
+      createdAt: mockDate
+    })
 
-    const result = await getCurrentStatusJobs(1, 1)
+    const result = await getCurrentStatusJobs(id, 1)
 
     expect(result).toMatchObject({ status: 'PENDING', created: mockDate })
   })
 
   test('retourne un job en statut ERROR', async () => {
     const mockDate = new Date()
-    mockedQuery().mockResolvedValueOnce(queryResult([{
-        status: 'ERROR',
-        result_job: 'Something went wrong',
-        ended_at: mockDate
-      }]))
+    const id = await insertJob({
+      status: 'ERROR',
+      resultJob: 'Something went wrong',
+      endedAt: mockDate
+    })
 
-    const result = await getCurrentStatusJobs(1, 1)
+    const result = await getCurrentStatusJobs(id, 1)
 
     expect(result).toMatchObject({ status: 'ERROR', error: 'Something went wrong', ended: mockDate })
   })
@@ -553,36 +552,27 @@ describe('updateImportJobStatus', () => {
   })
 
   test('met à jour le job avec le statut DONE', async () => {
-    mockedQuery().mockResolvedValueOnce(queryResult([]))
+    const id = await insertJob()
 
-    await updateImportJobStatus(1, 'DONE', { foo: 'bar' })
+    await updateImportJobStatus(id, 'DONE', { foo: 'bar' })
 
-    expect(mockPool.query).toHaveBeenCalledWith(
-      'UPDATE parcellaire_import SET status = $1, result_job = $2, ended_at = NOW() WHERE id = $3',
-      ['DONE', { foo: 'bar' }, 1]
-    )
+    expect(await findJob(id)).toMatchObject({ status: 'DONE', resultJob: { foo: 'bar' }, endedAt: expect.any(Date) })
   })
 
   test('met à jour le job avec le statut ERROR', async () => {
-    mockedQuery().mockResolvedValueOnce(queryResult([]))
+    const id = await insertJob()
 
-    await updateImportJobStatus(1, 'ERROR', { error: 'failed' })
+    await updateImportJobStatus(id, 'ERROR', { error: 'failed' })
 
-    expect(mockPool.query).toHaveBeenCalledWith(
-      'UPDATE parcellaire_import SET status = $1, result_job = $2, ended_at = NOW() WHERE id = $3',
-      ['ERROR', { error: 'failed' }, 1]
-    )
+    expect(await findJob(id)).toMatchObject({ status: 'ERROR', resultJob: { error: 'failed' }, endedAt: expect.any(Date) })
   })
 
   test('met à jour le job avec le statut PENDING', async () => {
-    mockedQuery().mockResolvedValueOnce(queryResult([]))
+    const id = await insertJob()
 
-    await updateImportJobStatus(1, 'PENDING', { progress: 50 })
+    await updateImportJobStatus(id, 'PENDING', { progress: 50 })
 
-    expect(mockPool.query).toHaveBeenCalledWith(
-      'UPDATE parcellaire_import SET status = $1, result_job = $2 WHERE id = $3',
-      ['PENDING', { progress: 50 }, 1]
-    )
+    expect(await findJob(id)).toMatchObject({ status: 'PENDING', resultJob: { progress: 50 }, endedAt: null })
   })
 })
 
@@ -592,18 +582,26 @@ describe('updateStatus', () => {
   })
 
   test('considère comme une création un renvoi après un import rejeté', async () => {
-    mockedQuery().mockResolvedValueOnce(queryResult([]))
+    await insertJob({
+      status: 'DONE',
+      statutJob: 'REJECTED',
+      numeroBio: '12345',
+      numeroClient: 'CLIENT-1',
+      auditDate: '2026-09-01'
+    })
+    const id = await insertJob()
 
-    await updateStatus(42, {
+    await updateStatus(id, {
       numeroBio: '12345',
       numeroClient: 'CLIENT-1',
       dateAudit: '2026-09-01'
     })
 
-    const [query, params] = mockedQuery().mock.calls[0]
-    expect(query).toContain('FROM cartobio_operators AS operator_record')
-    expect(query).toContain('operator_record.deleted_at IS NULL')
-    expect(query).not.toContain('FROM parcellaire_import AS previous_job')
-    expect(params).toEqual(['12345', 'CLIENT-1', '2026-09-01', 42])
+    expect(await findJob(id)).toMatchObject({
+      numeroBio: '12345',
+      numeroClient: 'CLIENT-1',
+      auditDate: '2026-09-01',
+      etat: 'CREATED'
+    })
   })
 })

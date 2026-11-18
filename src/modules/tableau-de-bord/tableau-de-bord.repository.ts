@@ -1,7 +1,8 @@
 import { and, asc, count, desc, eq, exists, gte, ilike, inArray, lte, or, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import { db } from '../../database/database.js'
-import { parcellaireImportLogs, parcellaireImportPayload, parcellairesImport } from '../../database/schema/index.js'
+import { parcellaireImportLogs, parcellaireImportPayload, parcellaireImport } from '../../database/schema/index.js'
+import { importJobResultEnumSchema, importStatusEnumSchema } from '../../database/validations/imports.js'
 import { getStreaksSuspectes } from './tableau-de-bord.utils.js'
 import type {
   GeneralKpiResponse,
@@ -26,18 +27,18 @@ import type {
 } from './tableau-de-bord.types.js'
 
 function organismeCondition(organismeCertificateur?: number): SQL {
-  return eq(parcellairesImport.organismeCertificateur, String(organismeCertificateur))
+  return eq(parcellaireImport.organismeCertificateur, String(organismeCertificateur))
 }
 
 function periodConditions({ from, to }: DateRange): SQL[] {
   const conditions: SQL[] = []
 
   if (from) {
-    conditions.push(gte(parcellairesImport.createdAt, new Date(from)))
+    conditions.push(gte(parcellaireImport.createdAt, new Date(from)))
   }
 
   if (to) {
-    conditions.push(lte(parcellairesImport.createdAt, new Date(to)))
+    conditions.push(lte(parcellaireImport.createdAt, new Date(to)))
   }
 
   return conditions
@@ -49,8 +50,8 @@ function rechercheCondition(recherche?: string): SQL | undefined {
   }
 
   return or(
-    ilike(parcellairesImport.numeroClient, `%${recherche}%`),
-    ilike(parcellairesImport.numeroBio, `%${recherche}%`)
+    ilike(parcellaireImport.numeroClient, `%${recherche}%`),
+    ilike(parcellaireImport.numeroBio, `%${recherche}%`)
   )
 }
 
@@ -86,14 +87,14 @@ async function getGeneralKpi({ from, to, organismeCertificateur }: DateRange): P
   const [[bilanRow], [anomalyRow]] = await Promise.all([
     db
       .select({
-        totalEnvoyes: sql<Numeric>`COALESCE(SUM((${parcellairesImport.resultJob}->>'count')::int), 0)`,
-        totalValides: sql<Numeric>`COALESCE(SUM(jsonb_array_length(${parcellairesImport.resultJob}->'numeroBioValid')), 0)`,
-        totalRejetes: sql<Numeric>`COALESCE(SUM(jsonb_array_length(${parcellairesImport.resultJob}->'numeroBioError')), 0)`
+        totalEnvoyes: sql<Numeric>`COALESCE(SUM((${parcellaireImport.resultJob}->>'count')::int), 0)`,
+        totalValides: sql<Numeric>`COALESCE(SUM(jsonb_array_length(${parcellaireImport.resultJob}->'numeroBioValid')), 0)`,
+        totalRejetes: sql<Numeric>`COALESCE(SUM(jsonb_array_length(${parcellaireImport.resultJob}->'numeroBioError')), 0)`
       })
-      .from(parcellairesImport)
+      .from(parcellaireImport)
       .where(
         and(
-          eq(parcellairesImport.status, 'DONE'),
+          eq(parcellaireImport.status, importStatusEnumSchema.enum.DONE),
           ...periodConditions({ from, to }),
           organismeCondition(organismeCertificateur)
         )
@@ -105,7 +106,7 @@ async function getGeneralKpi({ from, to, organismeCertificateur }: DateRange): P
         count: count()
       })
       .from(parcellaireImportLogs)
-      .innerJoin(parcellairesImport, eq(parcellairesImport.id, parcellaireImportLogs.importId))
+      .innerJoin(parcellaireImport, eq(parcellaireImport.id, parcellaireImportLogs.importId))
       .where(
         and(
           eq(parcellaireImportLogs.type, 'error'),
@@ -146,8 +147,8 @@ async function getTableauBilanRepo({
     organismeCondition(organismeCertificateur),
     ...periodConditions({ from, to }),
     rechercheCondition(recherche),
-    statuts?.length ? inArray(parcellairesImport.statutJob, statuts as StatutJob[]) : undefined,
-    etats?.length ? inArray(parcellairesImport.etat, etats as EtatJob[]) : undefined
+    statuts?.length ? inArray(parcellaireImport.statutJob, statuts as StatutJob[]) : undefined,
+    etats?.length ? inArray(parcellaireImport.etat, etats as EtatJob[]) : undefined
   )
 
   const ordre = ordreDate === 'asc' ? asc : desc
@@ -155,21 +156,21 @@ async function getTableauBilanRepo({
   const [rows, total] = await Promise.all([
     db
       .select({
-        jobId: parcellairesImport.id,
-        numeroClient: parcellairesImport.numeroClient,
-        numeroBio: parcellairesImport.numeroBio,
-        auditDate: parcellairesImport.auditDate,
-        statut: parcellairesImport.statutJob,
-        etat: parcellairesImport.etat,
-        createdAt: parcellairesImport.createdAt
+        jobId: parcellaireImport.id,
+        numeroClient: parcellaireImport.numeroClient,
+        numeroBio: parcellaireImport.numeroBio,
+        auditDate: parcellaireImport.auditDate,
+        statut: parcellaireImport.statutJob,
+        etat: parcellaireImport.etat,
+        createdAt: parcellaireImport.createdAt
       })
-      .from(parcellairesImport)
+      .from(parcellaireImport)
       .where(where)
-      .orderBy(ordre(parcellairesImport.createdAt))
+      .orderBy(ordre(parcellaireImport.createdAt))
       .limit(limit)
       .offset((page - 1) * limit),
 
-    db.$count(parcellairesImport, where)
+    db.$count(parcellaireImport, where)
   ])
 
   return {
@@ -193,7 +194,7 @@ async function getTableauErreursRepo({
   organismeCertificateur
 }: PaginationParams): Promise<TableauErreursResponse> {
   const where = and(
-    eq(parcellairesImport.statutJob, 'REJECTED'),
+    eq(parcellaireImport.statutJob, importJobResultEnumSchema.enum.REJECTED),
     organismeCondition(organismeCertificateur),
     ...periodConditions({ from, to }),
     rechercheCondition(recherche),
@@ -204,7 +205,7 @@ async function getTableauErreursRepo({
             .from(parcellaireImportLogs)
             .where(
               and(
-                eq(parcellaireImportLogs.importId, parcellairesImport.id),
+                eq(parcellaireImportLogs.importId, parcellaireImport.id),
                 eq(parcellaireImportLogs.type, 'error'),
                 inArray(parcellaireImportLogs.code, codes)
               )
@@ -218,21 +219,21 @@ async function getTableauErreursRepo({
   const [rows, total] = await Promise.all([
     db
       .select({
-        jobId: parcellairesImport.id,
-        statut: parcellairesImport.statutJob,
-        etat: parcellairesImport.etat,
-        numeroBio: parcellairesImport.numeroBio,
-        numeroClient: parcellairesImport.numeroClient,
-        auditDate: parcellairesImport.auditDate,
-        createdAt: parcellairesImport.createdAt
+        jobId: parcellaireImport.id,
+        statut: parcellaireImport.statutJob,
+        etat: parcellaireImport.etat,
+        numeroBio: parcellaireImport.numeroBio,
+        numeroClient: parcellaireImport.numeroClient,
+        auditDate: parcellaireImport.auditDate,
+        createdAt: parcellaireImport.createdAt
       })
-      .from(parcellairesImport)
+      .from(parcellaireImport)
       .where(where)
-      .orderBy(ordre(parcellairesImport.createdAt))
+      .orderBy(ordre(parcellaireImport.createdAt))
       .limit(limit)
       .offset((page - 1) * limit),
 
-    db.$count(parcellairesImport, where)
+    db.$count(parcellaireImport, where)
   ])
 
   const logsByJobId = await getErrorLogsByJobId(rows.map((row) => row.jobId))
@@ -258,21 +259,21 @@ async function getHistoriqueSpecificParcellaireRepo({
 }: HistoriqueParams): Promise<HistoriqueResponse> {
   const rows = await db
     .select({
-      jobId: parcellairesImport.id,
-      statut: parcellairesImport.statutJob,
-      etat: parcellairesImport.etat,
-      createdAt: parcellairesImport.createdAt
+      jobId: parcellaireImport.id,
+      statut: parcellaireImport.statutJob,
+      etat: parcellaireImport.etat,
+      createdAt: parcellaireImport.createdAt
     })
-    .from(parcellairesImport)
+    .from(parcellaireImport)
     .where(
       and(
         organismeCondition(organismeCertificateur),
-        numeroBio ? eq(parcellairesImport.numeroBio, numeroBio) : undefined,
-        numeroClient ? eq(parcellairesImport.numeroClient, numeroClient) : undefined,
-        auditDate ? eq(parcellairesImport.auditDate, auditDate) : undefined
+        numeroBio ? eq(parcellaireImport.numeroBio, numeroBio) : undefined,
+        numeroClient ? eq(parcellaireImport.numeroClient, numeroClient) : undefined,
+        auditDate ? eq(parcellaireImport.auditDate, auditDate) : undefined
       )
     )
-    .orderBy(desc(parcellairesImport.createdAt))
+    .orderBy(desc(parcellaireImport.createdAt))
 
   const jobIds = rows.map((row) => row.jobId)
 
@@ -313,8 +314,8 @@ async function getTopAnomaliesRepo({ from, to, organismeCertificateur }: DateRan
     return []
   }
 
-  const period = sql<Date>`date_trunc(${sql.raw(`'${getTruncate(from, to)}'`)}, ${parcellairesImport.createdAt})`.mapWith(
-    parcellairesImport.createdAt
+  const period = sql<Date>`date_trunc(${sql.raw(`'${getTruncate(from, to)}'`)}, ${parcellaireImport.createdAt})`.mapWith(
+    parcellaireImport.createdAt
   )
 
   const rows = await db
@@ -324,7 +325,7 @@ async function getTopAnomaliesRepo({ from, to, organismeCertificateur }: DateRan
       count: count()
     })
     .from(parcellaireImportLogs)
-    .innerJoin(parcellairesImport, eq(parcellairesImport.id, parcellaireImportLogs.importId))
+    .innerJoin(parcellaireImport, eq(parcellaireImport.id, parcellaireImportLogs.importId))
     .where(
       and(
         eq(parcellaireImportLogs.type, 'error'),
@@ -346,13 +347,13 @@ async function getTopAnomaliesGroupedRepo({ from, to, organismeCertificateur }: 
   const truncate = getTruncate(from, to)
   const unit = sql.raw(`'${truncate}'`)
   const interval = sql.raw(truncate === 'day' ? "'1 day'" : "'1 week'")
-  const periodOfImport = sql<Date>`date_trunc(${unit}, ${parcellairesImport.createdAt})`
+  const periodOfImport = sql<Date>`date_trunc(${unit}, ${parcellaireImport.createdAt})`
 
   const periodsCte = db
     .$with('periods')
     .as(
       db
-        .select({ period: sql<Date>`period`.mapWith(parcellairesImport.createdAt).as('period') })
+        .select({ period: sql<Date>`period`.mapWith(parcellaireImport.createdAt).as('period') })
         .from(
           sql`generate_series(date_trunc(${unit}, ${from}::timestamptz), date_trunc(${unit}, ${to}::timestamptz), ${interval}::interval) AS period`
         )
@@ -362,13 +363,13 @@ async function getTopAnomaliesGroupedRepo({ from, to, organismeCertificateur }: 
     db
       .select({
         period: periodOfImport.as('period'),
-        accepted: sql<number>`COUNT(*) FILTER (WHERE ${eq(parcellairesImport.statutJob, 'VALID')})`.as('accepted'),
+        accepted: sql<number>`COUNT(*) FILTER (WHERE ${eq(parcellaireImport.statutJob, importJobResultEnumSchema.enum.VALID)})`.as('accepted'),
         refused:
-          sql<number>`COUNT(*) FILTER (WHERE ${inArray(parcellairesImport.statutJob, ['REJECTED', 'ERROR'])})`.as(
+          sql<number>`COUNT(*) FILTER (WHERE ${inArray(parcellaireImport.statutJob, [importJobResultEnumSchema.enum.REJECTED, importJobResultEnumSchema.enum.ERROR])})`.as(
             'refused'
           )
       })
-      .from(parcellairesImport)
+      .from(parcellaireImport)
       .where(and(...periodConditions({ from, to }), organismeCondition(organismeCertificateur)))
       .groupBy(periodOfImport)
   )
@@ -381,7 +382,7 @@ async function getTopAnomaliesGroupedRepo({ from, to, organismeCertificateur }: 
         count: count().as('count')
       })
       .from(parcellaireImportLogs)
-      .innerJoin(parcellairesImport, eq(parcellairesImport.id, parcellaireImportLogs.importId))
+      .innerJoin(parcellaireImport, eq(parcellaireImport.id, parcellaireImportLogs.importId))
       .where(
         and(
           eq(parcellaireImportLogs.type, 'error'),
@@ -453,23 +454,23 @@ async function getEnvoisSuspectsRepo({
 }: PaginationParams): Promise<RepetitionsResponse> {
   const rows = await db
     .select({
-      jobId: parcellairesImport.id,
-      numeroBio: parcellairesImport.numeroBio,
-      numeroClient: parcellairesImport.numeroClient,
-      auditDate: parcellairesImport.auditDate,
-      statut: parcellairesImport.statutJob,
-      etat: parcellairesImport.etat,
-      createdAt: parcellairesImport.createdAt
+      jobId: parcellaireImport.id,
+      numeroBio: parcellaireImport.numeroBio,
+      numeroClient: parcellaireImport.numeroClient,
+      auditDate: parcellaireImport.auditDate,
+      statut: parcellaireImport.statutJob,
+      etat: parcellaireImport.etat,
+      createdAt: parcellaireImport.createdAt
     })
-    .from(parcellairesImport)
+    .from(parcellaireImport)
     .where(
       and(organismeCondition(organismeCertificateur), ...periodConditions({ from, to }), rechercheCondition(recherche))
     )
     .orderBy(
-      parcellairesImport.numeroBio,
-      parcellairesImport.numeroClient,
-      parcellairesImport.auditDate,
-      asc(parcellairesImport.createdAt)
+      parcellaireImport.numeroBio,
+      parcellaireImport.numeroClient,
+      parcellaireImport.auditDate,
+      asc(parcellaireImport.createdAt)
     )
 
   const logsByJobId = await getErrorLogsByJobId(rows.map((row) => row.jobId))

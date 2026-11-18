@@ -21,7 +21,7 @@ import geofoliaParcelles from './fixtures/geofolia-parcelles.js'
 import { normalizeRecord } from '../src/shared/outputs/record.js'
 import { surfaceForFeatureCollection, recordToApi } from '../src/shared/outputs/api.js'
 import {
-  collectFullValidationResults,
+  collectValidationResult,
   createImportJob,
   processFullJob
 } from '../src/modules/imports/imports.service.js'
@@ -57,7 +57,7 @@ const OTHER_OC_AUTH_TOKEN = 'zzzz-zzzz-zzzz-zzzz'
 const mockOnError = vi.fn()
 vi.mock('../src/modules/imports/imports.service.js', async (importOriginal) => ({
   ...(await importOriginal()),
-  collectFullValidationResults: vi.fn(),
+  collectValidationResult: vi.fn(),
   createImportJob: vi.fn(),
   processFullJob: vi.fn().mockResolvedValue(undefined),
   addErrorJob: vi.fn(),
@@ -1270,9 +1270,9 @@ describe('GET /api/v2/certification/parcellaires', () => {
 describe('POST /api/v2/certification/parcelles', () => {
   const postMock = vi.mocked(got.post)
 
-  const fakePayload = [{ numeroBio: '123', numeroClient: '1', parcelles: [] }]
+  const fakePayload = { numeroBio: '123', numeroClient: '1', parcelles: [] }
 
-  const collectFullValidationResultsMocked = collectFullValidationResults
+  const collectValidationResultMocked = collectValidationResult
   const createImportJobMocked = createImportJob
 
   beforeEach(() => {
@@ -1301,15 +1301,13 @@ describe('POST /api/v2/certification/parcelles', () => {
   })
 
   test('returns 200 when all records are valid', async () => {
-    vi.mocked(collectFullValidationResultsMocked).mockResolvedValue({
+    vi.mocked(collectValidationResultMocked).mockResolvedValue({
       errors: [],
-      validItems: [
-        {
-          numeroBio: '123',
-          record: { numerobio: '123', parcelles: { type: 'FeatureCollection', features: [] } },
-          warnings: []
-        }
-      ]
+      validItem: {
+        numeroBio: '123',
+        record: { numerobio: '123', parcelles: { type: 'FeatureCollection', features: [] } },
+        warnings: []
+      }
     })
 
     vi.mocked(createImportJobMocked).mockResolvedValue(42)
@@ -1328,55 +1326,12 @@ describe('POST /api/v2/certification/parcelles', () => {
       listeNumeroBioValides: ['123']
     })
 
-    expect(processFullJob).toHaveBeenCalledWith(42, expect.any(Array), expect.any(Array))
-  })
-
-  test('returns 207 when some records are invalid', async () => {
-    vi.mocked(collectFullValidationResultsMocked).mockResolvedValue({
-      validItems: [
-        {
-          numeroBio: '123',
-          record: { numerobio: '123', parcelles: { type: 'FeatureCollection', features: [] } },
-          warnings: []
-        }
-      ],
-      errors: [
-        {
-          numeroBio: '999',
-          message: 'Numéro bio inconnu du portail de notification',
-          code: 'UNKNOWN_NUMERO_BIO'
-        }
-      ]
-    })
-
-    vi.mocked(createImportJobMocked).mockResolvedValue(43)
-
-    const res = await request(app.server)
-      .post('/api/v2/certification/parcelles')
-      .set('Authorization', fakeOcToken)
-      .send(fakePayload)
-
-    expect(res.status).toBe(207)
-    expect(res.body).toMatchObject({
-      jobId: 43,
-      nbObjetAcceptes: 1,
-      nbObjetRefuses: 1,
-      listeNumeroBioValides: ['123'],
-      listeProblemes: [
-        {
-          numeroBio: '999',
-          code: 'UNKNOWN_NUMERO_BIO',
-          message: 'Numéro bio inconnu du portail de notification'
-        }
-      ]
-    })
-
-    expect(processFullJob).toHaveBeenCalledWith(43, expect.any(Array), expect.any(Array))
+    expect(processFullJob).toHaveBeenCalledWith(42, expect.any(Object))
   })
 
   test('returns 400 when all records are invalid', async () => {
-    vi.mocked(collectFullValidationResultsMocked).mockResolvedValue({
-      validItems: [],
+    vi.mocked(collectValidationResultMocked).mockResolvedValue({
+      validItem: null,
       errors: [
         {
           numeroBio: '123',

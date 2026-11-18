@@ -259,7 +259,7 @@ const STEPS: Step[] = [
     `
   },
   {
-    table: 'parcellaires_import',
+    table: 'parcellaire_import',
     extract: `
       SELECT id, status, organisme_certificateur,
         coalesce(created_at::timestamptz, now()) AS created_at,
@@ -367,7 +367,7 @@ async function main(): Promise<void> {
     const report: Row[] = []
     for (const step of STEPS) report.push(await run(source, target, step))
     await target.query(
-      "SELECT setval(pg_get_serial_sequence('parcellaires_import', 'id'), coalesce(max(id), 0) + 1, false) FROM parcellaires_import"
+      "SELECT setval(pg_get_serial_sequence('parcellaire_import', 'id'), coalesce(max(id), 0) + 1, false) FROM parcellaire_import"
     )
     await target.query('COMMIT')
     await source.query('COMMIT')

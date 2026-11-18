@@ -81,7 +81,7 @@ Les scripts npm sont regroupés par préfixe :
 | `test`, `test:*` | tests |
 | `db:*` | migrations de base de données |
 | `cron:*` | tâches planifiées (crontab des serveurs) |
-| `job:*` | scripts ponctuels (imports PAC, création d'imports de parcellaires) |
+| `job:*` | scripts ponctuels |
 
 Ouvrir :
 
@@ -210,18 +210,6 @@ docker run -i --rm postgres:15 psql -v ON_ERROR_STOP=1 -U postgres -h bdd-cartob
 ```
 
 **Remarque** : `bdd-cartobio` est un alias de `162.19.57.177` ; le port `5433` correspond à la base de production, et `5434` à la base de préprod.
-
-## Intégration des données du RPG bio
-
-Ces données sont utilisées pour la fonctionnalité d'import en un clic.
-Elles sont basées sur le [dump statique](#générer-les-fonds-de-carte) utilisé pour le fond de carte.
-
-```sh
-ogr2ogr -f PostgreSQL \
-  PG:'postgresql://postgres@bdd-cartobio:5433/postgres' rpg.gpkg \
-  -preserve_fid -nln rpg_bio -nlt POLYGON \
-  --config PG_USE_COPY YES --config OGR_TRUNCATE YES
-```
 
 ## Intégration des données des départements avec le demaine maritime
 

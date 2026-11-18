@@ -1,12 +1,12 @@
-import type { parcellairesImport } from '../../database/schema/index.js'
+import type { ImportJobEtat, ImportJobResult } from '../../database/validations/imports.js'
 
 export type OrdreTri = 'asc' | 'desc'
 
 export type Numeric = string | number | null
 
-export type StatutJob = (typeof parcellairesImport.statutJob.enumValues)[number]
+export type StatutJob = ImportJobResult
 
-export type EtatJob = (typeof parcellairesImport.etat.enumValues)[number]
+export type EtatJob = ImportJobEtat
 
 export type TypeStreak = 'envois' | 'refus'
 

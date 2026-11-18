@@ -4,15 +4,15 @@ import {
   getTopAnomaliesRepo
 } from '../../../src/modules/tableau-de-bord/tableau-de-bord.repository.js'
 import { db } from '../../../src/database/database.js'
-import { parcellaireImportLogs, parcellairesImport } from '../../../src/database/schema/index.js'
+import { parcellaireImportLogs, parcellaireImport } from '../../../src/database/schema/index.js'
 
 const organismeCertificateur = 7
 
-async function insertJob (job: Partial<typeof parcellairesImport.$inferInsert>): Promise<number> {
+async function insertJob (job: Partial<typeof parcellaireImport.$inferInsert>): Promise<number> {
   const [{ id }] = await db
-    .insert(parcellairesImport)
+    .insert(parcellaireImport)
     .values({ organismeCertificateur: String(organismeCertificateur), status: 'DONE', ...job })
-    .returning({ id: parcellairesImport.id })
+    .returning({ id: parcellaireImport.id })
 
   return id
 }

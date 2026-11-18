@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto'
-import JSONStream from 'jsonstream-next'
 import { polygon } from '@turf/helpers'
 import bboxPolygon from '@turf/bbox-polygon'
 import polygonInPolygon from '@turf/boolean-intersects'
@@ -7,13 +6,15 @@ import { fromCodeCpf } from '@agencebio/rosetta-cultures'
 import { CertificationState, EtatProduction, RegionBounds } from '@agencebio/cartobio-types'
 import type { AgenceBioNormalizedOperator, ImportJobStatusResponse, ImportSummary, CartoBioFeatureCollectionInput, CartoBioFeatureInput, CartoBioFeatureProperties, InputApiParcelle, InputApiRecord, NormalizedRecord, OrganismeCertificateur } from '@agencebio/cartobio-types'
 import type { Position } from 'geojson'
-import { InvalidRequestApiError } from '../../../shared/errors.js'
 import { getRandomFeatureId } from '../../../shared/outputs/features.js'
 import { normalizeEtatProduction } from '../../../shared/outputs/record.js'
 import { createOrUpdateOperatorRecord } from '../../../shared/parcellaires/parcellaires.service.js'
 import { parsePacDetailsFromComment, fetchOperatorByNumeroBio } from '../../../clients/agence-bio.client.js'
 import * as repository from '../imports.repository.js'
+import type { ImportJobListRow } from '../imports.types.js'
 import { withTransaction } from '../../../database/transaction.js'
+import { importJobResultEnumSchema, importStatusEnumSchema } from '../../../database/validations/imports.js'
+import type { ImportStatus } from '../../../database/validations/imports.js'
 import { logger } from '../../../config/logger.js'
 
 /**
@@ -52,24 +53,14 @@ const ImportLogType = {
 }
 
 type ImportWarning = { numeroBio: string, message: string, code: string }
-interface ImportJobListRow {
-  jobid?: number
-  id?: number
-  status: ImportSummary['status']
-  created_at: Date
-  started_at?: Date | null
-  ended_at: Date | null
-  numerobio: string | null
-  numeroclient: string | null
-  audit_date: string | null
-  result_job: Record<string, unknown> | null
-  payload: { id: number; payload: unknown } | null
-}
 type ImportJobStatusResult = ImportJobStatusResponse | { status: 'error'; error: string }
 type ValidItem = { record: Omit<Partial<NormalizedRecord>, 'parcelles'> & Pick<NormalizedRecord, 'numerobio'> & { parcelles: CartoBioFeatureCollectionInput }, numeroBio: string, warnings: ImportWarning[] }
 type RecordError = { message: string, code: string }
 type FeatureError = RecordError & { idParcelle?: string | number | null, nomParcelle?: string | null }
 type ErrorItem = FeatureError & { numeroBio?: string }
+type ParsedRecord =
+  | (ValidItem & { json: InputApiRecord; errors?: undefined })
+  | { numeroBio: string; errors: FeatureError[]; json: InputApiRecord; record?: undefined; warnings?: undefined }
 
 /**
  * Formate un préfixe d'identification de parcelle pour les messages d'erreur.
@@ -96,400 +87,358 @@ function buildFeatureError (parcelle: InputApiParcelle, message: string, code: s
   }
 }
 
-async function * parseAPIParcellaireStream (stream: AsyncIterable<unknown> | Iterable<unknown> | object, { organismeCertificateur }: { organismeCertificateur: OrganismeCertificateur }) {
-  const payloads = Symbol.asyncIterator in stream || Symbol.iterator in stream ? stream : [stream]
-  const streamRecords = (async function * (): AsyncGenerator<InputApiRecord> {
-    for await (const payload of payloads) {
-      if (Array.isArray(payload)) yield * payload
-      else yield payload as InputApiRecord
-    }
-  })()
+async function parseAPIParcellaire (payload: object, { organismeCertificateur }: { organismeCertificateur: OrganismeCertificateur }): Promise<ParsedRecord> {
+  const record = payload as InputApiRecord
+  const parcelleWarnings: ImportWarning[] = []
+  const recordErrors: RecordError[] = []
 
-  for await (const record of streamRecords) {
-    const parcelleWarnings: ImportWarning[] = []
-    const recordErrors: RecordError[] = []
+  const operator = await fetchOperator(String(record.numeroBio))
 
-    const operator = await fetchOperator(String(record.numeroBio))
-
-    if (operator == null) {
+  if (operator == null) {
+    recordErrors.push({
+      message: 'Numéro bio inconnu du portail de notification',
+      code: ImportLogType.UNKNOWN_NUMERO_BIO
+    })
+  } else {
+    if (!operator.isProduction) {
       recordErrors.push({
-        message: 'Numéro bio inconnu du portail de notification',
-        code: ImportLogType.UNKNOWN_NUMERO_BIO
+        message: 'Numéro bio sans notification liée à une activité de production',
+        code: ImportLogType.NOT_PRODUCTION
       })
-    } else {
-      if (!operator.isProduction) {
-        recordErrors.push({
-          message: 'Numéro bio sans notification liée à une activité de production',
-          code: ImportLogType.NOT_PRODUCTION
-        })
-      }
-      if (!operator.organismeCertificateur) {
-        recordErrors.push({
-          message: 'Aucun organisme certificateur pour ce numéro bio.',
-          code: ImportLogType.NO_OC
-        })
-      } else if (
-        !('numeroClient' in operator.organismeCertificateur) ||
-        operator.organismeCertificateur.numeroClient !== String(record.numeroClient)
-      ) {
-        recordErrors.push({
-          message: 'Numéro client différent',
-          code: ImportLogType.OC_MISMATCH
-        })
-      }
     }
-
-    if (
-      record.dateCertificationDebut &&
-      isNaN(Date.parse(record.dateCertificationDebut))
+    if (!operator.organismeCertificateur) {
+      recordErrors.push({
+        message: 'Aucun organisme certificateur pour ce numéro bio.',
+        code: ImportLogType.NO_OC
+      })
+    } else if (
+      !('numeroClient' in operator.organismeCertificateur) ||
+      operator.organismeCertificateur.numeroClient !== String(record.numeroClient)
     ) {
       recordErrors.push({
-        message: 'champ dateCertificationDebut incorrect',
-        code: ImportLogType.INVALID_DATE_CERTIFICATION_DEBUT
+        message: 'Numéro client différent',
+        code: ImportLogType.OC_MISMATCH
       })
     }
+  }
 
-    if (
-      record.dateCertificationFin &&
-      isNaN(Date.parse(record.dateCertificationFin))
-    ) {
-      recordErrors.push({
-        message: 'champ dateCertificationFin incorrect',
-        code: ImportLogType.INVALID_DATE_CERTIFICATION_FIN
-      })
-    }
+  if (
+    record.dateCertificationDebut &&
+    isNaN(Date.parse(record.dateCertificationDebut))
+  ) {
+    recordErrors.push({
+      message: 'champ dateCertificationDebut incorrect',
+      code: ImportLogType.INVALID_DATE_CERTIFICATION_DEBUT
+    })
+  }
 
-    if (!record.dateCertificationDebut || !record.dateCertificationFin) {
-      recordErrors.push({
-        message: 'Opérateur certifié sans dates de certification renseignées',
-        code: ImportLogType.MISSING_CERTIFICATION_DATES
-      })
-    }
+  if (
+    record.dateCertificationFin &&
+    isNaN(Date.parse(record.dateCertificationFin))
+  ) {
+    recordErrors.push({
+      message: 'champ dateCertificationFin incorrect',
+      code: ImportLogType.INVALID_DATE_CERTIFICATION_FIN
+    })
+  }
 
-    if (isNaN(Date.parse(record.dateAudit))) {
-      recordErrors.push({
-        message: 'champ dateAudit incorrect',
-        code: ImportLogType.INVALID_DATE_AUDIT
-      })
-    }
+  if (!record.dateCertificationDebut || !record.dateCertificationFin) {
+    recordErrors.push({
+      message: 'Opérateur certifié sans dates de certification renseignées',
+      code: ImportLogType.MISSING_CERTIFICATION_DATES
+    })
+  }
 
-    const featureErrors: FeatureError[] = []
+  if (isNaN(Date.parse(record.dateAudit))) {
+    recordErrors.push({
+      message: 'champ dateAudit incorrect',
+      code: ImportLogType.INVALID_DATE_AUDIT
+    })
+  }
 
-    const features = await Promise.all(
-      record.parcelles.map(async (parcelle) => {
-        const id = String(parcelle.id ?? getRandomFeatureId())
-        const cultures = parcelle.culture ?? parcelle.cultures
-        const pac = parsePacDetailsFromComment(parcelle.commentaire)
-        const numeroIlot = parseInt(String(parcelle.numeroIlot), 10)
-        const numeroParcelle = parseInt(String(parcelle.numeroParcelle), 10)
+  const featureErrors: FeatureError[] = []
 
-        if (!Number.isNaN(numeroIlot) && numeroIlot !== 0 && (parcelle.enAttentePac === true || parcelle.enAttentePac === 1)) {
-          parcelle.enAttentePac = false
-          parcelleWarnings.push({
-            numeroBio: String(record.numeroBio),
-            message: `Parcelle ${id ?? ''} acceptée mais ne peut être en attente PAC car un ilôt PAC est renseigné`,
-            code: ImportLogType.PAC_PENDING_WITH_ILOT
-          })
-        }
+  const features = await Promise.all(
+    record.parcelles.map(async (parcelle) => {
+      const id = String(parcelle.id ?? getRandomFeatureId())
+      const cultures = parcelle.culture ?? parcelle.cultures
+      const pac = parsePacDetailsFromComment(parcelle.commentaire)
+      const numeroIlot = parseInt(String(parcelle.numeroIlot), 10)
+      const numeroParcelle = parseInt(String(parcelle.numeroParcelle), 10)
 
-        let conversionNiveau: string | undefined
-        try {
-          conversionNiveau =
-            parcelle.etatProduction &&
-            normalizeEtatProduction(parcelle.etatProduction, { strict: true })
-          if (
-            conversionNiveau !== null &&
-            [EtatProduction.C1, EtatProduction.C2, EtatProduction.C3].some((etat) => etat === conversionNiveau) &&
-            !Date.parse(parcelle.dateEngagement)
-          ) {
-            featureErrors.push(buildFeatureError(
-              parcelle,
-              "Champ date d'engagement obligatoire lorsque que la parcelle est en conversion",
-              ImportLogType.MISSING_DATE_ENGAGEMENT
-            ))
-          }
-        } catch (error) {
-          logger.warn({ err: error }, 'champ etatProduction incorrect')
-          featureErrors.push(buildFeatureError(parcelle, 'champ etatProduction incorrect', ImportLogType.INVALID_ETAT_PRODUCTION))
-        }
-        const properties: CartoBioFeatureProperties = {
-          id,
-          cultures: cultures?.map(
-            ({ codeCPF, quantite, variete = '', dateSemis = '', unite }) => ({
-              id: randomUUID(),
-              CPF: codeCPF,
-              date_semis: dateSemis,
-              surface: parseFloat(String(quantite)),
-              unit: unite,
-              variete
-            })
-          ),
-          NUMERO_I: Number.isNaN(numeroIlot)
-            ? pac
-              ? pac.numeroIlot ?? null
-              : null
-            : String(numeroIlot),
-          NUMERO_P: Number.isNaN(numeroParcelle)
-            ? pac
-              ? pac.numeroParcelle ?? null
-              : null
-            : String(numeroParcelle),
-          PACAGE: record.numeroPacage ? String(record.numeroPacage) : null,
-          conversion_niveau: conversionNiveau ?? '',
-          engagement_date: parcelle.dateEngagement ?? null,
-          auditeur_notes: parcelle.commentaire ?? null,
-          TYPE: parcelle.codeCulture ?? null,
-          CODE_VAR: parcelle.codePrecision ?? null,
-          COMMUNE: parcelle.commune ?? null,
-          NOM: parcelle.nom ?? null,
-          attente_pac: parcelle.enAttentePac === true || parcelle.enAttentePac === 1
-        }
-
-        if (parcelle.dateEngagement && !Date.parse(parcelle.dateEngagement)) {
-          featureErrors.push(buildFeatureError(parcelle, 'champ dateEngagement incorrect', ImportLogType.INVALID_DATE_ENGAGEMENT))
-        }
-        if (!cultures?.length) {
-          featureErrors.push(buildFeatureError(parcelle, 'cultures absentes', ImportLogType.MISSING_CULTURES))
-        }
-
-        const invalidCodes = (cultures ?? [])
-          .filter((c) => !fromCodeCpf(c.codeCPF))
-          .map((c) => c.codeCPF)
-
-        if (invalidCodes.length > 0) {
-          featureErrors.push(buildFeatureError(parcelle, `cultures inconnues: ${invalidCodes.join(', ')}`, ImportLogType.INVALID_CPF))
-        }
-
-        let coordinates: Position[][] = []
-
-        if (
-          parcelle.geom === null ||
-          parcelle.geom === undefined ||
-          parcelle.geom === '' ||
-          parcelle.geom === 'null'
-        ) {
-          parcelleWarnings.push({
-            numeroBio: String(record.numeroBio),
-            message: `Parcelle ${id ?? ''} n'a pas de géométrie`,
-            code: ImportLogType.MISSING_GEOM
-          })
-          const featureSansGeometrie: CartoBioFeatureInput = { type: 'Feature', id, geometry: null, properties }
-          return featureSansGeometrie
-        }
-
-        try {
-          coordinates = JSON.parse(parcelle.geom.replace(/}$/, ''))
-          coordinates.forEach((ring): void =>
-            ring.forEach(([x, y]): void => {
-              if (!Number.isFinite(x) || !Number.isFinite(y)) {
-                throw new Error('les coordonnées doivent être des nombres finis')
-              }
-              if (y > 90 || y < -90) {
-                throw new Error(
-                  'la latitude doit être comprise entre 90 et -90'
-                )
-              }
-
-              if (x > 180 || x < -180) {
-                throw new Error(
-                  'la longitude doit être comprise entre 180 et -180'
-                )
-              }
-            })
-          )
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error)
-          featureErrors.push(buildFeatureError(parcelle, 'champ geom incorrect : ' + message, ImportLogType.INVALID_GEOM))
-          return null
-        }
-
-        let resPolygon
-
-        try {
-          resPolygon = polygon(coordinates, properties, { id })
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error)
-          featureErrors.push(buildFeatureError(parcelle, 'champ geom incorrect : ' + message, ImportLogType.INVALID_GEOM))
-        }
-
-        if (!resPolygon) {
-          return null
-        }
-
-        for (const [, bbox] of Object.entries(RegionBounds)) {
-          const regionGeometry = bboxPolygon([bbox[0], bbox[1], bbox[2], bbox[3]])
-
-          if (polygonInPolygon(resPolygon, regionGeometry)) {
-            return resPolygon
-          }
-        }
-
+      if (!Number.isNaN(numeroIlot) && numeroIlot !== 0 && (parcelle.enAttentePac === true || parcelle.enAttentePac === 1)) {
+        parcelle.enAttentePac = false
         parcelleWarnings.push({
           numeroBio: String(record.numeroBio),
-          message: `Parcelle ${id ?? ''} en dehors des régions autorisées`,
-          code: ImportLogType.GEOM_OUT_OF_BOUNDS
+          message: `Parcelle ${id ?? ''} acceptée mais ne peut être en attente PAC car un ilôt PAC est renseigné`,
+          code: ImportLogType.PAC_PENDING_WITH_ILOT
         })
-        return resPolygon
-      })
-    )
-
-    const allErrors = [...recordErrors, ...featureErrors]
-
-    if (allErrors.length > 0) {
-      yield {
-        numeroBio: String(record.numeroBio),
-        errors: allErrors,
-        json: record
       }
-      continue
-    }
 
-    yield {
-      record: {
-        numerobio: String(record.numeroBio),
-        certification_state: CertificationState.CERTIFIED,
-        oc_id: organismeCertificateur.id,
-        oc_label: organismeCertificateur.nom,
-        parcelles: { type: 'FeatureCollection' as const, features: features.filter((f) => f !== null) },
-        audit_notes: record.commentaire,
-        certification_date_debut: record.dateCertificationDebut,
-        certification_date_fin: record.dateCertificationFin,
-        audit_date: new Date(record.dateAudit).toISOString(),
-        annee_reference_controle: record.anneeReferenceControle,
-        metadata: {
-          source: 'API Parcellaire',
-          sourceLastUpdate: new Date().toISOString(),
-          anneeAssolement: record.anneeAssolement
+      let conversionNiveau: string | undefined
+      try {
+        conversionNiveau =
+          parcelle.etatProduction &&
+          normalizeEtatProduction(parcelle.etatProduction, { strict: true })
+        if (
+          conversionNiveau !== null &&
+          [EtatProduction.C1, EtatProduction.C2, EtatProduction.C3].some((etat) => etat === conversionNiveau) &&
+          !Date.parse(parcelle.dateEngagement)
+        ) {
+          featureErrors.push(buildFeatureError(
+            parcelle,
+            "Champ date d'engagement obligatoire lorsque que la parcelle est en conversion",
+            ImportLogType.MISSING_DATE_ENGAGEMENT
+          ))
         }
-      },
+      } catch (error) {
+        logger.warn({ err: error }, 'champ etatProduction incorrect')
+        featureErrors.push(buildFeatureError(parcelle, 'champ etatProduction incorrect', ImportLogType.INVALID_ETAT_PRODUCTION))
+      }
+      const properties: CartoBioFeatureProperties = {
+        id,
+        cultures: cultures?.map(
+          ({ codeCPF, quantite, variete = '', dateSemis = '', unite }) => ({
+            id: randomUUID(),
+            CPF: codeCPF,
+            date_semis: dateSemis,
+            surface: parseFloat(String(quantite)),
+            unit: unite,
+            variete
+          })
+        ),
+        NUMERO_I: Number.isNaN(numeroIlot)
+          ? pac
+            ? pac.numeroIlot ?? null
+            : null
+          : String(numeroIlot),
+        NUMERO_P: Number.isNaN(numeroParcelle)
+          ? pac
+            ? pac.numeroParcelle ?? null
+            : null
+          : String(numeroParcelle),
+        PACAGE: record.numeroPacage ? String(record.numeroPacage) : null,
+        conversion_niveau: conversionNiveau ?? '',
+        engagement_date: parcelle.dateEngagement ?? null,
+        auditeur_notes: parcelle.commentaire ?? null,
+        TYPE: parcelle.codeCulture ?? null,
+        CODE_VAR: parcelle.codePrecision ?? null,
+        COMMUNE: parcelle.commune ?? null,
+        NOM: parcelle.nom ?? null,
+        attente_pac: parcelle.enAttentePac === true || parcelle.enAttentePac === 1
+      }
+
+      if (parcelle.dateEngagement && !Date.parse(parcelle.dateEngagement)) {
+        featureErrors.push(buildFeatureError(parcelle, 'champ dateEngagement incorrect', ImportLogType.INVALID_DATE_ENGAGEMENT))
+      }
+      if (!cultures?.length) {
+        featureErrors.push(buildFeatureError(parcelle, 'cultures absentes', ImportLogType.MISSING_CULTURES))
+      }
+
+      const invalidCodes = (cultures ?? [])
+        .filter((c) => !fromCodeCpf(c.codeCPF))
+        .map((c) => c.codeCPF)
+
+      if (invalidCodes.length > 0) {
+        featureErrors.push(buildFeatureError(parcelle, `cultures inconnues: ${invalidCodes.join(', ')}`, ImportLogType.INVALID_CPF))
+      }
+
+      let coordinates: Position[][] = []
+
+      if (
+        parcelle.geom === null ||
+        parcelle.geom === undefined ||
+        parcelle.geom === '' ||
+        parcelle.geom === 'null'
+      ) {
+        parcelleWarnings.push({
+          numeroBio: String(record.numeroBio),
+          message: `Parcelle ${id ?? ''} n'a pas de géométrie`,
+          code: ImportLogType.MISSING_GEOM
+        })
+        const featureSansGeometrie: CartoBioFeatureInput = { type: 'Feature', id, geometry: null, properties }
+        return featureSansGeometrie
+      }
+
+      try {
+        coordinates = JSON.parse(parcelle.geom.replace(/}$/, ''))
+        coordinates.forEach((ring): void =>
+          ring.forEach(([x, y]): void => {
+            if (!Number.isFinite(x) || !Number.isFinite(y)) {
+              throw new Error('les coordonnées doivent être des nombres finis')
+            }
+            if (y > 90 || y < -90) {
+              throw new Error(
+                'la latitude doit être comprise entre 90 et -90'
+              )
+            }
+
+            if (x > 180 || x < -180) {
+              throw new Error(
+                'la longitude doit être comprise entre 180 et -180'
+              )
+            }
+          })
+        )
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        featureErrors.push(buildFeatureError(parcelle, 'champ geom incorrect : ' + message, ImportLogType.INVALID_GEOM))
+        return null
+      }
+
+      let resPolygon
+
+      try {
+        resPolygon = polygon(coordinates, properties, { id })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        featureErrors.push(buildFeatureError(parcelle, 'champ geom incorrect : ' + message, ImportLogType.INVALID_GEOM))
+      }
+
+      if (!resPolygon) {
+        return null
+      }
+
+      for (const [, bbox] of Object.entries(RegionBounds)) {
+        const regionGeometry = bboxPolygon([bbox[0], bbox[1], bbox[2], bbox[3]])
+
+        if (polygonInPolygon(resPolygon, regionGeometry)) {
+          return resPolygon
+        }
+      }
+
+      parcelleWarnings.push({
+        numeroBio: String(record.numeroBio),
+        message: `Parcelle ${id ?? ''} en dehors des régions autorisées`,
+        code: ImportLogType.GEOM_OUT_OF_BOUNDS
+      })
+      return resPolygon
+    })
+  )
+
+  const allErrors = [...recordErrors, ...featureErrors]
+
+  if (allErrors.length > 0) {
+    return {
       numeroBio: String(record.numeroBio),
-      warnings: parcelleWarnings,
+      errors: allErrors,
       json: record
     }
   }
-}
 
-/**
- * Consomme intégralement le générateur parseAPIParcellaireStream et sépare
- * les enregistrements valides des erreurs. C'est la seule passe de validation :
- * les validItems retournés contiennent les records déjà parsés et prêts pour l'insert.
- *
- * @param stream Flux JSON contenant des enregistrements parcellaire.
- * @throws {@link InvalidRequestApiError} Si le JSON est invalide.
- */
-async function collectFullValidationResults (stream: NodeJS.ReadableStream, { organismeCertificateur }: { organismeCertificateur: OrganismeCertificateur }, jobId: number): Promise<{ errors: ErrorItem[]; validItems: ValidItem[] }> {
-  const errors: ErrorItem[] = []
-  const validItems: ValidItem[] = []
-  const items: InputApiRecord[] = []
-  let statusUpdated = false
-
-  try {
-    const jsonStream = stream.pipe(JSONStream.parse([]))
-    for await (const { record, numeroBio, errors: recordErrors, warnings, json } of parseAPIParcellaireStream(jsonStream, { organismeCertificateur })) {
-      if (!statusUpdated && json) {
-        await updateStatus(jobId, json)
-        statusUpdated = true
+  return {
+    record: {
+      numerobio: String(record.numeroBio),
+      certification_state: CertificationState.CERTIFIED,
+      oc_id: organismeCertificateur.id,
+      oc_label: organismeCertificateur.nom,
+      parcelles: { type: 'FeatureCollection' as const, features: features.filter((f) => f !== null) },
+      audit_notes: record.commentaire,
+      certification_date_debut: record.dateCertificationDebut,
+      certification_date_fin: record.dateCertificationFin,
+      audit_date: new Date(record.dateAudit).toISOString(),
+      annee_reference_controle: record.anneeReferenceControle,
+      metadata: {
+        source: 'API Parcellaire',
+        sourceLastUpdate: new Date().toISOString(),
+        anneeAssolement: record.anneeAssolement
       }
-      if (recordErrors?.length) {
-        errors.push(...recordErrors.map(err => ({ numeroBio, ...err })))
-      } else if (record) {
-        validItems.push({ record, numeroBio, warnings: warnings ?? [] })
-      }
-      items.push(json)
-    }
-  } catch (error) {
-    if (
-      error instanceof Error &&
-      (error.message.startsWith('Invalid JSON') ||
-        error.message.startsWith('Unexpected '))
-    ) {
-      throw new InvalidRequestApiError('Le fichier JSON est invalide.')
-    }
-    throw error
+    },
+    numeroBio: String(record.numeroBio),
+    warnings: parcelleWarnings,
+    json: record
   }
-  await addPayload(items, jobId)
-
-  return { errors, validItems }
 }
 
 /**
- * Insère en base de données les enregistrements déjà validés.
+ * Seule passe de validation : le validItem retourné contient le record déjà parsé et prêt pour l'insert.
+ */
+async function collectValidationResult (payload: object, { organismeCertificateur }: { organismeCertificateur: OrganismeCertificateur }, jobId: number): Promise<{ errors: ErrorItem[]; validItem: ValidItem | null }> {
+  const json = payload as InputApiRecord
+  await updateStatus(jobId, json)
+  const { record, numeroBio, errors: recordErrors, warnings } = await parseAPIParcellaire(json, { organismeCertificateur })
+  await addPayload(json, jobId)
+
+  if (recordErrors?.length || !record) {
+    return { errors: (recordErrors ?? []).map(err => ({ numeroBio, ...err })), validItem: null }
+  }
+
+  return { errors: [], validItem: { record, numeroBio, warnings: warnings ?? [] } }
+}
+
+/**
+ * Insère en base de données l'enregistrement déjà validé.
  * Ne refait aucune validation métier : collecte uniquement les warnings post-insert
  * (corrections géométriques) et met à jour le job.
- *
- * @param validItems Records déjà validés par collectFullValidationResults.
- * @param errors Erreurs déjà collectées lors de la validation.
  */
-async function parcellaireValidItemsToDb (validItems: ValidItem[], errors: ErrorItem[], jobId: number): Promise<{
+async function parcellaireValidItemToDb ({ record, numeroBio, warnings }: ValidItem, jobId: number): Promise<{
     count: number
     errors: Array<{ numeroBio?: string; code: string; message: string }>
     warning: Array<[string, ImportWarning[]]>
     numeroBioValid: Array<{ numeroBio: string; nbParcelles: number }>
     numeroBioError: Array<string | undefined>
 }> {
-  const count = validItems.length + errors.length
-  const dbErrors: Array<{ numeroBio?: string; code: string; message: string }> = [...errors]
+  const count = 1
+  const dbErrors: Array<{ numeroBio?: string; code: string; message: string }> = []
   const warning: Array<[string, ImportWarning[]]> = []
-  const numeroBioError: Array<string | undefined> = errors.map(({ numeroBio }) => numeroBio)
+  const numeroBioError: Array<string | undefined> = []
   const numeroBioValid: Array<{ numeroBio: string; nbParcelles: number }> = []
 
+  if (warnings.length > 0) {
+    warning.push([numeroBio, warnings])
+  }
+
   await withTransaction(async (client): Promise<void> => {
-    for (const { record, numeroBio, warnings } of validItems) {
-      if (warnings?.length > 0) {
-        warning.push([numeroBio, warnings])
-      }
+    try {
+      const { parcelles } = await createOrUpdateOperatorRecord(record, null, client)
+      const parcellesCorrigees = parcelles
+        .filter(f => f.statut_import_geom === 'CORRIGE')
+        .map(f => f.id)
+        .filter(Boolean)
 
-      try {
-        const { parcelles } = await createOrUpdateOperatorRecord(record, null, client)
-        const parcellesCorrigees = parcelles
-          .filter(f => f.statut_import_geom === 'CORRIGE')
-          .map(f => f.id)
-          .filter(Boolean)
+      const parcellesNonCorrigees = parcelles
+        .filter(f => f.statut_import_geom === 'ACCEPTENONCORRIGE')
+        .map(f => f.id)
+        .filter(Boolean)
 
-        const parcellesNonCorrigees = parcelles
-          .filter(f => f.statut_import_geom === 'ACCEPTENONCORRIGE')
-          .map(f => f.id)
-          .filter(Boolean)
-
-        const correctionWarnings: ImportWarning[] = []
-        if (parcellesCorrigees.length > 0) {
-          correctionWarnings.push({
-            numeroBio,
-            message: `Ces parcelles ont été corrigées : ${parcellesCorrigees.join(', ')}`,
-            code: ImportLogType.GEOM_CORRECTED
-          })
-        }
-
-        if (parcellesNonCorrigees.length > 0) {
-          correctionWarnings.push({
-            numeroBio,
-            message: `Ces parcelles n'ont pas été corrigées mais sont invalides : ${parcellesNonCorrigees.join(', ')}`,
-            code: ImportLogType.GEOM_INVALID_NOT_CORRECTED
-          })
-        }
-
-        if (correctionWarnings.length > 0) {
-          warning.push([numeroBio, correctionWarnings])
-        }
-
-        numeroBioValid.push({
-          numeroBio: record.numerobio,
-          nbParcelles: record.parcelles.features.length
+      const correctionWarnings: ImportWarning[] = []
+      if (parcellesCorrigees.length > 0) {
+        correctionWarnings.push({
+          numeroBio,
+          message: `Ces parcelles ont été corrigées : ${parcellesCorrigees.join(', ')}`,
+          code: ImportLogType.GEOM_CORRECTED
         })
-      } catch (e) {
-        const apiError = e as { code?: string; message?: string }
-        if (apiError.code === 'INVALID_API_REQUEST' || apiError.code === 'MISSING_GEOMETRY') {
-          dbErrors.push({
-            numeroBio: record.numerobio,
-            message: apiError.message || 'Erreur de validation lors de l’import.',
-            code: apiError.code === 'MISSING_GEOMETRY' ? ImportLogType.MISSING_GEOM : ImportLogType.DB_ERROR
-          })
-          numeroBioError.push(record.numerobio)
-          continue
-        }
-        // noinspection ExceptionCaughtLocallyJS
-        throw e
       }
+
+      if (parcellesNonCorrigees.length > 0) {
+        correctionWarnings.push({
+          numeroBio,
+          message: `Ces parcelles n'ont pas été corrigées mais sont invalides : ${parcellesNonCorrigees.join(', ')}`,
+          code: ImportLogType.GEOM_INVALID_NOT_CORRECTED
+        })
+      }
+
+      if (correctionWarnings.length > 0) {
+        warning.push([numeroBio, correctionWarnings])
+      }
+
+      numeroBioValid.push({
+        numeroBio: record.numerobio,
+        nbParcelles: record.parcelles.features.length
+      })
+    } catch (e) {
+      const apiError = e as { code?: string; message?: string }
+      if (apiError.code === 'INVALID_API_REQUEST' || apiError.code === 'MISSING_GEOMETRY') {
+        dbErrors.push({
+          numeroBio: record.numerobio,
+          message: apiError.message || 'Erreur de validation lors de l’import.',
+          code: apiError.code === 'MISSING_GEOMETRY' ? ImportLogType.MISSING_GEOM : ImportLogType.DB_ERROR
+        })
+        numeroBioError.push(record.numerobio)
+        return
+      }
+      // noinspection ExceptionCaughtLocallyJS
+      throw e
     }
   })
 
@@ -524,15 +473,13 @@ async function createImportJob (organismeCertificateurId: number): Promise<numbe
 /**
  * Stocke le payload d'un job
  */
-async function addPayload (json: InputApiRecord[], jobId: number) {
+async function addPayload (json: InputApiRecord, jobId: number): Promise<InputApiRecord> {
   await repository.insertPayload(jobId, json)
 
-  const [firstRecord] = json
-
   await repository.updateImportJobRecordInfos(jobId, {
-    numeroBio: firstRecord?.numeroBio ? String(firstRecord.numeroBio) : null,
-    numeroClient: firstRecord?.numeroClient ? String(firstRecord.numeroClient) : null,
-    auditDate: firstRecord?.dateAudit && !isNaN(Date.parse(firstRecord.dateAudit)) ? new Date(firstRecord.dateAudit).toISOString() : null
+    numeroBio: json.numeroBio ? String(json.numeroBio) : null,
+    numeroClient: json.numeroClient ? String(json.numeroClient) : null,
+    auditDate: json.dateAudit && !isNaN(Date.parse(json.dateAudit)) ? new Date(json.dateAudit).toISOString() : null
   })
 
   return json
@@ -564,7 +511,7 @@ async function updateJobError (numeroBioValid: Array<string | number>, numeroBio
   return repository.completeImportJob({
     result: { count, errors: numeroBioError, warning, numeroBioValid, numeroBioError: [...new Set(numeroBioError.map(e => e.numeroBio))] },
     jobId,
-    statutJob: 'REJECTED'
+    statutJob: importJobResultEnumSchema.enum.REJECTED
   })
 }
 
@@ -578,11 +525,11 @@ async function getCurrentStatusJobs (id: number | string, organismeCertificateur
     return { status: 'error', error: "Aucun job n'a cet id" }
   }
 
-  if (job.status === 'PENDING' || job.status === 'CREATED') {
+  if (job.status === importStatusEnumSchema.enum.PENDING || job.status === importStatusEnumSchema.enum.CREATED) {
     return { status: job.status, created: job.created_at }
   }
 
-  if (job.status === 'DONE') {
+  if (job.status === importStatusEnumSchema.enum.DONE) {
     return {
       status: job.status,
       numeroBio: job.numerobio,
@@ -608,23 +555,20 @@ async function getCurrentStatusJobs (id: number | string, organismeCertificateur
  *
  * @param result Résultat ou détails associés au job.
  */
-async function updateImportJobStatus (jobId: number, status: 'CREATE' | 'PENDING' | 'DONE' | 'ERROR', result?: Record<string, unknown>): Promise<void> {
+async function updateImportJobStatus (jobId: number, status: ImportStatus, result?: Record<string, unknown>): Promise<void> {
   await repository.updateImportJobStatus(jobId, status, result)
 }
 
 /**
- * Exécute la phase d'insert d'un job : reçoit les validItems déjà validés,
+ * Exécute la phase d'insert d'un job : reçoit le validItem déjà validé,
  * fait uniquement l'insert en base et collecte les warnings post-insert.
  * Appelé en fire-and-forget après la réponse au client.
- *
- * @param validItems Records déjà validés par collectFullValidationResults.
- * @param errors Erreurs déjà collectées lors de la validation.
  */
-async function processFullJob (jobId: number, validItems: ValidItem[], errors: ErrorItem[]): Promise<void> {
-  await updateImportJobStatus(jobId, 'PENDING')
+async function processFullJob (jobId: number, validItem: ValidItem): Promise<void> {
+  await updateImportJobStatus(jobId, importStatusEnumSchema.enum.PENDING)
   try {
-    const result = await parcellaireValidItemsToDb(validItems, errors, jobId)
-    await repository.updateImportJobResult(jobId, result.errors.length > 0 ? 'REJECTED' : 'VALID')
+    const result = await parcellaireValidItemToDb(validItem, jobId)
+    await repository.updateImportJobResult(jobId, result.errors.length > 0 ? importJobResultEnumSchema.enum.REJECTED : importJobResultEnumSchema.enum.VALID)
   } catch (error) {
     logger.error({ err: error }, `Traitement du job d'import ${jobId} en échec`)
     const message = error instanceof Error ? error.message : String(error)
@@ -722,9 +666,9 @@ function normalizeJobReturn (row: ImportJobListRow): ImportSummary {
 
 export {
   ImportLogType,
-  parseAPIParcellaireStream,
-  collectFullValidationResults,
-  parcellaireValidItemsToDb,
+  parseAPIParcellaire,
+  collectValidationResult,
+  parcellaireValidItemToDb,
   updateImportJobStatus,
   createImportJob,
   processFullJob,

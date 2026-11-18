@@ -1,11 +1,12 @@
+import { importJobResultEnumSchema } from '../../database/validations/imports.js'
 import type { StreakSuspecte } from './tableau-de-bord.types.js'
 
 function getTypeEnvoi (statut: string | null): 'success' | 'echec' | null {
-  if (statut === 'VALID') {
+  if (statut === importJobResultEnumSchema.enum.VALID) {
     return 'success'
   }
 
-  if (statut === 'REJECTED' || statut === 'ERROR') {
+  if (statut === importJobResultEnumSchema.enum.REJECTED || statut === importJobResultEnumSchema.enum.ERROR) {
     return 'echec'
   }
 

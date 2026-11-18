@@ -12,7 +12,6 @@ updates:
       - dependency-name: "p-memoize"
       - dependency-name: "puppeteer"
       - dependency-name: "socks-proxy-agent"
-      - dependency-name: "strip-bom-stream"
 
   - package-ecosystem: "npm"
     directory: "/"
@@ -26,4 +25,3 @@ updates:
       - dependency-name: "p-memoize"
       - dependency-name: "puppeteer"
       - dependency-name: "socks-proxy-agent"
-      - dependency-name: "strip-bom-stream"

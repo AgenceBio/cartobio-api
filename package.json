@@ -124,7 +124,6 @@
     "puppeteer": "24.43.1",
     "reproject": "1.2.7",
     "socks-proxy-agent": "8.0.5",
-    "strip-bom-stream": "4.0.0",
     "validator": "13.15.35",
     "wkt": "0.1.1",
     "xlsx": "0.18.5",

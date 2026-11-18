@@ -5,10 +5,6 @@ import { anyGeometrySchema, bboxSchema } from './common.js'
 const optionalString = (description: string) => z.string().optional().meta({ description })
 const booleanString = (description: string) => optionalString(`${description} (\`true\` / \`false\`, défaut \`false\`)`)
 
-export const numeroPacageParamsSchema = z.object({
-  numeroPacage: z.string().regex(/^\d{9}$/).meta({ description: 'Numéro PACAGE sur 9 chiffres', examples: ['012345678'] })
-})
-
 const currentYear = new Date().getUTCFullYear()
 export const geofoliaQuerySchema = z.object({
   year: z.coerce.number().int().min(currentYear - 3).max(currentYear).default(currentYear)
@@ -93,7 +89,6 @@ export const importedFeatureCollectionSchema = z.object({
   bbox: bboxSchema
 })
 
-export type NumeroPacageParams = z.infer<typeof numeroPacageParamsSchema>
 export type GeofoliaQuery = z.infer<typeof geofoliaQuerySchema>
 export type EvvParams = z.infer<typeof evvParamsSchema>
 export type ImportListQuery = z.infer<typeof importListQuerySchema>

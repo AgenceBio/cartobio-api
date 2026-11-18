@@ -16,8 +16,7 @@ import {
   importedFeatureCollectionSchema,
   importIdParamsSchema,
   importListQuerySchema,
-  numeroBioParamsSchema,
-  numeroPacageParamsSchema
+  numeroBioParamsSchema
 } from '@agencebio/cartobio-types'
 import { z } from 'zod'
 import { apiError, commonErrorResponses, describedResponse, mergeSchemas, protectedWithToken, operatorFromNumeroBio, TAGS, withSchema } from '../../shared/routes.js'
@@ -52,14 +51,6 @@ export const convertAnyGeoSchema = withSchema(protectedWithToken(), {
   tags: [TAGS.IMPORT],
   summary: 'Convertir un fichier géographique en GeoJSON',
   description: 'Tout format lu par GDAL (GeoJSON, KML, GPKG, Shapefile zippé…), envoyé en multipart.',
-  response: featureCollectionResponse
-})
-
-export const pacageSchema = withSchema(ocOrCartobio(), {
-  operationId: 'getPacageParcelles',
-  tags: [TAGS.IMPORT],
-  summary: 'Parcelles RPG bio d\'un numéro PACAGE',
-  params: numeroPacageParamsSchema,
   response: featureCollectionResponse
 })
 
@@ -102,14 +93,13 @@ export const evvSchema = withSchema(operatorRoute(), {
 export const certificationParcellesSchema = withSchema(protectedWithToken({ oc: true }), {
   operationId: 'importParcellaires',
   tags: [TAGS.API_PARCELLAIRE],
-  summary: 'Envoyer des parcellaires',
-  description: 'Valide les parcellaires reçus puis les enregistre de façon asynchrone. Suivre l\'avancement avec `GET /api/v3/import/jobs/{id}`.',
-  body: z.unknown().meta({ description: 'Tableau de parcellaires (`numeroBio`, `numeroClient`, `dateAudit`, `parcelles`…), ou un parcellaire seul' }),
+  summary: 'Envoyer un parcellaire',
+  description: 'Valide le parcellaire reçu puis l\'enregistre de façon asynchrone. Suivre l\'avancement avec `GET /api/v3/import/jobs/{id}`.',
+  body: z.looseObject({}).meta({ description: 'Un parcellaire (`numeroBio`, `numeroClient`, `dateAudit`, `parcelles`…)' }),
   response: {
     ...commonErrorResponses,
-    202: importReportSchema.meta({ description: 'Tous les parcellaires sont acceptés, enregistrement en cours' }),
-    207: importReportSchema.meta({ description: 'Une partie des parcellaires est refusée, les autres sont en cours d\'enregistrement' }),
-    400: z.union([importReportSchema, apiErrorSchema]).meta({ description: 'Tous les parcellaires sont refusés (bilan de l\'envoi), ou corps illisible (erreur)' })
+    202: importReportSchema.meta({ description: 'Le parcellaire est accepté, enregistrement en cours' }),
+    400: z.union([importReportSchema, apiErrorSchema]).meta({ description: 'Le parcellaire est refusé (bilan de l\'envoi), ou corps illisible (erreur)' })
   }
 })
 

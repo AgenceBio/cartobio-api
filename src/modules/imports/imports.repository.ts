@@ -1,189 +1,261 @@
-import pool from '../../database/database.js'
+import { randomUUID } from 'node:crypto'
+import { and, asc, desc, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm'
+import type { SQL } from 'drizzle-orm'
+import { db } from '../../database/database.js'
+import {
+  organismeCertificateur,
+  parcellaireImportLogs,
+  parcellaireImportPayload,
+  parcellaires,
+  parcellaireImport,
+  parcellairesMetadata
+} from '../../database/schema/index.js'
+import {
+  createImportJobSchema,
+  createImportLogSchema,
+  createImportPayloadSchema,
+  importJobEtatEnumSchema,
+  importJobResultEnumSchema,
+  importStatusEnumSchema,
+  updateImportJobSchema
+} from '../../database/validations/imports.js'
+import type { ImportJobResult, ImportStatus } from '../../database/validations/imports.js'
 import type { DBOperatorRecord } from '@agencebio/cartobio-types'
-
-export type ImportJobStatus = 'CREATE' | 'CREATED' | 'PENDING' | 'DONE' | 'ERROR'
-
-export type ImportJobResult = 'REJECTED' | 'VALID' | 'ERROR'
-
-export interface ImportJobRow {
-  status: ImportJobStatus
-  numerobio: string | null
-  numeroclient: string | null
-  audit_date: string | null
-  result_job: Record<string, unknown> | null
-  ended_at: Date | null
-  created_at: Date
-}
-
-export interface PacageParcelleRow {
-  geometry: import('geojson').Polygon
-  NUMERO_I: string
-  NUMERO_P: string
-  BIO: number
-  TYPE: string
-  CODE_VAR: string
-  fid: number
-}
+import { importJobColumns, operatorRecordColumns, operatorRecordConditions, payloadColumn } from './imports.utils.js'
+import type {
+  ImportJobListRow,
+  ImportJobRecordInfos,
+  ImportJobRow,
+  ImportListFilters,
+  OperatorRecordFilters
+} from './imports.types.js'
 
 async function completeImportJob ({ result, jobId, statutJob = null }: { result: unknown; jobId: string | number; statutJob?: ImportJobResult | null }): Promise<number> {
-  const { rows } = await pool.query<{ id: number }>(
-    `UPDATE parcellaire_import SET result_job = $1, status = 'DONE', ended_at = NOW(),
-      statut_job = COALESCE($3::result_job_enum, statut_job)
-      WHERE id = $2 RETURNING id`,
-    [JSON.stringify(result), jobId, statutJob]
-  )
-  return rows[0].id
+  const [{ id }] = await db
+    .update(parcellaireImport)
+    .set({
+      ...updateImportJobSchema.parse({
+        resultJob: result,
+        status: importStatusEnumSchema.enum.DONE,
+        ...(statutJob ? { statutJob } : {})
+      }),
+      endedAt: sql`NOW()`
+    })
+    .where(eq(parcellaireImport.id, Number(jobId)))
+    .returning({ id: parcellaireImport.id })
+
+  return id
 }
 
-async function insertImportLog (importId: string | number, { numeroBio, idParcelle = null, nomParcelle = null, type, code, message }: { numeroBio?: string; idParcelle?: string | number | null; nomParcelle?: string | null; type: string; code: string; message: string }): Promise<void> {
-  await pool.query(
-    `INSERT INTO parcellaire_import_logs (import_id, numero_bio, parcelle_id, parcelle_name, type, code, message)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-    [importId, numeroBio, idParcelle, nomParcelle, type, code, message]
-  )
+async function insertImportLog (importId: string | number, { numeroBio, idParcelle = null, nomParcelle = null, type, code, message }: { numeroBio?: string; idParcelle?: string | number | null; nomParcelle?: string | null; type: 'warning' | 'error'; code: string; message: string }): Promise<void> {
+  await db.insert(parcellaireImportLogs).values(createImportLogSchema.parse({
+    importId: Number(importId),
+    numeroBio,
+    parcelleId: idParcelle === null ? null : String(idParcelle),
+    parcelleName: nomParcelle,
+    type,
+    code,
+    message
+  }))
 }
 
 async function createImportJob (organismeCertificateurId: number): Promise<number> {
-  const { rows } = await pool.query<{ id: number }>(
-    'INSERT INTO parcellaire_import (status, organisme_certificateur) VALUES ($1, $2) RETURNING id',
-    ['CREATED', organismeCertificateurId]
-  )
-  return rows[0].id
+  const [{ id }] = await db
+    .insert(parcellaireImport)
+    .values(createImportJobSchema.parse({ status: importStatusEnumSchema.enum.CREATED, organismeCertificateur: String(organismeCertificateurId) }))
+    .returning({ id: parcellaireImport.id })
+
+  return id
 }
 
 async function insertPayload (jobId: string | number, payload: unknown): Promise<void> {
-  await pool.query('INSERT INTO parcellaire_import_payload(import_id, payload) VALUES ($1, $2)', [jobId, JSON.stringify(payload)])
+  await db.insert(parcellaireImportPayload).values(createImportPayloadSchema.parse({ id: randomUUID(), importId: Number(jobId), payload }))
 }
 
-async function updateImportJobRecordInfos (jobId: string | number, { numeroBio, numeroClient, auditDate }: { numeroBio: string | null; numeroClient: string | null; auditDate: string | null }): Promise<void> {
-  await pool.query(
-    'UPDATE parcellaire_import SET numerobio=$1, numeroclient=$2, audit_date=$3 WHERE id=$4',
-    [numeroBio, numeroClient, auditDate, jobId]
-  )
+async function updateImportJobRecordInfos (jobId: string | number, { numeroBio, numeroClient, auditDate }: ImportJobRecordInfos): Promise<void> {
+  await db
+    .update(parcellaireImport)
+    .set({ numeroBio, numeroClient, auditDate })
+    .where(eq(parcellaireImport.id, Number(jobId)))
 }
 
 /**
  * Renseigne les informations du record et détermine s'il s'agit d'une création
  * ou de la mise à jour d'un parcellaire existant (colonne etat)
  */
-async function updateImportJobEtat (jobId: string | number, { numeroBio, numeroClient, auditDate }: { numeroBio: string | null; numeroClient: string | null; auditDate: string | null }): Promise<void> {
-  await pool.query(
-    `
-      UPDATE parcellaire_import AS current_job
-      SET
-        numerobio = $1::text,
-        numeroclient = $2::text,
-        audit_date = $3::date,
-        etat = CASE
-          WHEN $1::text IS NULL
-            OR $2::text IS NULL
-            OR $3::date IS NULL
-            THEN 'UNKNOWN'::etat_enum
+async function updateImportJobEtat (jobId: string | number, { numeroBio, numeroClient, auditDate }: ImportJobRecordInfos): Promise<void> {
+  const parcellaireExistant = numeroBio !== null && numeroClient !== null && auditDate !== null
+    ? await db.$count(parcellaires, and(
+      sql`${parcellaires.numeroBio}::text = ${numeroBio}`,
+      eq(parcellaires.auditDate, auditDate),
+      isNull(parcellaires.deletedAt)
+    )) > 0
+    : null
 
-          WHEN EXISTS (
-            SELECT 1
-            FROM cartobio_operators AS operator_record
-            WHERE operator_record.numerobio = $1::text
-              AND operator_record.audit_date = $3::date
-              AND operator_record.deleted_at IS NULL
-          )
-            THEN 'UPDATED'::etat_enum
-
-          ELSE 'CREATED'::etat_enum
-        END
-      WHERE current_job.id = $4::integer
-    `,
-    [numeroBio, numeroClient, auditDate, jobId]
-  )
+  await db
+    .update(parcellaireImport)
+    .set(updateImportJobSchema.parse({
+      numeroBio,
+      numeroClient,
+      auditDate,
+      etat: parcellaireExistant === null ? importJobEtatEnumSchema.enum.UNKNOWN : parcellaireExistant ? importJobEtatEnumSchema.enum.UPDATED : importJobEtatEnumSchema.enum.CREATED
+    }))
+    .where(eq(parcellaireImport.id, Number(jobId)))
 }
 
 async function updateImportJobResult (jobId: string | number, statutJob: ImportJobResult): Promise<void> {
-  await pool.query('UPDATE parcellaire_import SET statut_job = $1 WHERE id = $2', [statutJob, jobId])
+  await db.update(parcellaireImport).set(updateImportJobSchema.parse({ statutJob })).where(eq(parcellaireImport.id, Number(jobId)))
 }
 
 async function failImportJob (jobId: string | number, result: { name: string; message: string }): Promise<void> {
-  await pool.query(
-    `
-      UPDATE parcellaire_import
-      SET
-        status = 'ERROR',
-        statut_job = 'ERROR'::result_job_enum,
-        result_job = $1,
-        ended_at = NOW()
-      WHERE id = $2
-    `,
-    [JSON.stringify(result), jobId]
-  )
+  await db
+    .update(parcellaireImport)
+    .set({
+      ...updateImportJobSchema.parse({ status: importStatusEnumSchema.enum.ERROR, statutJob: importJobResultEnumSchema.enum.ERROR, resultJob: result }),
+      endedAt: sql`NOW()`
+    })
+    .where(eq(parcellaireImport.id, Number(jobId)))
 }
 
-async function findImportJob (id: string | number, organismeCertificateur: number): Promise<ImportJobRow | null> {
-  const { rows } = await pool.query<ImportJobRow>(
-    'SELECT status, numerobio, numeroclient, audit_date, result_job, ended_at, created_at FROM parcellaire_import WHERE id = $1 AND organisme_certificateur = $2',
-    [id, organismeCertificateur]
-  )
-  return rows[0] ?? null
+async function findImportJob (id: string | number, organisme: number): Promise<ImportJobRow | null> {
+  const [job] = await db
+    .select({
+      status: parcellaireImport.status,
+      numerobio: parcellaireImport.numeroBio,
+      numeroclient: parcellaireImport.numeroClient,
+      audit_date: parcellaireImport.auditDate,
+      result_job: parcellaireImport.resultJob,
+      ended_at: parcellaireImport.endedAt,
+      created_at: parcellaireImport.createdAt
+    })
+    .from(parcellaireImport)
+    .where(and(eq(parcellaireImport.id, Number(id)), eq(parcellaireImport.organismeCertificateur, String(organisme))))
+
+  return job ?? null
 }
 
-async function updateImportJobStatus (jobId: string | number, status: ImportJobStatus, result?: Record<string, unknown>): Promise<void> {
-  if (status === 'DONE' || status === 'ERROR') {
-    await pool.query('UPDATE parcellaire_import SET status = $1, result_job = $2, ended_at = NOW() WHERE id = $3', [status, result ?? '{}', jobId])
-    return
+async function updateImportJobStatus (jobId: string | number, status: ImportStatus, result?: Record<string, unknown>): Promise<void> {
+  await db
+    .update(parcellaireImport)
+    .set({
+      ...updateImportJobSchema.parse({ status, resultJob: result ?? {} }),
+      ...(status === importStatusEnumSchema.enum.DONE || status === importStatusEnumSchema.enum.ERROR ? { endedAt: sql`NOW()` } : {})
+    })
+    .where(eq(parcellaireImport.id, Number(jobId)))
+}
+
+async function findImportList ({ status, organismeCertificateur: organisme, from, to, payload, withRejected, page, limit }: ImportListFilters): Promise<{ rows: ImportJobListRow[]; total: number }> {
+  const conditions: SQL[] = []
+
+  if (status) {
+    const statuts = status.split(',').map(value => value.trim().toUpperCase())
+    conditions.push(inArray(parcellaireImport.status, importStatusEnumSchema.options.filter(value => statuts.includes(value))))
   }
-  await pool.query('UPDATE parcellaire_import SET status = $1, result_job = $2 WHERE id = $3', [status, result ?? '{}', jobId])
-}
 
-async function findImportList ({ status, organismeCertificateur, from, to, payload, withRejected, page, limit }: { status?: string; organismeCertificateur?: number; from?: string; to?: string; payload?: string; withRejected?: string; page: number; limit: number }) {
-  const conditions: string[] = []
-  const params: unknown[] = []
-  let index = 1
-  if (status) { conditions.push(`pi.status = ANY($${index}::text[])`); params.push(status.split(',').map(value => value.trim().toUpperCase())); index++ }
-  if (from) { conditions.push(`pi.created_at >= $${index}`); params.push(new Date(from)); index++ }
-  if (organismeCertificateur) { conditions.push(`pi.organisme_certificateur = $${index}`); params.push(organismeCertificateur); index++ }
-  if (to) { const end = new Date(to); end.setHours(23, 59, 59, 999); conditions.push(`pi.created_at <= $${index}`); params.push(end); index++ }
-  if (withRejected === 'true') conditions.push('pi.nb_objets_refuses >= 1')
-  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
+  if (from) {
+    conditions.push(gte(parcellaireImport.createdAt, new Date(from)))
+  }
+
+  if (organisme) {
+    conditions.push(eq(parcellaireImport.organismeCertificateur, String(organisme)))
+  }
+
+  if (to) {
+    const end = new Date(to)
+    end.setHours(23, 59, 59, 999)
+    conditions.push(lte(parcellaireImport.createdAt, end))
+  }
+
+  if (withRejected === 'true') {
+    conditions.push(eq(parcellaireImport.statutJob, importJobResultEnumSchema.enum.REJECTED))
+  }
+
   const includePayload = payload === 'true'
-  const selectPayload = includePayload ? ", json_build_object('id', pip.id, 'payload', pip.payload) AS payload" : ', NULL AS payload'
-  const joinPayload = includePayload ? 'LEFT JOIN parcellaire_import_payload pip ON pip.import_id = pi.id' : ''
-  const offset = (page - 1) * limit
-  const [data, count] = await Promise.all([
-    pool.query(`SELECT pi.id AS jobId, pi.status, pi.created_at, pi.ended_at, pi.numerobio,
-      pi.numeroclient, pi.audit_date, pi.result_job ${selectPayload}
-      FROM parcellaire_import pi ${joinPayload} ${where} ORDER BY pi.created_at DESC
-      LIMIT $${index} OFFSET $${index + 1}`, [...params, limit, offset]),
-    pool.query<{ total: string }>(`SELECT COUNT(*) AS total FROM parcellaire_import pi ${where}`, params)
+  const where = and(...conditions)
+
+  const query = db
+    .select({ ...importJobColumns, payload: payloadColumn(includePayload) })
+    .from(parcellaireImport)
+    .$dynamic()
+
+  if (includePayload) {
+    query.leftJoin(parcellaireImportPayload, eq(parcellaireImportPayload.importId, parcellaireImport.id))
+  }
+
+  const [rows, total] = await Promise.all([
+    query
+      .where(where)
+      .orderBy(desc(parcellaireImport.createdAt))
+      .limit(limit)
+      .offset((page - 1) * limit),
+    db.$count(parcellaireImport, where)
   ])
-  return { rows: data.rows, total: parseInt(count.rows[0].total) }
+
+  return { rows, total }
 }
 
-async function findImportById (id: string | number, organismeCertificateur: number, payload?: string) {
+async function findImportById (id: string | number, organisme: number, payload?: string): Promise<ImportJobListRow | null> {
   const includePayload = payload === 'true'
-  const selectPayload = includePayload ? ", json_build_object('id', pip.id, 'payload', pip.payload) AS payload" : ', NULL AS payload'
-  const joinPayload = includePayload ? 'LEFT JOIN parcellaire_import_payload pip ON pip.import_id = pi.id' : ''
-  const { rows } = await pool.query(`SELECT pi.id AS jobId, pi.status, pi.created_at, pi.started_at, pi.ended_at,
-    pi.numerobio, pi.numeroclient, pi.audit_date, pi.result_job ${selectPayload}
-    FROM parcellaire_import pi ${joinPayload} WHERE pi.id = $1 AND pi.organisme_certificateur = $2`, [id, organismeCertificateur])
-  return rows[0] ?? null
+
+  const query = db
+    .select({ ...importJobColumns, started_at: parcellaireImport.startedAt, payload: payloadColumn(includePayload) })
+    .from(parcellaireImport)
+    .$dynamic()
+
+  if (includePayload) {
+    query.leftJoin(parcellaireImportPayload, eq(parcellaireImportPayload.importId, parcellaireImport.id))
+  }
+
+  const [row] = await query.where(and(
+    eq(parcellaireImport.id, Number(id)),
+    eq(parcellaireImport.organismeCertificateur, String(organisme))
+  ))
+
+  return row ?? null
 }
 
-async function findPacageParcelles (numeroPacage: string): Promise<PacageParcelleRow[]> {
-  const { rows } = await pool.query<PacageParcelleRow>(`SELECT DISTINCT ON (pacage, num_ilot, num_parcel)
-    ST_AsGeoJSON(geom, 15)::json AS geometry, num_ilot AS "NUMERO_I", num_parcel AS "NUMERO_P",
-    bio AS "BIO", code_cultu AS "TYPE", precision AS "CODE_VAR", fid FROM rpg_bio WHERE pacage = $1`, [numeroPacage])
-  return rows
+async function findLastOperatorRecord (numeroBio: string | number, { anneeAudit = null, statut = null }: OperatorRecordFilters = {}): Promise<DBOperatorRecord | null> {
+  const [record] = await db
+    .select(operatorRecordColumns)
+    .from(parcellaires)
+    .leftJoin(organismeCertificateur, eq(organismeCertificateur.id, parcellaires.ocId))
+    .leftJoin(parcellairesMetadata, eq(parcellairesMetadata.recordId, parcellaires.recordId))
+    .where(and(
+      eq(parcellaires.numeroBio, Number(numeroBio)),
+      isNull(parcellaires.deletedAt),
+      ...operatorRecordConditions({ anneeAudit, statut })
+    ))
+    .orderBy(desc(parcellaires.updatedAt))
+    .limit(1)
+
+  return record ?? null
 }
 
-async function findLastOperatorRecord (numeroBio: string | number, { anneeAudit = null, statut = null }: { anneeAudit?: string | number | null; statut?: string | null } = {}): Promise<DBOperatorRecord | null> {
-  const conditions: string[] = []
-  const values: Array<string | number> = [numeroBio]
-  if (anneeAudit) { conditions.push(`EXTRACT('year' FROM audit_date) = $${values.length + 1}`); values.push(anneeAudit) }
-  if (statut) { conditions.push(`certification_state = $${values.length + 1}`); values.push(statut) }
-  const { rows } = await pool.query<DBOperatorRecord>(`SELECT cartobio_operators.record_id, numerobio, version_name, annee_reference_controle, certification_date_debut, certification_date_fin, certification_state, created_at, updated_at, oc_id, metadata, audit_date, audit_history, audit_notes, audit_demandes, mixite FROM cartobio_operators WHERE numerobio = $1 AND deleted_at IS NULL ${conditions.length ? `AND ${conditions.join(' AND ')}` : ''} ORDER BY updated_at DESC LIMIT 1`, values)
-  return rows[0] ?? null
+async function findOperatorLastRecords (ocId: number, { anneeAudit = null, statut = null, anneeReferenceControle = null, limit = null, start = null }: OperatorRecordFilters = {}): Promise<DBOperatorRecord[]> {
+  const query = db
+    .selectDistinctOn([parcellaires.numeroBio], operatorRecordColumns)
+    .from(parcellaires)
+    .leftJoin(organismeCertificateur, eq(organismeCertificateur.id, parcellaires.ocId))
+    .leftJoin(parcellairesMetadata, eq(parcellairesMetadata.recordId, parcellaires.recordId))
+    .where(and(
+      eq(parcellaires.ocId, String(ocId)),
+      isNull(parcellaires.deletedAt),
+      ...operatorRecordConditions({ anneeAudit, statut, anneeReferenceControle })
+    ))
+    .orderBy(asc(parcellaires.numeroBio), desc(parcellaires.updatedAt))
+    .$dynamic()
+
+  if (limit !== null) {
+    query.limit(limit)
+  }
+
+  if (start !== null) {
+    query.offset(start)
+  }
+
+  return query
 }
 
-export const query = ((...args: unknown[]) => (pool.query as (...a: unknown[]) => unknown)(...args)) as typeof pool.query
-export const connect = () => pool.connect()
 export {
   completeImportJob,
   insertImportLog,
@@ -197,6 +269,6 @@ export {
   updateImportJobStatus,
   findImportList,
   findImportById,
-  findPacageParcelles,
-  findLastOperatorRecord
+  findLastOperatorRecord,
+  findOperatorLastRecords
 }

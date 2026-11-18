@@ -12,6 +12,5 @@ declare module 'fastify' {
     organismeCertificateur: OrganismeCertificateur | null;
     operator: AgenceBioNormalizedOperator | null;
     record: NormalizedRecord | null;
-    originalPayload?: NodeJS.ReadableStream;
   }
 }
