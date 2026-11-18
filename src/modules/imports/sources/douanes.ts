@@ -43,8 +43,8 @@ const evvParcellaireSchema = z.looseObject({
 
 const evvClient = extend({
   http2: false,
-  https: { rejectUnauthorized: false },
-  timeout: { lookup: 200, connect: 500 },
+  https: { rejectUnauthorized: config.get('douanes.rejectUnauthorized') },
+  timeout: { lookup: 200, connect: 500, response: 30000 },
   ...(config.get('douanes.socksProxy')
     ? {
         agent: {

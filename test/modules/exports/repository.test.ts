@@ -259,7 +259,7 @@ describe('Generation du PDF', () => {
     })
     vi.mocked(utils.getAllParcelles).mockResolvedValueOnce(parcelles)
 
-    vi.spyOn(fs, 'readFileSync').mockReturnValue('test-file')
+    vi.spyOn(fs.promises, 'readFile').mockResolvedValue('test-file')
 
     const UUID = randomUUID()
     const gen = exportPdf.generatePDF('123', UUID)
@@ -335,15 +335,11 @@ describe('Generation du PDF', () => {
 
     vi.mocked(generatePdfContent.createPdfContent).mockResolvedValue([generatedPdf()])
     vi.spyOn(fs.promises, 'writeFile').mockResolvedValue(undefined)
-    vi.spyOn(fs, 'readFileSync').mockImplementation(() => {
-      throw new Error('Erreur de test readFile')
-    })
+    vi.spyOn(fs.promises, 'readFile').mockRejectedValue(new Error('Erreur de test readFile'))
 
     const UUID = randomUUID()
     const gen = exportPdf.generatePDF('123', UUID)
 
-    const count = (await gen.next()).value
-    expect(count).toEqual(0)
     const regenerationCount = (await gen.next()).value
     expect(regenerationCount).toEqual(3)
     const res = (await gen.next()).value
@@ -374,5 +370,47 @@ describe('Generation du PDF', () => {
     expect(repository.findPdfRecord).toHaveBeenCalledTimes(1)
 
     expect(res).toEqual('save-as-base-64')
+  })
+
+  it('libère le verrou après une régénération due à un fichier absent', async () => {
+    vi.mocked(repository.findValidAttestationProduction).mockResolvedValue({ path: 'test' })
+    vi.mocked(repository.findPdfRecord).mockResolvedValue(pdfRecord)
+    get.mockReturnValue({
+      async json() {
+        return agencebioOperator
+      }
+    })
+    vi.mocked(utils.getAllParcelles).mockResolvedValue(parcelles)
+    vi.mocked(generatePdfContent.createPdfContent).mockResolvedValue([generatedPdf()])
+    vi.spyOn(fs.promises, 'writeFile').mockResolvedValue(undefined)
+    vi.spyOn(fs.promises, 'readFile').mockRejectedValue(new Error('Erreur de test readFile'))
+
+    const UUID = randomUUID()
+    for (let i = 0; i < 2; i++) {
+      const gen = exportPdf.generatePDF('123', UUID)
+      expect((await gen.next()).value).toEqual(3)
+      expect((await gen.next()).value).toEqual('save-as-base-64')
+    }
+  })
+
+  it('refuse une seconde génération simultanée du même parcellaire', async () => {
+    vi.mocked(repository.findValidAttestationProduction).mockResolvedValue(null)
+    vi.mocked(repository.findPdfRecord).mockResolvedValue(pdfRecord)
+    get.mockReturnValue({
+      async json() {
+        return agencebioOperator
+      }
+    })
+    vi.mocked(utils.getAllParcelles).mockResolvedValue(parcelles)
+    vi.mocked(generatePdfContent.createPdfContent).mockResolvedValue([generatedPdf()])
+    vi.spyOn(fs.promises, 'writeFile').mockResolvedValue(undefined)
+
+    const UUID = randomUUID()
+    const first = exportPdf.generatePDF('123', UUID)
+    expect((await first.next()).value).toEqual(3)
+
+    await expect(exportPdf.generatePDF('123', UUID).next()).rejects.toThrow('déjà en cours')
+
+    expect((await first.next()).value).toEqual('save-as-base-64')
   })
 })

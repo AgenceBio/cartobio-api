@@ -189,6 +189,7 @@ export const certificationParcellaireSchema = withSchema(
     response: {
       ...commonErrorResponses,
       200: outputApiRecordSchema.meta({ description: "Parcellaire au format de l'API parcellaire" }),
+      403: apiError('Route réservée aux organismes certificateurs et aux administrateurs'),
       404: apiError('Opérateur ou parcellaire introuvable')
     }
   }

@@ -6,6 +6,7 @@ import {
   verifyAgenceBioToken,
   enforceAnyFastifyDecorator,
   compareOperatorOutputAndToken,
+  getRequestOc,
   checkCertification,
   haveRightToUpdate
 } from './middlewares.js'
@@ -127,51 +128,27 @@ function protectedWithToken({ oc = false, cartobio = true, admin = false } = {})
   }
 
   if (oc) {
-    const name = 'organismeCertificateur'
-    requiredDecorators.push(name)
+    requiredDecorators.push('organismeCertificateur')
     root.schema.security.push({ agenceBioAuthorizationAuth: [] })
     root.onRequest.push(verifyAgenceBioToken())
-    root.preSerialization.push(compareOperatorOutputAndToken((request) => request.organismeCertificateur))
   }
 
-  if (cartobio) {
-    const name = 'user'
-    requiredDecorators.push(name)
+  if (cartobio || admin) {
+    requiredDecorators.push('user')
     root.schema.security.push({ bearerAuth: [] })
-    root.onRequest.push(
-      decodeUserToken({
-        keys: [
-          // this one if for the tokens we emit with this application
-          config.get('jwtSecret'),
-          // and this one if for tokens emitted by the Notification app
-          // we do not know their private key, so they share a public key we can verify against
-          config.get('notifications.publicKey')
-        ]
-      })
-    )
-    root.preSerialization.push(compareOperatorOutputAndToken((request) => request.user?.organismeCertificateur))
-  }
-
-  if (admin) {
-    const name = 'user'
-    if (!requiredDecorators.includes(name)) requiredDecorators.push(name)
-    root.schema.security.push({ bearerAuth: [] })
-    root.onRequest.push(
-      decodeUserToken({
-        keys: [
-          // this one if for the tokens we emit with this application
-          config.get('jwtSecret'),
-          // and this one if for tokens emitted by the Notification app
-          // we do not know their private key, so they share a public key we can verify against
-          config.get('notifications.publicKey')
-        ]
-      })
-    )
-    root.onRequest.push(enforceAdminRole())
+    root.onRequest.push(decodeUserToken(config.get('jwtSecret')))
   }
 
   if (requiredDecorators.length) {
     root.onRequest.push(enforceAnyFastifyDecorator(requiredDecorators))
+  }
+
+  if (oc || cartobio) {
+    root.preSerialization.push(compareOperatorOutputAndToken(getRequestOc))
+  }
+
+  if (admin) {
+    root.onRequest.push(enforceAdminRole())
   }
 
   return root

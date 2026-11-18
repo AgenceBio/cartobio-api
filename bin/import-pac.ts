@@ -13,6 +13,7 @@ import type { Feature } from 'geojson'
 import { sql } from 'drizzle-orm'
 
 import { db } from '../src/database/database.js'
+import { scriptOutputPath } from '../src/shared/paths.js'
 import { importPac } from '../src/database/schema/index.js'
 import { createImportPacSchema } from '../src/database/validations/imports.js'
 import { surfaceForFeatureCollection } from '../src/shared/outputs/api.js'
@@ -317,17 +318,19 @@ if (aspFile === undefined || csvFile === undefined) {
       warningsNoNumeroBio,
       warningsSiretVide
     }
-    fs.writeFile('resultat.json', JSON.stringify(json), 'utf8', (err): void => {
+    const resultPath = scriptOutputPath('resultat.json')
+    fs.writeFile(resultPath, JSON.stringify(json), { encoding: 'utf8', mode: 0o600 }, (err): void => {
       if (err) {
         console.error(err)
       } else {
-        console.log('Warnings disponible dans le fichier resultat.json')
+        console.log(`Warnings disponible dans le fichier ${resultPath}`)
       }
     })
     if (exportNoCorrespondance.length > 0) {
       const outputCsv = toCSV(exportNoCorrespondance, ';', ['NUMEROBIO'])
-      fs.writeFileSync('lignes_sans_numerobio.csv', outputCsv, 'utf8')
-      console.log('Correctifs à faire disponible dans le fichier lignes_sans_numerobio.csv')
+      const csvPath = scriptOutputPath('lignes_sans_numerobio.csv')
+      fs.writeFileSync(csvPath, outputCsv, { encoding: 'utf8', mode: 0o600 })
+      console.log(`Correctifs à faire disponible dans le fichier ${csvPath}`)
     }
   }
 })()

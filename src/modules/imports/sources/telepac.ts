@@ -11,7 +11,7 @@ import { EtatProduction, LegalProjections } from '@agencebio/cartobio-types'
 import type { FeatureCollection } from 'geojson'
 import type { MultipartFile } from '@fastify/multipart'
 import { InvalidRequestApiError } from '../../../shared/errors.js'
-import { detectSrs, unzipGeographicalContent, wgs84 } from '../../../shared/geo/gdal.js'
+import { GEO_DRIVERS, detectSrs, unzipGeographicalContent, wgs84 } from '../../../shared/geo/gdal.js'
 import { getRandomFeatureId } from '../../../shared/outputs/features.js'
 
 const { toWgs84 } = reproject
@@ -103,7 +103,7 @@ async function fromShapefileArchive(buffer: Buffer): Promise<FeatureCollection> 
 
     // validateSchema(geojson.features)
     for await (const filepath of files) {
-      const dataset = await gdal.openAsync(filepath)
+      const dataset = await gdal.openAsync(filepath, 'r', GEO_DRIVERS)
 
       try {
         for await (const layer of dataset.layers) {

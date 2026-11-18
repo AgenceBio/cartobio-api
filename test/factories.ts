@@ -26,7 +26,6 @@ export function buildOperator(overrides: Partial<AgenceBioNormalizedOperator> = 
     siret: '',
     numeroBio: '99999',
     numeroPacage: null,
-    email: '',
     dateEngagement: new Date('2023-01-01').toISOString(),
     datePremierEngagement: new Date('2023-01-01').toISOString(),
     organismeCertificateur: {},
@@ -108,10 +107,10 @@ export function buildOcUser(overrides: Partial<CartoBioOCUser> = {}): CartoBioOC
     nom: 'test',
     organismeCertificateur: { id: 1, nom: "CartoBi'OC" },
     groups: [
-      { id: '1', nom: 'Auditeur' },
+      { id: '8', nom: 'Auditeur' },
       { id: '2', nom: 'Chargé de certification' }
     ],
-    mainGroup: { id: '1', nom: 'Auditeur' },
+    mainGroup: { id: '8', nom: 'Auditeur' },
     ...overrides
   }
 }

@@ -19,11 +19,14 @@ import type {
   AgenceBioNotification
 } from './agence-bio.types.js'
 import { parseApiResponse } from './clients.utils.js'
+import { HTTP_TIMEOUT } from './clients.utils.js'
 import { z } from 'zod'
 const Origin = config.get('notifications.origin')
 const serviceToken: string = config.get('notifications.serviceToken')
 
 const ONE_MINUTE = 60 * 1000
+const endpoint = (path: string): string => `${config.get('notifications.endpoint')}${path}`
+const requestOptions = { timeout: HTTP_TIMEOUT, headers: { Authorization: serviceToken, Origin } }
 
 type OperatorWithNotification = AgenceBioNormalizedOperator & { notifications: AgenceBioNotification }
 
@@ -34,21 +37,12 @@ function hasNotification(operator: AgenceBioNormalizedOperator): operator is Ope
 /**
  * Returns operators related to an OC
  */
-async function _getOperatorsByOc({
-  serviceToken,
-  oc
-}: {
-  serviceToken: string
-  oc: number
-}): Promise<AgenceBioNormalizedOperator[]> {
+async function _getOperatorsByOc({ oc }: { oc: number }): Promise<AgenceBioNormalizedOperator[]> {
   const limit = 10000
   const data = parseApiResponse(
     agenceBioOperateursPageSchema,
-    await get(`${config.get('notifications.endpoint')}/api/oc/${oc}/operateurs`, {
-      headers: {
-        Authorization: serviceToken,
-        Origin
-      },
+    await get(endpoint(`/api/oc/${oc}/operateurs`), {
+      ...requestOptions,
       searchParams: {
         limit,
         orderBy: 'nom'
@@ -64,11 +58,8 @@ async function _getOperatorsByOc({
   const requests: Promise<AgenceBioOperateursPage>[] = []
   for (let page = 1; page * limit < data.nbTotal; page++) {
     requests.push(
-      get(`${config.get('notifications.endpoint')}/api/oc/${oc}/operateurs`, {
-        headers: {
-          Authorization: serviceToken,
-          Origin
-        },
+      get(endpoint(`/api/oc/${oc}/operateurs`), {
+        ...requestOptions,
         searchParams: {
           limit,
           page: page + 1,
@@ -93,24 +84,15 @@ async function _getOperatorsByOc({
 /**
  * Returs operators for admin profile
  */
-async function _getOperatorsForAdmin({
-  serviceToken,
-  input = ''
-}: {
-  serviceToken: string
-  input?: string
-}): Promise<AgenceBioNormalizedOperator[]> {
+async function _getOperatorsForAdmin({ input = '' }: { input?: string }): Promise<AgenceBioNormalizedOperator[]> {
   const limit = 10000
 
   type SearchParams = { nom?: string; numeroBio?: string; siret?: string; page?: number }
   const fetchPage = async (searchParams: SearchParams): Promise<AgenceBioOperateursPage> =>
     parseApiResponse(
       agenceBioOperateursPageSchema,
-      await get(`${config.get('notifications.endpoint')}/api/operateurs/cartobio`, {
-        headers: {
-          Authorization: serviceToken,
-          Origin
-        },
+      await get(endpoint('/api/operateurs/cartobio'), {
+        ...requestOptions,
         searchParams: { limit, ...searchParams }
       }).json(),
       "l'API Agence Bio"
@@ -171,12 +153,7 @@ const getOperatorsForAdmin = memo(_getOperatorsForAdmin, {
 async function fetchUserOperators(userId: number): Promise<{ operators: AgenceBioNormalizedOperator[] }> {
   const data = parseApiResponse(
     z.array(agenceBioOperatorSchema),
-    await get(`${config.get('notifications.endpoint')}/api/utilisateur/${userId}/operateurs`, {
-      headers: {
-        Authorization: serviceToken,
-        Origin
-      }
-    }).json(),
+    await get(endpoint(`/api/utilisateur/${encodeURIComponent(userId)}/operateurs`), requestOptions).json(),
     "l'API Agence Bio"
   )
 
@@ -186,22 +163,17 @@ async function fetchUserOperators(userId: number): Promise<{ operators: AgenceBi
 }
 
 async function fetchCustomersByOc(oc: number): Promise<OperatorWithNotification[]> {
-  return (await getOperatorsByOc({ serviceToken, oc })).filter(hasNotification)
+  return (await getOperatorsByOc({ oc })).filter(hasNotification)
 }
 
 async function fetchOperatorsForAdmin(input = ''): Promise<OperatorWithNotification[]> {
-  return (await getOperatorsForAdmin({ serviceToken, input })).filter(hasNotification)
+  return (await getOperatorsForAdmin({ input })).filter(hasNotification)
 }
 
 async function fetchOperatorByNumeroBio(numeroBio: string): Promise<AgenceBioNormalizedOperator> {
   const data = parseApiResponse(
     agenceBioOperatorSchema,
-    await get(`${config.get('notifications.endpoint')}/api/operateur/${numeroBio}`, {
-      headers: {
-        Authorization: config.get('notifications.serviceToken'),
-        Origin
-      }
-    }).json(),
+    await get(endpoint(`/api/operateur/${encodeURIComponent(numeroBio)}`), requestOptions).json(),
     "l'API Agence Bio"
   )
   return normalizeOperator(data)
@@ -210,30 +182,25 @@ async function fetchOperatorByNumeroBio(numeroBio: string): Promise<AgenceBioNor
 async function fetchEmailForNumeroBio(numeroBio: string): Promise<AgenceBioOperatorEmails> {
   const data = parseApiResponse(
     agenceBioOperatorEmailsSchema,
-    await get(`${config.get('notifications.endpoint')}/api/operateur/${numeroBio}/utilisateurs-emails`, {
-      headers: {
-        Authorization: config.get('notifications.serviceToken'),
-        Origin
-      }
-    }).json(),
+    await get(endpoint(`/api/operateur/${encodeURIComponent(numeroBio)}/utilisateurs-emails`), requestOptions).json(),
     "l'API Agence Bio"
   )
   return data
 }
 
-async function checkOcToken(token: string): Promise<OrganismeCertificateur> {
+async function fetchOcToken(token: string): Promise<OrganismeCertificateur> {
   return parseApiResponse(
     organismeCertificateurSchema,
-    await post(`${config.get('notifications.endpoint')}/api/oc/check-token`, {
-      headers: {
-        Authorization: serviceToken,
-        Origin
-      },
+    await post(endpoint('/api/oc/check-token'), {
+      ...requestOptions,
       json: { token }
     }).json(),
     "l'API Agence Bio"
   )
 }
+
+const checkOcToken =
+  config.get('env') === 'test' ? fetchOcToken : memo(fetchOcToken, { cache: new ExpiryMap(5 * ONE_MINUTE) })
 
 function parsePacDetailsFromComment(commentaire?: string | null): {
   numeroIlot: string | null

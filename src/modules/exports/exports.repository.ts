@@ -53,6 +53,18 @@ async function findValidAttestationProduction(
   return production ?? null
 }
 
+async function failInterruptedAttestationsProductions(): Promise<number> {
+  const { rowCount } = await db
+    .update(attestationsProduction)
+    .set({ status: 'error', updatedAt: sql`CURRENT_TIMESTAMP` })
+    .where(eq(attestationsProduction.status, 'started'))
+  return rowCount ?? 0
+}
+
+async function deleteAttestationsProductions(recordId: string): Promise<void> {
+  await db.delete(attestationsProduction).where(eq(attestationsProduction.recordId, recordId))
+}
+
 async function findPdfRecord(recordId: string): Promise<PdfRecord | null> {
   const numerosPacage = db
     .select({
@@ -173,6 +185,8 @@ async function findPdfParcelles(recordId: string, pac: boolean): Promise<PdfParc
 export {
   updateAttestationsProductions,
   findValidAttestationProduction,
+  deleteAttestationsProductions,
+  failInterruptedAttestationsProductions,
   findPdfRecord,
   findExportRows,
   findPdfParcelles

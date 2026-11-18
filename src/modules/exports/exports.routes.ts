@@ -3,7 +3,8 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { exportPdfSchema, exportParcellaireSchema } from './exports.schema.js'
 import * as service from './exports.service.js'
 import { requireOcUser, requireRecord } from '../../shared/request.js'
-import { NotFoundApiError } from '../../shared/errors.js'
+import { InvalidRequestApiError, NotFoundApiError } from '../../shared/errors.js'
+import { CertificationState } from '@agencebio/cartobio-types'
 
 export default async function exportRoutes(fastify: FastifyInstance): Promise<void> {
   const app = fastify.withTypeProvider<ZodTypeProvider>()
@@ -13,7 +14,14 @@ export default async function exportRoutes(fastify: FastifyInstance): Promise<vo
     if (String(requireRecord(request).numerobio) !== request.params.numeroBio) {
       throw new NotFoundApiError('Parcellaire introuvable')
     }
+    if (requireRecord(request).certification_state !== CertificationState.CERTIFIED) {
+      throw new InvalidRequestApiError("L'attestation n'est disponible que pour un parcellaire certifié.")
+    }
 
+    request.log.info(
+      { audit: 'export-pdf', userId: request.user?.id, recordId: request.params.recordId },
+      'Export PDF du parcellaire'
+    )
     const generator = service.generatePDF(request.params.numeroBio, request.params.recordId, force, pac, zip)
     const numberParcelle = (await generator.next()).value
     if ((numberParcelle as number) > 80) {
@@ -31,7 +39,10 @@ export default async function exportRoutes(fastify: FastifyInstance): Promise<vo
   app.post('/api/v2/exportParcellaire', exportParcellaireSchema, async (request, reply) => {
     const user = requireOcUser(request)
     const data = await service.exportDataOcId(user.organismeCertificateur.id, request.body.payload, user.id)
-    if (data === null) throw new Error("Une erreur s'est produite, impossible d'exporter les parcellaires")
+    request.log.info(
+      { audit: 'export-xlsx', userId: user.id, ocId: user.organismeCertificateur.id, count: data.length },
+      "Export des parcellaires de l'OC"
+    )
     return reply.code(200).send(data)
   })
 }

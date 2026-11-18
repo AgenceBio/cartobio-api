@@ -10,3 +10,4 @@ data/generated/*
 !data/generated/.gitkeep
 storage/pdf/*
 !storage/pdf/.gitkeep
+storage/scripts/

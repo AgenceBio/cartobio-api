@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-import { sendRapportHebdo } from '../src/services/mailer/utils.js'
-import { getDestinatairesRapport } from '../src/services/mailer/repository.js'
+import { sendRapportHebdo } from '../src/services/mailer/mailer.service.js'
+import { getDestinatairesRapport } from '../src/services/mailer/mailer.repository.js'
 
 async function sendMail(): Promise<void> {
   const ocList = await getDestinatairesRapport()
@@ -15,10 +15,10 @@ async function sendMail(): Promise<void> {
   for (const oc of ocList) {
     try {
       await sendRapportHebdo(oc.id, oc.email, oc.label)
-      console.log(`Rapport envoyé à ${oc.email}`)
+      console.log(`Rapport envoyé à l'OC ${oc.id}`)
     } catch (err) {
       errors++
-      console.error(`Erreur envoi rapport à ${oc.email}:`, err)
+      console.error(`Erreur envoi rapport à l'OC ${oc.id}:`, err)
     }
   }
   process.exit(errors > 0 ? 1 : 0)

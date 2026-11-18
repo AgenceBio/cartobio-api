@@ -30,7 +30,9 @@ export const exportPdfSchema = withSchema(
     response: {
       ...commonErrorResponses,
       200: exportPdfResponseSchema,
-      204: describedResponse('Parcellaire trop volumineux (plus de 80 parcelles)'),
+      204: describedResponse(
+        "Génération en tâche de fond (plus de 80 parcelles ou file d'attente pleine), à récupérer plus tard"
+      ),
       400: apiError('Génération impossible : parcelle sans culture ou sans nom, ou parcellaire vide'),
       404: apiError('Parcellaire ou opérateur introuvable')
     }

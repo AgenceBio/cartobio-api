@@ -4,6 +4,13 @@ import app from '../../../src/app.js'
 import config from '../../../src/config/env.js'
 import { got } from '../../got-mock.js'
 import * as service from '../../../src/modules/tableau-de-bord/tableau-de-bord.service.js'
+import { getCachedUserProfile } from '../../../src/modules/auth/auth.service.js'
+import type { CartoBioUser } from '@agencebio/cartobio-types'
+
+vi.mock('../../../src/modules/auth/auth.service.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  getCachedUserProfile: vi.fn()
+}))
 
 vi.mock('../../../src/modules/tableau-de-bord/tableau-de-bord.service.js', () => ({
   getGeneralKpi: vi.fn(),
@@ -17,7 +24,16 @@ vi.mock('../../../src/modules/tableau-de-bord/tableau-de-bord.service.js', () =>
 
 const sign = createSigner({ key: config.get('jwtSecret') })
 const fakeOc = { id: 999, nom: 'CartobiOC', numeroControleEu: 'FR-BIO-999' }
-const USER_AUTH_HEADER = `Bearer ${sign({ id: 1, prenom: 'Tonio', nom: 'Est', test: true, organismeCertificateur: fakeOc, mainGroup: { id: 2 } })}`
+const fakeUser = {
+  id: 1,
+  prenom: 'Tonio',
+  nom: 'Est',
+  test: true,
+  organismeCertificateur: fakeOc,
+  mainGroup: { id: 2 }
+}
+const USER_AUTH_HEADER = `Bearer ${sign(fakeUser)}`
+vi.mocked(getCachedUserProfile).mockResolvedValue(fakeUser as unknown as CartoBioUser)
 const OC_TOKEN = 'aaaa-bbbb-cccc-dddd'
 
 beforeAll(() => app.ready())

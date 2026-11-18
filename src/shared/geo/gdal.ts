@@ -54,6 +54,10 @@ interface FileAnalysisResult {
   cleanup: () => Promise<unknown>
 }
 
+const MAX_UNZIPPED_SIZE = 200 * 1024 * 1024
+
+export const GEO_DRIVERS = ['ESRI Shapefile', 'GeoJSON', 'KML', 'GPKG']
+
 const wgs84 = gdal.SpatialReference.fromProj4('+init=epsg:4326')
 
 async function detectSrs(layer: gdal.Layer): Promise<gdal.SpatialReference> {
@@ -103,15 +107,24 @@ async function unzipGeographicalContent(buffer: Buffer): Promise<FileAnalysisRes
   const entries = zip
     .getEntries()
     .filter((entry) => /(.sh[xp]|.dbf|.kml|.geojson|.gpkg)$/.test(entry.entryName) && !entry.name.startsWith('.'))
+  if (entries.reduce((total, entry) => total + entry.header.size, 0) > MAX_UNZIPPED_SIZE) {
+    throw new InvalidRequestApiError("L'archive ZIP décompressée est trop volumineuse.")
+  }
   const toDir = await mkdtemp(join(tmpdir(), 'cartobio-anygeo-'))
 
   // extracts geo files but keep only the root .shp (.shx will be read as a companion file anyway)
-  const files = entries
-    .map((entry) => {
-      zip.extractEntryTo(entry, toDir, false, true, false)
-      return join(toDir, entry.name)
-    })
-    .filter((filename) => ['.dbf', '.shx'].includes(extname(filename)) === false)
+  let files: string[]
+  try {
+    files = entries
+      .map((entry) => {
+        zip.extractEntryTo(entry, toDir, false, true, false)
+        return join(toDir, entry.name)
+      })
+      .filter((filename) => ['.dbf', '.shx'].includes(extname(filename)) === false)
+  } catch (error) {
+    await rm(toDir, { recursive: true, force: true })
+    throw error
+  }
 
   return {
     path: toDir,
@@ -172,7 +185,7 @@ async function parseAnyGeographicalArchive(file: Promise<MultipartFile | undefin
       let dataset
 
       try {
-        dataset = await gdal.openAsync(filePathOrBuffer)
+        dataset = await gdal.openAsync(filePathOrBuffer, 'r', GEO_DRIVERS)
       } catch (error) {
         throw new InvalidRequestApiError('Format de fichier non-reconnu.', { cause: error })
       }

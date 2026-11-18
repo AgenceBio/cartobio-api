@@ -3,10 +3,11 @@ import fp from 'fastify-plugin'
 import cors from '@fastify/cors'
 import multipart from '@fastify/multipart'
 import formBody from '@fastify/formbody'
+import config from '../config/env.js'
 
 async function httpPlugin(app: FastifyInstance): Promise<void> {
   await app.register(cors, {
-    origin: true,
+    origin: config.get('env') === 'dev' ? true : config.get('corsOrigins'),
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'],
     allowedHeaders: [
       'Origin',

@@ -110,16 +110,6 @@ async function insertPayload(jobId: string | number, payload: unknown): Promise<
     .values(createImportPayloadSchema.parse({ id: randomUUID(), importId: Number(jobId), payload }))
 }
 
-async function updateImportJobRecordInfos(
-  jobId: string | number,
-  { numeroBio, numeroClient, auditDate }: ImportJobRecordInfos
-): Promise<void> {
-  await db
-    .update(parcellaireImport)
-    .set(updateImportJobSchema.parse({ numeroBio, numeroClient, auditDate }))
-    .where(eq(parcellaireImport.id, Number(jobId)))
-}
-
 /**
  * Renseigne les informations du record et détermine s'il s'agit d'une création
  * ou de la mise à jour d'un parcellaire existant (colonne etat)
@@ -177,6 +167,26 @@ async function failImportJob(jobId: string | number, result: { name: string; mes
       endedAt: sql`NOW()`
     })
     .where(eq(parcellaireImport.id, Number(jobId)))
+}
+
+async function failInterruptedImportJobs(): Promise<number> {
+  const { rowCount } = await db
+    .update(parcellaireImport)
+    .set({
+      ...updateImportJobSchema.parse({
+        status: importStatusEnumSchema.enum.ERROR,
+        statutJob: importJobResultEnumSchema.enum.ERROR,
+        resultJob: { name: 'InterruptedJob', message: "Le traitement de l'import a été interrompu." }
+      }),
+      endedAt: sql`NOW()`
+    })
+    .where(
+      and(
+        inArray(parcellaireImport.status, [importStatusEnumSchema.enum.CREATED, importStatusEnumSchema.enum.PENDING]),
+        lte(parcellaireImport.createdAt, sql`NOW() - interval '1 hour'`)
+      )
+    )
+  return rowCount ?? 0
 }
 
 async function findImportJob(id: string | number, organisme: number): Promise<ImportJobRow | null> {
@@ -360,10 +370,10 @@ export {
   insertImportLog,
   createImportJob,
   insertPayload,
-  updateImportJobRecordInfos,
   updateImportJobEtat,
   updateImportJobResult,
   failImportJob,
+  failInterruptedImportJobs,
   findImportJob,
   updateImportJobStatus,
   findImportList,

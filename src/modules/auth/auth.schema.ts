@@ -37,6 +37,7 @@ export const exchangeTokenSchema = withSchema(internalSchema, {
   response: {
     ...commonErrorResponses,
     200: exchangeTokenResponseSchema.meta({ description: 'Opérateur et jeton CartoBio' }),
+    403: apiError("Le compte du jeton n'a pas accès à cet opérateur"),
     404: apiError('Opérateur introuvable')
   }
 })

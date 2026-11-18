@@ -4,7 +4,6 @@ import type { OAuth2Namespace } from '@fastify/oauth2'
 declare module 'fastify' {
   interface FastifyInstance {
     agenceBioOAuth2: OAuth2Namespace;
-    geofoliaOAuth2: OAuth2Namespace;
   }
 
   interface FastifyRequest {

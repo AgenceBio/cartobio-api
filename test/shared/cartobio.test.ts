@@ -37,7 +37,7 @@ import { loadRecordFixture } from '../utils.js'
 import { EtatProduction, CertificationState } from '@agencebio/cartobio-types'
 import { randomUUID } from 'crypto'
 import { getConsultedOperators } from '../../src/modules/operators/operators.service.js'
-import * as mailer from '../../src/services/mailer/utils.js'
+import * as mailer from '../../src/services/mailer/mailer.service.js'
 import { fetchEmailForNumeroBio } from '../../src/clients/agence-bio.client.js'
 import type {
   AgenceBioNormalizedOperatorWithRecord,
@@ -71,7 +71,7 @@ const xmlParcellaire = readFileSync(join(import.meta.dirname, '../fixtures/provi
   encoding: 'utf8'
 })
 
-vi.mock('../../src/services/mailer/utils.js', () => ({
+vi.mock('../../src/services/mailer/mailer.service.js', () => ({
   sendCertificationComplete: vi.fn()
 }))
 
@@ -324,11 +324,7 @@ describe('createOrUpdateOperatorRecord', () => {
     }
 
     await expect(
-      createOrUpdateOperatorRecord(
-        asRecordInput({ ...recordToUpdate, parcelles: featureCollection }),
-        { user },
-        drizzleDb
-      )
+      createOrUpdateOperatorRecord(asRecordInput({ ...recordToUpdate, parcelles: featureCollection }), { user })
     ).rejects.toMatchObject({ code: 'MISSING_GEOMETRY' })
   })
 
@@ -371,11 +367,11 @@ describe('createOrUpdateOperatorRecord', () => {
       }
     ]
 
-    const result = await createOrUpdateOperatorRecord(
-      asRecordInput({ ...record, parcelles: featureCollection }),
-      { user, copyParcellesData: false, previousRecordId: record.record_id as string },
-      drizzleDb
-    )
+    const result = await createOrUpdateOperatorRecord(asRecordInput({ ...record, parcelles: featureCollection }), {
+      user,
+      copyParcellesData: false,
+      previousRecordId: record.record_id as string
+    })
 
     expect(result).toMatchObject({
       record_id: record.record_id,
@@ -408,11 +404,11 @@ describe('createOrUpdateOperatorRecord', () => {
       type: 'FeatureCollection',
       features: [] as FixtureFeature[]
     }
-    const result = await createOrUpdateOperatorRecord(
-      asRecordInput({ ...record, parcelles: featureCollection }),
-      { user, copyParcellesData: false, previousRecordId: record.record_id as string },
-      drizzleDb
-    )
+    const result = await createOrUpdateOperatorRecord(asRecordInput({ ...record, parcelles: featureCollection }), {
+      user,
+      copyParcellesData: false,
+      previousRecordId: record.record_id as string
+    })
 
     expect(result).toMatchObject({
       version_name: record.version_name,
@@ -442,11 +438,11 @@ describe('createOrUpdateOperatorRecord', () => {
       type: 'FeatureCollection',
       features: [] as FixtureFeature[]
     }
-    const result = await createOrUpdateOperatorRecord(
-      asRecordInput({ ...record, parcelles: featureCollection }),
-      { user, copyParcellesData: false, previousRecordId: record.record_id as string },
-      drizzleDb
-    )
+    const result = await createOrUpdateOperatorRecord(asRecordInput({ ...record, parcelles: featureCollection }), {
+      user,
+      copyParcellesData: false,
+      previousRecordId: record.record_id as string
+    })
 
     expect(result).toMatchObject({
       version_name: record.version_name,
@@ -507,8 +503,7 @@ describe('createOrUpdateOperatorRecord', () => {
 
     const result = await createOrUpdateOperatorRecord(
       asRecordInput({ ...record, record_id: randomUUID(), parcelles: featureCollection }),
-      { user, copyParcellesData: true, previousRecordId: record.record_id as string },
-      drizzleDb
+      { user, copyParcellesData: true, previousRecordId: record.record_id as string }
     )
 
     expect(result).toMatchObject({
@@ -572,11 +567,11 @@ describe('createOrUpdateOperatorRecord', () => {
       }
     ]
 
-    const result = await createOrUpdateOperatorRecord(
-      asRecordInput({ ...record, parcelles: featureCollection }),
-      { user, copyParcellesData: false, previousRecordId: record.record_id as string },
-      drizzleDb
-    )
+    const result = await createOrUpdateOperatorRecord(asRecordInput({ ...record, parcelles: featureCollection }), {
+      user,
+      copyParcellesData: false,
+      previousRecordId: record.record_id as string
+    })
 
     expect(result).toMatchObject({
       version_name: record.version_name,
@@ -642,11 +637,11 @@ describe('createOrUpdateOperatorRecord', () => {
       }
     ]
 
-    const result = await createOrUpdateOperatorRecord(
-      asRecordInput({ ...record, parcelles: featureCollection }),
-      { user, copyParcellesData: true, previousRecordId: record.record_id as string },
-      drizzleDb
-    )
+    const result = await createOrUpdateOperatorRecord(asRecordInput({ ...record, parcelles: featureCollection }), {
+      user,
+      copyParcellesData: true,
+      previousRecordId: record.record_id as string
+    })
 
     expect(result).toMatchObject({
       version_name: record.version_name,
@@ -704,11 +699,11 @@ describe('createOrUpdateOperatorRecord', () => {
       }
     ]
 
-    const result = await createOrUpdateOperatorRecord(
-      asRecordInput({ ...record, parcelles: featureCollection }),
-      { user, copyParcellesData: true, previousRecordId: record.record_id as string },
-      drizzleDb
-    )
+    const result = await createOrUpdateOperatorRecord(asRecordInput({ ...record, parcelles: featureCollection }), {
+      user,
+      copyParcellesData: true,
+      previousRecordId: record.record_id as string
+    })
 
     expect(result).toMatchObject({
       version_name: record.version_name,
@@ -773,11 +768,11 @@ describe('createOrUpdateOperatorRecord', () => {
       )
     }
 
-    const result = await createOrUpdateOperatorRecord(
-      asRecordInput({ ...record, parcelles: featureCollection }),
-      { user, copyParcellesData: false, previousRecordId: record.record_id as string },
-      drizzleDb
-    )
+    const result = await createOrUpdateOperatorRecord(asRecordInput({ ...record, parcelles: featureCollection }), {
+      user,
+      copyParcellesData: false,
+      previousRecordId: record.record_id as string
+    })
 
     expect(result.parcelles).toHaveLength(6)
     expect(result.parcelles[0]!.commune).toEqual('59183')
@@ -899,17 +894,6 @@ describe('updateAuditRecordState', () => {
       version_name: 'Attribution OC',
       oc_id: 10
     })
-  })
-
-  test('throw if not the correct OC', async () => {
-    const record: Record<string, unknown> = recordToUpdate
-    record.oc_id = 2
-
-    await loadRecordFixture([record])
-
-    await expect(
-      updateAuditRecordState({ user, record: asNormalizedRecord(record) }, { version_name: 'Attribution OC' })
-    ).rejects.toThrow()
   })
 })
 

@@ -49,7 +49,7 @@ export const certificationSearchSchema = withSchema(protectedWithToken(), {
 
 export const certificationAdminSearchSchema = withSchema(protectedWithToken({ admin: true }), {
   operationId: 'adminSearchOperators',
-  tags: [TAGS.OPERATEURS],
+  tags: ['X-HIDDEN'],
   summary: 'Rechercher parmi tous les opérateurs (admin)',
   body: certificationSearchBodySchema,
   response: {

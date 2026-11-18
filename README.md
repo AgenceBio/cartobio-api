@@ -157,16 +157,9 @@ npm run test:watch
 
 ### Environnement de préproduction et production
 
-Le workflow [Docker Image CI](https://github.com/AgenceBio/cartobio-api/blob/main/.github/workflows/docker.yml) dispose de trois jobs :
-
-- `build`
-  - construit les images docker [agencebio/cartobio-api](https://hub.docker.com/r/agencebio/cartobio-api/tags)
-- `deploy-staging`
-  - déclenché par un nouveau commit dans la branche `main`
-  - déploie l'API de préproduction
-- `deploy-production`
-  - déclenché par un nouvrau tag
-  - déploie l'API de production
+GitHub Actions lance les tests (`.github/workflows/test.yml`), l'analyse CodeQL et la publication du paquet
+`@agencebio/cartobio-types` (`.github/workflows/publish-types.yml`). La construction des images Docker et les
+déploiements sont assurés par la CI interne de l'Agence Bio.
 
 Pour créer un tag :
 
@@ -221,7 +214,7 @@ L'application lit les variables définies dans un fichier `.env`.
 | `NOTIFICATIONS_AB_ORIGIN`                   | ``                                                                    | Valeur de l'en-tête `Origin` envoyée au service de notifications.                            |
 | `NOTIFICATIONS_AB_PUBLIC_KEY`               | ``                                                                    | Clé publique utilisée pour vérifier les notifications de l'Agence Bio.                       |
 | `NOTIFICATIONS_AB_SERVICE_TOKEN`            | ``                                                                    | Jeton de service utilisé pour authentifier les appels au service de notifications.           |
-| `NOTIFICATIONS_AB_SSO_HOST`                 | `https://preprod-oauth.agencebio.org`                                 | URL du serveur SSO de l'Agence Bio.                                                          |
+| `NOTIFICATIONS_AB_SSO_HOST`                 | _(obligatoire)_                                                       | URL du serveur SSO de l'Agence Bio.                                                          |
 | `NOTIFICATIONS_AB_SSO_CLIENT_ID`            | ``                                                                    | Identifiant du client OAuth pour le SSO de l'Agence Bio.                                     |
 | `NOTIFICATIONS_AB_SSO_CLIENT_SECRET`        | ``                                                                    | Secret du client OAuth pour le SSO de l'Agence Bio.                                          |
 | `NOTIFICATIONS_AB_SSO_AUTHORIZATION_METHOD` | `header`                                                              | Méthode d'envoi des identifiants OAuth (`header` ou `body`).                                 |
@@ -316,26 +309,30 @@ qui recouvre le plus la parcelle (ou la plus proche). Une parcelle hors des terr
 
 ## Cron
 
-Pour lister les cron:
+Les tâches `cron:*` tournent dans le conteneur de l'API, lancées par la crontab du serveur (`crontab -l` pour
+lister, `crontab -e` pour modifier). Les tâches de purge et `cron:mail-certif` peuvent être relancées sans effet
+de bord ; `cron:mail-hebdo` renvoie le rapport à chaque lancement.
+
+| Tâche                | Effet                                                                                                                                    | Fréquence conseillée |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| `cron:import`        | Passe en erreur les imports API bloqués depuis plus d'une heure ; vide les charges utiles d'import (7 jours si valide, 3 mois si refusé) | tous les jours, 2 h  |
+| `cron:clean-records` | Supprime définitivement les parcellaires supprimés depuis plus de 6 mois et les jetons révoqués expirés (`--dry-run` pour simuler)       | tous les jours, 3 h  |
+| `cron:clean-pdf`     | Efface les attestations PDF générées depuis plus de 2 jours (régénérées à la demande)                                                    | tous les jours, 4 h  |
+| `cron:mail-certif`   | Prévient les opérateurs dont un parcellaire certifié a été modifié depuis la dernière notification                                       | tous les jours, 7 h  |
+| `cron:mail-hebdo`    | Envoie à chaque OC le rapport hebdomadaire de ses envois                                                                                 | le lundi, 8 h        |
+
+Exemple de crontab (adapter le nom du conteneur) :
 
 ```sh
-crontab -l
+0 2 * * *  (date && docker exec cartobio-api npm run cron:import)        >> /var/log/cron.log 2>&1
+0 3 * * *  (date && docker exec cartobio-api npm run cron:clean-records) >> /var/log/cron.log 2>&1
+0 4 * * *  (date && docker exec cartobio-api npm run cron:clean-pdf)     >> /var/log/cron.log 2>&1
+0 7 * * *  (date && docker exec cartobio-api npm run cron:mail-certif)   >> /var/log/cron.log 2>&1
+0 8 * * 1  (date && docker exec cartobio-api npm run cron:mail-hebdo)    >> /var/log/cron.log 2>&1
 ```
 
-Pour mettre à jour:
-
-```sh
-crontab -e
-```
-
-Tous les mois les parcellaires marqués comme supprimés (`deleted_at`) depuis plus de 6 mois, sont supprimés dans la base de données.
-
-Le script supprimant les parcellaires est utilisable via `npm run cron:clean-records`
-
-Exemple d'utilisation dans le crontab:
-
-```sh
-* 1 * * * (date && docker exec cartobio-api-test npm run cron:clean-records) >> /var/log/cron.log
-```
+Les scripts ponctuels `job:*` écrivent leurs fichiers de sortie (résultats, numéros bio, lignes à corriger) dans
+`storage/scripts/`, accessible au seul utilisateur du conteneur. Ces fichiers contiennent des données nominatives :
+les supprimer une fois exploités.
 
 </details>

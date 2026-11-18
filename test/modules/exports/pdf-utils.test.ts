@@ -69,7 +69,9 @@ describe('launchStyleTab', () => {
     pageMock = {
       goto: vi.fn().mockResolvedValue(undefined),
       evaluate: vi.fn().mockResolvedValue(undefined),
-      close: vi.fn()
+      close: vi.fn(),
+      setRequestInterception: vi.fn().mockResolvedValue(undefined),
+      on: vi.fn()
     }
 
     browserMock = {

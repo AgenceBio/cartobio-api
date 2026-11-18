@@ -3,14 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <script type="importmap">
-      {
-        "imports": {
-          "maplibre-gl": "https://unpkg.com/maplibre-gl@^4.7.1/dist/maplibre-gl.js"
-        }
-      }
-    </script>
-    <link href="https://unpkg.com/maplibre-gl@^4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+    <link href="/maplibre-gl/maplibre-gl.css" rel="stylesheet" />
     <style>
       html,
       body {
@@ -40,7 +33,7 @@
     <div id="attribution">© Etalab © OpenMapTiles © OpenStreetMap contributors</div>
 
     <script type="module">
-      import * as M from 'maplibre-gl'
+      import * as maplibregl from '/maplibre-gl/maplibre-gl.mjs'
 
       const map = new maplibregl.Map({
         hash: false,

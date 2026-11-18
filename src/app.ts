@@ -8,11 +8,9 @@ import httpPlugin from './plugins/http.js'
 import swaggerPlugin from './plugins/swagger.js'
 import requestDecoratorsPlugin from './plugins/request-decorators.js'
 import fastifyOauth, { type FastifyOAuth2Options } from '@fastify/oauth2'
-import { LRUMapWithDelete as LRUCache } from 'mnemonist'
-import { randomUUID } from 'node:crypto'
 import { createSigner } from 'fast-jwt'
 import { errorHandler } from './shared/errors.js'
-import type { AuthStateCache } from './modules/auth/auth.routes.js'
+import { encodeAuthState } from './modules/auth/auth.utils.js'
 import systemRoutes from './modules/system/system.routes.js'
 import operatorsRoutes from './modules/operators/operators.routes.js'
 import auditsRoutes from './modules/audits/audits.routes.js'
@@ -28,13 +26,13 @@ config.validate({ allowed: 'strict' })
 
 z.config(z.locales.fr())
 
-const app = Fastify(loggerOptions())
+const app = Fastify({ ...loggerOptions(), trustProxy: config.get('env') === 'production' })
 
 app.setValidatorCompiler(validatorCompiler)
 app.setSerializerCompiler(serializerCompiler)
 
 const DURATION_ONE_DAY = 1000 * 60 * 60 * 24
-const sign = createSigner({ key: config.get('jwtSecret'), expiresIn: DURATION_ONE_DAY * 30 })
+const sign = createSigner({ key: config.get('jwtSecret'), expiresIn: DURATION_ONE_DAY })
 
 app.setErrorHandler(errorHandler)
 
@@ -42,11 +40,11 @@ app.register(dbPlugin)
 app.register(httpPlugin)
 
 // SSO Agence Bio
-const stateCache: AuthStateCache = new LRUCache(50)
 app.register(fastifyOauth, {
   name: 'agenceBioOAuth2',
   scope: ['openid'],
   tags: ['X-HIDDEN'],
+  pkce: 'S256',
   credentials: {
     client: {
       id: config.get('notifications.sso.clientId'),
@@ -68,47 +66,21 @@ app.register(fastifyOauth, {
   startRedirectPath: '/api/auth-provider/agencebio/login',
   callbackUri: config.get('notifications.sso.callbackUri'),
   generateStateFunction: function (request: FastifyRequest<{ Querystring: { mode?: string; returnto?: string } }>) {
-    const state = randomUUID()
-    stateCache.set(state, {
-      mode: request.query?.mode,
-      returnto: request.query?.returnto
-    })
-    return state
+    return encodeAuthState({ mode: request.query?.mode, returnto: request.query?.returnto })
   } as FastifyOAuth2Options['generateStateFunction'],
   checkStateFunction: function (
-    { query }: FastifyRequest<{ Querystring: { state: string } }>,
+    request: FastifyRequest<{ Querystring: { state: string } }>,
     next: (err?: Error) => void
   ): void {
-    if (stateCache.has(query.state)) {
+    if (request.query.state && request.cookies['oauth2-redirect-state'] === request.query.state) {
       return next()
     }
     next(new Error('Invalid state'))
   } as FastifyOAuth2Options['checkStateFunction'],
   cookie: {
     secure: true,
-    sameSite: 'strict'
+    sameSite: 'lax'
   }
-})
-
-app.register(fastifyOauth, {
-  name: 'geofoliaOAuth2',
-  scope: [config.get('geofolia.api.scope')],
-  tags: ['X-HIDDEN'],
-  credentials: {
-    client: {
-      id: config.get('geofolia.oauth.clientId'),
-      secret: config.get('geofolia.oauth.clientSecret')
-    },
-    auth: {
-      authorizeHost: config.get('geofolia.oauth.host'),
-      authorizePath: `/${config.get('geofolia.oauth.tenant')}/oauth2/v2.0/auth`,
-      tokenHost: config.get('geofolia.oauth.host'),
-      tokenPath: `/${config.get('geofolia.oauth.tenant')}/oauth2/v2.0/token`,
-      revokePath: `/${config.get('geofolia.oauth.tenant')}/oauth2/v2.0/revoke`
-    }
-  },
-  startRedirectPath: '/api/login/geofolia',
-  callbackUri: config.get('geofolia.oauth.callbackUri')
 })
 
 app.register(swaggerPlugin)
@@ -119,8 +91,8 @@ app.register(operatorsRoutes)
 app.register(auditsRoutes)
 app.register(importsRoutes)
 app.register(exportsRoutes)
-app.register(authRoutes, { stateCache, sign })
-app.register(authExternalRoutes, { stateCache, sign })
+app.register(authRoutes, { sign })
+app.register(authExternalRoutes)
 app.register(geometryRoutes)
 app.register(referentielRoutes)
 app.register(tableauDeBordRoutes, { prefix: '/api/v3/tdb-api' })

@@ -35,7 +35,10 @@ export const importListQuerySchema = z.object({
   withPayload: booleanQuery('Inclure le corps JSON envoyé'),
   logs: optionalString('Non utilisé'),
   page: pageStringSchema.optional().meta({ description: 'Numéro de page, à partir de 1 (défaut 1)' }),
-  limit: integerStringSchema.optional().meta({ description: "Nombre d'imports par page (défaut 20)" }),
+  limit: integerStringSchema
+    .refine((limit) => Number(limit) <= 100)
+    .optional()
+    .meta({ description: "Nombre d'imports par page (défaut 20, 100 maximum)" }),
   withRejected: booleanQuery('Uniquement les imports comportant au moins un objet refusé')
 })
 
@@ -46,8 +49,9 @@ export const importDetailsQuerySchema = z.object({
 
 export const certificationParcellairesQuerySchema = z.object({
   limit: integerStringSchema
+    .refine((limit) => Number(limit) >= 1 && Number(limit) <= 1000)
     .optional()
-    .meta({ description: 'Nombre de parcellaires par page (sans limite si absent)' }),
+    .meta({ description: 'Nombre de parcellaires par page (défaut 100, 1000 maximum)' }),
   start: integerStringSchema.optional().meta({ description: 'Décalage de pagination (défaut 0)' }),
   anneeAudit: optionalString("Année de la date d'audit"),
   statut: optionalString('État du parcellaire (`OPERATOR_DRAFT`, `AUDITED`, `PENDING_CERTIFICATION`, `CERTIFIED`)'),

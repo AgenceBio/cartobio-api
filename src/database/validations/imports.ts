@@ -56,6 +56,12 @@ export const createImportPayloadSchema = createInsertSchema(parcellaireImportPay
   importId: (schema) => schema.int().positive()
 }).strict()
 
+export const updateImportPayloadSchema = createUpdateSchema(parcellaireImportPayload)
+  .pick({
+    payload: true
+  })
+  .strict()
+
 export const createImportPacSchema = createInsertSchema(importPac)
   .pick({
     numeroBio: true,

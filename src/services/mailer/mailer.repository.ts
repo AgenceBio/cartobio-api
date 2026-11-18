@@ -2,9 +2,9 @@ import { and, count, eq, gte, inArray, lte, sql } from 'drizzle-orm'
 import { db } from '../../database/database.js'
 import { organismeCertificateur, parcellaireImport } from '../../database/schema/index.js'
 import { importJobResultEnumSchema } from '../../database/validations/imports.js'
-import type { DestinataireRapport, StatsOrganisme } from './types.js'
+import type { DestinataireRapport, StatsOrganisme } from './mailer.types.js'
 
-async function getStatsByOrganisme(organisme: string, start: Date, end: Date): Promise<StatsOrganisme | null> {
+export async function getStatsByOrganisme(organisme: string, start: Date, end: Date): Promise<StatsOrganisme | null> {
   const [stats] = await db
     .select({
       organismeCertificateur: parcellaireImport.organismeCertificateur,
@@ -31,7 +31,7 @@ async function getStatsByOrganisme(organisme: string, start: Date, end: Date): P
   return stats ?? null
 }
 
-async function getDestinatairesRapport(): Promise<DestinataireRapport[]> {
+export async function getDestinatairesRapport(): Promise<DestinataireRapport[]> {
   return db
     .select({
       id: organismeCertificateur.id,
@@ -41,5 +41,3 @@ async function getDestinatairesRapport(): Promise<DestinataireRapport[]> {
     .from(organismeCertificateur)
     .where(eq(organismeCertificateur.active, true))
 }
-
-export { getStatsByOrganisme, getDestinatairesRapport }

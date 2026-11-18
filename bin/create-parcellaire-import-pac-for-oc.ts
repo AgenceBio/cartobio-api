@@ -5,6 +5,7 @@ import cliProgress from 'cli-progress'
 
 import { and, eq, inArray, sql } from 'drizzle-orm'
 import { db } from '../src/database/database.js'
+import { scriptOutputPath } from '../src/shared/paths.js'
 import { importPac } from '../src/database/schema/index.js'
 import { findLastAuditedRecordId } from '../src/shared/parcellaires/parcellaires.repository.js'
 import type { RecordInput } from '../src/shared/parcellaires/parcellaires.types.js'
@@ -42,7 +43,11 @@ if (ocId === undefined) {
 
   console.log("Nombre d'opérateurs ENGAGE pour cet OC: %d", operatorsEngages.length)
 
-  fs.writeFileSync('./numeros-bios-engages.txt', JSON.stringify(operatorsEngages.map((o) => o.numeroBio)))
+  fs.writeFileSync(
+    scriptOutputPath('numeros-bios-engages.txt'),
+    JSON.stringify(operatorsEngages.map((o) => o.numeroBio)),
+    { mode: 0o600 }
+  )
 
   const parcellairesACreer = await db
     .select({ record: importPac.record, numerobio: sql<string>`${importPac.numeroBio}` })

@@ -19,15 +19,16 @@ import type {
   RecordInput
 } from './parcellaires.types.js'
 import { fetchEmailForNumeroBio } from '../../clients/agence-bio.client.js'
-import { sendCertificationComplete } from '../../services/mailer/utils.js'
+import { sendCertificationComplete } from '../../services/mailer/mailer.service.js'
 import { logger } from '../../config/logger.js'
 import * as repository from './parcellaires.repository.js'
 import { createNewEvent } from '../outputs/history.js'
-import { InvalidRequestApiError, getErrorCode } from '../errors.js'
+import { ForbiddenApiError, InvalidRequestApiError, getErrorCode } from '../errors.js'
 import { getRandomFeatureId, populateWithMultipleCultures } from '../outputs/features.js'
 import { normalizeRecord, normalizeRecordSummary } from '../outputs/record.js'
 import { getHistoryUser } from '../../modules/auth/auth.service.js'
-import { setHistoryUsers } from './parcellaires.utils.js'
+import { isAllowedCertificationTransition, setHistoryUsers } from './parcellaires.utils.js'
+import { isAdmin } from '../../modules/auth/auth.utils.js'
 
 /**
  * Create a new record unless we find a dangling one with the same numeroBio and audit date, in which case we update it
@@ -40,13 +41,28 @@ async function createOrUpdateOperatorRecord(
     copyParcellesData?: boolean
     previousRecordId?: string
     fromAPI?: boolean
-  } | null = {},
-  parentTx: NodePgDatabase = db
+  } | null = {}
 ): Promise<DBOperatorRecordWithParcelles> {
-  const certificationState = record.certification_state || CertificationState.OPERATOR_DRAFT
-
   try {
-    const { operator, parcelles, shouldNotifyCertification } = await parentTx.transaction(async (tx) => {
+    const { operator, parcelles, shouldNotifyCertification } = await db.transaction(async (tx) => {
+      const previousCertificationState = await repository.findCertificationStateAtAuditDate(
+        tx,
+        record.numerobio,
+        record.audit_date
+      )
+
+      if (context && previousCertificationState === CertificationState.CERTIFIED) {
+        throw new InvalidRequestApiError("Une version certifiée existe déjà à cette date d'audit.")
+      }
+
+      let certificationState = record.certification_state || CertificationState.OPERATOR_DRAFT
+      if (context?.user && !isAdmin(context.user) && previousCertificationState) {
+        certificationState = record.certification_state ?? (previousCertificationState as CertificationState)
+        if (!isAllowedCertificationTransition(previousCertificationState, certificationState)) {
+          throw new ForbiddenApiError("ce changement d'état de certification n'est pas autorisé.")
+        }
+      }
+
       let preparedFeatures = await prepareFeatures(record.parcelles.features, tx)
 
       const previousMap = await loadPreviousFullData(
@@ -67,12 +83,6 @@ async function createOrUpdateOperatorRecord(
           date: new Date()
         },
         { user: context?.user, record: null }
-      )
-
-      const previousCertificationState = await repository.findCertificationStateAtAuditDate(
-        tx,
-        record.numerobio,
-        record.audit_date
       )
 
       const operator = await repository.upsertOperator(tx, record, certificationState, historyEntry)
@@ -111,7 +121,7 @@ async function createOrUpdateOperatorRecord(
     })
 
     if (shouldNotifyCertification) {
-      await notifyCertificationComplete(operator, parentTx)
+      await notifyCertificationComplete(operator)
     }
 
     return withHistoryUsers({ ...operator, parcelles })
@@ -124,17 +134,14 @@ async function createOrUpdateOperatorRecord(
   }
 }
 
-async function notifyCertificationComplete(
-  record: Parameters<typeof sendCertificationComplete>[0],
-  tx: NodePgDatabase = db
-): Promise<void> {
+async function notifyCertificationComplete(record: Parameters<typeof sendCertificationComplete>[0]): Promise<void> {
   try {
     const emails = await fetchEmailForNumeroBio(record.numerobio)
-    for (const utilisateur of emails.utilisateurs) {
-      const info = await sendCertificationComplete(record, utilisateur.email)
-      logger.info({ info }, `Mail de certification envoyé à ${utilisateur.email}`)
+    for (const email of new Set(emails.utilisateurs.map((utilisateur) => utilisateur.email))) {
+      const { messageId } = await sendCertificationComplete(record, email)
+      logger.info({ messageId, recordId: record.record_id }, 'Mail de certification envoyé')
     }
-    await repository.markCertificationNotified(tx, String(record.record_id))
+    await repository.markCertificationNotified(db, String(record.record_id))
   } catch (error) {
     logger.error(
       { err: error },
@@ -290,7 +297,14 @@ async function findHistoryUsers(entries: HistoryEntry[]): Promise<Map<string, Ca
   const users = await Promise.all(
     Array.from(roles, async ([id, role]): Promise<[string, CartoBioUser]> => [
       id,
-      (await getHistoryUser(id, role)) as CartoBioUser
+      await getHistoryUser(id, role).then(({ id, nom, prenom, mainGroup, organismeCertificateur }) => ({
+        id,
+        nom,
+        prenom,
+        groups: [],
+        mainGroup: { nom: mainGroup.nom },
+        ...(organismeCertificateur ? { organismeCertificateur } : {})
+      }))
     ])
   )
   return new Map(users)

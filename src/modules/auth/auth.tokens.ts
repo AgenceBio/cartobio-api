@@ -16,3 +16,8 @@ export const cartobioTokenSchema = z.looseObject({
   id_token: z.string().optional(),
   exp: z.number()
 })
+
+export const authStateSchema = z.object({
+  mode: z.string().optional(),
+  returnto: z.string().optional()
+})

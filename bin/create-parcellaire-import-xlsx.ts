@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import cliProgress from 'cli-progress'
-import xlsx from 'xlsx'
+import AdmZip from 'adm-zip'
+import { XMLParser } from 'fast-xml-parser'
 import { and, eq, inArray, sql } from 'drizzle-orm'
 import { db } from '../src/database/database.js'
 import { importPac } from '../src/database/schema/index.js'
@@ -19,15 +20,42 @@ if (xlsxPath === undefined || ocId === undefined) {
   process.exit(1)
 }
 
-;(async (): Promise<void> => {
-  const workbook = xlsx.readFile(xlsxPath)
-  const sheetName = workbook.SheetNames[0]
-  const sheet = sheetName === undefined ? undefined : workbook.Sheets[sheetName]
-  if (!sheet) {
+type XmlNode = { '#text'?: unknown } | string | number | undefined
+type XmlCell = { '@_r': string; '@_t'?: string; v?: XmlNode; is?: { t?: XmlNode } }
+
+function readFirstSheetRows(filePath: string): Array<Record<string, string | undefined>> {
+  const zip = new AdmZip(filePath)
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    isArray: (name): boolean => ['si', 'r', 'row', 'c'].includes(name)
+  })
+  const text = (node: XmlNode): string => String(typeof node === 'object' ? (node['#text'] ?? '') : (node ?? ''))
+  const sharedStrings: string[] = (parser.parse(zip.readAsText('xl/sharedStrings.xml') || '<sst/>').sst?.si ?? []).map(
+    (si: { t?: XmlNode; r?: Array<{ t?: XmlNode }> }) =>
+      si.t !== undefined ? text(si.t) : (si.r ?? []).map((run) => text(run.t)).join('')
+  )
+  const sheetXml = zip.readAsText('xl/worksheets/sheet1.xml')
+  if (!sheetXml) {
     console.error('Aucune feuille dans le fichier XLSX.')
     process.exit(1)
   }
-  const rows = xlsx.utils.sheet_to_json<Record<string, unknown>>(sheet)
+  const cellValue = (cell: XmlCell): string =>
+    cell['@_t'] === 's'
+      ? (sharedStrings[Number(text(cell.v))] ?? '')
+      : cell['@_t'] === 'inlineStr'
+        ? text(cell.is?.t)
+        : text(cell.v)
+  const [header = {}, ...data] = (parser.parse(sheetXml).worksheet?.sheetData?.row ?? []).map(
+    (row: { c?: XmlCell[] }): Record<string, string> =>
+      Object.fromEntries((row.c ?? []).map((cell) => [cell['@_r'].replace(/\d+$/, ''), cellValue(cell)]))
+  )
+  return data.map((row: Record<string, string>) =>
+    Object.fromEntries(Object.entries(header as Record<string, string>).map(([column, name]) => [name, row[column]]))
+  )
+}
+
+;(async (): Promise<void> => {
+  const rows = readFirstSheetRows(xlsxPath)
   const codesBio = rows
     .map((r) => r['Code bio'])
     .filter(Boolean)

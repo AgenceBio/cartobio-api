@@ -11,10 +11,10 @@ import {
   createFeaturesFromOtherBodySchema,
   createRecordBodySchema,
   deleteFeatureBodySchema,
-  featureCollectionSchema,
-  featureSchema,
-  numeroBioParamsSchema,
-  recordInfosBodySchema
+  patchFeatureBodySchema,
+  patchFeatureCollectionBodySchema,
+  patchRecordBodySchema,
+  numeroBioParamsSchema
 } from '@agencebio/cartobio-types'
 import {
   apiError,
@@ -137,7 +137,7 @@ export const patchRecordSchema = withSchema(recordRoute(), {
   description:
     "Mise à jour partielle des informations d'audit et de certification (hors parcelles). Un changement de `certification_state` est historisé ; le passage à `CERTIFIED` notifie l'opérateur par email.",
   params: auditParamsSchema,
-  body: recordInfosBodySchema,
+  body: patchRecordBodySchema,
   response: recordResponse
 })
 
@@ -154,7 +154,7 @@ export const patchFeatureCollectionSchema = withSchema(recordRoute(), {
   tags: [TAGS.PARCELLES],
   summary: 'Modifier plusieurs parcelles',
   description: 'Action de masse : les parcelles transmises sont mises à jour, les autres sont ignorées.',
-  body: featureCollectionSchema,
+  body: patchFeatureCollectionBodySchema,
   response: recordResponse
 })
 
@@ -164,7 +164,7 @@ export const updateFeaturePropertiesSchema = withSchema(recordRoute(), {
   summary: 'Modifier une parcelle',
   description: 'Les propriétés absentes sont conservées, les autres sont ajoutées ou remplacées (`cultures` compris).',
   params: featureParamsSchema,
-  body: featureSchema,
+  body: patchFeatureBodySchema,
   response: recordResponse
 })
 

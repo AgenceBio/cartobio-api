@@ -5,6 +5,7 @@ import {
   formatRefCad,
   calculateGlobalBoundingBox,
   launchStyleTab,
+  restrictNetwork,
   drawParcelleHighlightOnMap,
   drawAllParcellesOnMap,
   mergeAndAddFooter
@@ -102,20 +103,28 @@ function createPdfContent(
   currentOperator: AgenceBioNormalizedOperator & PdfRecord,
   pac: boolean
 ): Promise<PDFDocument[]> {
-  const run = pdfQueue.then(() => renderPdfContent(numeroBio, recordId, parcelles, currentOperator, pac))
+  const run = pdfQueue.then(async () => {
+    const tmpPrefix = path.join(
+      config.get('attestationsProductions.directory'),
+      `${numeroBio}-${recordId}-${Date.now()}`
+    )
+    const tmpPdf = (index: number): string => `${tmpPrefix}-${index}.pdf`
+    try {
+      return await renderPdfContent(parcelles, currentOperator, pac, tmpPdf)
+    } finally {
+      await Promise.all([1, 2].map((index) => fs.promises.rm(tmpPdf(index), { force: true })))
+    }
+  })
   pdfQueue = run.catch(() => undefined)
   return run
 }
 
 async function renderPdfContent(
-  numeroBio: string,
-  recordId: string,
   parcelles: Array<PdfParcelle>,
   currentOperator: AgenceBioNormalizedOperator & PdfRecord,
-  pac: boolean
+  pac: boolean,
+  tmpPdf: (index: number) => string
 ): Promise<PDFDocument[]> {
-  const dateTraitement = new Date()
-
   const browser = await puppeteer.launch({
     executablePath: process.env.CHROME_BIN || undefined,
     headless: true,
@@ -127,6 +136,8 @@ async function renderPdfContent(
     const globalImage = result.global
     if (!globalImage) throw new Error("La carte du parcellaire n'a pas pu être générée")
     const page = await browser.newPage()
+    await page.setJavaScriptEnabled(false)
+    await restrictNetwork(page)
     const fontPath = path.join(ASSETS_DIR, 'image-map/Marianne.woff2')
     const fontData = fs.readFileSync(fontPath, { encoding: 'base64' })
 
@@ -194,13 +205,13 @@ async function renderPdfContent(
             const block = `
       <div class="block">
         <div class="container">
-            <h3 class="header">${item.name ? 'Parcelle ' + escapeHtml(item.name) : ''}${item.name && item.nbilot ? ' - ' : ''}${item.nbilot ? 'Ilot ' + item.nbilot + (item.nbp ? ' parcelle ' + item.nbp : '') : ''}${!item.name && !item.nbilot && item.refcad ? item.refcad.map((e) => escapeHtml(formatRefCad(e))).join(' ; ') : ''}</h3>
+            <h3 class="header">${item.name ? 'Parcelle ' + escapeHtml(item.name) : ''}${item.name && item.nbilot ? ' - ' : ''}${item.nbilot ? 'Ilot ' + escapeHtml(item.nbilot) + (item.nbp ? ' parcelle ' + escapeHtml(item.nbp) : '') : ''}${!item.name && !item.nbilot && item.refcad ? item.refcad.map((e) => escapeHtml(formatRefCad(e))).join(' ; ') : ''}</h3>
             <div class="info">
               <div class="info-block"><div class="title-grey">Commune (code commune) :</div> ${item.communename && item.communename !== 'inconnu' ? escapeHtml(item.communename) : '-'} (${item.commune ? escapeHtml(item.commune) : '-'}) ${item.communename === 'inconnu' ? '<em class="font-10">Commune inconnue</em>' : ''}</div>
             </div>
               <div class="info">
                 <div class="info-block"><div class="title-grey">Date d'engagement :</div> ${item.engagement_date ? formatDate(item.engagement_date) : '-'}</div>
-                <div class="info-block"><div class="title-grey">Niveau de conversion :</div> ${item.conversion_niveau ? (item.conversion_niveau === 'CONV' ? 'Conventionnel' : item.conversion_niveau) : '-'}</div>
+                <div class="info-block"><div class="title-grey">Niveau de conversion :</div> ${item.conversion_niveau ? (item.conversion_niveau === 'CONV' ? 'Conventionnel' : escapeHtml(item.conversion_niveau)) : '-'}</div>
             </div>
             <div class="table-container">
                 <table>
@@ -298,7 +309,7 @@ async function renderPdfContent(
     })
 
     await page.pdf({
-      path: `${config.get('attestationsProductions.directory')}/${numeroBio}-${recordId}-${dateTraitement}-2.pdf`,
+      path: tmpPdf(2),
       format: 'A4',
       landscape: false,
       printBackground: true,
@@ -759,8 +770,8 @@ async function renderPdfContent(
             <td>
               ${
                 parcel.nbilot
-                  ? `Ilot ${parcel.nbilot || '-'} - Parcelle
-              ${parcel.nbp || ''}`
+                  ? `Ilot ${escapeHtml(parcel.nbilot || '-')} - Parcelle
+              ${escapeHtml(parcel.nbp || '')}`
                   : parcel.refcad
                     ? parcel.refcad.map((e) => escapeHtml(formatRefCad(e))).join(' ; ')
                     : '-'
@@ -779,7 +790,7 @@ async function renderPdfContent(
               ${parcel.engagement_date ? formatDate(parcel.engagement_date) : '-'}
             </td>
             <td>
-              ${parcel.conversion_niveau === 'CONV' ? 'Conventionnel' : parcel.conversion_niveau || '-'}
+              ${parcel.conversion_niveau === 'CONV' ? 'Conventionnel' : escapeHtml(parcel.conversion_niveau || '-')}
             </td>
             <td>${parcel.commune ? escapeHtml(parcel.commune) : '-'}</td>
             <td class="text-right">
@@ -791,7 +802,7 @@ async function renderPdfContent(
             .join('')}
           <tr class="group-total">
             <td colspan="4">
-              Niveau de conversion ${groupKey === 'CONV' ? 'conventionnel' : groupKey}
+              Niveau de conversion ${groupKey === 'CONV' ? 'conventionnel' : escapeHtml(groupKey)}
             </td>
             <td class="text-right" colspan="2">Surface totale :</td>
             <td class="text-right">
@@ -821,22 +832,6 @@ async function renderPdfContent(
     </div>
     </div>
 
-    <script>
-      (function () {
-        var el = document.querySelector('.name-operator');
-        if (!el) return;
-        var size = parseFloat(window.getComputedStyle(el).fontSize);
-        var minSize = 14;
-        function lineHeight() {
-          var lh = parseFloat(window.getComputedStyle(el).lineHeight);
-          return isNaN(lh) ? size * 1.2 : lh;
-        }
-        while (size > minSize && el.getBoundingClientRect().height > lineHeight() * 1.5) {
-          size -= 0.5;
-          el.style.fontSize = size + 'px';
-        }
-      })();
-    </script>
   </body>
 </html>
 `
@@ -858,8 +853,20 @@ async function renderPdfContent(
     await page.evaluate((): void => {
       document.body.style.fontFamily = 'Marianne, sans-serif'
     })
+    await page.evaluate((): void => {
+      const el = document.querySelector<HTMLElement>('.name-operator')
+      if (!el) return
+      let size = parseFloat(window.getComputedStyle(el).fontSize)
+      const minSize = 14
+      while (size > minSize) {
+        const lineHeight = parseFloat(window.getComputedStyle(el).lineHeight)
+        if (el.getBoundingClientRect().height <= (isNaN(lineHeight) ? size * 1.2 : lineHeight) * 1.5) break
+        size -= 0.5
+        el.style.fontSize = size + 'px'
+      }
+    })
     await page.pdf({
-      path: `${config.get('attestationsProductions.directory')}/${numeroBio}-${recordId}-${dateTraitement}-1.pdf`,
+      path: tmpPdf(1),
       format: 'A4',
       landscape: true,
       printBackground: true,
@@ -880,32 +887,11 @@ async function renderPdfContent(
   const pdf: PDFDocument[] = []
 
   if (pac) {
-    pdf.push(
-      await mergeAndAddFooter(
-        [
-          `${config.get('attestationsProductions.directory')}/${numeroBio}-${recordId}-${dateTraitement}-1.pdf`,
-          `${config.get('attestationsProductions.directory')}/${numeroBio}-${recordId}-${dateTraitement}-2.pdf`
-        ],
-        currentOperator.nom ?? '',
-        false
-      )
-    )
+    pdf.push(await mergeAndAddFooter([tmpPdf(1), tmpPdf(2)], currentOperator.nom ?? '', false))
 
-    pdf.push(
-      await mergeAndAddFooter(
-        [`${config.get('attestationsProductions.directory')}/${numeroBio}-${recordId}-${dateTraitement}-1.pdf`],
-        currentOperator.nom ?? '',
-        true
-      )
-    )
+    pdf.push(await mergeAndAddFooter([tmpPdf(1)], currentOperator.nom ?? '', true))
   } else {
-    pdf.push(
-      await mergeAndAddFooter(
-        [`${config.get('attestationsProductions.directory')}/${numeroBio}-${recordId}-${dateTraitement}-1.pdf`],
-        currentOperator.nom ?? '',
-        false
-      )
-    )
+    pdf.push(await mergeAndAddFooter([tmpPdf(1)], currentOperator.nom ?? '', false))
   }
   return pdf
 }

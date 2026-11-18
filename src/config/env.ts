@@ -13,11 +13,13 @@ interface AppConfig {
   port: number
   host: string
   frontendUrl: string
+  corsOrigins: string[]
   drizzleDatabaseUrl: string
   testDatabaseName: string
   douanes: {
     baseUrl: string
     socksProxy: string
+    rejectUnauthorized: boolean
   }
   geofolia: {
     api: {
@@ -31,7 +33,6 @@ interface AppConfig {
       clientSecret: string
       host: string
       tenant: string
-      callbackUri: string
     }
   }
   env: string
@@ -75,6 +76,11 @@ const config = convict<AppConfig>({
     format: 'url',
     env: 'FRONTEND_URL'
   },
+  corsOrigins: {
+    default: ['https://cartobio.agencebio.org'],
+    format: Array,
+    env: 'CORS_ORIGINS'
+  },
   drizzleDatabaseUrl: {
     sensitive: true,
     default: 'postgresql://docker:docker@localhost:25432/cartobio',
@@ -103,8 +109,9 @@ const config = convict<AppConfig>({
         env: 'GEOFOLIA_API_SERVICE_CODE'
       },
       subscriptionKey: {
+        sensitive: true,
         default: null,
-        format: 'url',
+        format: String,
         env: 'GEOFOLIA_API_SUBSCRIPTION_KEY'
       }
     },
@@ -115,6 +122,7 @@ const config = convict<AppConfig>({
         env: 'GEOFOLIA_OAUTH_CLIENT_ID'
       },
       clientSecret: {
+        sensitive: true,
         default: null,
         format: String,
         env: 'GEOFOLIA_OAUTH_CLIENT_SECRET'
@@ -128,11 +136,6 @@ const config = convict<AppConfig>({
         default: null,
         format: String,
         env: 'GEOFOLIA_OAUTH_TENANT'
-      },
-      callbackUri: {
-        default: 'http://127.0.0.1:8000/api/login/geofolia/callback',
-        format: 'url',
-        env: 'GEOFOLIA_OAUTH_CALLBACK_URI'
       }
     }
   },
@@ -149,7 +152,7 @@ const config = convict<AppConfig>({
   jwtSecret: {
     sensitive: true,
     default: '',
-    format: String,
+    format: 'jwt-secret',
     env: 'CARTOBIO_JWT_SECRET'
   },
   version: {
@@ -167,6 +170,11 @@ const config = convict<AppConfig>({
       default: '',
       format: 'url',
       env: 'DOUANES_SOCKS_PROXY'
+    },
+    rejectUnauthorized: {
+      default: true,
+      format: Boolean,
+      env: 'DOUANES_TLS_REJECT_UNAUTHORIZED'
     }
   },
   notifications: {
@@ -186,14 +194,15 @@ const config = convict<AppConfig>({
       format: 'pub-key'
     },
     serviceToken: {
+      sensitive: true,
       default: '',
       env: 'NOTIFICATIONS_AB_SERVICE_TOKEN',
       format: 'uuid'
     },
     sso: {
       host: {
-        default: 'https://preprod-oauth.agencebio.org',
-        format: 'url',
+        default: '',
+        format: 'required-url',
         env: 'NOTIFICATIONS_AB_SSO_HOST'
       },
       clientId: {
@@ -223,7 +232,7 @@ const config = convict<AppConfig>({
   },
   attestationsProductions: {
     directory: {
-      default: './storage/pdf/',
+      default: join(ROOT_DIR, 'storage/pdf'),
       env: 'ATTESTATIONS_PRODUCTIONS_DIRECTORY'
     }
   },

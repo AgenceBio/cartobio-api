@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { anyGeometrySchema, bboxSchema, geometrySchema, positionSchema } from './common.js'
 
 export const borderCutBodySchema = z
-  .object({
+  .strictObject({
     geometry: geometrySchema,
     distance: z.number().meta({ description: 'Largeur de la bordure, en mètres' }),
     allBorder: z
@@ -21,7 +21,7 @@ export const borderCutBodySchema = z
     path: ['endBorderPoint']
   })
 
-export const geometryEqualsBodySchema = z.object({
+export const geometryEqualsBodySchema = z.strictObject({
   payload: z.object({
     old: z.guid().meta({
       description: "Premier parcellaire (record_id). L'ordre chronologique est recalculé à partir des dates d'audit"
@@ -30,7 +30,7 @@ export const geometryEqualsBodySchema = z.object({
   })
 })
 
-export const addGeometryBodySchema = z.object({
+export const addGeometryBodySchema = z.strictObject({
   payload: z
     .object({
       geometry: z.unknown().optional(),

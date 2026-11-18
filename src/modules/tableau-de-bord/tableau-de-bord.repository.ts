@@ -47,10 +47,8 @@ function rechercheCondition(recherche?: string): SQL | undefined {
     return undefined
   }
 
-  return or(
-    ilike(parcellaireImport.numeroClient, `%${recherche}%`),
-    ilike(parcellaireImport.numeroBio, `%${recherche}%`)
-  )
+  const motif = `%${recherche.replace(/[\\%_]/g, '\\$&')}%`
+  return or(ilike(parcellaireImport.numeroClient, motif), ilike(parcellaireImport.numeroBio, motif))
 }
 
 async function getErrorLogsByJobId(jobIds: number[]): Promise<Record<number, ErrorDetail[]>> {

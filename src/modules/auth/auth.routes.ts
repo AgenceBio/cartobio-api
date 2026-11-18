@@ -4,17 +4,13 @@ import type { FastifyInstance } from 'fastify'
 import type { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { devLoginSchema, exchangeTokenSchema, logoutSchema, ssoCallbackSchema, verifySchema } from './auth.schema.js'
 import { cartobioTokenSchema } from './auth.tokens.js'
-import { UnauthorizedApiError } from '../../shared/errors.js'
+import { ForbiddenApiError, UnauthorizedApiError } from '../../shared/errors.js'
 import * as service from './auth.service.js'
-
-import type { LRUMapWithDelete } from 'mnemonist'
+import { decodeAuthState } from './auth.utils.js'
 
 const DURATION_ONE_HOUR = 1000 * 60 * 60
 
-export type AuthStateCache = LRUMapWithDelete<string, { mode?: string; returnto?: string }>
-
 export interface AuthRoutesOptions {
-  stateCache: AuthStateCache
   sign: (payload: object) => string
 }
 
@@ -23,12 +19,15 @@ export default async function authenticationRoutes(
   options: AuthRoutesOptions
 ): Promise<void> {
   const app = fastify.withTypeProvider<ZodTypeProvider>()
-  const { stateCache, sign } = options
+  const { sign } = options
   const verifyIgnoringExpiration = createVerifier({ key: config.get('jwtSecret'), ignoreExpiration: true })
+  const signExchangeToken = createSigner({ key: config.get('jwtSecret'), expiresIn: DURATION_ONE_HOUR * 2 })
   app.get('/api/v2/user/verify', verifySchema, async (request, reply) => {
     const { user, organismeCertificateur } = request
+    if (!user) return reply.send(organismeCertificateur)
 
-    return reply.send(user ?? organismeCertificateur)
+    const { id, nom, prenom, mainGroup } = user
+    return reply.send({ id, nom, prenom, mainGroup, organismeCertificateur: user.organismeCertificateur })
   })
 
   app.get('/api/v2/user/exchangeToken', exchangeTokenSchema, async (request, reply) => {
@@ -45,15 +44,14 @@ export default async function authenticationRoutes(
       service.getUserProfileById(decodedToken.userId)
     ])
 
-    const sign = createSigner({
-      key: config.get('jwtSecret'),
-      expiresIn: DURATION_ONE_HOUR * 2
-    })
+    if (!(await service.canAccessOperator(userProfile, operator))) {
+      throw new ForbiddenApiError("ce compte n'a pas accès à cet opérateur.")
+    }
 
     return reply.send({
       operator,
       // @todo use Notification pubkey and time based token to passthrough the requests to both Agence Bio and CartoBio APIs
-      token: sign(userProfile)
+      token: signExchangeToken(userProfile)
     })
   })
 
@@ -62,16 +60,21 @@ export default async function authenticationRoutes(
   )
   app.get('/api/auth-provider/agencebio/callback', ssoCallbackSchema, async (request, reply) => {
     // forwards to the UI the user-selected tab
-    const state = stateCache.get(request.query.state)
-    if (!state) throw new UnauthorizedApiError('état de connexion inconnu ou expiré, veuillez vous reconnecter.')
-    const { mode = '', returnto = '' } = state
-    const { token } = await app.agenceBioOAuth2.getAccessTokenFromAuthorizationCodeFlow(request)
-    stateCache.delete(request.query.state)
+    const { mode = '', returnto = '' } = decodeAuthState(request.query.state)
+    const { token } = await app.agenceBioOAuth2
+      .getAccessTokenFromAuthorizationCodeFlow(request, reply)
+      .catch((error: unknown) => {
+        throw new UnauthorizedApiError('état de connexion inconnu ou expiré, veuillez vous reconnecter.', {
+          cause: error
+        })
+      })
     const userProfile = await service.getUserProfileFromSSOToken(token.access_token)
 
     const cartobioToken = sign({ ...userProfile, id_token: token.id_token })
 
-    return reply.redirect(`${config.get('frontendUrl')}/login?mode=${mode}&returnto=${returnto}#token=${cartobioToken}`)
+    return reply.redirect(
+      `${config.get('frontendUrl')}/login?mode=${encodeURIComponent(mode)}&returnto=${encodeURIComponent(returnto)}#token=${cartobioToken}`
+    )
   })
 
   app.post('/api/auth-provider/logout', logoutSchema, async (request, reply) => {

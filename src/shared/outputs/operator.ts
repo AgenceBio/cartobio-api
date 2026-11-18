@@ -1,5 +1,6 @@
 import type { AgenceBioNormalizedOperator } from '@agencebio/cartobio-types'
 import type { AgenceBioOperator, AgenceBioNotification } from '../../clients/agence-bio.types.js'
+import { agenceBioNotificationSchema } from '../../clients/agence-bio.types.js'
 import type { AgenceBioNormalizedOperatorWithFilterData } from '../../modules/operators/operators.types.js'
 
 function sortRecord(
@@ -85,19 +86,32 @@ function normalizeOperator(operator: AgenceBioOperator): AgenceBioNormalizedOper
     numeroBio,
     numeroPacage,
     notifications,
-    email,
     dateEngagement,
     datePremierEngagement,
     adressesOperateurs = []
   } = operator
-  const currentNotifications = notifications ? getNotification(notifications) : null
+  const notification = notifications ? getNotification(notifications) : null
+  const currentNotifications = notification
+    ? agenceBioNotificationSchema
+        .strip()
+        .pick({
+          etatCertification: true,
+          status: true,
+          organismeCertificateurId: true,
+          numeroClient: true,
+          dateDemarrage: true,
+          dateArret: true,
+          certification_state: true
+        })
+        .parse(notification)
+    : null
   const adresses = adressesOperateurs ?? []
   let organismeCertificateur = {}
-  if (currentNotifications && currentNotifications.organismeCertificateurId) {
+  if (notification && notification.organismeCertificateurId) {
     organismeCertificateur = {
-      id: currentNotifications.organismeCertificateurId,
-      nom: currentNotifications.organisme,
-      numeroClient: currentNotifications.numeroClient
+      id: notification.organismeCertificateurId,
+      nom: notification.organisme,
+      numeroClient: notification.numeroClient
     }
   }
 
@@ -108,15 +122,12 @@ function normalizeOperator(operator: AgenceBioOperator): AgenceBioNormalizedOper
     siret,
     numeroBio,
     numeroPacage: formatPacage(numeroPacage ?? null),
-    email,
     dateEngagement,
     datePremierEngagement,
     organismeCertificateur,
     adressesOperateurs: adresses
       .filter(({ active }) => active)
-      .map(({ lat, long, codeCommune, lieu, codePostal, ville }) => ({
-        lat,
-        long,
+      .map(({ codeCommune, lieu, codePostal, ville }) => ({
         codeCommune,
         lieu,
         codePostal,

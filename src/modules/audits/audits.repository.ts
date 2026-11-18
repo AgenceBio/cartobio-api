@@ -14,7 +14,13 @@ import {
   upsertCultures
 } from '../../shared/parcellaires/parcellaires.repository.js'
 import { blankToNull, parcelleInsertValues } from '../../shared/parcellaires/parcellaires.utils.js'
-import { featureUpdateSet, geometryInput, recordColumnsByLegacyName } from './audits.utils.js'
+import {
+  assertUnmodified,
+  featureUpdateSet,
+  geometryInput,
+  recordColumnsByLegacyName,
+  unmodifiedSinceCondition
+} from './audits.utils.js'
 import { createParcelleControleSchema } from '../../database/validations/activites.js'
 import { updateParcellaireSchema } from '../../database/validations/parcellaires.js'
 import type { AuditRecordChanges } from './audits.types.js'
@@ -49,7 +55,8 @@ async function markFeatureUncontrolled(recordId: string, id: FeatureId, userId: 
 async function updateAuditRecord(
   recordId: string,
   changes: AuditRecordChanges,
-  historyEntry: HistoryEntry | null
+  historyEntry: HistoryEntry | null,
+  ifUnmodifiedSince?: string
 ): Promise<DBOperatorRecord[]> {
   const set: Record<string, SQL> = {}
   const values: Record<string, unknown> = {}
@@ -70,7 +77,13 @@ async function updateAuditRecord(
     if (changes.oc_id != null) {
       await ensureOrganismeCertificateur(tx, changes.oc_id, changes.oc_label)
     }
-    await tx.update(parcellaires).set(set).where(eq(parcellaires.recordId, recordId))
+    assertUnmodified(
+      await tx
+        .update(parcellaires)
+        .set(set)
+        .where(and(eq(parcellaires.recordId, recordId), unmodifiedSinceCondition(ifUnmodifiedSince)))
+        .returning({ recordId: parcellaires.recordId })
+    )
     await insertEvent(tx, recordId, historyEntry)
     const record = await findRecord(recordId, tx)
     return record ? [record] : []
@@ -81,7 +94,8 @@ async function setOperatorUpdatedAt(
   recordId: string,
   historyEntry: HistoryEntry | null,
   ocId: number | null,
-  ocLabel: string | null
+  ocLabel: string | null,
+  ifUnmodifiedSince?: string
 ): Promise<DBOperatorRecord[]> {
   const [current] = await tx
     .select({ ocId: parcellaires.ocId })
@@ -90,13 +104,15 @@ async function setOperatorUpdatedAt(
   if (current && current.ocId === null && ocId !== null) {
     await ensureOrganismeCertificateur(tx, ocId, ocLabel)
   }
-  await tx
+  const updated = await tx
     .update(parcellaires)
     .set({
       updatedAt: sql`now()`,
       ocId: sql`coalesce(${parcellaires.ocId}, ${ocId === null ? null : String(ocId)})`
     })
-    .where(eq(parcellaires.recordId, recordId))
+    .where(and(eq(parcellaires.recordId, recordId), unmodifiedSinceCondition(ifUnmodifiedSince)))
+    .returning({ recordId: parcellaires.recordId })
+  if (current) assertUnmodified(updated)
   if (current) await insertEvent(tx, recordId, historyEntry)
   const record = await findRecord(recordId, tx)
   return record ? [record] : []

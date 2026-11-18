@@ -40,7 +40,9 @@ export const cartobioUserSchema = z.looseObject({
   organismeCertificateur: organismeCertificateurSchema.optional()
 })
 
-export const verifyResponseSchema = z.union([cartobioUserSchema, organismeCertificateurSchema]).nullable()
+export const verifyResponseSchema = z
+  .union([cartobioUserSchema.omit({ groups: true }), organismeCertificateurSchema])
+  .nullable()
 
 export const exchangeTokenResponseSchema = z.object({
   operator: operatorSchema.meta({ description: 'Opérateur concerné par la notification' }),

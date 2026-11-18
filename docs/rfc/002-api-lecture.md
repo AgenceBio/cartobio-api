@@ -38,14 +38,17 @@ le chemin `/api/oc/check-token`.
 Par défaut, l'API renvoie les données de la version la plus récemment modifiée du parcellaire.
 Il est possible de spécifier des filtres pour obtenir les données d'une version spécifique.
 
-| Paramètre    | Type     | Description                                                                                            | Numero bio | ALL |
-| ------------ | -------- | ------------------------------------------------------------------------------------------------------ | ---------- | --- |
-| `anneeAudit` | `string` | Année de l'audit                                                                                       | ✅         | ✅  |
-| `statut`     | `string` | Statut de certification ([cf. statuts de certification](#valeurs-possibles--statuts-de-certification)) | ✅         | ✅  |
-| `limit`      | `number` | Nombre de résultat à retourner                                                                         | ❌         | ✅  |
-| `start`      | `number` | Index du premier résultat à retourner (offset de pagination)                                           | ❌         | ✅  |
+| Paramètre                | Type     | Description                                                                                            | Numero bio | ALL |
+| ------------------------ | -------- | ------------------------------------------------------------------------------------------------------ | ---------- | --- |
+| `anneeAudit`             | `string` | Année de l'audit                                                                                       | ✅         | ✅  |
+| `statut`                 | `string` | Statut de certification ([cf. statuts de certification](#valeurs-possibles--statuts-de-certification)) | ✅         | ✅  |
+| `anneeReferenceControle` | `number` | Année de référence du contrôle                                                                         | ❌         | ✅  |
+| `limit`                  | `number` | Nombre de résultat à retourner                                                                         | ❌         | ✅  |
+| `start`                  | `number` | Index du premier résultat à retourner (offset de pagination)                                           | ❌         | ✅  |
 
-Les paramètres optionnels limit et start permettent de définir une pagination des résultats.
+Les paramètres optionnels limit et start permettent de définir une pagination des résultats. `limit` vaut 100 par défaut et 1000 au maximum ; le lien `_links.next` donne la page suivante.
+
+Un OC ne lit que les parcellaires de ses opérateurs actuels. Si le dernier parcellaire a été créé par un autre OC, les notes d'audit, demandes, annotations et commentaires de parcelle sont masqués.
 
 ```bash
 curl -H 'Accept: application/json' \
@@ -72,19 +75,21 @@ curl -H 'Accept: application/json' \
 | Code HTTP | Message HTTP            | Signification                                                                                                             |
 | --------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `200`     | `OK`                    | Tout s'est bien passé.                                                                                                    |
-| `401`     | `Unauthorized`          | Le jeton d'`Authorization` est manquant.                                                                                  |
-| `403`     | `Forbidden`             | Ce jeton d'`Authorization` n'est pas attribué, ou a expiré.                                                               |
-| `404`     | `Not Found`             | Aucun parcellaire trouvé pour ce numéro bio.                                                                              |
-| `405`     | `Method Not Allowed`    | L'appel utilise un autre verbe HTTP que `GET`.                                                                            |
+| `400`     | `Bad Request`           | Paramètre de requête invalide.                                                                                            |
+| `401`     | `Unauthorized`          | Le jeton d'`Authorization` est manquant, refusé ou révoqué, ou l'opérateur n'est pas (ou plus) client de cet OC.          |
+| `404`     | `Not Found`             | Opérateur inconnu, aucun parcellaire trouvé pour ce numéro bio, ou verbe HTTP autre que `GET` (route inconnue).           |
 | `500`     | `Internal Server Error` | Une erreur inattendue s'est produite de notre côté — un bug doit être résolu pour qu'une nouvelle requête puisse aboutir. |
+| `502`     | `Bad Gateway`           | Le portail de l'Agence Bio n'a pas pu vérifier le jeton (indisponible) : réessayer plus tard.                             |
 
 En cas de statut `200`, un objet JSON représentant l'opérateur, son parcellaire et son statut de certification.
 
 #### Propriétés de la réponse
 
-La réponse est un objet JSON contenant deux clés principales :
+Pour `/parcellaire/:numeroBio`, la réponse est directement l'objet décrit ci-dessous.
 
-- **`data`** : un objet qui contient les champs décrits ci-dessous
+Pour `/parcellaires`, la réponse est un objet JSON contenant deux clés principales :
+
+- **`data`** : la liste des objets décrits ci-dessous
 - **`_links`** : un objet optionnel qui contient les URLs de pagination
   - `prev` : URL de la page précédente si disponible
   - `next` : URL de la page suivante si disponible
@@ -117,7 +122,7 @@ Le parcellaire est représenté en utilisant le [format standardisé **GeoJSON**
 
 | Clé                | Type     | Description                                                                                                             |
 | ------------------ | -------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `id`               | `string` | Le numéro bio de l'opérateur                                                                                            |
+| `id`               | `string` | Identifiant de la parcelle                                                                                              |
 | `commune`          | `string` | Code INSEE de la commune                                                                                                |
 | `cultures`         | `array`  | Liste des cultures en place ([cf. Cultures](#cultures))                                                                 |
 | `niveauConversion` | `string` | Niveau de conversion en Agriculture Biologique ([cf. niveaux de conversion](#valeurs-possibles--niveaux-de-conversion)) |
@@ -128,15 +133,15 @@ Le parcellaire est représenté en utilisant le [format standardisé **GeoJSON**
 
 ##### Propriétés facultatives
 
-| Clé                   | Type     | Description                                                                                       |
-| --------------------- | -------- | ------------------------------------------------------------------------------------------------- |
-| `dateAjout`           | `string` | Date d'ajout sur CartoBio (au format [ISO 8601])                                                  |
-| `dateMiseAJour`       | `string` | Date de modification sur CartoBio (au format [ISO 8601])                                          |
-| `nom`                 | `string` | Nom de la parcelle                                                                                |
-| `numeroPacage`        | `string` | Numéro PACAGE                                                                                     |
-| `numeroIlotPAC`       | `string` | Numéro de l'ilôt PAC                                                                              |
-| `numeroParcellePAC`   | `string` | Numéro de la parcelle PAC                                                                         |
-| `referenceCadastrale` | `string` | Référence cadastrale complète (code INSEE de la commune + préfixe + section + numéro de parcelle) |
+| Clé                   | Type     | Description                                                                                        |
+| --------------------- | -------- | -------------------------------------------------------------------------------------------------- |
+| `dateAjout`           | `string` | Date d'ajout sur CartoBio (au format [ISO 8601])                                                   |
+| `dateMiseAJour`       | `string` | Date de modification sur CartoBio (au format [ISO 8601])                                           |
+| `nom`                 | `string` | Nom de la parcelle                                                                                 |
+| `numeroPacage`        | `string` | Numéro PACAGE                                                                                      |
+| `numeroIlotPAC`       | `number` | Numéro de l'ilôt PAC                                                                               |
+| `numeroParcellePAC`   | `number` | Numéro de la parcelle PAC                                                                          |
+| `referenceCadastrale` | `string` | Références cadastrales complètes (code INSEE + préfixe + section + numéro), séparées par un espace |
 
 ##### Cultures
 

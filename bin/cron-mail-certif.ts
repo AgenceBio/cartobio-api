@@ -6,7 +6,7 @@ import { parcellaires as parcellairesTable } from '../src/database/schema/index.
 import { certificationEtatEnumSchema } from '../src/database/validations/parcellaires.js'
 import { markCertificationNotified } from '../src/shared/parcellaires/parcellaires.repository.js'
 import { recordColumns } from '../src/shared/parcellaires/parcellaires.utils.js'
-import { sendCertificationCompleteModifie } from '../src/services/mailer/utils.js'
+import { sendCertificationCompleteModifie } from '../src/services/mailer/mailer.service.js'
 import { fetchEmailForNumeroBio } from '../src/clients/agence-bio.client.js'
 
 async function sendMail(): Promise<void> {
@@ -39,8 +39,8 @@ async function sendMail(): Promise<void> {
       try {
         const emails = await fetchEmailForNumeroBio(parcellaire.numerobio)
 
-        for (const utilisateur of emails.utilisateurs) {
-          await sendCertificationCompleteModifie(parcellaire, utilisateur.email)
+        for (const email of new Set(emails.utilisateurs.map((utilisateur) => utilisateur.email))) {
+          await sendCertificationCompleteModifie(parcellaire, email)
         }
 
         await markCertificationNotified(db, parcellaire.record_id)

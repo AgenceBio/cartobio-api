@@ -22,6 +22,8 @@ import geofoliaParcelles from './fixtures/geofolia-parcelles.js'
 
 import { normalizeRecord } from '../src/shared/outputs/record.js'
 import { surfaceForFeatureCollection, recordToApi } from '../src/shared/outputs/api.js'
+import { getCachedUserProfile, getHistoryUser } from '../src/modules/auth/auth.service.js'
+import type { CartoBioUser } from '@agencebio/cartobio-types'
 import { collectValidationResult, createImportJob, processFullJob } from '../src/modules/imports/imports.service.js'
 import { asStoredParcelles, loadRecordFixture, expectDeepCloseTo } from './utils.js'
 import { asAgenceBioOperator, asDBRecordWithParcelles } from './factories.js'
@@ -42,17 +44,26 @@ const USER_DOC_AUTH_TOKEN = sign(fakeUser)
 const USER_DOC_AUTH_HEADER = `Bearer ${USER_DOC_AUTH_TOKEN}`
 
 const otherFakeOc = { id: 1111, nom: 'Certificator', numeroControleEu: 'FR-BIO-1111' }
-const OTHER_USER_DOC_AUTH_TOKEN = sign({
+const otherFakeUser = {
   id: 2,
   prenom: 'Tania',
   nom: 'Ouest',
   test: true,
   mainGroup: { id: 2 },
   organismeCertificateur: otherFakeOc
-})
+}
+const OTHER_USER_DOC_AUTH_TOKEN = sign(otherFakeUser)
 const OTHER_OC_AUTH_TOKEN = 'zzzz-zzzz-zzzz-zzzz'
 
 const mockOnError = vi.fn()
+vi.mock('../src/modules/auth/auth.service.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  getCachedUserProfile: vi.fn(),
+  getHistoryUser: vi.fn()
+}))
+const testUsers = { 1: fakeUser, 2: otherFakeUser } as unknown as Record<string, CartoBioUser>
+vi.mocked(getCachedUserProfile).mockImplementation(async (id) => testUsers[id]!)
+vi.mocked(getHistoryUser).mockImplementation(async (id) => testUsers[id]!)
 vi.mock('../src/modules/imports/imports.service.js', async (importOriginal) => ({
   ...(await importOriginal()),
   collectValidationResult: vi.fn(),
@@ -128,7 +139,8 @@ describe('GET /api/v2/user/verify', async () => {
       .set('Authorization', USER_DOC_AUTH_HEADER)
       .then((response) => {
         expect(response.status).toEqual(200)
-        expect(response.body).toMatchObject(fakeUser)
+        const { id, nom, prenom, mainGroup, organismeCertificateur } = fakeUser
+        expect(response.body).toMatchObject({ id, nom, prenom, mainGroup, organismeCertificateur })
       })
   })
 
@@ -447,7 +459,7 @@ describe('DELETE /api/v2/audits/:recordId', () => {
       .delete('/api/v2/audits/054f0d70-c3da-448f-823e-81fcf7c11112')
       .set('Authorization', `Bearer ${OTHER_USER_DOC_AUTH_TOKEN}`)
 
-    expect(response.status).toEqual(401)
+    expect(response.status).toEqual(403)
     const [stored] = await drizzleDb
       .select({ deletedAt: parcellaires.deletedAt })
       .from(parcellaires)

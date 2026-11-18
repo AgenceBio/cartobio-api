@@ -9,6 +9,8 @@ import { TAGS } from '../shared/routes.js'
 const host = config.get('host')
 const port = config.get('port')
 const version = config.get('version')
+const isProduction = config.get('env') === 'production'
+const publicTags: string[] = [TAGS.API_PARCELLAIRE]
 
 const swaggerConfig: SwaggerOptions = {
   openapi: {
@@ -19,7 +21,7 @@ const swaggerConfig: SwaggerOptions = {
     },
     servers: [
       {
-        url: config.get('env') === 'production' ? 'https://cartobio.agencebio.org' : `http://${host}:${port}`
+        url: isProduction ? 'https://cartobio.agencebio.org' : `http://${host}:${port}`
       }
     ],
     externalDocs: {
@@ -48,7 +50,7 @@ const swaggerConfig: SwaggerOptions = {
       { name: TAGS.GEOMETRIE, description: 'Calculs géographiques sur les parcelles' },
       { name: TAGS.EXPORTS, description: 'Attestations de production et exports de parcellaires' },
       { name: TAGS.REFERENTIELS, description: 'Données de référence' }
-    ],
+    ].filter(({ name }) => !isProduction || publicTags.includes(name)),
     components: {
       securitySchemes: {
         bearerAuth: {
@@ -72,7 +74,12 @@ const swaggerConfig: SwaggerOptions = {
       }
     }
   },
-  transform: jsonSchemaTransform
+  transform: (input) => {
+    const output = jsonSchemaTransform(input)
+    const tags = (input.schema as { tags?: string[] } | undefined)?.tags ?? []
+    if (!isProduction || tags.some((tag) => publicTags.includes(tag))) return output
+    return { ...output, schema: { ...output.schema, hide: true } }
+  }
 }
 
 async function documentationPlugin(app: FastifyInstance): Promise<void> {

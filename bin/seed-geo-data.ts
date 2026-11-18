@@ -7,6 +7,12 @@ import type { SQL } from 'drizzle-orm'
 import { db } from '../src/database/database.js'
 import { communes, departements, regions } from '../src/database/schema/geographie.js'
 import { fromGeoJSON } from '../src/database/postgis.js'
+import {
+  createCommuneSchema,
+  createDepartementSchema,
+  createRegionSchema,
+  updateCommuneSchema
+} from '../src/database/validations/geographie.js'
 import { DATA_DIR } from '../src/shared/paths.js'
 
 type Zone = { code: string; nom: string; geometry: unknown }
@@ -30,7 +36,12 @@ try {
     await byBatch(await readZones('reference/regions.json'), (batch) =>
       tx
         .insert(regions)
-        .values(batch.map(({ code, nom, geometry }) => ({ code, nom, geometry: multiPolygon(geometry) })))
+        .values(
+          batch.map(({ code, nom, geometry }) => ({
+            ...createRegionSchema.parse({ code, nom }),
+            geometry: multiPolygon(geometry)
+          }))
+        )
         .onConflictDoUpdate({ target: regions.code, set: { nom: sql`excluded.nom`, geometry: sql`excluded.geometry` } })
     )
 
@@ -49,10 +60,8 @@ try {
         .insert(departements)
         .values(
           batch.map(({ code, nom, geometry, codeRegion }) => ({
-            fid: code,
-            nom,
-            geometry: multiPolygon(geometry),
-            codeRegion
+            ...createDepartementSchema.parse({ fid: code, nom, codeRegion }),
+            geometry: multiPolygon(geometry)
           }))
         )
         .onConflictDoUpdate({
@@ -61,14 +70,17 @@ try {
         })
     )
 
-    await tx.update(communes).set({ active: false })
+    await tx.update(communes).set(updateCommuneSchema.parse({ active: false }))
     await byBatch(
       (await readZones('generated/communes.json')).filter(({ code }) => code.length <= 5),
       (batch) =>
         tx
           .insert(communes)
           .values(
-            batch.map(({ code, nom, geometry }) => ({ fid: code, nom, active: true, geometry: multiPolygon(geometry) }))
+            batch.map(({ code, nom, geometry }) => ({
+              ...createCommuneSchema.parse({ fid: code, nom, active: true }),
+              geometry: multiPolygon(geometry)
+            }))
           )
           .onConflictDoUpdate({
             target: communes.fid,

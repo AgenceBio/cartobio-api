@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { createWriteStream } from 'fs'
 import { promisify } from 'node:util'
 import { createGunzip } from 'node:zlib'
@@ -15,6 +16,43 @@ const pipeline = promisify(stream.pipeline)
 
 const generatedDataDirectory = join(DATA_DIR, 'generated')
 const referenceDataDirectory = join(DATA_DIR, 'reference')
+const GEO_SOURCE = 'https://etalab-datasets.geo.data.gouv.fr/contours-administratifs/2026/geojson/'
+const COMMUNES_SHA256 = '6db43cd98a7211516da64e91761100504ba3feeddc986ebe0d50f84df624cd38'
+const REGIONS_SHA256 = 'f85fe769841120140cdf0dc8fb9536926ad884157fd8e26f74aec58b18994ba4'
+
+const DEPARTEMENTS_SHA256 = '9ca63cdcca87f9b08a9242db504492cdfca1334ab17336873d8a5b547a24da6d'
+const REGIONS_50M_SHA256 = 'f95a49efca51c3343359daecbee5b74f585cfbc97dd3b547599db65a3343a65b'
+
+function assertSha256(actual: string, expected: string, source: string): void {
+  if (actual !== expected) throw new Error(`Empreinte SHA-256 inattendue pour ${source} : ${actual}`)
+}
+
+async function pipelineVerified(
+  source: string,
+  expectedSha256: string,
+  outFile: string,
+  steps: Array<NodeJS.ReadWriteStream | ((source: AsyncIterable<unknown>) => AsyncIterable<unknown>)>
+): Promise<void> {
+  const hash = createHash('sha256')
+  await pipeline([
+    got.stream(source),
+    async function* (chunks: AsyncIterable<Buffer>): AsyncGenerator<Buffer> {
+      for await (const chunk of chunks) {
+        hash.update(chunk)
+        yield chunk
+      }
+    },
+    ...steps,
+    createWriteStream(outFile)
+  ])
+
+  try {
+    assertSha256(hash.digest('hex'), expectedSha256, source)
+  } catch (error) {
+    await fs.promises.rm(outFile, { force: true })
+    throw error
+  }
+}
 async function fetchCommunesBoundaries(): Promise<void> {
   // Skip if file already exists
   const outFile = join(generatedDataDirectory, 'communes.json')
@@ -23,11 +61,7 @@ async function fetchCommunesBoundaries(): Promise<void> {
     return
   }
 
-  const FILENAME = 'communes-50m.geojson.gz'
-  const SOURCE = 'http://etalab-datasets.geo.data.gouv.fr/contours-administratifs/latest/geojson/' + FILENAME
-
-  return pipeline([
-    got.stream(SOURCE),
+  await pipelineVerified(GEO_SOURCE + 'communes-50m.geojson.gz', COMMUNES_SHA256, outFile, [
     createGunzip(),
     JSONStream.parse(['features', true]),
     (source) =>
@@ -36,8 +70,7 @@ async function fetchCommunesBoundaries(): Promise<void> {
         nom: feature.properties.nom,
         geometry: feature.geometry
       })),
-    JSONStream.stringify('[\n', ',\n', '\n]'),
-    createWriteStream(outFile)
+    JSONStream.stringify('[\n', ',\n', '\n]')
   ])
 }
 
@@ -63,11 +96,11 @@ async function fetchRegionsBoundaries(): Promise<void> {
     return
   }
 
-  const FILENAME = 'regions-100m.geojson'
-  const SOURCE = 'http://etalab-datasets.geo.data.gouv.fr/contours-administratifs/latest/geojson/' + FILENAME
+  const SOURCE = GEO_SOURCE + 'regions-100m.geojson'
 
   // Get content
   const response = await got(SOURCE)
+  assertSha256(createHash('sha256').update(response.rawBody).digest('hex'), REGIONS_SHA256, SOURCE)
   const content = response.body
 
   // Parse content
@@ -103,11 +136,7 @@ async function fetchDepartementBoundaries(): Promise<void> {
     return
   }
 
-  const FILENAME = 'departements-50m.geojson.gz'
-  const SOURCE = 'https://etalab-datasets.geo.data.gouv.fr/contours-administratifs/latest/geojson/' + FILENAME
-
-  return pipeline([
-    got.stream(SOURCE),
+  await pipelineVerified(GEO_SOURCE + 'departements-50m.geojson.gz', DEPARTEMENTS_SHA256, outFile, [
     createGunzip(),
     JSONStream.parse(['features', true]),
     (source) =>
@@ -116,8 +145,7 @@ async function fetchDepartementBoundaries(): Promise<void> {
         nom: feature.properties.nom,
         geometry: feature.geometry
       })),
-    JSONStream.stringify('[\n', ',\n', '\n]'),
-    createWriteStream(outFile)
+    JSONStream.stringify('[\n', ',\n', '\n]')
   ])
 }
 
@@ -128,9 +156,6 @@ async function fetchAtOnceRegionsBoundaries(): Promise<void> {
     console.log('Departement boundaries file already exists, skipping')
     return
   }
-
-  const FILENAME = 'regions-50m.geojson.gz'
-  const SOURCE = 'https://etalab-datasets.geo.data.gouv.fr/contours-administratifs/latest/geojson/' + FILENAME
 
   const goodCodes = [
     '11',
@@ -153,8 +178,7 @@ async function fetchAtOnceRegionsBoundaries(): Promise<void> {
     '06'
   ]
 
-  return pipeline([
-    got.stream(SOURCE),
+  await pipelineVerified(GEO_SOURCE + 'regions-50m.geojson.gz', REGIONS_50M_SHA256, outFile, [
     createGunzip(),
     JSONStream.parse(['features', true]),
     (source) =>
@@ -165,8 +189,7 @@ async function fetchAtOnceRegionsBoundaries(): Promise<void> {
           nom: feature.properties.nom,
           geometry: feature.geometry
         })),
-    JSONStream.stringify('[\n', ',\n', '\n]'),
-    createWriteStream(outFile)
+    JSONStream.stringify('[\n', ',\n', '\n]')
   ])
 }
 

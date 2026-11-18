@@ -27,7 +27,6 @@ import { getRandomFeatureId } from '../../../shared/outputs/features.js'
 import { normalizeEtatProduction } from '../../../shared/outputs/record.js'
 import { createOrUpdateOperatorRecord } from '../../../shared/parcellaires/parcellaires.service.js'
 import { parsePacDetailsFromComment, fetchOperatorByNumeroBio } from '../../../clients/agence-bio.client.js'
-import { db } from '../../../database/database.js'
 import * as repository from '../imports.repository.js'
 import type { ImportJobListRow } from '../imports.types.js'
 import { importJobResultEnumSchema, importStatusEnumSchema } from '../../../database/validations/imports.js'
@@ -385,7 +384,7 @@ async function collectValidationResult(
     errors: recordErrors,
     warnings
   } = await parseAPIParcellaire(json, { organismeCertificateur })
-  await addPayload(json, jobId)
+  await repository.insertPayload(jobId, json)
 
   if (recordErrors?.length || !record) {
     return { errors: (recordErrors ?? []).map((err) => ({ numeroBio, ...err })), validItem: null }
@@ -419,59 +418,56 @@ async function parcellaireValidItemToDb(
     warning.push([numeroBio, warnings])
   }
 
-  await db.transaction(async (tx): Promise<void> => {
-    try {
-      const { parcelles } = await createOrUpdateOperatorRecord(record, null, tx)
-      const parcellesCorrigees = parcelles
-        .filter((f) => f.statut_import_geom === 'CORRIGE')
-        .map((f) => f.id)
-        .filter(Boolean)
+  try {
+    const { parcelles } = await createOrUpdateOperatorRecord(record, null)
+    const parcellesCorrigees = parcelles
+      .filter((f) => f.statut_import_geom === 'CORRIGE')
+      .map((f) => f.id)
+      .filter(Boolean)
 
-      const parcellesNonCorrigees = parcelles
-        .filter((f) => f.statut_import_geom === 'ACCEPTENONCORRIGE')
-        .map((f) => f.id)
-        .filter(Boolean)
+    const parcellesNonCorrigees = parcelles
+      .filter((f) => f.statut_import_geom === 'ACCEPTENONCORRIGE')
+      .map((f) => f.id)
+      .filter(Boolean)
 
-      const correctionWarnings: ImportWarning[] = []
-      if (parcellesCorrigees.length > 0) {
-        correctionWarnings.push({
-          numeroBio,
-          message: `Ces parcelles ont été corrigées : ${parcellesCorrigees.join(', ')}`,
-          code: ImportLogType.GEOM_CORRECTED
-        })
-      }
-
-      if (parcellesNonCorrigees.length > 0) {
-        correctionWarnings.push({
-          numeroBio,
-          message: `Ces parcelles n'ont pas été corrigées mais sont invalides : ${parcellesNonCorrigees.join(', ')}`,
-          code: ImportLogType.GEOM_INVALID_NOT_CORRECTED
-        })
-      }
-
-      if (correctionWarnings.length > 0) {
-        warning.push([numeroBio, correctionWarnings])
-      }
-
-      numeroBioValid.push({
-        numeroBio: record.numerobio,
-        nbParcelles: record.parcelles.features.length
+    const correctionWarnings: ImportWarning[] = []
+    if (parcellesCorrigees.length > 0) {
+      correctionWarnings.push({
+        numeroBio,
+        message: `Ces parcelles ont été corrigées : ${parcellesCorrigees.join(', ')}`,
+        code: ImportLogType.GEOM_CORRECTED
       })
-    } catch (e) {
-      const apiError = e as { code?: string; message?: string }
-      if (apiError.code === 'INVALID_API_REQUEST' || apiError.code === 'MISSING_GEOMETRY') {
-        dbErrors.push({
-          numeroBio: record.numerobio,
-          message: apiError.message || 'Erreur de validation lors de l’import.',
-          code: apiError.code === 'MISSING_GEOMETRY' ? ImportLogType.MISSING_GEOM : ImportLogType.DB_ERROR
-        })
-        numeroBioError.push(record.numerobio)
-        return
-      }
-      // noinspection ExceptionCaughtLocallyJS
+    }
+
+    if (parcellesNonCorrigees.length > 0) {
+      correctionWarnings.push({
+        numeroBio,
+        message: `Ces parcelles n'ont pas été corrigées mais sont invalides : ${parcellesNonCorrigees.join(', ')}`,
+        code: ImportLogType.GEOM_INVALID_NOT_CORRECTED
+      })
+    }
+
+    if (correctionWarnings.length > 0) {
+      warning.push([numeroBio, correctionWarnings])
+    }
+
+    numeroBioValid.push({
+      numeroBio: record.numerobio,
+      nbParcelles: record.parcelles.features.length
+    })
+  } catch (e) {
+    const apiError = e as { code?: string; message?: string }
+    if (apiError.code === 'INVALID_API_REQUEST' || apiError.code === 'MISSING_GEOMETRY') {
+      dbErrors.push({
+        numeroBio: record.numerobio,
+        message: apiError.message || 'Erreur de validation lors de l’import.',
+        code: apiError.code === 'MISSING_GEOMETRY' ? ImportLogType.MISSING_GEOM : ImportLogType.DB_ERROR
+      })
+      numeroBioError.push(record.numerobio)
+    } else {
       throw e
     }
-  })
+  }
 
   const importId = await repository.completeImportJob({
     result: { count, errors: dbErrors, warning, numeroBioValid, numeroBioError },
@@ -496,22 +492,6 @@ async function parcellaireValidItemToDb(
  */
 async function createImportJob(organismeCertificateurId: number): Promise<number> {
   return repository.createImportJob(organismeCertificateurId)
-}
-
-/**
- * Stocke le payload d'un job
- */
-async function addPayload(json: InputApiRecordBody, jobId: number): Promise<InputApiRecordBody> {
-  await repository.insertPayload(jobId, json)
-
-  await repository.updateImportJobRecordInfos(jobId, {
-    numeroBio: json.numeroBio ? String(json.numeroBio) : null,
-    numeroClient: json.numeroClient ? String(json.numeroClient) : null,
-    auditDate:
-      json.dateAudit && !isNaN(Date.parse(json.dateAudit)) ? new Date(json.dateAudit).toISOString().slice(0, 10) : null
-  })
-
-  return json
 }
 
 /**

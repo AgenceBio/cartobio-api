@@ -1,7 +1,7 @@
 import { and, eq, sql } from 'drizzle-orm'
 import type { SQL, SQLWrapper } from 'drizzle-orm'
 import type { PgInsertValue } from 'drizzle-orm/pg-core'
-import { EventType } from '@agencebio/cartobio-types'
+import { CertificationState, EventType } from '@agencebio/cartobio-types'
 import type { Polygon } from 'geojson'
 import type {
   CartoBioAnnotation,
@@ -328,4 +328,15 @@ export const parcelleColumns = {
   attente_pac: parcelles.attentePac,
   from_parcelles: parcelles.fromParcelles,
   deleted_at: parcelles.deletedAt
+}
+
+const allowedCertificationTransitions: Record<CertificationState, string[]> = {
+  [CertificationState.OPERATOR_DRAFT]: [CertificationState.AUDITED, CertificationState.PENDING_CERTIFICATION],
+  [CertificationState.AUDITED]: [CertificationState.PENDING_CERTIFICATION],
+  [CertificationState.PENDING_CERTIFICATION]: [CertificationState.CERTIFIED],
+  [CertificationState.CERTIFIED]: []
+}
+
+export function isAllowedCertificationTransition(from: string, to: string): boolean {
+  return from === to || (allowedCertificationTransitions[from as CertificationState] ?? []).includes(to)
 }

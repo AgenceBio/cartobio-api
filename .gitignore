@@ -13,6 +13,7 @@ cartobio-asp*.gpkg*
 # Fichiers PDF temporaires générés par les exports
 storage/pdf/*
 !storage/pdf/.gitkeep
+storage/scripts/
 
 # types
 docs/types

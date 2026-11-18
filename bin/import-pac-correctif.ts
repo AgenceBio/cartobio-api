@@ -10,6 +10,7 @@ import type { Feature } from 'geojson'
 import { sql } from 'drizzle-orm'
 
 import { db } from '../src/database/database.js'
+import { scriptOutputPath } from '../src/shared/paths.js'
 import { importPac } from '../src/database/schema/index.js'
 import { createImportPacSchema } from '../src/database/validations/imports.js'
 import { surfaceForFeatureCollection } from '../src/shared/outputs/api.js'
@@ -232,11 +233,12 @@ if (aspFile === undefined || csvFile === undefined) {
       warningsSiretVide,
       warningsNumeroBioVide
     }
-    fs.writeFile('resultat_correctif_csv.json', JSON.stringify(json), 'utf8', (err): void => {
+    const resultPath = scriptOutputPath('resultat_correctif_csv.json')
+    fs.writeFile(resultPath, JSON.stringify(json), { encoding: 'utf8', mode: 0o600 }, (err): void => {
       if (err) {
         console.error(err)
       } else {
-        console.log('Warnings disponible dans le fichier resultat.json')
+        console.log(`Warnings disponible dans le fichier ${resultPath}`)
       }
     })
   }

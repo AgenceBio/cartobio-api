@@ -1,4 +1,4 @@
-import { collectFeatureIdsFromPayload, createNewEvent } from '../../src/shared/outputs/history.js'
+import { collectFeatureIdsFromPayload, createNewEvent, maskOcAgents } from '../../src/shared/outputs/history.js'
 import { CertificationState, EventType } from '@agencebio/cartobio-types'
 import type { CartoBioFeatureCollection } from '@agencebio/cartobio-types'
 import { buildCulture, buildFeature, buildNormalizedRecord, buildOcUser } from '../factories.js'
@@ -221,5 +221,50 @@ describe('createNewEvent()', () => {
         { user, record: { ...record, certification_state: CertificationState.AUDITED } }
       )
     ).toMatchObject({ ...expectation, type: EventType.CERTIFICATION_STATE_CHANGE })
+  })
+})
+
+describe('maskOcAgents()', () => {
+  const ocActuel = { id: 1, nom: 'OC actuel' }
+  const ancienOc = { id: 2, nom: 'Ancien OC' }
+  const record = {
+    audit_history: [
+      {
+        type: EventType.FEATURE_UPDATE,
+        date: '2026-01-01',
+        user: { id: 10, nom: 'Durand', prenom: 'Léa', organismeCertificateur: ocActuel }
+      },
+      {
+        type: EventType.FEATURE_UPDATE,
+        date: '2026-01-02',
+        user: { id: 20, nom: 'Martin', prenom: 'Paul', organismeCertificateur: ancienOc }
+      },
+      { type: EventType.FEATURE_UPDATE, date: '2026-01-03', user: { id: 30, nom: 'Exploitant', prenom: 'Jean' } }
+    ]
+  }
+  const operateur = { mainGroup: { id: 4 } } as never
+
+  test("opérateur : voit les agents de l'OC actuel, l'agent de l'ancien OC est remplacé par son organisme", () => {
+    const [actuel, ancien, exploitant] = maskOcAgents(record, { user: operateur }, ocActuel.id).audit_history
+
+    expect(actuel?.user).toMatchObject({ id: 10, nom: 'Durand', prenom: 'Léa' })
+    expect(ancien?.user).toMatchObject({ id: 0, nom: 'Ancien OC', prenom: '', organismeCertificateur: ancienOc })
+    expect(exploitant?.user).toMatchObject({ id: 30, nom: 'Exploitant' })
+  })
+
+  test('ancien OC : voit ses propres agents', () => {
+    const [, ancien] = maskOcAgents(
+      record,
+      { user: { mainGroup: { id: 2 } } as never, ocId: ancienOc.id },
+      ocActuel.id
+    ).audit_history
+
+    expect(ancien?.user).toMatchObject({ id: 20, nom: 'Martin' })
+  })
+
+  test('admin : voit tout', () => {
+    expect(maskOcAgents(record, { user: { id: 1, mainGroup: { id: 1, nom: 'Admin' } } as never }, ocActuel.id)).toBe(
+      record
+    )
   })
 })

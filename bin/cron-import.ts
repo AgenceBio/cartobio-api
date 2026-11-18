@@ -1,20 +1,15 @@
 import 'dotenv/config'
-import { and, eq, inArray, isNotNull, lt, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNotNull, lt, ne, or, isNull, sql } from 'drizzle-orm'
+import type { SQL } from 'drizzle-orm'
 import { db } from '../src/database/database.js'
 import { parcellaireImport, parcellaireImportPayload } from '../src/database/schema/index.js'
-import {
-  importJobResultEnumSchema,
-  importStatusEnumSchema,
-  updateImportJobSchema
-} from '../src/database/validations/imports.js'
+import { importJobResultEnumSchema, updateImportPayloadSchema } from '../src/database/validations/imports.js'
+import { failInterruptedImportJobs } from '../src/modules/imports/imports.repository.js'
 
-async function clearPayloads(
-  status: typeof parcellaireImport.$inferSelect.status,
-  olderThan: string
-): Promise<number | null> {
+async function clearPayloads(condition: SQL | undefined, olderThan: string): Promise<number | null> {
   const { rowCount } = await db
     .update(parcellaireImportPayload)
-    .set({ payload: null })
+    .set(updateImportPayloadSchema.parse({ payload: null }))
     .where(
       and(
         isNotNull(parcellaireImportPayload.payload),
@@ -25,7 +20,8 @@ async function clearPayloads(
             .from(parcellaireImport)
             .where(
               and(
-                eq(parcellaireImport.status, status),
+                isNotNull(parcellaireImport.endedAt),
+                condition,
                 lt(parcellaireImport.endedAt, sql`now() - ${olderThan}::interval`)
               )
             )
@@ -36,38 +32,21 @@ async function clearPayloads(
   return rowCount
 }
 
-async function failStuckJobs(): Promise<number | null> {
-  const { rowCount } = await db
-    .update(parcellaireImport)
-    .set({
-      ...updateImportJobSchema.parse({
-        status: importStatusEnumSchema.enum.ERROR,
-        statutJob: importJobResultEnumSchema.enum.ERROR,
-        resultJob: { name: 'Error', message: 'Traitement du job interrompu' }
-      }),
-      endedAt: sql`NOW()`
-    })
-    .where(
-      and(
-        eq(parcellaireImport.status, importStatusEnumSchema.enum.PENDING),
-        lt(parcellaireImport.createdAt, sql`now() - interval '1 hour'`)
-      )
-    )
-
-  return rowCount
-}
-
 async function cleanupJobsImportPayload(): Promise<{
-  stuck: number | null
-  done: number | null
-  error: number | null
+  stuck: number
+  valid: number | null
+  refused: number | null
 }> {
   try {
-    const stuckCount = await failStuckJobs()
-    const doneCount = await clearPayloads(importStatusEnumSchema.enum.DONE, '15 days')
-    const errorCount = await clearPayloads(importStatusEnumSchema.enum.ERROR, '3 months')
+    const stuckCount = await failInterruptedImportJobs()
+    const valid = eq(parcellaireImport.statutJob, importJobResultEnumSchema.enum.VALID)
+    const validCount = await clearPayloads(valid, '7 days')
+    const refusedCount = await clearPayloads(
+      or(isNull(parcellaireImport.statutJob), ne(parcellaireImport.statutJob, importJobResultEnumSchema.enum.VALID)),
+      '3 months'
+    )
 
-    return { stuck: stuckCount, done: doneCount, error: errorCount }
+    return { stuck: stuckCount, valid: validCount, refused: refusedCount }
   } catch (err) {
     console.error('Erreur lors du nettoyage de jobs_import :', err)
     throw err

@@ -284,6 +284,21 @@ async function findParcelles(tx: NodePgDatabase, recordId: string, ids: string[]
   return ids.flatMap((id) => rows.filter((row) => row.id === id))
 }
 
+async function hasRecordForOc(numeroBio: string | number, ocId: number): Promise<boolean> {
+  const [row] = await db
+    .select({ recordId: parcellaires.recordId })
+    .from(parcellaires)
+    .where(
+      and(
+        eq(parcellaires.numeroBio, Number(numeroBio)),
+        eq(parcellaires.ocId, String(ocId)),
+        isNull(parcellaires.deletedAt)
+      )
+    )
+    .limit(1)
+  return row !== undefined
+}
+
 async function findCertificationStateAtAuditDate(
   tx: NodePgDatabase,
   numerobio: string | undefined,
@@ -451,7 +466,8 @@ async function findLastAuditedRecordId(numeroBio: string): Promise<string | null
           certificationEtatEnumSchema.enum.AUDITED,
           certificationEtatEnumSchema.enum.PENDING_CERTIFICATION
         ]),
-        eq(parcellaires.numeroBio, Number(numeroBio))
+        eq(parcellaires.numeroBio, Number(numeroBio)),
+        isNull(parcellaires.deletedAt)
       )
     )
     .orderBy(
@@ -475,7 +491,7 @@ async function findRecord(recordId: string, tx: NodePgDatabase = db): Promise<DB
     .select(recordColumns)
     .from(parcellaires)
     .leftJoin(parcellairesMetadata, eq(parcellairesMetadata.recordId, parcellaires.recordId))
-    .where(eq(parcellaires.recordId, recordId))
+    .where(and(eq(parcellaires.recordId, recordId), isNull(parcellaires.deletedAt)))
     .limit(1)
 
   return record ?? null
@@ -664,10 +680,8 @@ async function findRecords(numeroBio: string | number): Promise<RecordSummaryRow
     })
     .from(parcellaires)
     .leftJoin(parcellairesMetadata, eq(parcellairesMetadata.recordId, parcellaires.recordId))
-    .leftJoin(parcelles, eq(parcellaires.recordId, parcelles.recordId))
-    .where(
-      and(eq(parcellaires.numeroBio, Number(numeroBio)), isNull(parcellaires.deletedAt), isNull(parcelles.deletedAt))
-    )
+    .leftJoin(parcelles, and(eq(parcellaires.recordId, parcelles.recordId), isNull(parcelles.deletedAt)))
+    .where(and(eq(parcellaires.numeroBio, Number(numeroBio)), isNull(parcellaires.deletedAt)))
     .groupBy(parcellaires.recordId, parcellairesMetadata.recordId)
     .orderBy(
       sql`COALESCE(${parcellaires.certificationDateDebut}, ${parcellaires.auditDate}, ${parcellaires.createdAt}) DESC`,
@@ -874,6 +888,7 @@ export {
   copyParcellesFromPreviousRecord,
   findLastAuditedRecordId,
   markCertificationNotified,
+  hasRecordForOc,
   upsertOperator,
   upsertParcelles,
   deleteMissingParcelles,

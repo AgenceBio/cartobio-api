@@ -14,7 +14,7 @@ export const exportPdfQuerySchema = z.object({
   zip: booleanQuery('Archive zip des attestations PAC détaillée et complète')
 })
 
-export const exportParcellaireBodySchema = z.object({
+export const exportParcellaireBodySchema = z.strictObject({
   payload: z.object({
     input: z.string().meta({ description: "Texte recherché, comme pour la recherche d'opérateurs" }),
     filterForSearch: operatorFilterSchema

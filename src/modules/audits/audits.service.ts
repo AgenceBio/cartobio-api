@@ -1,7 +1,8 @@
 import * as cartobio from '../../shared/parcellaires/parcellaires.service.js'
-import { findValidAttestationProduction } from '../exports/exports.service.js'
+import { deleteRecordAttestations, findValidAttestationProduction } from '../exports/exports.service.js'
 import { normalizeRecord } from '../../shared/outputs/record.js'
 import * as repository from './audits.repository.js'
+import { logger } from '../../config/logger.js'
 import { db, firstRow } from '../../database/database.js'
 import { CertificationState, EventType } from '@agencebio/cartobio-types'
 import type {
@@ -18,7 +19,7 @@ import type { DBOperatorRecord, DBOperatorRecordWithParcelles } from '../../shar
 import { sql } from 'drizzle-orm'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import { createNewEvent } from '../../shared/outputs/history.js'
-import { InvalidRequestApiError, ForbiddenApiError, NotFoundApiError, getErrorCode } from '../../shared/errors.js'
+import { InvalidRequestApiError, NotFoundApiError, getErrorCode } from '../../shared/errors.js'
 import { getRandomFeatureId } from '../../shared/outputs/features.js'
 import { assertConversionNiveau } from './audits.utils.js'
 import type { AuditRecordChanges } from './audits.types.js'
@@ -27,10 +28,18 @@ type FeatureId = string | number
 type OptionalOperator = AgenceBioNormalizedOperator | null | undefined
 
 type AuditUser = CartoBioUser & { organismeCertificateur?: OrganismeCertificateur }
-type AuditContext = { user: AuditUser | null; record: NormalizedRecord; operator?: OptionalOperator }
+type AuditContext = {
+  user: AuditUser | null
+  record: NormalizedRecord
+  operator?: OptionalOperator
+  ifUnmodifiedSince?: string
+}
 
-async function deleteRecord({ record }: { record: NormalizedRecord; user?: CartoBioUser }): Promise<void> {
+async function deleteRecord(record: NormalizedRecord): Promise<void> {
   await repository.deleteRecord(record.record_id)
+  await deleteRecordAttestations(record.record_id).catch((error: unknown): void =>
+    logger.error({ err: error }, `Suppression des attestations du parcellaire ${record.record_id} en échec`)
+  )
 }
 async function markFeatureControlled(recordId: string, id: FeatureId, userId: number): Promise<void> {
   await repository.markFeatureControlled(recordId, id, userId)
@@ -47,13 +56,21 @@ function getOc(user: AuditUser | null, operator: OptionalOperator): { id: number
 }
 
 async function updateAuditRecordState(
-  { user, record, operator }: { user: AuditUser; record: NormalizedRecord; operator?: OptionalOperator },
+  {
+    user,
+    record,
+    operator,
+    ifUnmodifiedSince
+  }: { user: AuditUser; record: NormalizedRecord; operator?: OptionalOperator; ifUnmodifiedSince?: string },
   patch: RecordInfosBody & { certification_state?: CertificationState }
 ): Promise<DBOperatorRecordWithParcelles> {
-  if (record.oc_id !== null && user.organismeCertificateur && record.oc_id !== user.organismeCertificateur.id)
-    throw new ForbiddenApiError("vous n'êtes pas autorisé·e à modifier de ce parcellaire.")
-
   const { certification_state: state } = patch
+  if (
+    state === CertificationState.CERTIFIED &&
+    (!(patch.certification_date_debut ?? record.certification_date_debut) ||
+      !(patch.certification_date_fin ?? record.certification_date_fin))
+  )
+    throw new InvalidRequestApiError('Les dates de certification sont manquantes.')
   const changes: AuditRecordChanges = { updated_at: sql`now()`, ...patch }
 
   if (record.oc_id === null) {
@@ -76,8 +93,7 @@ async function updateAuditRecordState(
 
   let rows
   try {
-    rows = await repository.updateAuditRecord(record.record_id, changes, historyEntry)
-    if (user && String(user.mainGroup.id) === '4') firstRow(rows).audit_notes = null
+    rows = await repository.updateAuditRecord(record.record_id, changes, historyEntry, ifUnmodifiedSince)
     if (state === CertificationState.CERTIFIED && record.certification_state !== CertificationState.CERTIFIED) {
       await cartobio.notifyCertificationComplete(record)
     }
@@ -100,24 +116,25 @@ async function updateOperator(
   record: NormalizedRecord,
   historyEntry: HistoryEntry | null,
   user: AuditUser | null,
-  operator: OptionalOperator
+  operator: OptionalOperator,
+  ifUnmodifiedSince: string | undefined
 ): Promise<DBOperatorRecord[]> {
   const oc = getOc(user, operator)
-  return repository.setOperatorUpdatedAt(tx, record.record_id, historyEntry, oc.id, oc.label)
+  return repository.setOperatorUpdatedAt(tx, record.record_id, historyEntry, oc.id, oc.label, ifUnmodifiedSince)
 }
 async function refreshMixiteIfCertified(tx: NodePgDatabase, record: NormalizedRecord): Promise<void> {
   if (record.certification_state === CertificationState.CERTIFIED) await repository.updateMixite(tx, record.record_id)
 }
 
 async function patchFeatureCollection(
-  { user, record, operator }: AuditContext,
+  { user, record, operator, ifUnmodifiedSince }: AuditContext,
   input: FeatureInput[]
 ): Promise<DBOperatorRecordWithParcelles> {
   assertConversionNiveau(record.certification_state, input, false)
   const features = input.map((feature) => ({ ...feature, id: feature.id || getRandomFeatureId() }))
   const historyEntry = createNewEvent(EventType.FEATURE_COLLECTION_UPDATE, { features }, { user, record })
   const updatedRecord = await db.transaction(async (tx) => {
-    const rows = await updateOperator(tx, record, historyEntry, user, operator)
+    const rows = await updateOperator(tx, record, historyEntry, user, operator, ifUnmodifiedSince)
     for (const feature of features) {
       await repository.patchFeature(tx, record.record_id, feature.id, feature)
     }
@@ -128,7 +145,7 @@ async function patchFeatureCollection(
 }
 
 async function updateFeature(
-  { featureId, user, record, operator }: AuditContext & { featureId: FeatureId },
+  { featureId, user, record, operator, ifUnmodifiedSince }: AuditContext & { featureId: FeatureId },
   { properties, geometry }: FeatureInput
 ): Promise<DBOperatorRecordWithParcelles> {
   const matchingFeature = record.parcelles.features.find(({ id }) => id === String(featureId))
@@ -136,7 +153,7 @@ async function updateFeature(
   assertConversionNiveau(record.certification_state, [{ properties, geometry }], false)
   const historyEntry = createNewEvent(EventType.FEATURE_UPDATE, { features: [matchingFeature] }, { user, record })
   const updatedRecord = await db.transaction(async (tx) => {
-    const rows = await updateOperator(tx, record, historyEntry, user, operator)
+    const rows = await updateOperator(tx, record, historyEntry, user, operator, ifUnmodifiedSince)
     await repository.updateFeature(tx, record.record_id, String(featureId), properties ?? {}, geometry)
     await refreshMixiteIfCertified(tx, record)
     return firstRow(rows)
@@ -149,8 +166,15 @@ async function deleteSingleFeature(
     featureId,
     user,
     record,
-    operator
-  }: { featureId: FeatureId; user: AuditUser; record: NormalizedRecord; operator?: OptionalOperator },
+    operator,
+    ifUnmodifiedSince
+  }: {
+    featureId: FeatureId
+    user: AuditUser
+    record: NormalizedRecord
+    operator?: OptionalOperator
+    ifUnmodifiedSince?: string
+  },
   { reason }: DeleteFeatureBody
 ): Promise<DBOperatorRecordWithParcelles> {
   const matchingFeature = record.parcelles.features.find(({ id }) => id === String(featureId))
@@ -162,14 +186,15 @@ async function deleteSingleFeature(
   )
   const updatedRecord = await db.transaction(async (tx) => {
     await repository.deleteFeature(tx, record.record_id, String(featureId))
-    const rows = await updateOperator(tx, record, historyEntry, user, operator)
+    const rows = await updateOperator(tx, record, historyEntry, user, operator, ifUnmodifiedSince)
+    await refreshMixiteIfCertified(tx, record)
     return firstRow(rows)
   })
   return joinRecordParcelles(updatedRecord)
 }
 
 async function addRecordFeature(
-  { user, record, operator }: AuditContext,
+  { user, record, operator, ifUnmodifiedSince }: AuditContext,
   feature: FeatureInput
 ): Promise<DBOperatorRecordWithParcelles> {
   assertConversionNiveau(record.certification_state, [feature], true)
@@ -181,7 +206,7 @@ async function addRecordFeature(
   )
   const updatedRecord = await db.transaction(async (tx) => {
     await repository.addFeature(tx, record.record_id, id, feature)
-    const rows = await updateOperator(tx, record, historyEntry, user, operator)
+    const rows = await updateOperator(tx, record, historyEntry, user, operator, ifUnmodifiedSince)
     await refreshMixiteIfCertified(tx, record)
     return firstRow(rows)
   })
@@ -193,7 +218,8 @@ async function createFeaturesFromOther(
   record: NormalizedRecord,
   operator: OptionalOperator,
   input: FeatureInput[],
-  from: FeatureId[]
+  from: FeatureId[],
+  ifUnmodifiedSince?: string
 ): Promise<DBOperatorRecordWithParcelles> {
   assertConversionNiveau(record.certification_state, input, true)
   const features = input.map((feature) => ({ ...feature, id: getRandomFeatureId() }))
@@ -205,7 +231,7 @@ async function createFeaturesFromOther(
   const updatedRecord = await db.transaction(async (tx) => {
     await repository.softDeleteFeatures(tx, record.record_id, from)
     await repository.addFeaturesFromOther(tx, record.record_id, features, from)
-    const rows = await updateOperator(tx, record, historyEntry, user, operator)
+    const rows = await updateOperator(tx, record, historyEntry, user, operator, ifUnmodifiedSince)
     await refreshMixiteIfCertified(tx, record)
     return firstRow(rows)
   })

@@ -10,7 +10,6 @@ import { getAllParcelles } from './pdf-utils.js'
 import { createPdfContent } from './pdf-content.js'
 import * as repository from './exports.repository.js'
 import { findControlBodyOperators } from '../operators/operators.service.js'
-import { logger } from '../../config/logger.js'
 import { InvalidRequestApiError, NotFoundApiError, isHandledError } from '../../shared/errors.js'
 
 async function updateProductions(
@@ -60,6 +59,26 @@ function archivePdfs(paths: string[], operator: ArchiveOperator): string {
   return zip.toBuffer().toString('base64')
 }
 
+const pdfsInProgress = new Set<string>()
+const MAX_PDF_GENERATIONS = 10
+const PDF_QUEUED = Number.POSITIVE_INFINITY
+let runningPdfGenerations = 0
+const pdfGenerationQueue: Array<() => void> = []
+
+async function acquirePdfSlot(): Promise<void> {
+  if (runningPdfGenerations < MAX_PDF_GENERATIONS) {
+    runningPdfGenerations++
+    return
+  }
+  await new Promise<void>((resolve) => pdfGenerationQueue.push(resolve))
+}
+
+function releasePdfSlot(): void {
+  const next = pdfGenerationQueue.shift()
+  if (next) next()
+  else runningPdfGenerations--
+}
+
 async function* generatePDF(
   numeroBio: string,
   recordId: string,
@@ -77,20 +96,32 @@ async function* generatePDF(
     ).filter((production) => production !== null)
     const [production] = productions
     if (production) {
-      yield 0
       try {
-        if (!zip) return fs.readFileSync(production.path, { encoding: 'base64' })
-        return archivePdfs(
-          productions.map(({ path }) => path),
-          { annee_reference_controle: '', numeroBio }
-        )
+        const document = zip
+          ? archivePdfs(
+              productions.map(({ path }) => path),
+              { annee_reference_controle: '', numeroBio }
+            )
+          : await fs.promises.readFile(production.path, { encoding: 'base64' })
+        yield 0
+        return document
       } catch {
         // Sinon on regenere le fichier
       }
     }
   }
-  await updateProductions(recordId, AttestationsProductionsStatus.STARTED, types)
+  const lockKey = `${recordId}_${pac || zip}`
+  if (pdfsInProgress.has(lockKey)) {
+    throw new InvalidRequestApiError("Une génération de l'attestation est déjà en cours pour ce parcellaire.")
+  }
+  pdfsInProgress.add(lockKey)
+  const isQueued = runningPdfGenerations >= MAX_PDF_GENERATIONS || pdfGenerationQueue.length > 0
+  let hasSlot = false
   try {
+    await updateProductions(recordId, AttestationsProductionsStatus.STARTED, types)
+    if (isQueued) yield PDF_QUEUED
+    await acquirePdfSlot()
+    hasSlot = true
     const [operatorData, record, parcelles] = await Promise.all([
       fetchOperatorByNumeroBio(numeroBio),
       repository.findPdfRecord(recordId),
@@ -98,7 +129,7 @@ async function* generatePDF(
     ])
     if (!record) throw new NotFoundApiError(`Parcellaire introuvable : ${recordId}`)
     assertParcellesCanProducePdf(parcelles, recordId)
-    yield parcelles.length
+    if (!isQueued) yield parcelles.length
     const operator = { ...operatorData, ...record }
     const pdfs = await createPdfContent(numeroBio, recordId, parcelles, operator, pac || zip)
     const directory = config.get('attestationsProductions.directory')
@@ -116,48 +147,55 @@ async function* generatePDF(
     await updateProductions(recordId, AttestationsProductionsStatus.ERROR, types)
     if (isHandledError(error)) throw error
     throw new Error("Une erreur s'est produite, impossible de générer l'attestation du parcellaire", { cause: error })
+  } finally {
+    pdfsInProgress.delete(lockKey)
+    if (hasSlot) releasePdfSlot()
   }
+}
+
+async function deleteRecordAttestations(recordId: string): Promise<void> {
+  const directory = config.get('attestationsProductions.directory')
+  const files = (await fs.promises.readdir(directory)).filter(
+    (file) => file.includes(recordId) && file.toLowerCase().endsWith('.pdf')
+  )
+  await Promise.all(files.map((file) => fs.promises.rm(path.join(directory, file), { force: true })))
+  await repository.deleteAttestationsProductions(recordId)
 }
 
 async function exportDataOcId(
   ocId: number,
   filter: ExportParcellaireBody['payload'],
   userId: number
-): Promise<ExportParcellaireResponse | null> {
-  try {
-    const records = (
-      await findControlBodyOperators({
-        ocId,
-        userId,
-        input: filter.input,
-        filter: filter.filterForSearch
-      })
-    ).sort((a, b) => Number(a.numeroBio) - Number(b.numeroBio))
-    const rows: ExportRow[] = []
-    for (let index = 0; index < records.length; index += 10000)
-      rows.push(
-        ...(await repository.findExportRows(
-          ocId,
-          records.slice(index, index + 10000).map(({ numeroBio }) => Number(numeroBio))
-        ))
-      )
-    const byNumeroBio = new Map(records.map((operator) => [String(operator.numeroBio), operator]))
-    return rows.map((row) => {
-      const operator = byNumeroBio.get(String(row.numerobio))
-      return {
-        ...row,
-        numeroclient: operator?.notifications?.numeroClient ?? '',
-        siret: operator?.siret,
-        raisonSociale: operator?.nom,
-        codePostal: operator?.codePostal,
-        commune: operator?.commune
-      }
+): Promise<ExportParcellaireResponse> {
+  const records = (
+    await findControlBodyOperators({
+      ocId,
+      userId,
+      input: filter.input,
+      filter: filter.filterForSearch
     })
-  } catch (error) {
-    logger.error({ err: error }, "Export des parcellaires de l'OC en échec")
-    return null
-  }
+  ).sort((a, b) => Number(a.numeroBio) - Number(b.numeroBio))
+  const rows: ExportRow[] = []
+  for (let index = 0; index < records.length; index += 10000)
+    rows.push(
+      ...(await repository.findExportRows(
+        ocId,
+        records.slice(index, index + 10000).map(({ numeroBio }) => Number(numeroBio))
+      ))
+    )
+  const byNumeroBio = new Map(records.map((operator) => [String(operator.numeroBio), operator]))
+  return rows.map((row) => {
+    const operator = byNumeroBio.get(String(row.numerobio))
+    return {
+      ...row,
+      numeroclient: operator?.notifications?.numeroClient ?? '',
+      siret: operator?.siret,
+      raisonSociale: operator?.nom,
+      codePostal: operator?.codePostal,
+      commune: operator?.commune
+    }
+  })
 }
 
 export { findValidAttestationProduction } from './exports.repository.js'
-export { generatePDF, exportDataOcId }
+export { generatePDF, exportDataOcId, deleteRecordAttestations }

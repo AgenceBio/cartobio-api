@@ -54,8 +54,6 @@ describe('normalizeOperator()', () => {
       organismeCertificateur: {},
       adressesOperateurs: [
         {
-          lat: 45.470757,
-          long: 4.63488839,
           codeCommune: '42210'
         }
       ],
@@ -88,8 +86,6 @@ describe('normalizeOperator()', () => {
       organismeCertificateur: {},
       adressesOperateurs: [
         {
-          lat: 45.470757,
-          long: 4.63488839,
           codeCommune: '42210'
         }
       ],
@@ -108,8 +104,6 @@ describe('normalizeOperator()', () => {
       organismeCertificateur: {},
       adressesOperateurs: [
         {
-          lat: 45.470757,
-          long: 4.63488839,
           codeCommune: '42210'
         }
       ]
@@ -125,8 +119,6 @@ describe('normalizeOperator()', () => {
       organismeCertificateur: {},
       adressesOperateurs: [
         {
-          lat: 45.470757,
-          long: 4.63488839,
           codeCommune: '42210'
         }
       ]

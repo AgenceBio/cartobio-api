@@ -2,6 +2,7 @@ import AdmZip from 'adm-zip'
 import memo from 'p-memoize'
 import ExpiryMap from 'expiry-map'
 import got from 'got'
+import { HTTP_TIMEOUT } from '../../../clients/clients.utils.js'
 import { parse } from 'wkt'
 import { featureCollection, feature as Feature } from '@turf/helpers'
 import reproject from 'reproject'
@@ -113,6 +114,8 @@ function convertGeofoliaFieldsToGeoJSON(data: { Fields: GeofoliaField[] }): Feat
 
 function fetchAuthToken(): Promise<string> {
   return post(`${config.get('geofolia.oauth.tenant')}/oauth2/v2.0/token`, {
+    timeout: HTTP_TIMEOUT,
+
     prefixUrl: config.get('geofolia.oauth.host'),
     form: {
       client_id: config.get('geofolia.oauth.clientId'),
@@ -135,6 +138,8 @@ async function geofoliaTriggerDataOrder(numeroSiret: string, year: number): Prom
   const token = await auth()
 
   return post('flow/api/v1/data-orders', {
+    timeout: HTTP_TIMEOUT,
+
     prefixUrl: config.get('geofolia.api.host'),
     headers: {
       Authorization: `Bearer ${token}`,
@@ -158,6 +163,8 @@ async function geofoliaRequestDataOrder(
   const orders = parseApiResponse(
     geofoliaDataOrdersSchema,
     await get('flow/api/v1/flow-attributes', {
+      timeout: HTTP_TIMEOUT,
+
       prefixUrl: config.get('geofolia.api.host'),
       headers: {
         Authorization: `Bearer ${token}`,
@@ -190,6 +197,8 @@ async function geofoliaFetchDataOrder(order: { id: string }): Promise<Buffer> {
   const token = await auth()
 
   return get(`flow/api/v1/flows/${order.id}`, {
+    timeout: HTTP_TIMEOUT,
+
     prefixUrl: config.get('geofolia.api.host'),
     headers: {
       Authorization: `Bearer ${token}`,

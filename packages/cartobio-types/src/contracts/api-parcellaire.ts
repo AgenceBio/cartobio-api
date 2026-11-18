@@ -47,29 +47,29 @@ export const inputApiRecordSchema = z.object({
   parcelles: z.array(inputApiParcelleSchema).meta({ description: 'Parcelles' })
 })
 
-const optionalNumberOrString = z.union([z.number(), z.string()]).nullish()
+const optionalNumberOrString = z.union([z.number(), z.string().max(255)]).nullish()
 
 const optionalYear = z.preprocess((value) => (value === '' ? null : value), z.coerce.number().int().nullish())
 
 export const inputApiCultureBodySchema = z.looseObject({
-  codeCPF: z.string().optional(),
-  dateSemis: z.string().optional(),
-  variete: z.string().optional(),
+  codeCPF: z.string().max(255).optional(),
+  dateSemis: z.string().max(255).optional(),
+  variete: z.string().max(255).optional(),
   quantite: optionalNumberOrString,
   unite: z.enum(['ha', '%']).optional()
 })
 
 export const inputApiParcelleBodySchema = z.looseObject({
   id: optionalNumberOrString,
-  dateEngagement: z.string().nullish(),
-  etatProduction: z.string().nullish(),
+  dateEngagement: z.string().max(255).nullish(),
+  etatProduction: z.string().max(255).nullish(),
   numeroIlot: optionalNumberOrString,
-  commune: z.string().nullish(),
-  nom: z.string().nullish(),
+  commune: z.string().max(255).nullish(),
+  nom: z.string().max(255).nullish(),
   numeroParcelle: optionalNumberOrString,
-  commentaire: z.string().nullish(),
-  codeCulture: z.string().nullish(),
-  codePrecision: z.string().nullish(),
+  commentaire: z.string().max(10000).nullish(),
+  codeCulture: z.string().max(255).nullish(),
+  codePrecision: z.string().max(255).nullish(),
   geom: z.string().nullish(),
   culture: z.array(inputApiCultureBodySchema).nullish(),
   cultures: z.array(inputApiCultureBodySchema).nullish(),
@@ -82,10 +82,10 @@ export const inputApiRecordBodySchema = z
     numeroClient: optionalNumberOrString,
     anneeReferenceControle: optionalYear,
     anneeAssolement: optionalYear,
-    commentaire: z.string().nullish(),
-    dateAudit: z.string().nullish(),
-    dateCertificationDebut: z.string().nullish(),
-    dateCertificationFin: z.string().nullish(),
+    commentaire: z.string().max(10000).nullish(),
+    dateAudit: z.string().max(255).nullish(),
+    dateCertificationDebut: z.string().max(255).nullish(),
+    dateCertificationFin: z.string().max(255).nullish(),
     numeroPacage: optionalNumberOrString,
     parcelles: z.array(inputApiParcelleBodySchema)
   })

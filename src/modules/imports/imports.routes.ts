@@ -14,9 +14,17 @@ import {
   importJobSchema,
   importListSchema
 } from './imports.schema.js'
-import { InvalidRequestApiError, NotFoundApiError, UnauthorizedApiError } from '../../shared/errors.js'
+import {
+  ForbiddenApiError,
+  InvalidRequestApiError,
+  NotFoundApiError,
+  UnauthorizedApiError
+} from '../../shared/errors.js'
 import { requireOperator, requireOrganismeCertificateur } from '../../shared/request.js'
+import { redactAuditNotes } from '../../shared/middlewares.js'
+import { pageUrl } from './imports.utils.js'
 import * as service from './imports.service.js'
+import { isOperatorUser } from '../auth/auth.utils.js'
 
 export default async function importRoutes(fastify: FastifyInstance): Promise<void> {
   const app = fastify.withTypeProvider<ZodTypeProvider>()
@@ -154,39 +162,16 @@ export default async function importRoutes(fastify: FastifyInstance): Promise<vo
       limit: finalLimit
     })
 
-    const links: { prev?: string | null; next?: string | null } = {}
-    const host = request.hostname
-    const baseUrl = `https://${host}${request.url.split('?')[0]}`
-
-    if (finalLimit > 0) {
-      if (finalPage > 1) {
-        const prevParams = new URLSearchParams(request.url.split('?')[1])
-        prevParams.set('page', String(finalPage - 1))
-        prevParams.set('limit', String(finalLimit))
-        links.prev = `${baseUrl}?${prevParams.toString()}`
-      } else {
-        links.prev = null
-      }
-
-      if (finalPage * finalLimit < result.meta.total) {
-        const nextParams = new URLSearchParams(request.url.split('?')[1])
-        nextParams.set('page', String(finalPage + 1))
-        nextParams.set('limit', String(finalLimit))
-        links.next = `${baseUrl}?${nextParams.toString()}`
-      } else {
-        links.next = null
-      }
-    } else {
-      if (finalPage > 1) {
-        const prevParams = new URLSearchParams(request.url.split('?')[1])
-        prevParams.delete('page')
-        links.prev = `${baseUrl}?${prevParams.toString()}`
-      } else {
-        links.prev = null
-      }
-
-      links.next = null
-    }
+    const links =
+      finalLimit > 0
+        ? {
+            prev: finalPage > 1 ? pageUrl(request.url, { page: finalPage - 1, limit: finalLimit }) : null,
+            next:
+              finalPage * finalLimit < result.meta.total
+                ? pageUrl(request.url, { page: finalPage + 1, limit: finalLimit })
+                : null
+          }
+        : { prev: finalPage > 1 ? pageUrl(request.url, { page: null }) : null, next: null }
 
     return reply.send({ ...result, _links: links })
   })
@@ -211,7 +196,7 @@ export default async function importRoutes(fastify: FastifyInstance): Promise<vo
   app.get('/api/v2/certification/parcellaires', certificationParcellairesSchema, async (request, reply) => {
     reply.header('Content-Type', 'application/json')
     const { limit, start, anneeAudit, statut, anneeReferenceControle } = request.query
-    const finalLimit = limit ? Number(limit) : null
+    const finalLimit = limit ? Number(limit) : 100
     const finalStart = start ? Number(start) : 0
 
     const records = await service.iterateOperatorLastRecords(requireOrganismeCertificateur(request).id, {
@@ -223,49 +208,42 @@ export default async function importRoutes(fastify: FastifyInstance): Promise<vo
     })
 
     const apiRecords = await service.recordsToApi(records)
-    const links: { prev?: string | null; next?: string | null } = {}
-
-    const host = request.hostname
-    const baseUrl = `https://${host}${request.url.split('?')[0]}`
-
-    if (finalLimit !== null && finalLimit > 0) {
-      if (finalStart > 0) {
-        const prevParams = new URLSearchParams(request.url.split('?')[1])
-        prevParams.set('start', String(Math.max(0, finalStart - finalLimit)))
-        prevParams.set('limit', String(finalLimit))
-        links.prev = `${baseUrl}?${prevParams.toString()}`
-      } else {
-        links.prev = null
-      }
-
-      if (records.length === finalLimit) {
-        const nextParams = new URLSearchParams(request.url.split('?')[1])
-        nextParams.set('start', String(finalStart + finalLimit))
-        nextParams.set('limit', String(finalLimit))
-        links.next = `${baseUrl}?${nextParams.toString()}`
-      } else {
-        links.next = null
-      }
-    } else {
-      if (finalStart > 0) {
-        const prevParams = new URLSearchParams(request.url.split('?')[1])
-        prevParams.delete('start')
-        links.prev = `${baseUrl}?${prevParams.toString()}`
-      } else {
-        links.prev = null
-      }
-
-      links.next = null
+    request.log.info(
+      { audit: 'export-api', ocId: requireOrganismeCertificateur(request).id, count: apiRecords.length },
+      "Lecture des parcellaires par l'API OC"
+    )
+    const links = {
+      prev:
+        finalStart > 0
+          ? pageUrl(request.url, { start: Math.max(0, finalStart - finalLimit), limit: finalLimit })
+          : null,
+      next:
+        records.length === finalLimit
+          ? pageUrl(request.url, { start: finalStart + finalLimit, limit: finalLimit })
+          : null
     }
 
     return reply.code(200).send({ data: apiRecords, _links: links })
   })
 
   app.get('/api/v2/certification/parcellaire/:numeroBio', certificationParcellaireSchema, async (request, reply) => {
+    if (isOperatorUser(request.user)) {
+      throw new ForbiddenApiError('Accès réservé aux organismes certificateurs et aux administrateurs.')
+    }
+    const ocId = (request.organismeCertificateur ?? request.user?.organismeCertificateur)?.id
     const record = await service.getOperatorLastRecord(request.params.numeroBio, {
       anneeAudit: request.query.anneeAudit,
       statut: request.query.statut
     })
+    if (ocId !== undefined && record.oc_id !== ocId) {
+      if (requireOperator(request).organismeCertificateur.id !== ocId)
+        throw new UnauthorizedApiError("vous n'êtes pas autorisé·e à accéder à ce contenu avec vos identifiants.")
+      redactAuditNotes(record)
+    }
+    request.log.info(
+      { audit: 'export-api', ocId, userId: request.user?.id, recordId: record.record_id },
+      "Lecture d'un parcellaire par l'API OC"
+    )
     return reply.code(200).send(await service.recordToApi(record))
   })
 }

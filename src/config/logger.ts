@@ -22,7 +22,12 @@ class LoggerDev extends LogController {
 
 function createLogger(env: string): Logger {
   if (env === 'test') return pino({ level: 'silent' })
-  if (env !== 'dev') return pino()
+  if (env !== 'dev')
+    return pino({
+      serializers: {
+        req: (req: FastifyRequest) => ({ method: req.method, url: req.url.split('?')[0], remoteAddress: req.ip })
+      }
+    })
 
   return pino({
     depthLimit: Number.MAX_SAFE_INTEGER,

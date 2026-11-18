@@ -38,7 +38,7 @@ export const operatorFilterSchema = z.object({
     .meta({ description: 'Tri : `nom-ASC`, `nom-DESC`, `date-audit-ASC` ou `date-audit-DESC`' })
 })
 
-export const certificationSearchBodySchema = z.object({
+export const certificationSearchBodySchema = z.strictObject({
   input: z.string().meta({ description: 'Texte recherché (nom, numéro bio, numéro client, SIRET…)' }),
   page: z.int().min(1).default(1).meta({ description: 'Numéro de page (à partir de 1)' }),
   limit: z.int().min(1).max(100).default(7).meta({ description: "Nombre d'opérateurs par page (100 maximum)" }),
@@ -51,11 +51,17 @@ export const autocompleteQuerySchema = z.object({
 
 export const userOperatorsQuerySchema = z.object({
   search: z.string().optional().meta({ description: 'Filtre sur la dénomination, le nom, le numéro bio ou le SIRET' }),
-  limit: z.coerce.number().int().optional().meta({ description: "Nombre d'opérateurs retournés" }),
-  offset: z.coerce.number().int().optional().meta({ description: 'Décalage de pagination' })
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(1000)
+    .default(100)
+    .meta({ description: "Nombre d'opérateurs retournés (défaut 100, 1000 maximum)" }),
+  offset: z.coerce.number().int().min(0).default(0).meta({ description: 'Décalage de pagination (défaut 0)' })
 })
 
-export const dashboardSummaryBodySchema = z.object({
+export const dashboardSummaryBodySchema = z.strictObject({
   departements: z.array(z.string()).meta({ description: 'Codes de départements à inclure' }),
   anneeReferenceControle: z.int().meta({ description: 'Année de référence du contrôle' })
 })
@@ -73,15 +79,13 @@ export const pinResponseSchema = z.object({
 })
 
 export const operatorNotificationSchema = z.looseObject({
-  id: textOrNumber('Identifiant de la notification Agence Bio'),
   etatCertification: text('État de certification : `ENGAGEE`, `ENGAGEE FUTUR`, `ARRETEE`, `NON ENGAGEE`…'),
   status: text('Statut de la notification'),
   organismeCertificateurId: opt(z.number(), "Identifiant de l'OC de la notification"),
-  organisme: text("Nom de l'OC de la notification"),
   numeroClient: text("Numéro client de l'opérateur chez l'OC"),
   dateDemarrage: text("Date de démarrage de l'engagement"),
   dateArret: text("Date d'arrêt de l'engagement"),
-  activites: opt(z.array(z.unknown()), 'Activités déclarées')
+  certification_state: text("`ARRETEE` lorsque l'opérateur a changé d'OC")
 })
 
 export const operatorSchema = z.looseObject({
@@ -91,7 +95,6 @@ export const operatorSchema = z.looseObject({
   denominationCourante: text('Dénomination courante'),
   siret: text('SIRET'),
   numeroPacage: text('Numéro PACAGE sur 9 chiffres'),
-  email: text('E-mail'),
   dateEngagement: opt(dateTimeSchema, "Date d'engagement en bio"),
   datePremierEngagement: opt(dateTimeSchema, 'Date du premier engagement en bio'),
   organismeCertificateur: z
@@ -104,8 +107,6 @@ export const operatorSchema = z.looseObject({
   adressesOperateurs: z
     .array(
       z.looseObject({
-        lat: opt(z.number(), 'Latitude'),
-        long: opt(z.number(), 'Longitude'),
         codeCommune: text('Code INSEE de la commune'),
         lieu: text('Adresse'),
         codePostal: text('Code postal'),

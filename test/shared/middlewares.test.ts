@@ -13,7 +13,7 @@ import {
   NotFoundApiError,
   UnauthorizedApiError
 } from '../../src/shared/errors.js'
-import { getRecords } from '../../src/shared/parcellaires/parcellaires.service.js'
+import { hasRecordForOc } from '../../src/shared/parcellaires/parcellaires.repository.js'
 import { fetchOperatorByNumeroBio, fetchUserOperators } from '../../src/clients/agence-bio.client.js'
 import {
   asFastifyRequest,
@@ -31,9 +31,9 @@ vi.mock('../../src/clients/agence-bio.client.js', async (importOriginal) => ({
   fetchUserOperators: vi.fn()
 }))
 
-vi.mock('../../src/shared/parcellaires/parcellaires.service.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../src/shared/parcellaires/parcellaires.service.js')>()),
-  getRecords: vi.fn()
+vi.mock('../../src/shared/parcellaires/parcellaires.repository.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/shared/parcellaires/parcellaires.repository.js')>()),
+  hasRecordForOc: vi.fn()
 }))
 
 const reply = { code: vi.fn(), header: vi.fn() } as unknown as FastifyReply
@@ -60,7 +60,7 @@ describe('haveRightToUpdate()', () => {
   describe('user from group 4 (OPERATOR)', () => {
     test('record is a draft → op can change everything', async () => {
       const request = {
-        user: { mainGroup: { id: 4 } },
+        user: { id: 1, mainGroup: { id: 4, nom: 'Opérateur' } },
         record: { certification_state: 'OPERATOR_DRAFT' },
         body: { properties: { NOM: 'a', surface: 12, comments: 'b' } }
       }
@@ -72,7 +72,7 @@ describe('haveRightToUpdate()', () => {
 
     test('record is not a draft → restricted fields only', async () => {
       const request = {
-        user: { mainGroup: { id: 4 } },
+        user: { id: 1, mainGroup: { id: 4, nom: 'Opérateur' } },
         record: { certification_state: 'CERTIFIED' },
         body: { properties: { NOM: 'a', surface: 12, commentaires: 'b', attente_pac: true } }
       }
@@ -86,23 +86,53 @@ describe('haveRightToUpdate()', () => {
       })
     })
 
-    test('no properties in body → nothing happens', async () => {
+    test('record is not a draft → geometry change refused', async () => {
       const request = {
-        user: { mainGroup: { id: 4 } },
+        user: { id: 1, mainGroup: { id: 4, nom: 'Opérateur' } },
         record: { certification_state: 'CERTIFIED' },
         body: { geometry: { type: 'Point' } }
       }
 
-      await haveRightToUpdateAuditMiddleware(request)
+      await expect(haveRightToUpdateAuditMiddleware(request)).rejects.toThrow(ForbiddenApiError)
+    })
 
-      expect(request.body).toEqual({ geometry: { type: 'Point' } })
+    test('record is not a draft → geometry change in a feature collection refused', async () => {
+      const request = {
+        user: { id: 1, mainGroup: { id: 4, nom: 'Opérateur' } },
+        record: { certification_state: 'AUDITED' },
+        body: { features: [{ properties: { NOM: 'a' } }, { geometry: { type: 'Polygon' } }] }
+      }
+
+      await expect(haveRightToUpdateAuditMiddleware(request)).rejects.toThrow(ForbiddenApiError)
+    })
+
+    test('record is not a draft → deletion refused', async () => {
+      const request = {
+        method: 'DELETE',
+        user: { id: 1, mainGroup: { id: 4, nom: 'Opérateur' } },
+        record: { certification_state: 'PENDING_CERTIFICATION' },
+        body: { reason: { code: 'other' } }
+      }
+
+      await expect(haveRightToUpdateAuditMiddleware(request)).rejects.toThrow(ForbiddenApiError)
+    })
+
+    test('record is a draft → deletion allowed', async () => {
+      const request = {
+        method: 'DELETE',
+        user: { id: 1, mainGroup: { id: 4, nom: 'Opérateur' } },
+        record: { certification_state: 'OPERATOR_DRAFT' },
+        body: { reason: { code: 'other' } }
+      }
+
+      await expect(haveRightToUpdateAuditMiddleware(request)).resolves.toBeUndefined()
     })
   })
 
   describe('user from group 8', () => {
     test('record is CERTIFIED → restricted fields only', async () => {
       const request = {
-        user: { mainGroup: { id: 8 } },
+        user: { id: 1, mainGroup: { id: 8 } },
         record: { certification_state: 'CERTIFIED' },
         body: { properties: { NOM: 'a', surface: 12, commentaires: 'b' } }
       }
@@ -114,7 +144,7 @@ describe('haveRightToUpdate()', () => {
 
     test('record is PENDING → can change everything', async () => {
       const request = {
-        user: { mainGroup: { id: 8 } },
+        user: { id: 1, mainGroup: { id: 8 } },
         record: { certification_state: 'PENDING_CERTIFICATION' },
         body: { properties: { surface: 12, NOM: 'a' } }
       }
@@ -125,23 +155,82 @@ describe('haveRightToUpdate()', () => {
     })
   })
 
-  describe('user from another group', () => {
-    test('no filtering regardless of state', async () => {
+  describe('OC user', () => {
+    const auditeur = {
+      id: 1,
+      mainGroup: { id: 8 },
+      groups: [{ id: 8, nom: 'Auditeur' }],
+      organismeCertificateur: { id: 1, nom: 'OC' }
+    }
+    const chargeCertification = {
+      ...auditeur,
+      mainGroup: { id: 2 },
+      groups: [{ id: 2, nom: 'Chargé de certification' }]
+    }
+    const superOc = { ...auditeur, mainGroup: { id: 3 }, groups: [{ id: 3, nom: 'Super OC' }] }
+
+    test('record of another OC → write refused', async () => {
       const request = {
-        user: { mainGroup: { id: 5 } },
+        method: 'PATCH',
+        user: chargeCertification,
+        record: { oc_id: 2, certification_state: 'AUDITED' },
+        body: { properties: { NOM: 'a' } }
+      }
+
+      await expect(haveRightToUpdateAuditMiddleware(request)).rejects.toThrow(ForbiddenApiError)
+    })
+
+    test('record of another OC → read allowed', async () => {
+      const request = { method: 'GET', user: chargeCertification, record: { oc_id: 2, certification_state: 'AUDITED' } }
+
+      await expect(haveRightToUpdateAuditMiddleware(request)).resolves.toBeUndefined()
+    })
+
+    test('auditor on a CERTIFIED record → restricted fields only, no deletion', async () => {
+      const request = {
+        method: 'PATCH',
+        user: auditeur,
+        record: { oc_id: 1, certification_state: 'CERTIFIED' },
+        body: { properties: { NOM: 'a', surface: 12 } }
+      }
+
+      await haveRightToUpdateAuditMiddleware(request)
+      expect(request.body.properties).toEqual({ NOM: 'a' })
+
+      await expect(haveRightToUpdateAuditMiddleware({ ...request, method: 'DELETE' })).rejects.toThrow(
+        ForbiddenApiError
+      )
+    })
+
+    test('super OC on a CERTIFIED record → no restriction', async () => {
+      const request = {
+        method: 'DELETE',
+        user: superOc,
+        record: { oc_id: 1, certification_state: 'CERTIFIED' },
+        body: { reason: { code: 'other' } }
+      }
+
+      await expect(haveRightToUpdateAuditMiddleware(request)).resolves.toBeUndefined()
+    })
+  })
+
+  describe('user from another group', () => {
+    test('record is CERTIFIED → restricted fields only', async () => {
+      const request = {
+        user: { id: 1, mainGroup: { id: 5 } },
         record: { certification_state: 'CERTIFIED' },
         body: { properties: { surface: 12 } }
       }
 
       await haveRightToUpdateAuditMiddleware(request)
 
-      expect(request.body.properties).toEqual({ surface: 12 })
+      expect(request.body.properties).toEqual({})
     })
   })
 
   test('group id is a string ("4") → filtering still applies', async () => {
     const request = {
-      user: { mainGroup: { id: '4' } },
+      user: { id: 1, mainGroup: { id: '4', nom: 'Opérateur' } },
       record: { certification_state: 'CERTIFIED' },
       body: { properties: { surface: 12, NOM: 'a' } }
     }
@@ -152,28 +241,89 @@ describe('haveRightToUpdate()', () => {
   })
 })
 
+describe('haveRightToUpdate() : transitions de certification_state', () => {
+  const haveRightToUpdateAuditMiddleware = haveRightToUpdate() as (request: unknown) => Promise<void>
+  const ocUser = {
+    id: 1,
+    mainGroup: { id: 2 },
+    groups: [{ id: 3, nom: 'Super OC' }],
+    organismeCertificateur: { id: 1, nom: 'OC' }
+  }
+
+  test('OC : retour de PENDING_CERTIFICATION à AUDITED → refusé', async () => {
+    await expect(
+      haveRightToUpdateAuditMiddleware({
+        user: ocUser,
+        record: { certification_state: 'PENDING_CERTIFICATION' },
+        body: { certification_state: 'AUDITED' }
+      })
+    ).rejects.toThrow(ForbiddenApiError)
+  })
+
+  test('OC : AUDITED directement à CERTIFIED → refusé', async () => {
+    await expect(
+      haveRightToUpdateAuditMiddleware({
+        user: ocUser,
+        record: { certification_state: 'AUDITED' },
+        body: { certification_state: 'CERTIFIED' }
+      })
+    ).rejects.toThrow(ForbiddenApiError)
+  })
+
+  test('OC : OPERATOR_DRAFT à PENDING_CERTIFICATION → autorisé', async () => {
+    await expect(
+      haveRightToUpdateAuditMiddleware({
+        user: ocUser,
+        record: { certification_state: 'OPERATOR_DRAFT' },
+        body: { certification_state: 'PENDING_CERTIFICATION' }
+      })
+    ).resolves.toBeUndefined()
+  })
+
+  test('OC : création directe en CERTIFIED → refusé', async () => {
+    await expect(
+      haveRightToUpdateAuditMiddleware({ user: ocUser, record: undefined, body: { certification_state: 'CERTIFIED' } })
+    ).rejects.toThrow(ForbiddenApiError)
+  })
+
+  test('admin : retour en arrière → autorisé', async () => {
+    await expect(
+      haveRightToUpdateAuditMiddleware({
+        user: { id: 1, mainGroup: { id: 1, nom: 'Admin' } },
+        record: { certification_state: 'CERTIFIED' },
+        body: { certification_state: 'AUDITED' }
+      })
+    ).resolves.toBeUndefined()
+  })
+})
+
 describe('enforceAdminRole()', () => {
   const hook = enforceAdminRole()
 
   test('admin (group 1) → allowed', async () => {
     await expect(
-      hook(asFastifyRequest({ user: buildUser({ mainGroup: { id: '1', nom: 'Admin' } }) }), reply)
+      hook(
+        asFastifyRequest({
+          user: buildUser({ mainGroup: { id: '1', nom: 'Admin' }, groups: [{ id: '1', nom: 'Admin' }] })
+        })
+      )
     ).resolves.toBeUndefined()
   })
 
   test('numeric group id 1 → allowed', async () => {
-    await expect(hook(asFastifyRequest({ user: { mainGroup: { id: 1 } } }), reply)).resolves.toBeUndefined()
+    await expect(
+      hook(asFastifyRequest({ user: { id: 1, mainGroup: { id: 1, nom: 'Admin' } } }))
+    ).resolves.toBeUndefined()
   })
 
   test.each(['2', '4', '8'])('group %s → 403', async (id) => {
-    await expect(hook(asFastifyRequest({ user: buildUser({ mainGroup: { id, nom: '' } }) }), reply)).rejects.toThrow(
-      UnauthorizedApiError
+    await expect(hook(asFastifyRequest({ user: buildUser({ mainGroup: { id, nom: '' } }) }))).rejects.toThrow(
+      ForbiddenApiError
     )
-    expect(reply.code).toHaveBeenCalledWith(403)
   })
 
   test('no user → 403', async () => {
-    await expect(hook(asFastifyRequest({ user: null }), reply)).rejects.toThrow(UnauthorizedApiError)
+    await expect(hook(asFastifyRequest({ user: null }))).rejects.toThrow(ForbiddenApiError)
   })
 })
 
@@ -320,7 +470,7 @@ describe('enforceOperatorAccess()', () => {
   const ocUser = buildOcUser()
 
   beforeEach(() => {
-    vi.mocked(getRecords).mockReset().mockResolvedValue([])
+    vi.mocked(hasRecordForOc).mockReset().mockResolvedValue(false)
   })
 
   test('no OC (operator user) → allowed', async () => {
@@ -355,7 +505,7 @@ describe('enforceOperatorAccess()', () => {
   })
 
   test('previous OC of the operator → allowed', async () => {
-    vi.mocked(getRecords).mockResolvedValue([buildNormalizedRecord({ oc_id: 1 })] as never)
+    vi.mocked(hasRecordForOc).mockResolvedValue(true)
 
     await expect(
       hook(asFastifyRequest({ user: ocUser, operator: buildOperator({ organismeCertificateur: { id: 2 } }) }))

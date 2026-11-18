@@ -1,6 +1,7 @@
 import fs from 'fs'
 import pdflib from 'pdf-lib'
 import path from 'path'
+import { fileURLToPath } from 'node:url'
 
 import { findPdfParcelles } from './exports.repository.js'
 import type { BoundingBox, MapDrawOptions, MapDrawResult, PdfParcelle } from './exports.types.js'
@@ -9,12 +10,51 @@ import { getErrorMessage } from '../../shared/errors.js'
 import type { Browser, Page } from 'puppeteer'
 import { logger } from '../../config/logger.js'
 
+const ALLOWED_PDF_HOSTS = ['openmaptiles.geo.data.gouv.fr', 'openmaptiles.data.gouv.fr', 'openmaptiles.github.io']
+const PDF_ORIGIN = 'https://pdf.cartobio.invalid'
+const MAPLIBRE_DIR = path.dirname(fileURLToPath(import.meta.resolve('maplibre-gl')))
+const CONTENT_TYPES: Record<string, string> = {
+  '.html': 'text/html',
+  '.mjs': 'text/javascript',
+  '.css': 'text/css',
+  '.map': 'application/json'
+}
+
+function localPdfFile(pathname: string): string | null {
+  if (pathname === '/map.html') return path.join(ASSETS_DIR, 'image-map/map.html')
+  if (pathname.startsWith('/maplibre-gl/')) return path.join(MAPLIBRE_DIR, path.basename(pathname))
+  return null
+}
+
+async function restrictNetwork(page: Page): Promise<void> {
+  await page.setRequestInterception(true)
+  page.on('request', (request): void => {
+    const url = new URL(request.url())
+    const localFile = url.origin === PDF_ORIGIN ? localPdfFile(url.pathname) : null
+    if (localFile && fs.existsSync(localFile)) {
+      void request.respond({
+        status: 200,
+        contentType: CONTENT_TYPES[path.extname(localFile)] ?? 'application/octet-stream',
+        body: fs.readFileSync(localFile)
+      })
+    } else if (
+      ['data:', 'blob:'].includes(url.protocol) ||
+      (url.protocol === 'https:' && ALLOWED_PDF_HOSTS.includes(url.hostname))
+    ) {
+      void request.continue()
+    } else {
+      void request.abort()
+    }
+  })
+}
+
 /**
  * Lancer le navigateur
  */
 async function launchStyleTab(browser: Browser, timeout = 30000): Promise<Page> {
   const page = await browser.newPage()
-  const filePath = `file://${path.join(ASSETS_DIR, 'image-map/map.html')}`
+  await restrictNetwork(page)
+  const filePath = `${PDF_ORIGIN}/map.html`
 
   try {
     await page.goto(filePath, {
@@ -358,6 +398,7 @@ export {
   getOptimalZoom,
   calculateGlobalBoundingBox,
   launchStyleTab,
+  restrictNetwork,
   drawParcelleHighlightOnMap,
   drawAllParcellesOnMap,
   mergeAndAddFooter,

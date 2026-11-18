@@ -25,7 +25,6 @@
     "@vitest/coverage-v8": "5.0.5",
     "db-migrate": "1.8.1",
     "db-migrate-pg": "1.7.1",
-    "drizzle-kit": "1.0.0-rc.5",
     "eslint": "10.13.0",
     "eslint-config-prettier": "10.1.8",
     "globals": "17.13.0",
@@ -104,6 +103,7 @@
     "convict": "6.2.5",
     "deepmerge": "4.3.1",
     "dotenv": "18.0.9",
+    "drizzle-kit": "1.0.0-rc.5",
     "drizzle-orm": "1.0.0-rc.5",
     "expiry-map": "2.0.0",
     "fast-jwt": "6.3.5",
@@ -116,7 +116,7 @@
     "get-stream": "9.0.1",
     "got": "16.1.0",
     "jsonstream-next": "3.0.0",
-    "mnemonist": "0.40.6",
+    "maplibre-gl": "6.16.0",
     "nodemailer": "10.2.1",
     "p-memoize": "9.0.0",
     "pdf-lib": "1.17.1",
@@ -127,7 +127,6 @@
     "socks-proxy-agent": "10.1.0",
     "validator": "13.15.35",
     "wkt": "0.1.1",
-    "xlsx": "0.18.5",
     "zod": "4.6.7"
   },
   "overrides": {

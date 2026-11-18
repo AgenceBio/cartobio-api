@@ -1,5 +1,6 @@
 import { CertificationState, EventType } from '@agencebio/cartobio-types'
 import type { CartoBioUser, NormalizedRecord, HistoryEntry } from '@agencebio/cartobio-types'
+import { isAdmin } from '../../modules/auth/auth.utils.js'
 
 function isAfterCertificationState(referenceState: CertificationState) {
   const stateValues = Object.values(CertificationState)
@@ -84,4 +85,31 @@ function collectFeatureIdsFromPayload(
   return Array.isArray(features) ? features.map(({ id }) => id) : null
 }
 
-export { EventType, collectFeatureIdsFromPayload, createNewEvent }
+type HistoryViewer = { user?: CartoBioUser | null; ocId?: number | null }
+
+function maskOcAgents<T extends object>(record: T, viewer: HistoryViewer, currentOcId?: number | null): T {
+  const history = (record as { audit_history?: HistoryEntry[] | null }).audit_history
+  if (!history?.length || isAdmin(viewer.user)) return record
+
+  return {
+    ...record,
+    audit_history: history.map((entry) => {
+      const agentOc = entry.user?.organismeCertificateur
+      if (!entry.user || !agentOc || agentOc.id === currentOcId || agentOc.id === viewer.ocId) return entry
+
+      return {
+        ...entry,
+        user: {
+          id: 0,
+          nom: agentOc.nom,
+          prenom: '',
+          groups: [],
+          mainGroup: entry.user.mainGroup,
+          organismeCertificateur: agentOc
+        }
+      }
+    })
+  }
+}
+
+export { EventType, collectFeatureIdsFromPayload, createNewEvent, maskOcAgents }

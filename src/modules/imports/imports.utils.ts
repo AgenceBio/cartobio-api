@@ -8,6 +8,7 @@ import {
 } from '../../database/schema/index.js'
 import { recordColumns } from '../../shared/parcellaires/parcellaires.utils.js'
 import type { ImportJobListRow, OperatorRecordFilters } from './imports.types.js'
+import config from '../../config/env.js'
 
 export const importJobColumns = {
   jobid: parcellaireImport.id,
@@ -47,4 +48,14 @@ export function operatorRecordConditions({ anneeAudit, statut, anneeReferenceCon
   }
 
   return conditions
+}
+
+export function pageUrl(url: string, params: Record<string, number | null>): string {
+  const [pathname = '', query] = url.split('?')
+  const searchParams = new URLSearchParams(query)
+  for (const [key, value] of Object.entries(params)) {
+    if (value === null) searchParams.delete(key)
+    else searchParams.set(key, String(value))
+  }
+  return `${new URL(pathname, config.get('frontendUrl')).toString()}?${searchParams.toString()}`
 }

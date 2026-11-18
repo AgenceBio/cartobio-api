@@ -38,55 +38,60 @@ export const cultureSchema = z.object({
   variete: z.string().max(255).nullish(),
   surface: z.union([z.number(), z.string()]).nullish(),
   unit: z.enum(['%', 'ha']).nullish(),
-  date_semis: z.string().nullish(),
-  commentaire: z.string().nullish()
+  date_semis: z.string().max(32).nullish(),
+  commentaire: z.string().max(5000).nullish()
 })
 
 const historiqueCultureSchema = z.object({
   cultures: z.array(cultureSchema).nullish(),
   annee_controle: z.number().nullish(),
-  conversion_niveau: z.string().nullish()
+  conversion_niveau: z.string().max(255).nullish()
 })
 
+const boundedJson = <T extends z.ZodType>(schema: T): T =>
+  schema.refine((value) => value === undefined || JSON.stringify(value).length <= 10_000, {
+    message: 'Les métadonnées ne doivent pas dépasser 10 Ko'
+  })
+
 export const annotationSchema = z.object({
-  id: z.string().optional(),
-  code: z.string().optional(),
-  date: z.string().nullish(),
-  metadata: z.unknown().optional()
+  id: z.string().max(255).optional(),
+  code: z.string().max(255).optional(),
+  date: z.string().max(255).nullish(),
+  metadata: boundedJson(z.unknown()).optional()
 })
 
 export const featurePropertiesSchema = z.object({
   id: z.union([z.string(), z.number()]).optional(),
-  createdAt: z.string().nullish(),
-  updatedAt: z.string().nullish(),
-  COMMUNE_LABEL: z.string().nullish(),
+  createdAt: z.string().max(255).nullish(),
+  updatedAt: z.string().max(255).nullish(),
+  COMMUNE_LABEL: z.string().max(255).nullish(),
   COMMUNE: z.string().max(5).nullish(),
   cultures: z.array(cultureSchema).nullish(),
   conversion_niveau: conversionNiveauSchema.nullish(),
   engagement_date: isoDateStringSchema.or(z.literal('')).nullish(),
-  commentaires: z.string().nullish(),
-  auditeur_notes: z.string().nullish(),
+  commentaires: z.string().max(10000).nullish(),
+  auditeur_notes: z.string().max(10000).nullish(),
   annotations: z.array(annotationSchema).nullish(),
-  NOM: z.string().nullish(),
+  NOM: z.string().max(1000).nullish(),
   PACAGE: z
     .string()
     .regex(/^\d{0,9}$/)
     .nullish(),
   NUMERO_I: smallintSchema.nullish(),
   NUMERO_P: smallintSchema.nullish(),
-  cadastre: z.array(z.string()).nullish(),
+  cadastre: z.array(z.string().max(255)).nullish(),
   etranger: z.boolean().nullish(),
   statut_import_geom: z.enum(['ACCEPTE', 'CORRIGE', 'ACCEPTENONCORRIGE', 'ACCEPTE_NON_CORRIGE']).nullish(),
-  TYPE: z.string().nullish(),
-  CODE_VAR: z.string().nullish(),
-  CODE_CULTURE: z.string().nullish(),
-  CODE_PRECISION: z.string().nullish(),
+  TYPE: z.string().max(255).nullish(),
+  CODE_VAR: z.string().max(255).nullish(),
+  CODE_CULTURE: z.string().max(255).nullish(),
+  CODE_PRECISION: z.string().max(255).nullish(),
   controlee: z.boolean().nullish(),
   historique: z.array(historiqueCultureSchema).nullish(),
   attente_pac: z.boolean().nullish(),
-  CPF: z.string().nullish(),
+  CPF: z.string().max(255).nullish(),
   SURF: z.number().nullish(),
-  variete: z.string().nullish()
+  variete: z.string().max(255).nullish()
 })
 
 export const featureSchema = z.object({
@@ -123,8 +128,12 @@ export const attestationProductionQuerySchema = z.object({
 
 export const recordInfosBodySchema = z.object({
   audit_date: z.iso.date().nullish().meta({ description: "Date de l'audit" }),
-  audit_notes: z.string().nullish().meta({ description: "Notes de l'auditeur" }),
-  audit_demandes: z.string().nullish().meta({ description: "Demandes formulées à l'opérateur lors de l'audit" }),
+  audit_notes: z.string().max(10000).nullish().meta({ description: "Notes de l'auditeur" }),
+  audit_demandes: z
+    .string()
+    .max(10000)
+    .nullish()
+    .meta({ description: "Demandes formulées à l'opérateur lors de l'audit" }),
   certification_date_debut: z.iso.date().nullish().meta({ description: 'Début de validité de la certification' }),
   certification_date_fin: z.iso.date().nullish().meta({ description: 'Fin de validité de la certification' }),
   certification_state: z
@@ -132,7 +141,7 @@ export const recordInfosBodySchema = z.object({
     .optional()
     .meta({ description: 'État du parcellaire ; un changement est historisé' }),
   mixite: mixiteSchema.nullish().meta({ description: "Mixité de l'exploitation" }),
-  version_name: z.string().optional().meta({ description: 'Nom de la version du parcellaire' }),
+  version_name: z.string().max(255).optional().meta({ description: 'Nom de la version du parcellaire' }),
   annee_reference_controle: z.int().optional().meta({ description: 'Année de référence du contrôle' })
 })
 
@@ -155,14 +164,16 @@ const createRecordFeatureCollectionSchema = featureCollectionSchema
 
 export const createRecordBodySchema = recordInfosBodySchema.extend({
   parcelles: createRecordFeatureCollectionSchema,
-  metadata: z
-    .looseObject({
+  metadata: boundedJson(
+    z.looseObject({
       source: z.enum(MetadataSource).nullish().meta({ description: "Source de l'import" })
     })
+  )
     .optional()
     .meta({ description: "Métadonnées de l'import (source, provenance…)" }),
   version_name: z
     .string()
+    .max(255)
     .nullish()
     .transform((versionName) => versionName ?? undefined)
     .meta({ description: 'Nom de la version du parcellaire' }),
@@ -179,22 +190,26 @@ export const createRecordBodySchema = recordInfosBodySchema.extend({
     .meta({ description: 'Parcellaire précédent dont recopier les données' })
 })
 
-export const createFeatureBodySchema = z.object({
+export const patchRecordBodySchema = z.strictObject(recordInfosBodySchema.shape)
+export const patchFeatureBodySchema = z.strictObject(featureSchema.shape)
+export const patchFeatureCollectionBodySchema = z.strictObject(featureCollectionSchema.shape)
+
+export const createFeatureBodySchema = z.strictObject({
   feature: newFeatureSchema
 })
 
-export const deleteFeatureBodySchema = z.object({
+export const deleteFeatureBodySchema = z.strictObject({
   reason: z
     .object({
       code: z
         .enum(['lifecycle', 'other', 'error'])
         .meta({ description: 'Motif : fin de vie de la parcelle, erreur de saisie ou autre' }),
-      reason: z.string().nullish().meta({ description: 'Précision libre' })
+      reason: z.string().max(10000).nullish().meta({ description: 'Précision libre' })
     })
     .meta({ description: "Motif de suppression, conservé dans l'historique" })
 })
 
-export const createFeaturesFromOtherBodySchema = z.object({
+export const createFeaturesFromOtherBodySchema = z.strictObject({
   features: z.array(newFeatureSchema).meta({ description: 'Nouvelles parcelles (features GeoJSON)' }),
   from: z.array(z.union([z.string(), z.number()])).meta({
     description: 'Identifiants des parcelles remplacées : supprimées et référencées comme origine des nouvelles'

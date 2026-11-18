@@ -65,11 +65,11 @@ le chemin `/api/oc/check-token`.
 | --------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `202`     | `Accepted`              | Les données d'entrée sont validées et le processus d'import va se lancer.                                                 |
 | `400`     | `Bad Request`           | Le fichier JSON est invalide ou certaines données sont incorrectes et donc le traitement ne se lancera pas.               |
-| `401`     | `Unauthorized`          | Le jeton d'`Authorization` est manquant.                                                                                  |
-| `403`     | `Forbidden`             | Ce jeton d'`Authorization` n'est pas attribué, ou a expiré.                                                               |
-| `405`     | `Method Not Allowed`    | L'appel utilise un autre verbe HTTP que `POST`.                                                                           |
+| `401`     | `Unauthorized`          | Le jeton d'`Authorization` est manquant, refusé par le portail de l'Agence Bio, ou révoqué.                               |
+| `404`     | `Not Found`             | L'appel utilise un autre verbe HTTP que `POST` (route inconnue).                                                          |
 | `413`     | `Payload Too Large`     | Le corps de la requête dépasse 50 Mo.                                                                                     |
 | `500`     | `Internal Server Error` | Une erreur inattendue s'est produite de notre côté — un bug doit être résolu pour qu'une nouvelle requête puisse aboutir. |
+| `502`     | `Bad Gateway`           | Le portail de l'Agence Bio n'a pas pu vérifier le jeton (indisponible) : réessayer plus tard.                             |
 
 #### Réponse
 
@@ -308,14 +308,15 @@ Liste paginée des imports de l'OC authentifié.
 
 ##### Paramètres query
 
-| Paramètre | Type   | Description                                                         |
-| --------- | ------ | ------------------------------------------------------------------- |
-| `status`  | string | Filtre par statut (ex. `DONE,ERROR`). Valeurs séparées par virgule. |
-| `from`    | string | Date de début (ISO 8601).                                           |
-| `to`      | string | Date de fin (ISO 8601).                                             |
-| `payload` | bool   | Inclure le payload brut (`true`/`false`, défaut `false`).           |
-| `page`    | number | Numéro de page (défaut `1`).                                        |
-| `limit`   | number | Taille de page (défaut `20`).                                       |
+| Paramètre      | Type   | Description                                                         |
+| -------------- | ------ | ------------------------------------------------------------------- |
+| `status`       | string | Filtre par statut (ex. `DONE,ERROR`). Valeurs séparées par virgule. |
+| `from`         | string | Date de début (ISO 8601).                                           |
+| `to`           | string | Date de fin (ISO 8601).                                             |
+| `withPayload`  | bool   | Inclure le payload brut (`true`/`false`, défaut `false`).           |
+| `withRejected` | bool   | Uniquement les imports comportant au moins un objet refusé.         |
+| `page`         | number | Numéro de page (défaut `1`).                                        |
+| `limit`        | number | Taille de page (défaut `20`, maximum `100`).                        |
 
 ##### Réponse
 

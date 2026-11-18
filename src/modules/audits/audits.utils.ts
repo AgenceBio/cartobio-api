@@ -1,11 +1,22 @@
 import { sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import { CertificationState } from '@agencebio/cartobio-types'
-import type { FeatureInput, FeaturePropertiesInput } from '@agencebio/cartobio-types'
+import type {
+  AgenceBioNormalizedOperator,
+  CartoBioUser,
+  FeatureInput,
+  FeaturePropertiesInput,
+  NormalizedRecord
+} from '@agencebio/cartobio-types'
+import type { DBOperatorRecordWithParcelles } from '../../shared/parcellaires/parcellaires.types.js'
+import { normalizeRecord } from '../../shared/outputs/record.js'
+import { maskOcAgents } from '../../shared/outputs/history.js'
+import { redactAuditNotes } from '../../shared/middlewares.js'
 import { parcellaires, parcelles } from '../../database/schema/index.js'
-import { InvalidRequestApiError } from '../../shared/errors.js'
+import { InvalidRequestApiError, PreconditionFailedApiError } from '../../shared/errors.js'
 import { parcelleUpdateSet } from '../../shared/parcellaires/parcellaires.utils.js'
 import { areaHa, wgs84FromGeoJSON } from '../../database/postgis.js'
+import { isOperatorUser } from '../auth/auth.utils.js'
 
 export function assertConversionNiveau(
   state: string | null | undefined,
@@ -18,6 +29,31 @@ export function assertConversionNiveau(
     return isCreation ? !value : value === '' || value === null
   })
   if (isMissing) throw new InvalidRequestApiError('Le niveau de conversion est obligatoire.')
+}
+
+export function outputRecord(
+  user: CartoBioUser | null,
+  record: DBOperatorRecordWithParcelles,
+  operator?: AgenceBioNormalizedOperator | null
+): NormalizedRecord {
+  const normalized = normalizeRecord(record)
+  if (isOperatorUser(user)) normalized.audit_notes = null
+  if (user?.organismeCertificateur && normalized.oc_id !== user.organismeCertificateur.id) redactAuditNotes(normalized)
+  return maskOcAgents(
+    normalized,
+    { user, ocId: user?.organismeCertificateur?.id },
+    operator?.organismeCertificateur?.id
+  )
+}
+
+export function unmodifiedSinceCondition(ifUnmodifiedSince: string | undefined): SQL | undefined {
+  if (!ifUnmodifiedSince || Number.isNaN(Date.parse(ifUnmodifiedSince))) return undefined
+  return sql`date_trunc('second', ${parcellaires.updatedAt}) <= ${new Date(ifUnmodifiedSince).toISOString()}::timestamptz`
+}
+
+export function assertUnmodified(updatedRows: unknown[]): void {
+  if (updatedRows.length === 0)
+    throw new PreconditionFailedApiError('Le contenu a été modifié depuis votre dernière requête.')
 }
 
 export function geometryInput(geometry: FeatureInput['geometry'] | null | undefined): SQL {

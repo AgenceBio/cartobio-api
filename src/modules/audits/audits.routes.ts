@@ -19,6 +19,8 @@ import { AttestationsProductionsType } from '@agencebio/cartobio-types'
 import type { FeatureInput } from '@agencebio/cartobio-types'
 import * as service from './audits.service.js'
 import { requireOperator, requireRecord, requireUser } from '../../shared/request.js'
+import { NotFoundApiError } from '../../shared/errors.js'
+import { outputRecord } from './audits.utils.js'
 
 export default async function auditRoutes(fastify: FastifyInstance): Promise<void> {
   const app = fastify.withTypeProvider<ZodTypeProvider>()
@@ -42,12 +44,16 @@ export default async function auditRoutes(fastify: FastifyInstance): Promise<voi
   )
 
   app.post('/api/v2/audits/:recordId/:id/controlee', markControlledSchema, async (request, reply) => {
+    if (!requireRecord(request).parcelles.features.some(({ id }) => id === request.params.id))
+      throw new NotFoundApiError('Parcelle introuvable')
     await service.markFeatureControlled(request.params.recordId, request.params.id, requireUser(request).id)
 
     return reply.code(200).send({ controlee: true })
   })
 
   app.post('/api/v2/audits/:recordId/:id/non-controlee', markUncontrolledSchema, async (request, reply) => {
+    if (!requireRecord(request).parcelles.features.some(({ id }) => id === request.params.id))
+      throw new NotFoundApiError('Parcelle introuvable')
     await service.markFeatureUncontrolled(request.params.recordId, request.params.id, requireUser(request).id)
 
     return reply.code(200).send({ controlee: false })
@@ -58,10 +64,10 @@ export default async function auditRoutes(fastify: FastifyInstance): Promise<voi
     const { id: ocId, nom: ocLabel } = requireOperator(request).organismeCertificateur
     const record = await service.createOrUpdateOperatorRecord(
       {
+        ...request.body,
         numerobio: String(numeroBio),
         oc_id: ocId,
-        oc_label: ocLabel,
-        ...request.body
+        oc_label: ocLabel
       },
       {
         user: request.user,
@@ -69,11 +75,11 @@ export default async function auditRoutes(fastify: FastifyInstance): Promise<voi
         previousRecordId: request.body.recordId
       }
     )
-    return reply.code(200).send(service.normalizeRecord(record))
+    return reply.code(200).send(outputRecord(request.user, record, request.operator))
   })
 
   app.delete('/api/v2/audits/:recordId', deleteRecordSchema, async (request, reply) => {
-    await service.deleteRecord({ user: requireUser(request), record: requireRecord(request) })
+    await service.deleteRecord(requireRecord(request))
     return reply.code(204).send()
   })
 
@@ -81,18 +87,26 @@ export default async function auditRoutes(fastify: FastifyInstance): Promise<voi
     const { body: patch, operator } = request
 
     const record = await service.updateAuditRecordState(
-      { user: requireUser(request), record: requireRecord(request), operator },
+      {
+        user: requireUser(request),
+        record: requireRecord(request),
+        operator,
+        ifUnmodifiedSince: request.headers['if-unmodified-since']
+      },
       patch
     )
-    return reply.code(200).send(service.normalizeRecord(record))
+    return reply.code(200).send(outputRecord(request.user, record, request.operator))
   })
 
   app.post('/api/v2/audits/:recordId/parcelles', createFeatureSchema, async (request, reply) => {
     const { feature } = request.body
     const { user, operator } = request
 
-    const record = await service.addRecordFeature({ user, record: requireRecord(request), operator }, feature)
-    return reply.code(200).send(service.normalizeRecord(record))
+    const record = await service.addRecordFeature(
+      { user, record: requireRecord(request), operator, ifUnmodifiedSince: request.headers['if-unmodified-since'] },
+      feature
+    )
+    return reply.code(200).send(outputRecord(request.user, record, request.operator))
   })
 
   app.get('/api/v2/audits/:recordId/parcelles', getFeaturesSchema, async (request, reply) => {
@@ -103,18 +117,27 @@ export default async function auditRoutes(fastify: FastifyInstance): Promise<voi
     const { body: featureCollection, user, operator } = request
 
     const record = await service.patchFeatureCollection(
-      { user, record: requireRecord(request), operator },
+      { user, record: requireRecord(request), operator, ifUnmodifiedSince: request.headers['if-unmodified-since'] },
       featureCollection.features ?? []
     )
-    return reply.code(200).send(service.normalizeRecord(record))
+    return reply.code(200).send(outputRecord(request.user, record, request.operator))
   })
 
   app.patch('/api/v2/audits/:recordId/parcelles/:featureId', updateFeaturePropertiesSchema, async (request, reply) => {
     const { body: feature, user, operator } = request
     const { featureId } = request.params
 
-    const record = await service.updateFeature({ featureId, user, record: requireRecord(request), operator }, feature)
-    return reply.code(200).send(service.normalizeRecord(record))
+    const record = await service.updateFeature(
+      {
+        featureId,
+        user,
+        record: requireRecord(request),
+        operator,
+        ifUnmodifiedSince: request.headers['if-unmodified-since']
+      },
+      feature
+    )
+    return reply.code(200).send(outputRecord(request.user, record, request.operator))
   })
 
   app.delete('/api/v2/audits/:recordId/parcelles/:featureId', deleteSingleFeatureSchema, async (request, reply) => {
@@ -123,10 +146,16 @@ export default async function auditRoutes(fastify: FastifyInstance): Promise<voi
     const { featureId } = request.params
 
     const record = await service.deleteSingleFeature(
-      { featureId, user: requireUser(request), record: requireRecord(request), operator },
+      {
+        featureId,
+        user: requireUser(request),
+        record: requireRecord(request),
+        operator,
+        ifUnmodifiedSince: request.headers['if-unmodified-since']
+      },
       { reason }
     )
-    return reply.code(200).send(service.normalizeRecord(record))
+    return reply.code(200).send(outputRecord(request.user, record, request.operator))
   })
 
   app.put('/api/v2/audits/:recordId/parcelles', createFeaturesFromOtherSchema, async (request, reply) => {
@@ -138,8 +167,9 @@ export default async function auditRoutes(fastify: FastifyInstance): Promise<voi
       requireRecord(request),
       operator,
       features as FeatureInput[],
-      from as Array<string | number>
+      from as Array<string | number>,
+      request.headers['if-unmodified-since']
     )
-    return reply.code(200).send(service.normalizeRecord(record))
+    return reply.code(200).send(outputRecord(request.user, record, request.operator))
   })
 }

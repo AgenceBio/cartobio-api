@@ -18,6 +18,8 @@ import type {
   NormalizedRecordSummary
 } from '@agencebio/cartobio-types'
 import { getRecords } from '../../shared/parcellaires/parcellaires.service.js'
+import { maskOcAgents } from '../../shared/outputs/history.js'
+import { isOperatorUser } from '../auth/auth.utils.js'
 
 type NumeroBio = string | number
 type SortableOperator = Pick<AgenceBioNormalizedOperator, 'nom' | 'denominationCourante' | 'notifications'>
@@ -321,7 +323,8 @@ async function getDashboardSummary(
   const enAttentes = rows.find((r) => r.certifie === false)?.numerobios ?? []
 
   const countCertifiees = certifiees.length
-  const countEnAttentes = enAttentes.filter((e) => !certifiees.includes(e)).length
+  const certifieesSet = new Set(certifiees)
+  const countEnAttentes = enAttentes.filter((e) => !certifieesSet.has(e)).length
 
   return {
     countCertifiees,
@@ -406,7 +409,7 @@ async function getConsultedOperators(userId: number): Promise<number[]> {
 
 async function listUserOperators(
   userId: number,
-  { search, limit, offset }: { search?: string; limit?: number; offset?: number }
+  { search, limit, offset }: { search?: string; limit: number; offset: number }
 ): Promise<{ nbTotal: number; operators: AgenceBioNormalizedOperatorWithPinnedStatus[] }> {
   const [{ operators }, pinnedOperators] = await Promise.all([fetchUserOperators(userId), getPinnedOperators(userId)])
 
@@ -423,7 +426,7 @@ async function listUserOperators(
 
   const paginatedOperators = filteredOperators
     .toSorted(compareByNotificationsDesc)
-    .slice(offset, Number(offset) + Number(limit))
+    .slice(offset, offset + limit)
     .map((o) => ({
       ...o,
       epingle: pinnedOperators.includes(+o.numeroBio)
@@ -487,12 +490,17 @@ async function getOperatorRecordsForUser(
 ): Promise<NormalizedRecordSummary[]> {
   const records = await getRecords(numeroBio)
   const oc = user.organismeCertificateur
+  const visibleRecords =
+    !oc || oc.id === operator.organismeCertificateur.id ? records : records.filter((r) => r.oc_id === oc.id)
 
-  if (!oc || oc.id === operator.organismeCertificateur.id) {
-    return records
-  }
-
-  return records.filter((r) => r.oc_id === oc.id)
+  return visibleRecords.map((record) => {
+    const viewer = { user, ocId: oc?.id }
+    const currentOcId = operator.organismeCertificateur.id
+    if (isOperatorUser(user)) return maskOcAgents({ ...record, audit_notes: null }, viewer, currentOcId)
+    if (oc && record.oc_id !== oc.id)
+      return maskOcAgents({ ...record, audit_notes: null, audit_demandes: null }, viewer, currentOcId)
+    return maskOcAgents(record, viewer, currentOcId)
+  })
 }
 
 export { fetchUserOperators, fetchCustomersByOc }
