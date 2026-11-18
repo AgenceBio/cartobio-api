@@ -6,7 +6,7 @@ const { get } = got
 import { createDecoder, createVerifier } from 'fast-jwt'
 import config from '../../config/env.js'
 import * as repository from './auth.repository.js'
-import type { DepartementRow } from './auth.repository.js'
+import type { DepartementRow } from './auth.types.js'
 import { fetchOperatorByNumeroBio } from '../../clients/agence-bio.client.js'
 import type { AgenceBioUserGroup, OrganismeCertificateur } from '@agencebio/cartobio-types'
 
@@ -76,8 +76,8 @@ function verifyNotificationAuthorization(authorizationHeader: string | undefined
 async function getDepartement() {
   const rows = await repository.findDepartements()
   const grouped = rows.reduce<Record<string, DepartementRow[]>>((regions, row) => {
-    regions[row.nom_region] ??= []
-    regions[row.nom_region].push(row)
+    regions[row.nomRegion] ??= []
+    regions[row.nomRegion].push(row)
     return regions
   }, {})
   return Object.fromEntries(Object.keys(grouped).sort().map(region => [region, grouped[region].map(({ code, nom }) => ({ code, nom })).sort((a, b) => a.nom.localeCompare(b.nom))]))
