@@ -1,357 +1,446 @@
-import type { PoolClient } from 'pg'
+import { randomUUID } from 'node:crypto'
+import { and, asc, desc, eq, inArray, isNull, notInArray, sql } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/pg-core'
+import type { SQL } from 'drizzle-orm'
 import type { Polygon } from 'geojson'
 
-import pool from '../../database/database.js'
+import { db } from '../../database/database.js'
+import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
+import {
+  communes,
+  organismeCertificateur,
+  parcelleCultures,
+  parcellaires,
+  parcellairesEvenements,
+  parcellairesMetadata,
+  parcelles,
+  parcellesAnnotations,
+  parcellesControles,
+  territoires
+} from '../../database/schema/index.js'
 import type { CertificationState } from '@agencebio/cartobio-types'
 import type { DBOperatorRecord, DBOperatorRecordWithParcelles, DBParcelle, NormalizedRecord, HistoryEntry, CartoBioFeatureInput } from '@agencebio/cartobio-types'
 import { MissingGeometryApiError } from '../errors.js'
 import { getRandomFeatureId } from '../outputs/features.js'
+import { annotationCodes } from '../../database/validations/parcelles.js'
+import { blankToNull, coalesceBlank, culturesJson, eventTypes, parcelleColumns, recordColumns } from './parcellaires.utils.js'
+import type { GeometryFixAnalysis, RecordSummaryRow } from './parcellaires.types.js'
 
-const recordFields = /* sqlFragment */`cartobio_operators.record_id, numerobio, version_name, annee_reference_controle, certification_date_debut, certification_date_fin, certification_state, created_at, updated_at, oc_id, metadata, audit_date, audit_history, audit_notes, audit_demandes, mixite`
+type FeatureProperties = CartoBioFeatureInput['properties']
 
-async function findCertificationStateAtAuditDate (client: PoolClient, numerobio: string | undefined, auditDate: string | null | undefined): Promise<string | null> {
+const geometryFromGeoJSON = (geometry: unknown): SQL => sql`ST_SetSRID(ST_GeomFromGeoJSON(${JSON.stringify(geometry)}), 4326)`
+
+const surfaceHa = (geometry: SQL): SQL => sql`round((ST_Area(${geometry}::geography) / 10000)::numeric, 4)`
+
+const statutImportGeom = (statut: string | null | undefined): SQL => sql`${statut === 'ACCEPTENONCORRIGE' ? 'ACCEPTE_NON_CORRIGE' : statut ?? null}::cartobio.statut_import_geom`
+
+const surfaceCulture = (surface: unknown): string | null => {
+  const value = String(surface ?? '').replace(',', '.')
+  return /^\d+(\.\d+)?$/.test(value) ? value : null
+}
+
+const dateSemis = (value: unknown): string | null =>
+  typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null
+
+async function insertEvent (tx: NodePgDatabase, recordId: string, entry: HistoryEntry | null): Promise<void> {
+  if (!entry) return
+
+  await tx.insert(parcellairesEvenements).values({
+    recordId,
+    type: eventTypes[entry.type],
+    certificationEtat: (entry.state as CertificationState | undefined) ?? null,
+    date: new Date(entry.date),
+    userId: entry.user?.id != null ? String(entry.user.id) : null,
+    userRole: entry.user?.mainGroup?.nom ?? null,
+    parcellesId: entry.featureIds ? entry.featureIds.map((id) => (id == null ? null : String(id))) as string[] : null,
+    description: entry.description ?? null,
+    metadata: entry.metadata ?? null
+  })
+}
+
+async function ensureOrganismeCertificateur (tx: NodePgDatabase, ocId: number | string | null | undefined, ocLabel: string | null | undefined): Promise<void> {
+  if (ocId == null) return
+
+  await tx
+    .insert(organismeCertificateur)
+    .values({ id: String(ocId), label: ocLabel || String(ocId) })
+    .onConflictDoNothing()
+}
+
+async function upsertMetadata (tx: NodePgDatabase, recordId: string, metadata: Record<string, unknown> | null | undefined): Promise<void> {
+  const meta = metadata ?? {}
+  const sourceLastUpdate = typeof meta.sourceLastUpdate === 'string' && !Number.isNaN(Date.parse(meta.sourceLastUpdate)) ? new Date(meta.sourceLastUpdate) : null
+  const year = (value: unknown): number | null => /^\d{4}$/.test(String(value ?? '')) ? Number(value) : null
+  const values = {
+    source: typeof meta.source === 'string' ? meta.source : null,
+    sourceUpdatedAt: sourceLastUpdate,
+    provenance: typeof meta.provenance === 'string' ? meta.provenance : null,
+    campagne: year(meta.campagne),
+    numeroPacage: meta.pacage == null ? null : String(meta.pacage),
+    anneeAssolement: year(meta.anneeAssolement),
+    copyOf: meta.copy_of == null ? null : String(meta.copy_of),
+    warnings: meta.warnings ?? null
+  }
+
+  await tx
+    .insert(parcellairesMetadata)
+    .values({ recordId, ...values })
+    .onConflictDoUpdate({ target: parcellairesMetadata.recordId, set: values })
+}
+
+async function upsertCultures (tx: NodePgDatabase, recordId: string, parcelleId: string, cultures: FeatureProperties['cultures'] | null | undefined): Promise<void> {
+  if (!cultures) return
+
+  const parcelle = and(eq(parcelleCultures.recordId, recordId), eq(parcelleCultures.parcelleId, parcelleId))
+  const values = cultures.map((culture, position) => ({
+    id: culture.id ?? randomUUID(),
+    recordId,
+    parcelleId,
+    cpf: blankToNull(culture.CPF),
+    codeCultureImport: blankToNull(culture.TYPE),
+    surface: surfaceCulture(culture.surface),
+    unit: blankToNull(culture.unit),
+    variete: blankToNull(culture.variete),
+    dateSemis: dateSemis(culture.date_semis),
+    commentaire: blankToNull((culture as { commentaire?: string | null }).commentaire),
+    position
+  }))
+
+  await tx
+    .delete(parcelleCultures)
+    .where(and(parcelle, values.length > 0 ? notInArray(parcelleCultures.id, values.map(({ id }) => id)) : undefined))
+
+  if (values.length === 0) return
+
+  await tx
+    .insert(parcelleCultures)
+    .values(values)
+    .onConflictDoUpdate({
+      target: [parcelleCultures.recordId, parcelleCultures.parcelleId, parcelleCultures.id],
+      set: {
+        cpf: sql`excluded.cpf`,
+        codeCultureImport: sql`excluded.code_culture_import`,
+        surface: sql`excluded.surface`,
+        unit: sql`excluded.unit`,
+        variete: sql`excluded.variete`,
+        dateSemis: sql`excluded.date_semis`,
+        commentaire: sql`excluded.commentaire`,
+        position: sql`excluded.position`
+      }
+    })
+}
+
+async function upsertAnnotations (tx: NodePgDatabase, recordId: string, parcelleId: string, annotations: FeatureProperties['annotations'] | null | undefined): Promise<void> {
+  if (!annotations) return
+
+  const parcelle = and(eq(parcellesAnnotations.recordId, recordId), eq(parcellesAnnotations.parcelleId, parcelleId))
+  const kept = (annotations as Array<{ id?: unknown; code?: unknown; date?: unknown; metadata?: unknown }>)
+    .filter((annotation) => Object.hasOwn(annotationCodes, String(annotation.code)))
+  const values = kept
+    .map((annotation) => ({
+      id: typeof annotation.id === 'string' ? annotation.id : randomUUID(),
+      recordId,
+      parcelleId,
+      typeAnnot: annotationCodes[String(annotation.code)],
+      createdAt: typeof annotation.date === 'string' && !Number.isNaN(Date.parse(annotation.date)) ? new Date(annotation.date) : new Date(),
+      metadata: annotation.metadata ?? null
+    }))
+
+  await tx
+    .delete(parcellesAnnotations)
+    .where(and(parcelle, values.length > 0 ? notInArray(parcellesAnnotations.id, values.map(({ id }) => id)) : undefined))
+
+  if (values.length === 0) return
+
+  await tx
+    .insert(parcellesAnnotations)
+    .values(values)
+    .onConflictDoUpdate({
+      target: [parcellesAnnotations.recordId, parcellesAnnotations.parcelleId, parcellesAnnotations.id],
+      set: {
+        typeAnnot: sql`excluded.type_annot`,
+        createdAt: sql`excluded.created_at`,
+        metadata: sql`excluded.metadata`
+      }
+    })
+}
+
+async function findParcelles (tx: NodePgDatabase, recordId: string, ids: string[]): Promise<DBParcelle[]> {
+  if (ids.length === 0) return []
+
+  const rows = await tx
+    .select(parcelleColumns)
+    .from(parcelles)
+    .where(and(eq(parcelles.recordId, recordId), inArray(parcelles.id, ids)))
+
+  return ids.flatMap((id) => rows.filter((row) => row.id === id)) as unknown as DBParcelle[]
+}
+
+async function findCertificationStateAtAuditDate (tx: NodePgDatabase, numerobio: string | undefined, auditDate: string | null | undefined): Promise<string | null> {
   if (!auditDate) return null
 
-  const { rows } = await client.query<{ certification_state: string }>(`
-    SELECT certification_state
-    FROM cartobio_operators
-    WHERE numerobio = $1
-      AND audit_date = $2
-      AND deleted_at IS NULL
-  `, [numerobio, auditDate])
+  const [row] = await tx
+    .select({ certification_state: parcellaires.certificationEtat })
+    .from(parcellaires)
+    .where(and(
+      eq(parcellaires.numeroBio, Number(numerobio)),
+      sql`${parcellaires.auditDate} = ${auditDate}::date`,
+      isNull(parcellaires.deletedAt)
+    ))
 
-  return rows[0]?.certification_state ?? null
+  return row?.certification_state ?? null
 }
 
-async function findMatchingPreviousParcelle (client: PoolClient, numerobio: string, previousRecordId: string, geometry: CartoBioFeatureInput['geometry']): Promise<DBParcelle | null> {
-  const { rows } = await client.query(
-    `
-    SELECT
-      cp.id,
-      cp.cultures,
-      cp.conversion_niveau,
-      cp.engagement_date,
-      cp.name
-    FROM cartobio_parcelles cp
-    JOIN cartobio_operators co ON co.record_id = cp.record_id
-    WHERE co.numerobio = $1
-      AND co.record_id = $2
-      AND co.deleted_at IS NULL
-      AND cp.deleted_at IS NULL
-      AND ST_area(
-        ST_Intersection(
-          ST_MakeValid(cp.geometry),
-          ST_MakeValid(ST_SetSRID($3::geometry, 4326))
-        )
-      ) / (ST_area(ST_MakeValid(cp.geometry)) / 100) > 99
-      AND ST_area(
-        ST_Intersection(
-          ST_MakeValid(cp.geometry),
-          ST_MakeValid(ST_SetSRID($3::geometry, 4326))
-        )
-      ) / (ST_area(ST_MakeValid(ST_SetSRID($3::geometry, 4326))) / 100) > 99
-    ORDER BY cp.created DESC
-    LIMIT 1
-    `,
-    [numerobio, previousRecordId, geometry]
-  )
+async function findMatchingPreviousParcelle (tx: NodePgDatabase, numerobio: string, previousRecordId: string, geometry: CartoBioFeatureInput['geometry']): Promise<DBParcelle | null> {
+  const input = sql`ST_MakeValid(ST_SetSRID(ST_GeomFromGeoJSON(${JSON.stringify(geometry)}), 4326))`
+  const intersection = sql`ST_area(ST_Intersection(ST_MakeValid(${parcelles.geometry}), ${input}))`
 
-  return rows[0] ?? null
+  const [row] = await tx
+    .select({
+      id: parcelles.id,
+      cultures: culturesJson(parcelles.recordId, parcelles.id),
+      conversion_niveau: parcelles.conversionNiveau,
+      engagement_date: parcelles.engagementDate,
+      name: parcelles.name
+    })
+    .from(parcelles)
+    .innerJoin(parcellaires, eq(parcellaires.recordId, parcelles.recordId))
+    .where(and(
+      eq(parcellaires.numeroBio, Number(numerobio)),
+      eq(parcellaires.recordId, previousRecordId),
+      isNull(parcellaires.deletedAt),
+      isNull(parcelles.deletedAt),
+      sql`${intersection} / (ST_area(ST_MakeValid(${parcelles.geometry})) / 100) > 99`,
+      sql`${intersection} / (ST_area(${input}) / 100) > 99`
+    ))
+    .orderBy(desc(parcelles.createdAt))
+    .limit(1)
+
+  return (row ?? null) as unknown as DBParcelle | null
 }
 
-async function copyParcellesFromPreviousRecord (client: PoolClient, recordId: string, numerobio: string, previousRecordId: string): Promise<Array<DBParcelle>> {
-  const { rows } = await client.query(
-    /* sql */`
-      INSERT INTO cartobio_parcelles
-      (record_id, id, geometry, commune, cultures, conversion_niveau, engagement_date, auditeur_notes,
+async function copyParcellesFromPreviousRecord (tx: NodePgDatabase, recordId: string, numerobio: string, previousRecordId: string): Promise<Array<DBParcelle>> {
+  const copied = await tx.execute<{ id: string }>(sql`
+    INSERT INTO ${parcelles}
+      (record_id, id, geometry, surface_ha, commune, conversion_niveau, engagement_date, auditeur_notes_parcelles,
         name, reference_cadastre, code_culture_pac, code_precision_pac)
-      (
-            SELECT $1, id, geometry, commune, cultures, conversion_niveau, engagement_date, NULL as auditeur_notes,
-                name, reference_cadastre, code_culture_pac, code_precision_pac
-            FROM cartobio_operators co
-            CROSS JOIN jsonb_to_recordset(co.audit_history)
-                AS x("featureIds" text, type text, state text, date text)
-            LEFT JOIN cartobio_parcelles ON co.record_id = cartobio_parcelles.record_id
-            WHERE
-                type = 'FeatureCollectionCreation'
-                AND state = 'OPERATOR_DRAFT'
-                AND NOT "featureIds" ~ id
-                AND NOT EXISTS (
-                  SELECT 1 FROM cartobio_parcelles cp_base
-                  WHERE cp_base.record_id = $1
-                  AND ST_Intersects(cp_base.geometry, cartobio_parcelles.geometry)
-                  AND (
-                      ST_Area(ST_Intersection(cp_base.geometry, cartobio_parcelles.geometry)) / ST_Area(cp_base.geometry) > 0.5
-                      OR
-                      ST_Area(ST_Intersection(cp_base.geometry, cartobio_parcelles.geometry)) / ST_Area(cartobio_parcelles.geometry) > 0.5
-                    )
-                  AND cp_base.deleted_at IS NULL
-                )
-                AND co.record_id = (
-                    SELECT record_id
-                    FROM cartobio_operators
-                    WHERE numerobio = $2
-                      AND cartobio_operators.record_id = $3
-                      AND cartobio_operators.deleted_at IS NULL
-                      AND cartobio_parcelles.deleted_at IS NULL
-                    ORDER BY created_at DESC
-                    LIMIT 1
-                )
-            ORDER BY date DESC
+    SELECT ${recordId}, ${parcelles.id}, ${parcelles.geometry}, ${parcelles.surfaceHa}, ${parcelles.commune}, ${parcelles.conversionNiveau},
+      ${parcelles.engagementDate}, NULL, ${parcelles.name}, ${parcelles.referenceCadastre}, ${parcelles.codeCulturePac}, ${parcelles.codePrecisionPac}
+    FROM ${parcelles}
+    JOIN ${parcellaires} ON ${eq(parcellaires.recordId, parcelles.recordId)}
+    WHERE ${parcellaires.recordId} = ${previousRecordId}
+      AND ${parcellaires.numeroBio} = ${Number(numerobio)}
+      AND ${parcellaires.deletedAt} IS NULL
+      AND ${parcelles.deletedAt} IS NULL
+      AND EXISTS (
+        SELECT 1 FROM ${parcellairesEvenements}
+        WHERE ${eq(parcellairesEvenements.recordId, parcellaires.recordId)}
+          AND ${parcellairesEvenements.type} = 'FEATURE_COLLECTION_CREATE'
+          AND ${parcellairesEvenements.certificationEtat} = 'OPERATOR_DRAFT'
+          AND NOT array_to_json(${parcellairesEvenements.parcellesId})::text ~ ${parcelles.id}
       )
-      ON CONFLICT (record_id, id) DO NOTHING
-      RETURNING *, ST_AsGeoJSON(geometry)::json as geometry
-    `,
-    [recordId, numerobio, previousRecordId]
-  )
+      AND NOT EXISTS (
+        SELECT 1 FROM ${parcelles} cp_base
+        WHERE cp_base.record_id = ${recordId}
+          AND ST_Intersects(cp_base.geometry, ${parcelles.geometry})
+          AND (
+            ST_Area(ST_Intersection(cp_base.geometry, ${parcelles.geometry})) / ST_Area(cp_base.geometry) > 0.5
+            OR ST_Area(ST_Intersection(cp_base.geometry, ${parcelles.geometry})) / ST_Area(${parcelles.geometry}) > 0.5
+          )
+          AND cp_base.deleted_at IS NULL
+      )
+    ON CONFLICT (record_id, id) DO NOTHING
+    RETURNING id
+  `)
 
-  return rows
+  const ids = copied.rows.map(({ id }) => id)
+
+  if (ids.length > 0) {
+    await tx.execute(sql`
+      INSERT INTO ${parcelleCultures} (id, record_id, parcelle_id, cpf, code_culture_import, surface, unit, variete, date_semis, commentaire, position)
+      SELECT id, ${recordId}, parcelle_id, cpf, code_culture_import, surface, unit, variete, date_semis, commentaire, position
+      FROM ${parcelleCultures}
+      WHERE record_id = ${previousRecordId} AND ${inArray(parcelleCultures.parcelleId, ids)}
+    `)
+  }
+
+  return findParcelles(tx, recordId, ids)
 }
 
-async function markCertificationNotified (client: Pick<PoolClient, 'query'>, recordId: string): Promise<void> {
-  await client.query(
-    /* sql */`
-      UPDATE cartobio_operators
-      SET date_derniere_notif = NOW()
-      WHERE record_id = $1
-    `,
-    [recordId])
+async function markCertificationNotified (tx: NodePgDatabase, recordId: string): Promise<void> {
+  await tx
+    .update(parcellaires)
+    .set({ dateDerniereNotif: sql`now()` })
+    .where(eq(parcellaires.recordId, recordId))
 }
 
-/**
- * Insert or update a cartobio_operators row
- */
-async function upsertOperator (client: PoolClient, record: Omit<Partial<NormalizedRecord>, 'parcelles'>, certificationState: CertificationState, historyEntry: HistoryEntry): Promise<import('pg').QueryResult<DBOperatorRecord>> {
-  return await client.query(
-    /* sql */`
-      INSERT INTO cartobio_operators
-        (numerobio, oc_id, oc_label, created_at, metadata, certification_state, certification_date_debut, certification_date_fin, audit_history, audit_date, audit_notes, version_name, annee_reference_controle)
-      VALUES ($1, $2, $3, $4, $5, $6, nullif($7, '')::date, nullif($8, '')::date, jsonb_build_array($9::jsonb),
-              nullif($10, '')::date, $11, COALESCE($12, 'Version créée le ' || to_char(now(), 'DD/MM/YYYY')), COALESCE(nullif($13, '')::int, DATE_PART('year', COALESCE(nullif($10, '')::date, NOW()))))
-      ON CONFLICT (numerobio, audit_date) WHERE cartobio_operators.deleted_at IS NULL
-          DO UPDATE
-          SET (oc_id, oc_label, updated_at, metadata, certification_state, certification_date_debut, certification_date_fin, audit_history, audit_notes, version_name, annee_reference_controle)
-                  = ($2, $3, $4, $5, coalesce($6, cartobio_operators.certification_state),
-                     nullif(coalesce($7, cartobio_operators.certification_date_debut::text), '')::date,
-                     nullif(coalesce($8, cartobio_operators.certification_date_fin::text), '')::date,
-                     (cartobio_operators.audit_history || coalesce($9::jsonb, '[]'::jsonb)),
-                     coalesce($11, cartobio_operators.audit_notes), coalesce($12, cartobio_operators.version_name), coalesce(nullif($13, '')::int, cartobio_operators.annee_reference_controle))
-      RETURNING ${recordFields}`,
-    [
-      /* $1 */ record.numerobio,
-      /* $2 */ record.oc_id,
-      /* $3 */ record.oc_label,
-      /* $4 */ 'now',
-      /* $5 */ record.metadata,
-      /* $6 */ certificationState,
-      /* $7 */ record.certification_date_debut,
-      /* $8 */ record.certification_date_fin,
-      /* $9 */ historyEntry,
-      /* $10 */ record.audit_date,
-      /* $11 */ record.audit_notes,
-      /* $12 */ record.version_name,
-      /* $13 */ record.annee_reference_controle
-    ]
-  )
+async function findRecord (recordId: string, tx: NodePgDatabase = db): Promise<DBOperatorRecord | null> {
+  const [record] = await tx
+    .select(recordColumns)
+    .from(parcellaires)
+    .leftJoin(parcellairesMetadata, eq(parcellairesMetadata.recordId, parcellaires.recordId))
+    .where(eq(parcellaires.recordId, recordId))
+    .limit(1)
+
+  return record ?? null
 }
 
-/**
- * Insert or update cartobio_parcelles rows for a given record.
- * Features without geometry are handled as partial updates (non-geo columns only).
- * Throws if a geometry-less feature does not already exist in the database.
- */
-async function upsertParcelles (client: PoolClient, recordId: string, features: Array<CartoBioFeatureInput>): Promise<Array<DBParcelle>> {
-  const parcelles: DBParcelle[] = []
+async function upsertOperator (tx: NodePgDatabase, record: Omit<Partial<NormalizedRecord>, 'parcelles'>, certificationState: CertificationState, historyEntry: HistoryEntry): Promise<DBOperatorRecord> {
+  await ensureOrganismeCertificateur(tx, record.oc_id, (record as { oc_label?: string | null }).oc_label)
+
+  const auditDate = sql`nullif(${record.audit_date ?? null}::text, '')::date`
+  const anneeReferenceControle = sql`nullif(${record.annee_reference_controle == null ? null : String(record.annee_reference_controle)}::text, '')::int`
+
+  const [{ recordId }] = await tx
+    .insert(parcellaires)
+    .values({
+      numeroBio: Number(record.numerobio),
+      ocId: record.oc_id == null ? null : String(record.oc_id),
+      createdAt: sql`now()`,
+      certificationEtat: certificationState,
+      certificationDateDebut: sql`nullif(${record.certification_date_debut ?? null}::text, '')::date`,
+      certificationDateFin: sql`nullif(${record.certification_date_fin ?? null}::text, '')::date`,
+      auditDate,
+      auditNotesCertif: blankToNull(record.audit_notes),
+      versionNom: sql`COALESCE(${blankToNull(record.version_name)}::text, 'Version créée le ' || to_char(now(), 'DD/MM/YYYY'))`,
+      anneeReferenceControle: sql`COALESCE(${anneeReferenceControle}, DATE_PART('year', COALESCE(${auditDate}, NOW())))`
+    })
+    .onConflictDoUpdate({
+      target: [parcellaires.numeroBio, parcellaires.auditDate],
+      targetWhere: sql`${parcellaires.deletedAt} IS NULL`,
+      set: {
+        ocId: record.oc_id == null ? null : String(record.oc_id),
+        updatedAt: sql`now()`,
+        certificationEtat: sql`coalesce(${certificationState}::cartobio.certification_type, ${parcellaires.certificationEtat})`,
+        certificationDateDebut: sql`nullif(coalesce(${record.certification_date_debut ?? null}::text, ${parcellaires.certificationDateDebut}::text), '')::date`,
+        certificationDateFin: sql`nullif(coalesce(${record.certification_date_fin ?? null}::text, ${parcellaires.certificationDateFin}::text), '')::date`,
+        auditNotesCertif: coalesceBlank(record.audit_notes, parcellaires.auditNotesCertif),
+        versionNom: sql`coalesce(${blankToNull(record.version_name)}::text, ${parcellaires.versionNom})`,
+        anneeReferenceControle: sql`coalesce(${anneeReferenceControle}, ${parcellaires.anneeReferenceControle})`
+      }
+    })
+    .returning({ recordId: parcellaires.recordId })
+
+  await upsertMetadata(tx, recordId, record.metadata)
+  await insertEvent(tx, recordId, historyEntry)
+
+  return (await findRecord(recordId, tx)) as DBOperatorRecord
+}
+
+async function upsertParcelles (tx: NodePgDatabase, recordId: string, features: Array<CartoBioFeatureInput>): Promise<Array<DBParcelle>> {
+  const result: DBParcelle[] = []
   for (const feature of features) {
-    if (!feature.geometry) {
-      const { rows: partialUpdateRows } = await client.query(
-        /* sql */`
-          UPDATE cartobio_parcelles
-          SET (commune, cultures, conversion_niveau, engagement_date, commentaire, auditeur_notes,
-               annotations, updated, name, numero_pacage, numero_ilot_pac, numero_parcelle_pac,
-               reference_cadastre, code_culture_pac, code_precision_pac, etranger, statut_import_geom, attente_pac) =
-              (coalesce($3, cartobio_parcelles.commune),
-               coalesce($4, cartobio_parcelles.cultures),
-               coalesce($5, cartobio_parcelles.conversion_niveau),
-               nullif(coalesce($6::text, cartobio_parcelles.engagement_date::text), '')::date,
-               coalesce($7, cartobio_parcelles.commentaire),
-               coalesce($8, cartobio_parcelles.auditeur_notes),
-               coalesce($9, cartobio_parcelles.annotations),
-               now(),
-               coalesce($10, cartobio_parcelles.name),
-               coalesce($11, cartobio_parcelles.numero_pacage),
-               coalesce($12, cartobio_parcelles.numero_ilot_pac),
-               coalesce($13, cartobio_parcelles.numero_parcelle_pac),
-               coalesce($14, cartobio_parcelles.reference_cadastre),
-               coalesce($15, cartobio_parcelles.code_culture_pac),
-               coalesce($16, cartobio_parcelles.code_precision_pac),
-               coalesce($17, cartobio_parcelles.etranger),
-               coalesce($18, cartobio_parcelles.statut_import_geom),
-               coalesce($19, cartobio_parcelles.attente_pac))
-          WHERE record_id = $1 AND id = $2
-          RETURNING *, ST_AsGeoJSON(geometry)::json AS geometry
-        `,
-        [
-          /*  $1 */ recordId,
-          /*  $2 */ feature.id || getRandomFeatureId(),
-          /*  $3 */ feature.properties.COMMUNE,
-          /*  $4 */ feature.properties.cultures ? JSON.stringify(feature.properties.cultures) : null,
-          /*  $5 */ feature.properties.conversion_niveau,
-          /*  $6 */ feature.properties.engagement_date,
-          /*  $7 */ feature.properties.commentaires,
-          /*  $8 */ feature.properties.auditeur_notes,
-          /*  $9 */ feature.properties.annotations ? JSON.stringify(feature.properties.annotations) : null,
-          /* $10 */ feature.properties.NOM,
-          /* $11 */ feature.properties.PACAGE,
-          /* $12 */ feature.properties.NUMERO_I,
-          /* $13 */ feature.properties.NUMERO_P,
-          /* $14 */ feature.properties.cadastre,
-          /* $15 */ feature.properties.TYPE,
-          /* $16 */ feature.properties.CODE_VAR,
-          /* $17 */ feature.properties.etranger ?? false,
-          /* $18 */ feature.properties.statut_import_geom || 'ACCEPTE',
-          /* $19 */ feature.properties.attente_pac ?? null
-        ]
-      )
+    const properties = feature.properties
+    const id = String(feature.id || getRandomFeatureId())
 
-      if (!partialUpdateRows.length) {
+    if (!feature.geometry) {
+      const updated = await tx
+        .update(parcelles)
+        .set({
+          commune: coalesceBlank(properties.COMMUNE, parcelles.commune),
+          conversionNiveau: properties.conversion_niveau === ''
+            ? sql`NULL`
+            : sql`coalesce(${properties.conversion_niveau ?? null}::cartobio.conversion_niveau, ${parcelles.conversionNiveau})`,
+          engagementDate: sql`nullif(coalesce(${properties.engagement_date ?? null}::text, ${parcelles.engagementDate}::text), '')::date`,
+          commentaireOperateur: coalesceBlank(properties.commentaires, parcelles.commentaireOperateur),
+          auditeurNotesParcelles: coalesceBlank(properties.auditeur_notes, parcelles.auditeurNotesParcelles),
+          updatedAt: sql`now()`,
+          name: coalesceBlank(properties.NOM, parcelles.name),
+          numeroPacage: coalesceBlank(properties.PACAGE, parcelles.numeroPacage),
+          numeroIlotPac: coalesceBlank(properties.NUMERO_I, parcelles.numeroIlotPac, 'smallint'),
+          numeroParcellesPac: coalesceBlank(properties.NUMERO_P, parcelles.numeroParcellesPac, 'smallint'),
+          referenceCadastre: sql`coalesce(${properties.cadastre ?? null}::text[], ${parcelles.referenceCadastre})`,
+          codeCulturePac: coalesceBlank(properties.TYPE, parcelles.codeCulturePac),
+          codePrecisionPac: coalesceBlank(properties.CODE_VAR, parcelles.codePrecisionPac),
+          etranger: sql`coalesce(${properties.etranger ?? false}::boolean, ${parcelles.etranger})`,
+          statutImportGeom: sql`coalesce(${statutImportGeom(properties.statut_import_geom || 'ACCEPTE')}, ${parcelles.statutImportGeom})`,
+          attentePac: sql`coalesce(${properties.attente_pac ?? null}::boolean, ${parcelles.attentePac})`
+        })
+        .where(and(eq(parcelles.recordId, recordId), eq(parcelles.id, id)))
+        .returning({ id: parcelles.id })
+
+      if (!updated.length) {
         throw new MissingGeometryApiError('Impossible de créer une parcelle sans donnée géographique.')
       }
 
-      parcelles.push(partialUpdateRows.at(0))
+      await upsertCultures(tx, recordId, id, properties.cultures)
+      await upsertAnnotations(tx, recordId, id, properties.annotations)
+      result.push(...await findParcelles(tx, recordId, [id]))
       continue
     }
 
-    const { rows } = await client.query(
-      /* sql */`
-        INSERT INTO cartobio_parcelles
-        (
-          record_id,
-          id,
+    const geometry = geometryFromGeoJSON(feature.geometry)
+
+    await tx
+      .insert(parcelles)
+      .values({
+        recordId,
+        id,
+        geometry,
+        surfaceHa: surfaceHa(geometry),
+        commune: blankToNull(properties.COMMUNE),
+        conversionNiveau: sql`${properties.conversion_niveau || null}::cartobio.conversion_niveau`,
+        engagementDate: sql`NULLIF(${properties.engagement_date ?? null}::text, '')::date`,
+        commentaireOperateur: blankToNull(properties.commentaires),
+        auditeurNotesParcelles: blankToNull(properties.auditeur_notes),
+        createdAt: sql`now()`,
+        updatedAt: sql`now()`,
+        name: blankToNull(properties.NOM),
+        numeroPacage: blankToNull(properties.PACAGE),
+        numeroIlotPac: sql`${blankToNull(properties.NUMERO_I)}::smallint`,
+        numeroParcellesPac: sql`${blankToNull(properties.NUMERO_P)}::smallint`,
+        referenceCadastre: sql`${properties.cadastre ?? null}::text[]`,
+        codeCulturePac: blankToNull(properties.TYPE),
+        codePrecisionPac: blankToNull(properties.CODE_VAR),
+        etranger: properties.etranger ?? false,
+        statutImportGeom: statutImportGeom(properties.statut_import_geom || 'ACCEPTE'),
+        attentePac: sql`COALESCE(${properties.attente_pac ?? null}::boolean, false)`
+      })
+      .onConflictDoUpdate({
+        target: [parcelles.recordId, parcelles.id],
+        set: {
           geometry,
-          commune,
-          cultures,
-          conversion_niveau,
-          engagement_date,
-          commentaire,
-          auditeur_notes,
-          annotations,
-          created,
-          updated,
-          name,
-          numero_pacage,
-          numero_ilot_pac,
-          numero_parcelle_pac,
-          reference_cadastre,
-          code_culture_pac,
-          code_precision_pac,
-          etranger,
-          statut_import_geom,
-          attente_pac
-        )
-        VALUES (
-          $1,
-          $2,
-          $3,
-          $4,
-          COALESCE($5::jsonb, '[]'::jsonb),
-          $6,
-          NULLIF($7::text, '')::date,
-          $8,
-          $9,
-          COALESCE($10::jsonb, '[]'::jsonb),
-          now(),
-          now(),
-          NULLIF($11, ''),
-          $12,
-          $13,
-          $14,
-          $15,
-          $16,
-          $17,
-          $18,
-          $19,
-          COALESCE($20::boolean, false)
-        )
-        ON CONFLICT (record_id, id)
-        DO UPDATE SET
-          geometry = COALESCE($3, cartobio_parcelles.geometry),
-          commune = COALESCE($4, cartobio_parcelles.commune),
-          cultures = COALESCE($5::jsonb, cartobio_parcelles.cultures),
-          conversion_niveau = COALESCE($6, cartobio_parcelles.conversion_niveau),
-          engagement_date = nullif(coalesce($7::text, cartobio_parcelles.engagement_date::text), '')::date,
-          commentaire = COALESCE($8, cartobio_parcelles.commentaire),
-          auditeur_notes = COALESCE($9, cartobio_parcelles.auditeur_notes),
-          annotations = COALESCE($10::jsonb, cartobio_parcelles.annotations),
-          updated = now(),
-          name = COALESCE($11, cartobio_parcelles.name),
-          numero_pacage = COALESCE($12, cartobio_parcelles.numero_pacage),
-          numero_ilot_pac = COALESCE($13, cartobio_parcelles.numero_ilot_pac),
-          numero_parcelle_pac = COALESCE($14, cartobio_parcelles.numero_parcelle_pac),
-          reference_cadastre = COALESCE($15, cartobio_parcelles.reference_cadastre),
-          code_culture_pac = COALESCE($16, cartobio_parcelles.code_culture_pac),
-          code_precision_pac = COALESCE($17, cartobio_parcelles.code_precision_pac),
-          etranger = COALESCE($18, cartobio_parcelles.etranger),
-          statut_import_geom = COALESCE($19, cartobio_parcelles.statut_import_geom),
-          attente_pac = COALESCE($20, cartobio_parcelles.attente_pac)
+          surfaceHa: surfaceHa(geometry),
+          commune: coalesceBlank(properties.COMMUNE, parcelles.commune),
+          conversionNiveau: properties.conversion_niveau === ''
+            ? sql`NULL`
+            : sql`COALESCE(${properties.conversion_niveau ?? null}::cartobio.conversion_niveau, ${parcelles.conversionNiveau})`,
+          engagementDate: sql`nullif(coalesce(${properties.engagement_date ?? null}::text, ${parcelles.engagementDate}::text), '')::date`,
+          commentaireOperateur: coalesceBlank(properties.commentaires, parcelles.commentaireOperateur),
+          auditeurNotesParcelles: coalesceBlank(properties.auditeur_notes, parcelles.auditeurNotesParcelles),
+          updatedAt: sql`now()`,
+          name: coalesceBlank(properties.NOM, parcelles.name),
+          numeroPacage: coalesceBlank(properties.PACAGE, parcelles.numeroPacage),
+          numeroIlotPac: coalesceBlank(properties.NUMERO_I, parcelles.numeroIlotPac, 'smallint'),
+          numeroParcellesPac: coalesceBlank(properties.NUMERO_P, parcelles.numeroParcellesPac, 'smallint'),
+          referenceCadastre: sql`COALESCE(${properties.cadastre ?? null}::text[], ${parcelles.referenceCadastre})`,
+          codeCulturePac: coalesceBlank(properties.TYPE, parcelles.codeCulturePac),
+          codePrecisionPac: coalesceBlank(properties.CODE_VAR, parcelles.codePrecisionPac),
+          etranger: sql`COALESCE(${properties.etranger ?? false}::boolean, ${parcelles.etranger})`,
+          statutImportGeom: sql`COALESCE(${statutImportGeom(properties.statut_import_geom || 'ACCEPTE')}, ${parcelles.statutImportGeom})`,
+          attentePac: sql`COALESCE(${properties.attente_pac ?? null}::boolean, ${parcelles.attentePac})`
+        }
+      })
 
-        RETURNING *,
-          ST_AsGeoJSON(geometry)::json AS geometry
-      `,
-      [
-        /* $1  */ recordId,
-        /* $2  */ feature.id || getRandomFeatureId(),
-        /* $3  */ feature.geometry,
-        /* $4  */ feature.properties.COMMUNE,
-        /* $5  */ feature.properties.cultures ? JSON.stringify(feature.properties.cultures) : null,
-        /* $6  */ feature.properties.conversion_niveau,
-        /* $7  */ feature.properties.engagement_date,
-        /* $8  */ feature.properties.commentaires,
-        /* $9  */ feature.properties.auditeur_notes,
-        /* $10 */ feature.properties.annotations ? JSON.stringify(feature.properties.annotations) : null,
-        /* $11 */ feature.properties.NOM,
-        /* $12 */ feature.properties.PACAGE,
-        /* $13 */ feature.properties.NUMERO_I,
-        /* $14 */ feature.properties.NUMERO_P,
-        /* $15 */ feature.properties.cadastre,
-        /* $16 */ feature.properties.TYPE,
-        /* $17 */ feature.properties.CODE_VAR,
-        /* $18 */ feature.properties.etranger ?? false,
-        /* $19 */ feature.properties.statut_import_geom || 'ACCEPTE',
-        /* $20 */ feature.properties.attente_pac ?? null
-
-      ]
-    )
-    if (rows.at(0)) {
-      parcelles.push(rows.at(0))
-    }
+    await upsertCultures(tx, recordId, id, properties.cultures)
+    await upsertAnnotations(tx, recordId, id, properties.annotations)
+    result.push(...await findParcelles(tx, recordId, [id]))
   }
 
-  return parcelles
+  return result
 }
 
-/**
- * Delete parcelles of a record that are no longer present in the new feature collection
- */
-async function deleteMissingParcelles (client: PoolClient, recordId: string, parcelles: Array<DBParcelle>): Promise<void> {
-  await client.query(
-    `
-    DELETE FROM cartobio_parcelles
-    WHERE record_id = $1
-    AND id != ALL($2)
-    `,
-    [recordId, parcelles.map(p => p.id)]
-  )
+async function deleteMissingParcelles (tx: NodePgDatabase, recordId: string, existing: Array<DBParcelle>): Promise<void> {
+  const ids = existing.map((parcelle) => parcelle.id)
+
+  await tx
+    .delete(parcelles)
+    .where(and(eq(parcelles.recordId, recordId), ids.length > 0 ? notInArray(parcelles.id, ids) : undefined))
 }
 
-/**
- * Recompute and update the mixite field of a cartobio_operators row
- * based on the conversion_niveau of its parcelles
- */
-async function updateMixite (client: PoolClient, recordId: string): Promise<void> {
-  await client.query(
-    `
-    UPDATE cartobio_operators co
+async function updateMixite (tx: NodePgDatabase, recordId: string): Promise<void> {
+  await tx.execute(sql`
+    UPDATE ${parcellaires}
     SET mixite = sub.mixite
     FROM (
       SELECT
@@ -364,154 +453,145 @@ async function updateMixite (client: PoolClient, recordId: string): Promise<void
           WHEN COUNT(*) FILTER (WHERE cp.conversion_niveau = 'CONV') > 0
             THEN 'MIXTE'
           ELSE NULL
-        END AS mixite
-      FROM cartobio_operators co
-      LEFT JOIN cartobio_parcelles cp ON cp.record_id = co.record_id
-      WHERE co.record_id = $1 and NOT EXISTS (
+        END::cartobio.mixite_type AS mixite
+      FROM ${parcellaires} co
+      LEFT JOIN ${parcelles} cp ON cp.record_id = co.record_id
+      WHERE co.record_id = ${recordId} AND NOT EXISTS (
         SELECT 1
-        FROM jsonb_array_elements(cp.cultures) AS elem
-        WHERE elem->>'CPF' IN ('01.99.10.1', '01.99.10.2'))
+        FROM ${parcelleCultures} pc
+        WHERE pc.record_id = cp.record_id
+          AND pc.parcelle_id = cp.id
+          AND pc.cpf IN ('01.99.10.1', '01.99.10.2'))
       GROUP BY co.record_id
     ) sub
-    WHERE co.record_id = sub.record_id
-    `,
-    [recordId]
-  )
+    WHERE ${parcellaires.recordId} = sub.record_id
+  `)
 }
-async function findRecords (numeroBio: string | number): Promise<Array<Omit<DBOperatorRecord, 'parcelles'> & { surface: number; parcelles: number }>> {
-  const { rows } = await pool.query(
-    /* sql */`
-        SELECT
-        ${recordFields},
-        jsonb_build_object(
-          'type', 'FeatureCollection',
-          'features', COALESCE(jsonb_agg(
-            jsonb_build_object(
-              'type', 'Feature',
-              'geometry', ST_AsGeoJSON(cp.geometry)::jsonb,
-              'properties',json_build_object(
-                'conversion_niveau',cp.conversion_niveau,
-                'attente_pac',cp.attente_pac,
-                'numero_ilot',cp.numero_ilot_pac
-              )
+
+async function findRecords (numeroBio: string | number): Promise<RecordSummaryRow[]> {
+  const rows = await db
+    .select({
+      ...recordColumns,
+      geojson: sql<Record<string, unknown>>`jsonb_build_object(
+        'type', 'FeatureCollection',
+        'features', COALESCE(jsonb_agg(
+          jsonb_build_object(
+            'type', 'Feature',
+            'geometry', ST_AsGeoJSON(${parcelles.geometry})::jsonb,
+            'properties', json_build_object(
+              'conversion_niveau', ${parcelles.conversionNiveau},
+              'attente_pac', ${parcelles.attentePac},
+              'numero_ilot', ${parcelles.numeroIlotPac}::text
             )
-          ) FILTER (WHERE cp.id IS NOT NULL), '[]'::jsonb)
-        ) AS geojson,
-        COUNT(cp.id) AS parcelles,
-        SUM(ST_Area(to_legal_projection(cp.geometry))) AS surface
-      FROM cartobio_operators
-      LEFT JOIN public.cartobio_parcelles cp
-        ON cartobio_operators.record_id = cp.record_id
-      WHERE numerobio = $1
-        AND cartobio_operators.deleted_at IS NULL
-        AND cp.deleted_at IS NULL
-      GROUP BY ${recordFields}
-      ORDER BY COALESCE(certification_date_debut, audit_date, created_at) DESC, COALESCE(audit_date,created_at) DESC;
-    `,
-    [numeroBio]
-  )
+          )
+        ) FILTER (WHERE ${parcelles.id} IS NOT NULL), '[]'::jsonb)
+      )`,
+      parcelles: sql<string>`COUNT(${parcelles.id})`,
+      surface: sql<number | null>`SUM(ST_Area(cartobio.to_legal_projection(${parcelles.geometry})))`
+    })
+    .from(parcellaires)
+    .leftJoin(parcellairesMetadata, eq(parcellairesMetadata.recordId, parcellaires.recordId))
+    .leftJoin(parcelles, eq(parcellaires.recordId, parcelles.recordId))
+    .where(and(
+      eq(parcellaires.numeroBio, Number(numeroBio)),
+      isNull(parcellaires.deletedAt),
+      isNull(parcelles.deletedAt)
+    ))
+    .groupBy(parcellaires.recordId, parcellairesMetadata.recordId)
+    .orderBy(
+      sql`COALESCE(${parcellaires.certificationDateDebut}, ${parcellaires.auditDate}, ${parcellaires.createdAt}) DESC`,
+      sql`COALESCE(${parcellaires.auditDate}, ${parcellaires.createdAt}) DESC`
+    )
 
-  return rows
+  return rows as unknown as RecordSummaryRow[]
 }
-
-async function findRecord (recordId: string): Promise<DBOperatorRecord | null> {
-  const result = await pool.query<DBOperatorRecord>(/* sql */`SELECT ${recordFields} FROM cartobio_operators WHERE record_id = $1 LIMIT 1`, [recordId])
-  return result.rows[0] ?? null
-}
-
 
 async function findRecordParcelles (record: DBOperatorRecord, userId: number | null = null): Promise<DBOperatorRecordWithParcelles> {
   if (record && !record.parcelles) {
-    const { rows } = await pool.query(
-      /* sql */`
-        WITH derniers_parcellaires AS (
-    SELECT cp.record_id, cp.id, cp.geometry, c.audit_date, c.numerobio, c.annee_reference_controle
-    FROM cartobio_parcelles cp
-    JOIN cartobio_operators c ON cp.record_id = c.record_id
-    WHERE cp.record_id = $1
-),
-historique_cultures AS (
-    SELECT
-        dp.id AS parcelle_id,
-        r.cultures,
-        r.conversion_niveau,
-        co.annee_reference_controle,
-        co.audit_date,
-        ST_Area(ST_Intersection(dp.geometry, r.geometry)) / ST_Area(dp.geometry) AS intersection_ratio,
-        ST_Equals(dp.geometry, r.geometry) AS geometrie_identique,
-        ST_Contains(r.geometry, dp.geometry) AS r_inclut_dp,
-        ST_Contains(dp.geometry, r.geometry) AS dp_inclut_r
-    FROM cartobio_parcelles r
-    JOIN derniers_parcellaires dp ON ST_Intersects(dp.geometry, r.geometry)
-    JOIN cartobio_operators co ON r.record_id = co.record_id
-    WHERE co.certification_state = 'CERTIFIED'
-    AND ST_Isvalid(r.geometry) AND ST_Isvalid(dp.geometry)
-    AND co.annee_reference_controle <= dp.annee_reference_controle
-    AND (co.audit_date < dp.audit_date OR dp.audit_date IS NULL)
-    AND co.numerobio = dp.numerobio
-    AND co.annee_reference_controle >= EXTRACT(YEAR FROM CURRENT_DATE) - 3
-    AND r.deleted_at IS NULL
-    AND co.deleted_at IS NULL
-)
-SELECT
-    cp.*,
-    ST_AsGeoJSON(cp.geometry)::json AS geometry,
+    const dp = alias(parcelles, 'dp')
+    const dpRecord = alias(parcellaires, 'dp_record')
+    const r = alias(parcelles, 'r')
+    const co = alias(parcellaires, 'co')
 
-    pc.id IS NOT NULL AS controlee,
-    (
-        jsonb_build_array(
-            jsonb_build_object(
-                'cultures', cp.cultures,
-                'conversion_niveau', cp.conversion_niveau,
-                'annee_controle', co.annee_reference_controle
-            )
-        )
-        ||
-        coalesce(
-            (
-                select jsonb_agg(
-                    jsonb_build_object(
-                        'cultures', hc.cultures,
-                        'conversion_niveau', hc.conversion_niveau,
-                        'annee_controle', hc.annee_reference_controle
-                    )
-                    ORDER BY hc.annee_reference_controle DESC, hc.audit_date DESC
-                )
-                from historique_cultures hc
-                where hc.parcelle_id = cp.id
-                  and hc.intersection_ratio >= 0.95
-            ),
-            '[]'::jsonb
-        )
-    ) as historique_cultures
-FROM cartobio_parcelles cp
-LEFT JOIN parcelles_controlees pc ON pc.record_id = $1 AND cp.id = pc.id AND pc.user_id = $2
-join cartobio_operators co on co.record_id = cp.record_id
-WHERE cp.record_id = $1
-  AND cp.deleted_at IS NULL
-ORDER BY cp.created ASC;
-`,
-      [record.record_id, userId]
+    const historiqueCultures = db.$with('historique_cultures').as(
+      db
+        .select({
+          parcelle_id: sql<string>`${dp.id}`.as('parcelle_id'),
+          cultures: sql`${culturesJson(r.recordId, r.id)}`.as('cultures'),
+          conversion_niveau: sql`${r.conversionNiveau}`.as('conversion_niveau'),
+          annee_reference_controle: sql<number>`${co.anneeReferenceControle}`.as('annee_reference_controle'),
+          audit_date: sql`${co.auditDate}`.as('audit_date'),
+          intersection_ratio: sql<number>`ST_Area(ST_Intersection(${dp.geometry}, ${r.geometry})) / ST_Area(${dp.geometry})`.as('intersection_ratio')
+        })
+        .from(r)
+        .innerJoin(dp, sql`ST_Intersects(${dp.geometry}, ${r.geometry})`)
+        .innerJoin(dpRecord, eq(dpRecord.recordId, dp.recordId))
+        .innerJoin(co, eq(r.recordId, co.recordId))
+        .where(and(
+          eq(dp.recordId, record.record_id),
+          sql`${co.certificationEtat} = 'CERTIFIED'`,
+          sql`ST_Isvalid(${r.geometry}) AND ST_Isvalid(${dp.geometry})`,
+          sql`${co.anneeReferenceControle} <= ${dpRecord.anneeReferenceControle}`,
+          sql`(${co.auditDate} < ${dpRecord.auditDate} OR ${dpRecord.auditDate} IS NULL)`,
+          eq(co.numeroBio, dpRecord.numeroBio),
+          sql`${co.anneeReferenceControle} >= EXTRACT(YEAR FROM CURRENT_DATE) - 3`,
+          isNull(r.deletedAt),
+          isNull(co.deletedAt)
+        ))
     )
 
-    return { ...record, parcelles: rows }
+    const rows = await db
+      .with(historiqueCultures)
+      .select({
+        ...parcelleColumns,
+        controlee: sql<boolean>`${parcellesControles.parcelleId} IS NOT NULL`,
+        historique_cultures: sql`(
+          jsonb_build_array(
+            jsonb_build_object(
+              'cultures', ${culturesJson(parcelles.recordId, parcelles.id)},
+              'conversion_niveau', ${parcelles.conversionNiveau},
+              'annee_controle', ${parcellaires.anneeReferenceControle}
+            )
+          )
+          ||
+          coalesce(
+            (
+              SELECT jsonb_agg(
+                jsonb_build_object(
+                  'cultures', ${historiqueCultures.cultures},
+                  'conversion_niveau', ${historiqueCultures.conversion_niveau},
+                  'annee_controle', ${historiqueCultures.annee_reference_controle}
+                )
+                ORDER BY ${historiqueCultures.annee_reference_controle} DESC, ${historiqueCultures.audit_date} DESC
+              )
+              FROM ${historiqueCultures}
+              WHERE ${historiqueCultures.parcelle_id} = ${parcelles.id}
+                AND ${historiqueCultures.intersection_ratio} >= 0.95
+            ),
+            '[]'::jsonb
+          )
+        )`
+      })
+      .from(parcelles)
+      .leftJoin(parcellesControles, and(
+        eq(parcellesControles.recordId, record.record_id),
+        eq(parcellesControles.parcelleId, parcelles.id),
+        sql`${parcellesControles.userId} = ${userId === null ? null : String(userId)}`
+      ))
+      .innerJoin(parcellaires, eq(parcellaires.recordId, parcelles.recordId))
+      .where(and(eq(parcelles.recordId, record.record_id), isNull(parcelles.deletedAt)))
+      .orderBy(asc(parcelles.createdAt))
+
+    return { ...record, parcelles: rows as unknown as DBParcelle[] }
   }
 
   return { ...record, parcelles: record?.parcelles ?? [] }
 }
-type GeometryFixAnalysis = {
-  already_valid: boolean
-  is_polygon: boolean
-  diff_ha: number
-  diff_pct: number
-  geometry: Polygon
-}
 
 async function analyzeGeometryFix (geometry: Polygon): Promise<GeometryFixAnalysis> {
-  const result = await pool.query<GeometryFixAnalysis>(
-    `
+  const result = await db.execute<GeometryFixAnalysis>(sql`
     WITH input AS (
-      SELECT ST_SetSRID(ST_GeomFromGeoJSON($1), 4326) AS geom
+      SELECT ST_SetSRID(ST_GeomFromGeoJSON(${JSON.stringify(geometry)}), 4326) AS geom
     ),
     validated AS (
       SELECT
@@ -547,83 +627,74 @@ async function analyzeGeometryFix (geometry: Polygon): Promise<GeometryFixAnalys
       )                                                                           AS diff_pct,
       ST_AsGeoJSON(fixed)::json                                                   AS geometry
     FROM largest
-  `,
-    [JSON.stringify(geometry)]
-  )
+  `)
 
   return result.rows[0]
 }
 
 async function isEtranger (geometry: Polygon): Promise<boolean> {
-  const result = await pool.query<{ etranger: boolean }>(
-    `
+  const result = await db.execute<{ etranger: boolean }>(sql`
     SELECT NOT EXISTS(
-      SELECT fid FROM territoires
-      WHERE ST_Intersects(ST_SetSRID(ST_GeomFromGeoJSON($1), 4326), geom)
+      SELECT ${territoires.fid} FROM ${territoires}
+      WHERE ST_Intersects(ST_SetSRID(ST_GeomFromGeoJSON(${JSON.stringify(geometry)}), 4326), ${territoires.geometry})
     ) AS etranger
-  `,
-    [JSON.stringify(geometry)]
-  )
+  `)
+
   return result.rows[0].etranger
 }
+
 async function communeExists (geometry: Polygon, code: string): Promise<boolean> {
-  const result = await pool.query<{ exists: boolean }>(
-    `
-    SELECT EXISTS(
-      SELECT 1
-      FROM communes
-      WHERE code = $1
-      AND active = true
-      AND (
-        ST_Within(geometry, ST_SetSRID(ST_GeomFromGeoJSON($2),4326))
-        OR ST_Intersects(geometry, ST_SetSRID(ST_GeomFromGeoJSON($2),4326))
-      )
-    ) AS exists
-    `,
-    [code, JSON.stringify(geometry)]
-  )
-  return result.rows[0].exists
+  const input = sql`ST_SetSRID(ST_GeomFromGeoJSON(${JSON.stringify(geometry)}), 4326)`
+  const [row] = await db
+    .select({ fid: communes.fid })
+    .from(communes)
+    .where(and(
+      eq(communes.fid, code),
+      eq(communes.active, true),
+      sql`(ST_Within(${communes.geometry}, ${input}) OR ST_Intersects(${communes.geometry}, ${input}))`
+    ))
+    .limit(1)
+
+  return row !== undefined
 }
 
 async function findCommune (geometry: Polygon, code: string | null = null): Promise<string | null> {
-  if (code) {
-    const prefilter = await pool.query(
-      `SELECT code, geometry
-       FROM communes
-       WHERE code = $1
-         AND active = true
-         AND ST_Within(ST_SetSRID(ST_GeomFromGeoJSON($2), 4326), geometry)`,
-      [code, JSON.stringify(geometry)]
-    )
+  const input = sql`ST_SetSRID(ST_GeomFromGeoJSON(${JSON.stringify(geometry)}), 4326)`
 
-    if (prefilter.rows.length > 0) return prefilter.rows[0].code
+  if (code) {
+    const prefilter = await db
+      .select({ code: communes.fid })
+      .from(communes)
+      .where(and(eq(communes.fid, code), eq(communes.active, true), sql`ST_Within(${input}, ${communes.geometry})`))
+
+    if (prefilter.length > 0) return prefilter[0].code
   }
 
-  const result = await pool.query(
-    `SELECT code, geometry
-     FROM communes
-     WHERE ST_Intersects(ST_SetSRID(ST_GeomFromGeoJSON($1), 4326), geometry)
-      AND active = true
-     LIMIT 1`,
-    [JSON.stringify(geometry)]
-  )
+  const intersecting = await db
+    .select({ code: communes.fid })
+    .from(communes)
+    .where(and(sql`ST_Intersects(${input}, ${communes.geometry})`, eq(communes.active, true)))
+    .limit(1)
 
-  if (result.rows.length > 0) return result.rows[0].code
+  if (intersecting.length > 0) return intersecting[0].code
 
-  const nearest = await pool.query(
-    `SELECT code, geometry
-     FROM communes
-     WHERE active = true
-     ORDER BY ST_Distance(ST_SetSRID(ST_GeomFromGeoJSON($1), 4326), geometry)
-     LIMIT 1`,
-    [JSON.stringify(geometry)]
-  )
+  const nearest = await db
+    .select({ code: communes.fid })
+    .from(communes)
+    .where(eq(communes.active, true))
+    .orderBy(sql`ST_Distance(${input}, ${communes.geometry})`)
+    .limit(1)
 
-  return nearest.rows[0].code ?? null
+  return nearest[0].code ?? null
 }
 
-
 export {
+  insertEvent,
+  ensureOrganismeCertificateur,
+  upsertMetadata,
+  upsertCultures,
+  upsertAnnotations,
+  findParcelles,
   findCertificationStateAtAuditDate,
   findMatchingPreviousParcelle,
   copyParcellesFromPreviousRecord,

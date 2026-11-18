@@ -15,15 +15,18 @@ import { evvClient, evvLookup, evvParcellaire } from '../../src/modules/imports/
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { normalizeRecord } from '../../src/shared/outputs/record.js'
-import db from '../../src/database/database.js'
-import { loadParcellairesFixture, loadRecordFixture } from '../utils.js'
+import { eq, sql } from 'drizzle-orm'
+import db, { db as drizzleDb } from '../../src/database/database.js'
+import * as schema from '../../src/database/schema/index.js'
+import { upsertCultures } from '../../src/shared/parcellaires/parcellaires.repository.js'
+import { loadRecordFixture } from '../utils.js'
 import { EtatProduction, CertificationState } from '@agencebio/cartobio-types'
 import { randomUUID } from 'crypto'
 import { getConsultedOperators } from '../../src/modules/operators/operators.service.js'
 import * as mailer from '../../src/services/mailer/utils.js'
 import { fetchEmailForNumeroBio } from '../../src/clients/agence-bio.client.js'
 import type { AgenceBioNormalizedOperatorWithRecord, DeleteFeatureBody, FeaturePropertiesInput } from '@agencebio/cartobio-types'
-import { asDBRecordWithParcelles, asGotRequest, asNormalizedRecord, asPoolClient, asRecordInput, buildOcUser, buildOperator, buildUser } from '../factories.js'
+import { asDBRecordWithParcelles, asGotRequest, asNormalizedRecord, asRecordInput, buildOcUser, buildOperator, buildUser } from '../factories.js'
 
 type FixtureFeature = { type: 'Feature'; id: unknown; geometry: unknown; properties: Record<string, unknown> }
 
@@ -58,7 +61,7 @@ beforeEach(() => {
 
 describe('updateFeature', () => {
   afterEach(async () => {
-    await db.query('DELETE FROM cartobio_operators where numerobio = \'' + record.numerobio + '\'')
+    await drizzleDb.delete(schema.parcellaires).where(eq(schema.parcellaires.numeroBio, Number(record.numerobio)))
   })
 
   test('successfully update feature', async () => {
@@ -220,7 +223,7 @@ describe('createOrUpdateOperatorRecord', () => {
   })
 
   afterEach(async () => {
-    await db.query('DELETE FROM cartobio_operators where numerobio = \'' + recordToUpdate.numerobio + '\'')
+    await drizzleDb.delete(schema.parcellaires).where(eq(schema.parcellaires.numeroBio, Number(recordToUpdate.numerobio)))
   })
 
   test('returns an explicit error code when a new feature has no geometry', async () => {
@@ -237,7 +240,7 @@ describe('createOrUpdateOperatorRecord', () => {
     await expect(createOrUpdateOperatorRecord(
       asRecordInput({ ...recordToUpdate, parcelles: featureCollection }),
       { user },
-      asPoolClient(db)
+      drizzleDb
     )).rejects.toMatchObject({ code: 'MISSING_GEOMETRY' })
   })
 
@@ -245,7 +248,7 @@ describe('createOrUpdateOperatorRecord', () => {
     const record: Record<string, unknown> = recordToUpdate
 
     // Data we don't want to copy
-    await db.query('UPDATE cartobio_parcelles SET cultures = \'[{"id": "1", "CPF": "123", "variete": "VARIETE DIFFERENTE"}]\' WHERE id = \'' + parcelles[0].id + '\' AND record_id = \'' + record.record_id + '\'')
+    await upsertCultures(drizzleDb, record.record_id as string, parcelles[0].id, [{"id": "1", "CPF": "123", "variete": "VARIETE DIFFERENTE"}])
 
     const featureCollection = {
       type: 'FeatureCollection',
@@ -279,7 +282,7 @@ describe('createOrUpdateOperatorRecord', () => {
     const result = await createOrUpdateOperatorRecord(
       asRecordInput({ ...record, parcelles: featureCollection }),
       { user, copyParcellesData: false, previousRecordId: record.record_id as string },
-      asPoolClient(db)
+      drizzleDb
     )
 
     expect(result).toMatchObject({
@@ -304,7 +307,7 @@ describe('createOrUpdateOperatorRecord', () => {
     // To avoid ON CONFLICT condition
     const pastDate = new Date()
     pastDate.setDate(pastDate.getDate() - 12)
-    await db.query('UPDATE cartobio_operators SET audit_date = \'' + pastDate.toISOString() + '\', created_at = \'' + pastDate.toISOString() + '\' WHERE record_id = \'' + record.record_id + '\'')
+    await drizzleDb.update(schema.parcellaires).set({ auditDate: sql`${pastDate.toISOString()}::date`, createdAt: pastDate }).where(eq(schema.parcellaires.recordId, record.record_id as string))
 
     const featureCollection = {
       type: 'FeatureCollection',
@@ -313,7 +316,7 @@ describe('createOrUpdateOperatorRecord', () => {
     const result = await createOrUpdateOperatorRecord(
       asRecordInput({ ...record, parcelles: featureCollection }),
       { user, copyParcellesData: false, previousRecordId: record.record_id as string },
-      asPoolClient(db)
+      drizzleDb
     )
 
     expect(result).toMatchObject({
@@ -335,7 +338,7 @@ describe('createOrUpdateOperatorRecord', () => {
     // To avoid ON CONFLICT condition
     const pastDate = new Date()
     pastDate.setDate(pastDate.getDate() - 12)
-    await db.query('UPDATE cartobio_operators SET audit_date = \'' + pastDate.toISOString() + '\', created_at = \'' + pastDate.toISOString() + '\' WHERE record_id = \'' + record.record_id + '\'')
+    await drizzleDb.update(schema.parcellaires).set({ auditDate: sql`${pastDate.toISOString()}::date`, createdAt: pastDate }).where(eq(schema.parcellaires.recordId, record.record_id as string))
 
     const featureCollection = {
       type: 'FeatureCollection',
@@ -344,7 +347,7 @@ describe('createOrUpdateOperatorRecord', () => {
     const result = await createOrUpdateOperatorRecord(
       asRecordInput({ ...record, parcelles: featureCollection }),
       { user, copyParcellesData: false, previousRecordId: record.record_id as string },
-      asPoolClient(db)
+      drizzleDb
     )
 
     expect(result).toMatchObject({
@@ -361,12 +364,12 @@ describe('createOrUpdateOperatorRecord', () => {
     const record: Record<string, unknown> = recordToUpdate
 
     // Data we want to copy
-    await db.query('UPDATE cartobio_parcelles SET cultures = \'[{"id": "1", "CPF": "123", "variete": "VARIETE DIFFERENTE"}]\' WHERE id = \'' + parcelles[0].id + '\' AND record_id = \'' + record.record_id + '\'')
+    await upsertCultures(drizzleDb, record.record_id as string, parcelles[0].id, [{"id": "1", "CPF": "123", "variete": "VARIETE DIFFERENTE"}])
 
     // To avoid ON CONFLICT condition
     const yesterday = new Date()
     yesterday.setDate(yesterday.getDate() - 1)
-    await db.query('UPDATE cartobio_operators SET audit_date = \'' + yesterday.toISOString() + '\', created_at = \'' + yesterday.toISOString() + '\' WHERE record_id = \'' + record.record_id + '\'')
+    await drizzleDb.update(schema.parcellaires).set({ auditDate: sql`${yesterday.toISOString()}::date`, createdAt: yesterday }).where(eq(schema.parcellaires.recordId, record.record_id as string))
 
     const featureCollection = {
       type: 'FeatureCollection',
@@ -400,7 +403,7 @@ describe('createOrUpdateOperatorRecord', () => {
     const result = await createOrUpdateOperatorRecord(
       asRecordInput({ ...record, record_id: randomUUID(), parcelles: featureCollection }),
       { user, copyParcellesData: true, previousRecordId: record.record_id as string },
-      asPoolClient(db)
+      drizzleDb
     )
 
     expect(result).toMatchObject({
@@ -423,10 +426,10 @@ describe('createOrUpdateOperatorRecord', () => {
     // To avoid ON CONFLICT condition
     const yesterday = new Date()
     yesterday.setDate(yesterday.getDate() - 1)
-    await db.query('UPDATE cartobio_operators SET audit_date = \'' + yesterday.toISOString() + '\', created_at = \'' + yesterday.toISOString() + '\' WHERE record_id = \'' + record.record_id + '\'')
+    await drizzleDb.update(schema.parcellaires).set({ auditDate: sql`${yesterday.toISOString()}::date`, createdAt: yesterday }).where(eq(schema.parcellaires.recordId, record.record_id as string))
 
     // Data we don't want to copy
-    await db.query('UPDATE cartobio_parcelles SET cultures = \'[{"id": "1", "CPF": "123", "variete": "VARIETE DIFFERENTE"}]\' WHERE id = \'' + parcelles[0].id + '\' AND record_id = \'' + record.record_id + '\'')
+    await upsertCultures(drizzleDb, record.record_id as string, parcelles[0].id, [{"id": "1", "CPF": "123", "variete": "VARIETE DIFFERENTE"}])
 
     const featureCollection = {
       type: 'FeatureCollection',
@@ -460,7 +463,7 @@ describe('createOrUpdateOperatorRecord', () => {
     const result = await createOrUpdateOperatorRecord(
       asRecordInput({ ...record, parcelles: featureCollection }),
       { user, copyParcellesData: false, previousRecordId: record.record_id as string },
-      asPoolClient(db)
+      drizzleDb
     )
 
     expect(result).toMatchObject({
@@ -482,8 +485,10 @@ describe('createOrUpdateOperatorRecord', () => {
     const yesterday = new Date()
     yesterday.setDate(yesterday.getDate() - 1)
 
-    await db.query('UPDATE cartobio_parcelles SET cultures = \'[{"id": "1", "CPF": "123", "variete": "VARIETE 1"}, {"id": "1", "CPF": "123", "variete": "VARIETE 2"}]\' WHERE id = \'' + parcelles[0].id + '\'')
-    await db.query('UPDATE cartobio_operators SET audit_date = \'' + yesterday.toISOString() + '\', created_at = \'' + yesterday.toISOString() + '\' WHERE record_id = \'' + record.record_id + '\'')
+    for (const { recordId } of await drizzleDb.select({ recordId: schema.parcelles.recordId }).from(schema.parcelles).where(eq(schema.parcelles.id, parcelles[0].id))) {
+      await upsertCultures(drizzleDb, recordId, parcelles[0].id, [{"id": "1", "CPF": "123", "variete": "VARIETE 1"}, {"id": "2", "CPF": "123", "variete": "VARIETE 2"}])
+    }
+    await drizzleDb.update(schema.parcellaires).set({ auditDate: sql`${yesterday.toISOString()}::date`, createdAt: yesterday }).where(eq(schema.parcellaires.recordId, record.record_id as string))
 
     const featureCollection = {
       type: 'FeatureCollection',
@@ -517,7 +522,7 @@ describe('createOrUpdateOperatorRecord', () => {
     const result = await createOrUpdateOperatorRecord(
       asRecordInput({ ...record, parcelles: featureCollection }),
       { user, copyParcellesData: true, previousRecordId: record.record_id as string },
-      asPoolClient(db)
+      drizzleDb
     )
 
     expect(result).toMatchObject({
@@ -539,8 +544,8 @@ describe('createOrUpdateOperatorRecord', () => {
     const yesterday = new Date()
     yesterday.setDate(yesterday.getDate() - 1)
 
-    await db.query('UPDATE cartobio_parcelles SET cultures = \'[{"id": "1", "CPF": "123"}]\' WHERE id = \'' + parcelles[0].id + '\' AND record_id = \'' + record.record_id + '\'')
-    await db.query('UPDATE cartobio_operators SET audit_date = \'' + yesterday.toISOString() + '\', created_at = \'' + yesterday.toISOString() + '\' WHERE record_id = \'' + record.record_id + '\'')
+    await upsertCultures(drizzleDb, record.record_id as string, parcelles[0].id, [{"id": "1", "CPF": "123"}])
+    await drizzleDb.update(schema.parcellaires).set({ auditDate: sql`${yesterday.toISOString()}::date`, createdAt: yesterday }).where(eq(schema.parcellaires.recordId, record.record_id as string))
 
     const featureCollection = {
       type: 'FeatureCollection',
@@ -574,7 +579,7 @@ describe('createOrUpdateOperatorRecord', () => {
     const result = await createOrUpdateOperatorRecord(
       asRecordInput({ ...record, parcelles: featureCollection }),
       { user, copyParcellesData: true, previousRecordId: record.record_id as string },
-      asPoolClient(db)
+      drizzleDb
     )
 
     expect(result).toMatchObject({
@@ -587,7 +592,7 @@ describe('createOrUpdateOperatorRecord', () => {
     })
     expect(result.audit_history).toHaveLength(1)
     expect(result.parcelles).toHaveLength(3)
-    expect(result.parcelles[0].cultures[0].variete).toEqual('')
+    expect(result.parcelles[0].cultures[0].variete).toBeUndefined()
     expect(result.parcelles[1].cultures[0].variete).toEqual(parcelles[1].cultures[0].variete)
   })
 
@@ -637,7 +642,7 @@ describe('createOrUpdateOperatorRecord', () => {
     const result = await createOrUpdateOperatorRecord(
       asRecordInput({ ...record, parcelles: featureCollection }),
       { user, copyParcellesData: false, previousRecordId: record.record_id as string },
-      asPoolClient(db)
+      drizzleDb
     )
 
     expect(result.parcelles).toHaveLength(6)
@@ -658,7 +663,7 @@ describe('createOrUpdateOperatorRecord', () => {
 
 describe('updateAuditRecordState', () => {
   afterEach(async () => {
-    await db.query('DELETE FROM cartobio_operators where numerobio = \'' + recordToUpdate.numerobio + '\'')
+    await drizzleDb.delete(schema.parcellaires).where(eq(schema.parcellaires.numeroBio, Number(recordToUpdate.numerobio)))
   })
 
   test('successfully update version name', async () => {
@@ -850,13 +855,13 @@ describe('evvParcelles', () => {
 
 describe('test search with filter', () => {
   beforeEach(async () => {
-    await loadParcellairesFixture(
+    await loadRecordFixture(
       records.map(
         (r, index) =>
           (
             {
               ...r,
-              numerobio: String(index + 1),
+              numerobio: index + 1,
               annee_reference_controle: new Date().getFullYear()
             }
           )

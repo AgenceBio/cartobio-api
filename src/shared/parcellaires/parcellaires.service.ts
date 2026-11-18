@@ -1,8 +1,7 @@
 import { polygon } from '@turf/helpers'
-import type { PoolClient } from 'pg'
 import type { Polygon } from 'geojson'
-import pool from '../../database/database.js'
-import { withTransaction } from '../../database/transaction.js'
+import { db } from '../../database/database.js'
+import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import { CertificationState, EventType } from '@agencebio/cartobio-types'
 import type { CartoBioUser, DBOperatorRecord, DBOperatorRecordWithParcelles, DBParcelle, NormalizedRecord, HistoryEntry, CartoBioCulture, CartoBioFeatureInput, CartoBioFeatureCollectionInput, CultureInput } from '@agencebio/cartobio-types'
 import { fetchEmailForNumeroBio } from '../../clients/agence-bio.client.js'
@@ -13,21 +12,23 @@ import { createNewEvent } from '../outputs/history.js'
 import { InvalidRequestApiError, getErrorCode } from '../errors.js'
 import { getRandomFeatureId, populateWithMultipleCultures } from '../outputs/features.js'
 import { normalizeRecord, normalizeRecordSummary } from '../outputs/record.js'
+import { getHistoryUser } from '../../modules/auth/auth.service.js'
+import { setHistoryUsers } from './parcellaires.utils.js'
 
 /**
  * Create a new record unless we find a dangling one with the same numeroBio and audit date, in which case we update it
  * with the merge algorithm described in ../../docs/rfc/[001-api-parcellaire.md](http://001-api-parcellaire.md)
  */
-async function createOrUpdateOperatorRecord (record: Omit<Partial<NormalizedRecord>, 'parcelles'> & { parcelles: CartoBioFeatureCollectionInput }, context: { user?: CartoBioUser | null; copyParcellesData?: boolean; previousRecordId?: string; fromAPI?: boolean } | null = {}, customClient?: PoolClient): Promise<DBOperatorRecordWithParcelles> {
+async function createOrUpdateOperatorRecord (record: Omit<Partial<NormalizedRecord>, 'parcelles'> & { parcelles: CartoBioFeatureCollectionInput }, context: { user?: CartoBioUser | null; copyParcellesData?: boolean; previousRecordId?: string; fromAPI?: boolean } | null = {}, parentTx: NodePgDatabase = db): Promise<DBOperatorRecordWithParcelles> {
   const certificationState =
     record.certification_state || CertificationState.OPERATOR_DRAFT
 
   try {
-    const { operator, parcelles, shouldNotifyCertification } = await withTransaction(async (client) => {
+    const { operator, parcelles, shouldNotifyCertification } = await parentTx.transaction(async (tx) => {
       let preparedFeatures = await prepareFeatures(record.parcelles.features)
 
       const previousMap = await loadPreviousFullData(
-        client,
+        tx,
         context,
         record.numerobio ? record.numerobio : '',
         preparedFeatures
@@ -50,16 +51,15 @@ async function createOrUpdateOperatorRecord (record: Omit<Partial<NormalizedReco
         { user: context?.user, record: null }
       )
 
-      const previousCertificationState = await repository.findCertificationStateAtAuditDate(client, record.numerobio, record.audit_date)
+      const previousCertificationState = await repository.findCertificationStateAtAuditDate(tx, record.numerobio, record.audit_date)
 
-      const operatorResult = await repository.upsertOperator(
-        client,
+      const operator = await repository.upsertOperator(
+        tx,
         record,
         certificationState,
         historyEntry
       )
 
-      const operator = operatorResult.rows[0]
       const recordId = operator.record_id
 
       if (operator.certification_state === CertificationState.CERTIFIED) {
@@ -68,29 +68,29 @@ async function createOrUpdateOperatorRecord (record: Omit<Partial<NormalizedReco
         }
       }
 
-      const parcelles = await repository.upsertParcelles(client, recordId, preparedFeatures)
+      const parcelles = await repository.upsertParcelles(tx, recordId, preparedFeatures)
 
-      await repository.deleteMissingParcelles(client, recordId, parcelles)
+      await repository.deleteMissingParcelles(tx, recordId, parcelles)
 
       if (context?.copyParcellesData && context?.previousRecordId) {
-        const addedParcelles = await repository.copyParcellesFromPreviousRecord(client, recordId, operator.numerobio, context.previousRecordId)
+        const addedParcelles = await repository.copyParcellesFromPreviousRecord(tx, recordId, operator.numerobio, context.previousRecordId)
         parcelles.push(...addedParcelles)
       }
 
       if (record.certification_state === 'CERTIFIED') {
-        await repository.updateMixite(client, recordId)
+        await repository.updateMixite(tx, recordId)
       }
 
       const shouldNotifyCertification = previousCertificationState !== CertificationState.CERTIFIED && record.certification_state === CertificationState.CERTIFIED
 
       return { operator, parcelles, shouldNotifyCertification }
-    }, customClient)
+    })
 
     if (shouldNotifyCertification) {
-      await notifyCertificationComplete(operator, customClient)
+      await notifyCertificationComplete(operator, parentTx)
     }
 
-    return { ...operator, parcelles }
+    return withHistoryUsers({ ...operator, parcelles })
   } catch (e) {
     if (getErrorCode(e) === '23502') {
       throw new InvalidRequestApiError('La donnée géographique est manquante ou invalide.')
@@ -100,14 +100,14 @@ async function createOrUpdateOperatorRecord (record: Omit<Partial<NormalizedReco
   }
 }
 
-async function notifyCertificationComplete (record: Parameters<typeof sendCertificationComplete>[0], client: Pick<PoolClient, 'query'> = pool): Promise<void> {
+async function notifyCertificationComplete (record: Parameters<typeof sendCertificationComplete>[0], tx: NodePgDatabase = db): Promise<void> {
   try {
     const emails = await fetchEmailForNumeroBio(record.numerobio)
     for (const utilisateur of emails.utilisateurs) {
       const info = await sendCertificationComplete(record, utilisateur.email)
       logger.info({ info }, `Mail de certification envoyé à ${utilisateur.email}`)
     }
-    await repository.markCertificationNotified(client, String(record.record_id))
+    await repository.markCertificationNotified(tx, String(record.record_id))
   } catch (error) {
     logger.error({ err: error }, `Erreur lors de l'envoi de la notification de certification pour le record ${record.record_id}`)
   }
@@ -116,7 +116,7 @@ async function notifyCertificationComplete (record: Parameters<typeof sendCertif
 /**
  * Load the parcelles of a previous record to allow data copy across records
  */
-async function loadPreviousFullData (client: PoolClient, context: { copyParcellesData?: boolean; previousRecordId?: string } | null, numerobio: string, features: Array<CartoBioFeatureInput>): Promise<Map<string | number, DBParcelle>> {
+async function loadPreviousFullData (tx: NodePgDatabase, context: { copyParcellesData?: boolean; previousRecordId?: string } | null, numerobio: string, features: Array<CartoBioFeatureInput>): Promise<Map<string | number, DBParcelle>> {
   if (!context?.copyParcellesData || !context?.previousRecordId) {
     return new Map()
   }
@@ -126,7 +126,7 @@ async function loadPreviousFullData (client: PoolClient, context: { copyParcelle
   for (const feature of features) {
     if (!feature.id || !feature.geometry) continue
 
-    const previous = await repository.findMatchingPreviousParcelle(client, numerobio, context.previousRecordId, feature.geometry)
+    const previous = await repository.findMatchingPreviousParcelle(tx, numerobio, context.previousRecordId, feature.geometry)
 
     if (previous) {
       previousMap.set(feature.id, previous)
@@ -278,9 +278,26 @@ async function fixGeometry (geometry: Polygon): Promise<FixGeometryResult> {
   return { statut: 'CORRIGE', geometry: analysis.geometry }
 }
 
+async function findHistoryUsers (entries: HistoryEntry[]): Promise<Map<string, CartoBioUser>> {
+  const roles = new Map<string, string | null>()
+  for (const { user } of entries) {
+    if (user && !roles.has(String(user.id))) roles.set(String(user.id), user.mainGroup?.nom ?? null)
+  }
+
+  const users = await Promise.all(Array.from(roles, async ([id, role]): Promise<[string, CartoBioUser]> => [id, await getHistoryUser(id, role) as CartoBioUser]))
+  return new Map(users)
+}
+
+async function withHistoryUsers<T extends { audit_history: HistoryEntry[] }> (record: T): Promise<T> {
+  if (!record.audit_history?.length) return record
+
+  return setHistoryUsers(record, await findHistoryUsers(record.audit_history))
+}
+
 async function getRecords (numeroBio: string | number) {
   const records = await repository.findRecords(numeroBio)
-  return records.map(normalizeRecordSummary)
+  const users = await findHistoryUsers(records.flatMap((record) => record.audit_history ?? []))
+  return records.map((record) => normalizeRecordSummary(setHistoryUsers(record, users)))
 }
 
 async function getRecord (recordId: string, user: CartoBioUser | null = null) {
@@ -288,11 +305,11 @@ async function getRecord (recordId: string, user: CartoBioUser | null = null) {
   if (!record) return null
 
   const recordWithParcelles = await joinRecordParcelles(record, user?.id)
-  return normalizeRecord(recordWithParcelles)
+  return normalizeRecord(await withHistoryUsers(recordWithParcelles))
 }
 
 async function joinRecordParcelles (record: DBOperatorRecord, userId: number | null = null) {
   return repository.findRecordParcelles(record, userId)
 }
 
-export { createOrUpdateOperatorRecord, notifyCertificationComplete, getRecords, getRecord, joinRecordParcelles }
+export { createOrUpdateOperatorRecord, notifyCertificationComplete, getRecords, getRecord, joinRecordParcelles, withHistoryUsers }

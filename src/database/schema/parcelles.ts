@@ -3,6 +3,7 @@ import {
   date,
   foreignKey,
   index,
+  jsonb,
   numeric,
   primaryKey,
   smallint,
@@ -61,7 +62,7 @@ export const parcelles = cartobio.table(
 export const parcelleCultures = cartobio.table(
   "parcelle_cultures",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
+    id: text("id").notNull(),
     recordId: uuid("record_id")
       .notNull()
       .references(() => parcellaires.recordId, { onDelete: "cascade" }),
@@ -72,8 +73,11 @@ export const parcelleCultures = cartobio.table(
     unit: varchar("unit", { length: 20 }),
     variete: varchar("variete", { length: 255 }),
     dateSemis: date("date_semis"),
+    commentaire: text("commentaire"),
+    position: smallint("position").notNull().default(0),
   },
   (table) => [
+    primaryKey({ columns: [table.recordId, table.parcelleId, table.id] }),
     foreignKey({
       name: "parcelle_cultures_parcelle_fkey",
       columns: [table.recordId, table.parcelleId],
@@ -88,15 +92,17 @@ export const parcelleCultures = cartobio.table(
 export const parcellesAnnotations = cartobio.table(
   "parcelles_annotations",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
+    id: uuid("id").notNull().defaultRandom(),
     parcelleId: text("parcelle_id").notNull(),
     recordId: uuid("record_id")
       .notNull()
       .references(() => parcellaires.recordId, { onDelete: "cascade" }),
     typeAnnot: annotationType("type_annot").notNull(),
-    createdAt: date("created_at").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    metadata: jsonb("metadata"),
   },
   (table) => [
+    primaryKey({ columns: [table.recordId, table.parcelleId, table.id] }),
     foreignKey({
       name: "parcelles_annotations_parcelle_fkey",
       columns: [table.recordId, table.parcelleId],

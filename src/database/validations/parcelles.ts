@@ -1,7 +1,25 @@
 import { createInsertSchema, createUpdateSchema } from 'drizzle-orm/zod';
 import { z } from 'zod';
+import { annotationType, conversionNiveau } from '../schema/enums.js';
 import { parcelles, parcelleCultures } from '../schema/parcelles.js';
 import { emptyToNull, isoDate } from './helpers.js';
+
+export const annotationTypeEnumSchema = z.enum(annotationType.enumValues);
+
+export type AnnotationType = z.infer<typeof annotationTypeEnumSchema>;
+
+export const conversionNiveauEnumSchema = z.enum(conversionNiveau.enumValues);
+
+export type ConversionNiveau = z.infer<typeof conversionNiveauEnumSchema>;
+
+export const annotationCodes: Record<string, AnnotationType> = {
+  downgraded: annotationTypeEnumSchema.enum.DOWNGRADED,
+  state: annotationTypeEnumSchema.enum.METADATA_STATE,
+  'reduction-conversion': annotationTypeEnumSchema.enum.REDUCED_CONVERSION_PERIOD,
+  risky: annotationTypeEnumSchema.enum.RISKY,
+  sampled: annotationTypeEnumSchema.enum.SAMPLED,
+  surveyed: annotationTypeEnumSchema.enum.SURVEYED,
+};
 
 export const createParcelleSchema = createInsertSchema(parcelles, {
   id: (schema) => schema.min(1).max(255),

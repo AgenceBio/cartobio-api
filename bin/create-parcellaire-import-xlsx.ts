@@ -107,8 +107,7 @@ if (process.argv.length < 4) {
           user: null,
           copyParcellesData: previousParcellaire != null,
           previousRecordId: previousParcellaire ? previousParcellaire.record_id : null
-        },
-        client
+        }
       )
 
       if (record.numerobio !== parcelle.numerobio) {

@@ -21,7 +21,7 @@ export type DBOperatorRecord = {
     created_at: string;
     updated_at: string;
     oc_id: number | null;
-    oc_label: string | null;
+    oc_label?: string | null;
     parcelles?: DBParcelle[];
     metadata: Record<string, unknown>;
     audit_history: HistoryEntry[];

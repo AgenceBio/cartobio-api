@@ -1,15 +1,12 @@
 import { eq, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
-import { EventType } from '@agencebio/cartobio-types'
-import type { HistoryEntry } from '@agencebio/cartobio-types'
 import {
   organismeCertificateur,
   parcellaireImportPayload,
   parcellaires,
-  parcellairesEvenements,
   parcellaireImport
 } from '../../database/schema/index.js'
-import { recordMetadata } from '../../shared/parcellaires/parcellaires.utils.js'
+import { recordColumns } from '../../shared/parcellaires/parcellaires.utils.js'
 import type { ImportJobListRow, OperatorRecordFilters } from './imports.types.js'
 
 export const importJobColumns = {
@@ -29,41 +26,9 @@ export function payloadColumn (includePayload: boolean): SQL<ImportJobListRow['p
     : sql`NULL`
 }
 
-const ancienTypeEvenement = sql.join(
-  Object.entries(EventType).map(([type, ancien]) => sql`WHEN ${type} THEN ${ancien}::text`),
-  sql` `
-)
-
 export const operatorRecordColumns = {
-  record_id: parcellaires.recordId,
-  numerobio: sql<string>`${parcellaires.numeroBio}::text`,
-  version_name: parcellaires.versionNom,
-  annee_reference_controle: parcellaires.anneeReferenceControle,
-  certification_date_debut: parcellaires.certificationDateDebut,
-  certification_date_fin: parcellaires.certificationDateFin,
-  certification_state: parcellaires.certificationEtat,
-  created_at: sql<string>`${parcellaires.createdAt}`,
-  updated_at: sql<string>`${parcellaires.updatedAt}`,
-  oc_id: sql<number | null>`${parcellaires.ocId}`.mapWith(Number),
-  oc_label: organismeCertificateur.label,
-  metadata: recordMetadata,
-  audit_date: parcellaires.auditDate,
-  audit_history: sql<HistoryEntry[]>`COALESCE((
-    SELECT json_agg(json_strip_nulls(json_build_object(
-      'type', CASE ${parcellairesEvenements.type}::text ${ancienTypeEvenement} END,
-      'state', ${parcellairesEvenements.certificationEtat},
-      'date', ${parcellairesEvenements.date},
-      'user', CASE WHEN ${parcellairesEvenements.userId} IS NOT NULL
-        THEN json_build_object('id', ${parcellairesEvenements.userId}, 'mainGroup', json_build_object('nom', ${parcellairesEvenements.userRole}))
-      END,
-      'featureIds', ${parcellairesEvenements.parcellesId}
-    )) ORDER BY ${parcellairesEvenements.date})
-    FROM ${parcellairesEvenements}
-    WHERE ${eq(parcellairesEvenements.recordId, parcellaires.recordId)}
-  ), '[]'::json)`,
-  audit_notes: parcellaires.auditNotesCertif,
-  audit_demandes: parcellaires.auditDemandesOperateur,
-  mixite: parcellaires.mixite
+  ...recordColumns,
+  oc_label: organismeCertificateur.label
 }
 
 export function operatorRecordConditions ({ anneeAudit, statut, anneeReferenceControle }: OperatorRecordFilters): SQL[] {

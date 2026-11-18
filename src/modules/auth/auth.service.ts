@@ -2,11 +2,11 @@ import { createHash } from 'node:crypto'
 import memo from 'p-memoize'
 import gotModule from 'got'
 const got = gotModule.default
-const { get } = got
+const { get, HTTPError } = got
 import { createDecoder, createVerifier } from 'fast-jwt'
 import config from '../../config/env.js'
 import * as repository from './auth.repository.js'
-import type { DepartementRow } from './auth.types.js'
+import type { DepartementRow, UserProfile } from './auth.types.js'
 import { fetchOperatorByNumeroBio } from '../../clients/agence-bio.client.js'
 import type { AgenceBioUserGroup, OrganismeCertificateur } from '@agencebio/cartobio-types'
 
@@ -36,7 +36,7 @@ function fetchCertificationBodies() {
 
 const getCertificationBodies = memo(fetchCertificationBodies, { maxAge: 24 * oneHour })
 
-async function getUserProfileById(userId: number) {
+async function getUserProfileById(userId: number): Promise<UserProfile> {
   const [userProfile, certificationBodies] = await Promise.all([
     get(`${config.get('notifications.endpoint')}/api/users/${userId}`, {
       headers: { Authorization: config.get('notifications.serviceToken'), Origin: origin }
@@ -53,6 +53,20 @@ async function getUserProfileById(userId: number) {
       : {}),
     groups: userProfile.groupes.map(({ id, nom }) => ({ id, nom })),
     mainGroup: { id: userProfile.groupes.at(0)?.id, nom: userProfile.groupes.at(0)?.nom }
+  }
+}
+
+const getCachedUserProfile = memo(getUserProfileById, { maxAge: oneHour })
+
+async function getHistoryUser(userId: string | number, userRole: string | null): Promise<UserProfile> {
+  try {
+    return await getCachedUserProfile(Number(userId))
+  } catch (error) {
+    if (error instanceof HTTPError && error.response.statusCode === 404) {
+      return { id: Number(userId), nom: 'Utilisateur supprimé', prenom: '', groups: [], mainGroup: { nom: userRole } }
+    }
+
+    throw error
   }
 }
 
@@ -98,6 +112,7 @@ export {
   verifyNotificationAuthorization,
   fetchOperatorByNumeroBio,
   getUserProfileById,
+  getHistoryUser,
   getUserProfileFromSSOToken,
   getDepartement,
   revokeToken,

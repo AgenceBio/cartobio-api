@@ -75,8 +75,7 @@ if (process.argv.length < 3) {
       const { id: ocId, nom: ocLabel } = oc
       const record = await createOrUpdateOperatorRecord(
         { numerobio: parcelle.numerobio, oc_id: ocId, oc_label: ocLabel, ...parcelle.record },
-        { user: null, copyParcellesData: previousParcellaire != null, previousRecordId: previousParcellaire ? previousParcellaire.record_id : null },
-        client)
+        { user: null, copyParcellesData: previousParcellaire != null, previousRecordId: previousParcellaire ? previousParcellaire.record_id : null })
 
       if (record.numerobio !== parcelle.numerobio) {
         console.error("Une erreur s'est produite pour l'import du numéro: %s, résultat: numéro bio: %s, parcellaire; %s ", parcelle.numerobio, record.numerobio, record.record_id)

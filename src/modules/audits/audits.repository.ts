@@ -1,189 +1,186 @@
-import pool from '../../database/database.js'
-import type { PoolClient, QueryResult } from 'pg'
+import { SQL, and, eq, inArray, isNull, sql } from 'drizzle-orm'
 import type { DBOperatorRecord, FeatureInput, FeaturePropertiesInput, HistoryEntry } from '@agencebio/cartobio-types'
+import { db } from '../../database/database.js'
+import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
+import { parcellaires, parcelles, parcellesControles } from '../../database/schema/index.js'
+import {
+  ensureOrganismeCertificateur,
+  findRecord,
+  insertEvent,
+  upsertAnnotations,
+  upsertCultures
+} from '../../shared/parcellaires/parcellaires.repository.js'
+import { blankToNull } from '../../shared/parcellaires/parcellaires.utils.js'
+import { featureUpdateSet, geometryInput, mixiteParcelles, recordColumnsByLegacyName } from './audits.utils.js'
 
 type FeatureId = string | number
-const recordFields =
-  'cartobio_operators.record_id, numerobio, version_name, annee_reference_controle, certification_date_debut, certification_date_fin, certification_state, created_at, updated_at, oc_id, metadata, audit_date, audit_history, audit_notes, audit_demandes, mixite'
 
 async function deleteRecord(recordId: string): Promise<void> {
-  await pool.query('UPDATE cartobio_operators SET deleted_at = now() WHERE record_id = $1', [recordId])
+  await db.update(parcellaires).set({ deletedAt: sql`now()` }).where(eq(parcellaires.recordId, recordId))
 }
 async function markFeatureControlled(recordId: string, id: FeatureId, userId: number): Promise<void> {
-  await pool.query(
-    'INSERT INTO parcelles_controlees (record_id, id, user_id) VALUES ($1, $2, $3) ON CONFLICT (record_id, id, user_id) DO NOTHING',
-    [recordId, id, userId]
-  )
+  await db
+    .insert(parcellesControles)
+    .values({ recordId, parcelleId: String(id), userId: String(userId) })
+    .onConflictDoNothing({ target: [parcellesControles.recordId, parcellesControles.parcelleId, parcellesControles.userId] })
 }
 async function markFeatureUncontrolled(recordId: string, id: FeatureId, userId: number): Promise<void> {
-  await pool.query('DELETE FROM parcelles_controlees WHERE record_id = $1 AND id = $2 AND user_id = $3', [
-    recordId,
-    id,
-    userId
-  ])
+  await db
+    .delete(parcellesControles)
+    .where(and(
+      eq(parcellesControles.recordId, recordId),
+      eq(parcellesControles.parcelleId, String(id)),
+      eq(parcellesControles.userId, String(userId))
+    ))
 }
 async function findMixite(recordId: string): Promise<string | null> {
-  const { rows } = await pool.query(
-    "SELECT CASE WHEN COUNT(*) FILTER (WHERE conversion_niveau = 'AB') = COUNT(*) THEN 'AB' WHEN COUNT(*) FILTER (WHERE conversion_niveau IN ('C1','C2','C3','AB')) = COUNT(*) THEN 'ABCONV' WHEN COUNT(*) FILTER (WHERE conversion_niveau = 'CONV') > 0 THEN 'MIXTE' END AS mixite FROM cartobio_parcelles WHERE record_id = $1 AND deleted_at IS NULL",
-    [recordId]
-  )
-  return rows[0]?.mixite ?? null
+  const [row] = await db
+    .select({ mixite: mixiteParcelles })
+    .from(parcelles)
+    .where(and(eq(parcelles.recordId, recordId), isNull(parcelles.deletedAt)))
+  return row?.mixite ?? null
 }
 async function updateAuditRecord(
   recordId: string,
-  columns: string[],
-  placeholders: string[],
-  values: unknown[]
+  changes: Record<string, unknown>,
+  historyEntry: HistoryEntry | null
 ): Promise<DBOperatorRecord[]> {
-  const { rows } = await pool.query<DBOperatorRecord>(
-    `UPDATE cartobio_operators SET (${columns.join(', ')}) = (${placeholders.join(
-      ', '
-    )}) WHERE record_id = $1 RETURNING ${recordFields}`,
-    [recordId, ...values]
-  )
-  return rows
+  const set: Record<string, SQL> = {}
+  for (const [field, value] of Object.entries(changes)) {
+    if (field === 'oc_label') continue
+    const column = recordColumnsByLegacyName[field]
+    if (!column) throw new Error(`column "${field}" of relation "parcellaires" does not exist`)
+    const isBlank = value != null && blankToNull(value) === null
+    if (isBlank && column === 'versionNom') continue
+    set[column] = value instanceof SQL ? value : sql`${isBlank ? null : value ?? null}`
+  }
+
+  return db.transaction(async (tx) => {
+    if (changes.oc_id != null) {
+      await ensureOrganismeCertificateur(tx, changes.oc_id as number, changes.oc_label as string | null | undefined)
+    }
+    await tx.update(parcellaires).set(set).where(eq(parcellaires.recordId, recordId))
+    await insertEvent(tx, recordId, historyEntry)
+    const record = await findRecord(recordId, tx)
+    return record ? [record] : []
+  })
 }
 async function setOperatorUpdatedAt(
-  client: PoolClient,
+  tx: NodePgDatabase,
   recordId: string,
   historyEntry: HistoryEntry | null,
   ocId: number | null,
   ocLabel: string | null
-): Promise<QueryResult<DBOperatorRecord>> {
-  return client.query<DBOperatorRecord>(
-    `UPDATE cartobio_operators SET updated_at = now(), audit_history = (audit_history || coalesce($2, '[]')::jsonb), oc_id = coalesce(oc_id, $3), oc_label = coalesce(oc_label, $4) WHERE record_id = $1 RETURNING ${recordFields}`,
-    [recordId, historyEntry, ocId, ocLabel]
-  )
+): Promise<DBOperatorRecord[]> {
+  const [current] = await tx
+    .select({ ocId: parcellaires.ocId })
+    .from(parcellaires)
+    .where(eq(parcellaires.recordId, recordId))
+  if (current && current.ocId === null && ocId !== null) {
+    await ensureOrganismeCertificateur(tx, ocId, ocLabel)
+  }
+  await tx
+    .update(parcellaires)
+    .set({
+      updatedAt: sql`now()`,
+      ocId: sql`coalesce(${parcellaires.ocId}, ${ocId === null ? null : String(ocId)})`
+    })
+    .where(eq(parcellaires.recordId, recordId))
+  if (current) await insertEvent(tx, recordId, historyEntry)
+  const record = await findRecord(recordId, tx)
+  return record ? [record] : []
 }
-async function patchFeature(client: PoolClient, recordId: string, featureId: FeatureId, feature: FeatureInput) {
+async function patchFeature(tx: NodePgDatabase, recordId: string, featureId: FeatureId, feature: FeatureInput): Promise<void> {
   const properties = feature.properties ?? {}
-  return client.query(
-    `UPDATE cartobio_parcelles SET (geometry, commune, cultures, conversion_niveau, engagement_date, commentaire, auditeur_notes, annotations, updated, name, numero_pacage, numero_ilot_pac, numero_parcelle_pac, reference_cadastre, code_culture_pac, code_precision_pac) = (coalesce($3, geometry), coalesce($4, commune), coalesce($5, cultures), coalesce($6, conversion_niveau), nullif(coalesce($7::text, engagement_date::text), '')::date, coalesce($8, commentaire), coalesce($9, auditeur_notes), coalesce($10, annotations), now(), coalesce($11, name), coalesce($12, numero_pacage), coalesce($13, numero_ilot_pac), coalesce($14, numero_parcelle_pac), coalesce($15, reference_cadastre), coalesce($16, code_culture_pac), coalesce($17, code_precision_pac)) WHERE record_id = $1 AND id = $2 RETURNING record_id, id`,
-    [
-      recordId,
-      featureId,
-      feature.geometry,
-      properties.COMMUNE,
-      properties.cultures ? JSON.stringify(properties.cultures) : null,
-      properties.conversion_niveau,
-      properties.engagement_date,
-      properties.commentaires,
-      properties.auditeur_notes,
-      properties.annotations ? JSON.stringify(properties.annotations) : null,
-      properties.NOM,
-      properties.PACAGE,
-      properties.NUMERO_I,
-      properties.NUMERO_P,
-      properties.cadastre,
-      properties.TYPE,
-      properties.CODE_VAR
-    ]
-  )
+  const updated = await tx
+    .update(parcelles)
+    .set(featureUpdateSet(properties, feature.geometry))
+    .where(and(eq(parcelles.recordId, recordId), eq(parcelles.id, String(featureId))))
+    .returning({ id: parcelles.id })
+  if (updated.length) {
+    await upsertCultures(tx, recordId, String(featureId), properties.cultures)
+    await upsertAnnotations(tx, recordId, String(featureId), properties.annotations)
+  }
 }
 async function updateFeature(
-  client: PoolClient,
+  tx: NodePgDatabase,
   recordId: string,
   featureId: FeatureId,
   properties: FeaturePropertiesInput,
   geometry: FeatureInput['geometry']
-) {
-  return client.query(
-    `UPDATE cartobio_parcelles SET (geometry, commune, cultures, conversion_niveau, engagement_date, commentaire, auditeur_notes, annotations, updated, name, numero_pacage, numero_ilot_pac, numero_parcelle_pac, reference_cadastre, code_culture_pac, code_precision_pac, attente_pac) = (coalesce($3, geometry), coalesce($4, commune), coalesce($5, cultures), coalesce($6, conversion_niveau), nullif(coalesce($7::text, engagement_date::text), '')::date, coalesce($8, commentaire), coalesce($9, auditeur_notes), coalesce($10, annotations), now(), coalesce($11, name), coalesce($12, numero_pacage), coalesce($13, numero_ilot_pac), coalesce($14, numero_parcelle_pac), coalesce($15, reference_cadastre), coalesce($16, code_culture_pac), coalesce($17, code_precision_pac), coalesce($18, attente_pac)) WHERE record_id = $1 AND id = $2`,
-    [
-      recordId,
-      featureId,
-      geometry,
-      properties.COMMUNE,
-      properties.cultures ? JSON.stringify(properties.cultures) : null,
-      properties.conversion_niveau,
-      properties.engagement_date,
-      properties.commentaires,
-      properties.auditeur_notes,
-      properties.annotations ? JSON.stringify(properties.annotations) : null,
-      properties.NOM,
-      properties.PACAGE,
-      properties.NUMERO_I,
-      properties.NUMERO_P,
-      properties.cadastre,
-      properties.TYPE,
-      properties.CODE_VAR,
-      properties.attente_pac
-    ]
-  )
+): Promise<void> {
+  const updated = await tx
+    .update(parcelles)
+    .set({
+      ...featureUpdateSet(properties, geometry),
+      attentePac: sql`coalesce(${properties.attente_pac ?? null}::boolean, ${parcelles.attentePac})`
+    })
+    .where(and(eq(parcelles.recordId, recordId), eq(parcelles.id, String(featureId))))
+    .returning({ id: parcelles.id })
+  if (updated.length) {
+    await upsertCultures(tx, recordId, String(featureId), properties.cultures)
+    await upsertAnnotations(tx, recordId, String(featureId), properties.annotations)
+  }
 }
-async function deleteFeature(client: PoolClient, recordId: string, featureId: FeatureId): Promise<void> {
-  await client.query('DELETE FROM cartobio_parcelles WHERE record_id = $1 AND id = $2', [recordId, featureId])
+async function deleteFeature(tx: NodePgDatabase, recordId: string, featureId: FeatureId): Promise<void> {
+  await tx.delete(parcelles).where(and(eq(parcelles.recordId, recordId), eq(parcelles.id, String(featureId))))
 }
-async function addFeature(client: PoolClient, recordId: string, id: FeatureId, feature: FeatureInput): Promise<void> {
+async function insertFeature(tx: NodePgDatabase, recordId: string, id: FeatureId, feature: FeatureInput, from: FeatureId[] | null): Promise<void> {
   const properties = feature.properties ?? {}
-  await client.query(
-    `INSERT INTO cartobio_parcelles (record_id, id, geometry, commune, cultures, conversion_niveau, engagement_date, commentaire, auditeur_notes, annotations, created, updated, name, numero_pacage, numero_ilot_pac, numero_parcelle_pac, reference_cadastre, code_culture_pac, code_precision_pac) VALUES ($1, $2, $3, $4, coalesce($5, '[]')::jsonb, $6, $7, $8, $9, coalesce($10, '[]')::jsonb, now(), now(), $11, $12, $13, $14, $15, $16, $17)`,
-    [
-      recordId,
-      id,
-      feature.geometry,
-      properties.COMMUNE,
-      JSON.stringify(properties.cultures ?? []),
-      properties.conversion_niveau,
-      properties.engagement_date || undefined,
-      properties.commentaires,
-      properties.auditeur_notes,
-      JSON.stringify(properties.annotations ?? []),
-      properties.NOM,
-      properties.PACAGE,
-      properties.NUMERO_I,
-      properties.NUMERO_P,
-      properties.cadastre,
-      properties.TYPE,
-      properties.CODE_VAR
-    ]
-  )
-}
-async function softDeleteFeatures(client: PoolClient, recordId: string, featureIds: FeatureId[]): Promise<void> {
-  await client.query('UPDATE cartobio_parcelles SET deleted_at = now() WHERE record_id = $1 AND id = ANY($2)', [
+  const geometry = geometryInput(feature.geometry)
+  await tx.insert(parcelles).values({
     recordId,
-    featureIds
-  ])
+    id: String(id),
+    geometry,
+    surfaceHa: sql`round((ST_Area(${geometry}::geography) / 10000)::numeric, 4)`,
+    commune: blankToNull(properties.COMMUNE),
+    conversionNiveau: sql`${properties.conversion_niveau || null}::cartobio.conversion_niveau`,
+    engagementDate: sql`${properties.engagement_date || null}::date`,
+    commentaireOperateur: blankToNull(properties.commentaires),
+    auditeurNotesParcelles: blankToNull(properties.auditeur_notes),
+    createdAt: sql`now()`,
+    updatedAt: sql`now()`,
+    name: blankToNull(properties.NOM),
+    numeroPacage: blankToNull(properties.PACAGE),
+    numeroIlotPac: sql`${blankToNull(properties.NUMERO_I)}::smallint`,
+    numeroParcellesPac: sql`${blankToNull(properties.NUMERO_P)}::smallint`,
+    referenceCadastre: sql`${properties.cadastre ?? null}::text[]`,
+    codeCulturePac: blankToNull(properties.TYPE),
+    codePrecisionPac: blankToNull(properties.CODE_VAR),
+    fromParcelles: from ? from.map(String) : null
+  })
+  await upsertCultures(tx, recordId, String(id), properties.cultures ?? [])
+  await upsertAnnotations(tx, recordId, String(id), properties.annotations ?? [])
+}
+async function addFeature(tx: NodePgDatabase, recordId: string, id: FeatureId, feature: FeatureInput): Promise<void> {
+  await insertFeature(tx, recordId, id, feature, null)
+}
+async function softDeleteFeatures(tx: NodePgDatabase, recordId: string, featureIds: FeatureId[]): Promise<void> {
+  await tx
+    .update(parcelles)
+    .set({ deletedAt: sql`now()` })
+    .where(and(eq(parcelles.recordId, recordId), inArray(parcelles.id, featureIds.map(String))))
 }
 async function addFeaturesFromOther(
-  client: PoolClient,
+  tx: NodePgDatabase,
   recordId: string,
   features: FeatureInput[],
   from: FeatureId[]
 ): Promise<void> {
   for (const feature of features) {
     const id = Date.now() + Math.round(Math.random() * 1000)
-    const properties = feature.properties ?? {}
-    await client.query(
-      'INSERT INTO cartobio_parcelles (record_id, id, geometry, commune, cultures, conversion_niveau, engagement_date, commentaire, auditeur_notes, annotations, created, updated, name, numero_pacage, numero_ilot_pac, numero_parcelle_pac, reference_cadastre, code_culture_pac, code_precision_pac, from_parcelles) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now(), now(), $11, $12, $13, $14, $15, $16, $17, $18)',
-      [
-        recordId,
-        id,
-        feature.geometry,
-        properties.COMMUNE,
-        JSON.stringify(properties.cultures),
-        properties.conversion_niveau,
-        properties.engagement_date || undefined,
-        properties.commentaires,
-        properties.auditeur_notes,
-        JSON.stringify(properties.annotations),
-        properties.NOM,
-        properties.PACAGE,
-        properties.NUMERO_I,
-        properties.NUMERO_P,
-        properties.cadastre,
-        properties.TYPE,
-        properties.CODE_VAR,
-        from
-      ]
-    )
+    await insertFeature(tx, recordId, id, feature, from)
   }
 }
-async function refreshMixite(client: PoolClient, recordId: string): Promise<void> {
-  await client.query(
-    `UPDATE cartobio_operators SET mixite = mixite_data.mixite FROM (SELECT CASE WHEN COUNT(*) FILTER (WHERE conversion_niveau = 'AB') = COUNT(*) THEN 'AB' WHEN COUNT(*) FILTER (WHERE conversion_niveau IN ('C1', 'C2', 'C3', 'AB')) = COUNT(*) THEN 'ABCONV' WHEN COUNT(*) FILTER (WHERE conversion_niveau = 'CONV') > 0 THEN 'MIXTE' END AS mixite FROM cartobio_parcelles WHERE record_id = $1 AND deleted_at IS NULL) AS mixite_data WHERE record_id = $1`,
-    [recordId]
-  )
+async function refreshMixite(tx: NodePgDatabase, recordId: string): Promise<void> {
+  const [{ mixite }] = await tx
+    .select({ mixite: mixiteParcelles })
+    .from(parcelles)
+    .where(and(eq(parcelles.recordId, recordId), isNull(parcelles.deletedAt)))
+  await tx
+    .update(parcellaires)
+    .set({ mixite: sql`${mixite}::cartobio.mixite_type` })
+    .where(eq(parcellaires.recordId, recordId))
 }
 
 export {

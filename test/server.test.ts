@@ -6,7 +6,7 @@ import { createSigner } from 'fast-jwt'
 import { got, HTTPError, TimeoutError } from './got-mock.js'
 import fs from 'node:fs'
 import { join } from 'node:path'
-import db, { db as drizzleDb } from '../src/database/database.js'
+import { db as drizzleDb } from '../src/database/database.js'
 import { organismeCertificateur, parcellaires } from '../src/database/schema/index.js'
 import { eq } from 'drizzle-orm'
 
@@ -27,8 +27,8 @@ import {
   createImportJob,
   processFullJob
 } from '../src/modules/imports/imports.service.js'
-import { loadParcellairesFixture, loadRecordFixture, expectDeepCloseTo } from './utils.js'
-import { asAgenceBioOperator, asDBRecordWithParcelles, asMockedDatabase } from './factories.js'
+import { asStoredParcelles, loadRecordFixture, expectDeepCloseTo } from './utils.js'
+import { asAgenceBioOperator, asDBRecordWithParcelles } from './factories.js'
 
 const sign = createSigner({ key: config.get('jwtSecret') })
 
@@ -69,9 +69,12 @@ vi.mock('../src/modules/imports/imports.service.js', async (importOriginal) => (
 let apiRecordExpect: Awaited<ReturnType<typeof recordToApi>>
 // start and stop server
 beforeAll(async () => {
-  const returnRecordToApi = await recordToApi(normalizeRecord(asDBRecordWithParcelles({ parcelles, ...record })))
-  apiRecordExpect = expectDeepCloseTo(returnRecordToApi)
-  apiRecordExpect.parcellaire.features.forEach((f) => delete f.properties.dateAjout)
+  const returnRecordToApi = await recordToApi(normalizeRecord(asDBRecordWithParcelles({ parcelles: asStoredParcelles(parcelles), ...record })))
+  apiRecordExpect = expectDeepCloseTo<typeof returnRecordToApi>(JSON.parse(JSON.stringify(returnRecordToApi)))
+  apiRecordExpect.parcellaire.features.forEach((f) => {
+    delete f.properties.dateAjout
+    delete f.properties.dateMiseAJour
+  })
 
   app.addHook('onError', async (req, res, error) => {
     if (isHandledError(error)) {
@@ -234,10 +237,7 @@ describe('GET /api/v2/certification/parcellaire/:numeroBio', () => {
   const postMock = vi.mocked(got.post)
   const getMock = vi.mocked(got.get)
 
-  beforeEach(async () => {
-    await loadRecordFixture()
-    await loadParcellairesFixture()
-  })
+  beforeEach(() => loadRecordFixture())
   afterEach(() => {
     postMock.mockReset()
     getMock.mockReset()
@@ -360,12 +360,16 @@ describe('GET /api/v2/audits/:recordId', () => {
       .set('Authorization', USER_DOC_AUTH_HEADER)
       .type('json')
 
-    const expectedRecord = normalizeRecord(asDBRecordWithParcelles({ parcelles, ...record }))
+    const expectedRecord = normalizeRecord(asDBRecordWithParcelles({ parcelles: asStoredParcelles(parcelles), ...record }))
 
     // we cleanup fixtures stuff
     delete expectedRecord.oc_id
     delete (expectedRecord as Partial<typeof expectedRecord>).oc_label
-    expectedRecord.parcelles.features.forEach((f) => delete f.properties.createdAt)
+    expectedRecord.parcelles.features.forEach((f) => {
+      delete f.properties.createdAt
+      delete f.properties.updatedAt
+    })
+    expectedRecord.audit_history.sort((a, b) => a.date.localeCompare(b.date))
     expect(response.status).toEqual(200)
     expect(response.body).toMatchObject(expectDeepCloseTo(expectedRecord))
   })
@@ -879,7 +883,7 @@ describe('GET /api/v2/certification/search', () => {
   }
 
   describe('with search', () => {
-    beforeEach(() => loadParcellairesFixture())
+    beforeEach(() => loadRecordFixture())
     beforeEach(() => mockResultsOrder({ nbTotal: 1, operateurs: [{ ...agencebioOperator, siret: '12345678912345' }] }))
     afterEach(() => getMock.mockReset())
 
@@ -997,7 +1001,7 @@ describe('PATCH /api/v2/audits/:recordId/parcelles', () => {
     const patchedRecordExpectation = normalizeRecord(
       asDBRecordWithParcelles({
         ...record,
-        parcelles: parcellesPatched
+        parcelles: asStoredParcelles(parcellesPatched)
       })
     )
     patchedRecordExpectation.parcelles.features.forEach((parcelle) => {
@@ -1005,6 +1009,7 @@ describe('PATCH /api/v2/audits/:recordId/parcelles', () => {
       delete parcelle.properties.createdAt
     }) // we don't know
 
+    const transaction = vi.spyOn(drizzleDb, 'transaction')
     const response = await request(app.server)
       .patch('/api/v2/audits/054f0d70-c3da-448f-823e-81fcf7c2bf6e/parcelles')
       .set('Authorization', USER_DOC_AUTH_HEADER)
@@ -1039,7 +1044,7 @@ describe('PATCH /api/v2/audits/:recordId/parcelles', () => {
 
     expect(response.status).toBe(200)
     expect(response.body.audit_history).toHaveLength(2)
-    expect(asMockedDatabase(db)._clientRelease).toHaveBeenCalled()
+    expect(transaction).toHaveBeenCalled()
     expect(response.body.parcelles).toMatchObject(expectDeepCloseTo(patchedRecordExpectation.parcelles))
   })
 
@@ -1199,10 +1204,13 @@ describe('GET /api/v2/certification/parcellaires', () => {
       async (accPromise, record) => {
         const acc = await accPromise
 
-        const normalizedRecord = normalizeRecord(asDBRecordWithParcelles({ parcelles, ...record }))
+        const normalizedRecord = normalizeRecord(asDBRecordWithParcelles({ parcelles: asStoredParcelles(parcelles), ...record }))
         const apiRecord = await recordToApi(normalizedRecord)
-        const expectedRecord = expectDeepCloseTo(apiRecord)
-        expectedRecord.parcellaire.features.forEach((f) => delete f.properties.dateAjout)
+        const expectedRecord = expectDeepCloseTo<typeof apiRecord>(JSON.parse(JSON.stringify(apiRecord)))
+        expectedRecord.parcellaire.features.forEach((f) => {
+          delete f.properties.dateAjout
+          delete f.properties.dateMiseAJour
+        })
         if (acc.find((r) => r.numeroBio === expectedRecord.numeroBio)) {
           return acc
         } else {
@@ -1219,7 +1227,6 @@ describe('GET /api/v2/certification/parcellaires', () => {
       }
     })
     await loadRecordFixture()
-    await loadParcellairesFixture()
   })
   afterEach(() => postMock.mockReset())
 
@@ -1250,9 +1257,6 @@ describe('GET /api/v2/certification/parcellaires', () => {
   })
 
   test("it should only return this oc's parcellaire", async () => {
-    await db.query(`
-      UPDATE cartobio_operators SET oc_id = '1' WHERE numerobio = '99999';
-    `)
     await drizzleDb.insert(organismeCertificateur).values({ id: '1', label: 'OC 1' }).onConflictDoNothing()
     await drizzleDb.update(parcellaires).set({ ocId: '1' }).where(eq(parcellaires.numeroBio, 99999))
     const res = await request(app.server)

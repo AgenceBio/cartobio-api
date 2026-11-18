@@ -20,7 +20,10 @@ const hasProperty = <K extends string>(value: unknown, key: K): value is Record<
 
 const getErrorMessage = (error: unknown): string => error instanceof Error ? error.message : String(error)
 
-const getErrorCode = (error: unknown): unknown => hasProperty(error, 'code') ? error.code : undefined
+const getErrorCode = (error: unknown): unknown => {
+  if (hasProperty(error, 'code')) return error.code
+  return hasProperty(error, 'cause') ? getErrorCode(error.cause) : undefined
+}
 
 const getResponseStatusCode = (error: unknown): unknown =>
   hasProperty(error, 'response') && hasProperty(error.response, 'statusCode') ? error.response.statusCode : undefined

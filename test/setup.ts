@@ -29,6 +29,38 @@ async function setupDrizzleTestDatabase (testDatabaseName: string): Promise<void
   }
 }
 
+async function copyReferentielsGeographiques (source: pg.Client, testDatabaseName: string): Promise<void> {
+  const url = new URL(config.get('drizzleDatabaseUrl'))
+  url.pathname = `/${testDatabaseName}`
+  const target = new Client({ connectionString: url.toString() })
+  await target.connect()
+  try {
+    const extractions = [
+      {
+        table: 'communes',
+        extract: `SELECT code AS fid, nom, coalesce(active, false) AS active, encode(ST_AsEWKB(ST_Multi(ST_CollectionExtract(ST_SetSRID(geometry, 4326), 3))), 'hex') AS geometry
+          FROM communes WHERE length(code) <= 5 AND nom <> '' AND geometry IS NOT NULL ORDER BY ctid`
+      },
+      {
+        table: 'territoires',
+        extract: `SELECT fid::text AS fid, encode(ST_AsEWKB(ST_Multi(ST_CollectionExtract(ST_SetSRID(geom, 4326), 3))), 'hex') AS geom
+          FROM territoires WHERE geom IS NOT NULL ORDER BY ctid`
+      }
+    ]
+    for (const { table, extract } of extractions) {
+      const { rows } = await source.query(extract)
+      for (let i = 0; i < rows.length; i += 1000) {
+        await target.query(
+          `INSERT INTO cartobio.${table} SELECT * FROM json_populate_recordset(null::cartobio.${table}, $1)`,
+          [JSON.stringify(rows.slice(i, i + 1000))]
+        )
+      }
+    }
+  } finally {
+    await target.end()
+  }
+}
+
 export default async function () {
   await setupDrizzleTestDatabase(config.get('testDatabaseName'))
 
@@ -77,6 +109,8 @@ export default async function () {
   await testClient.query('TRUNCATE TABLE cartobio_operators CASCADE')
 
   await initTerritoires(testClient)
+
+  await copyReferentielsGeographiques(testClient, testDatabaseName)
 
   await testClient.end()
 

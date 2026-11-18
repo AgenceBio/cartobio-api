@@ -1,9 +1,12 @@
+import { sql } from 'drizzle-orm';
 import {
   date,
   index,
   integer,
+  jsonb,
   smallint,
   text,
+  uniqueIndex,
   varchar,
   timestamp,
   uuid,
@@ -35,6 +38,9 @@ export const parcellaires = cartobio.table(
   (table) => [
     index('parcellaires_numerobio_idx').on(table.numeroBio),
     index('parcellaires_oc_id_idx').on(table.ocId),
+    uniqueIndex('parcellaires_numerobio_audit_date_idx')
+      .on(table.numeroBio, table.auditDate)
+      .where(sql`${table.deletedAt} IS NULL`),
   ],
 );
 
@@ -43,11 +49,13 @@ export const parcellairesMetadata = cartobio.table('parcellaires_metadata', {
     .primaryKey()
     .references(() => parcellaires.recordId, { onDelete: 'cascade' }),
   source: text('source'),
-  sourceUpdatedAt: timestamp('source_updated_at', { withTimezone: true }).notNull(),
+  sourceUpdatedAt: timestamp('source_updated_at', { withTimezone: true }),
   provenance: text('provenance'),
   campagne: smallint('campagne'),
   numeroPacage: text('numero_pacage'),
   anneeAssolement: smallint('annee_assolement'),
+  copyOf: text('copy_of'),
+  warnings: jsonb('warnings'),
 });
 
 export const parcellairesEvenements = cartobio.table(
@@ -58,8 +66,10 @@ export const parcellairesEvenements = cartobio.table(
       .notNull()
       .references(() => parcellaires.recordId, { onDelete: 'cascade' }),
     type: parcellaireEventType('type').notNull(),
-    certificationEtat: certificationType('certification_etat').notNull(),
+    certificationEtat: certificationType('certification_etat'),
     date: timestamp('date', { withTimezone: true }).notNull(),
+    description: text('description'),
+    metadata: jsonb('metadata'),
     userId: varchar('user_id', { length: 255 }),
     userRole: text('user_role'),
     parcellesId: text('parcelles_id').array(),

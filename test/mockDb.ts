@@ -61,6 +61,11 @@ expect.extend({
 
 vi.mock('got')
 
+vi.mock('../src/modules/auth/auth.service.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../src/modules/auth/auth.service.js')>()),
+  getHistoryUser: vi.fn(async (userId: string | number, userRole: string | null) => ({ id: Number(userId), nom: '', prenom: '', groups: [], mainGroup: { nom: userRole } }))
+}))
+
 vi.mock('../src/database/database.js', async () => {
   const { default: pg } = await import('pg')
   const { default: config } = await import('../src/config/env.js')

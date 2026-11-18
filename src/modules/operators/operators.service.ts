@@ -1,10 +1,8 @@
 import { fetchCustomersByOc, fetchUserOperators, fetchOperatorsForAdmin } from '../../clients/agence-bio.client.js'
 import { applyOperatorTextSearch, filterOperatorForAutocomplete, sortRecord } from '../../shared/outputs/operator.js'
 
-import memo from 'p-memoize'
-import gotModule from 'got'
 import * as repository from './operators.repository.js'
-import { getUserProfileById } from '../auth/auth.service.js'
+import { getHistoryUser } from '../auth/auth.service.js'
 import type { OperatorRecordWithUser } from './operators.types.js'
 import type { OperatorFilter, AgenceBioNormalizedOperator, AgenceBioNormalizedOperatorWithRecord, AgenceBioNormalizedOperatorWithFilterData, AgenceBioNormalizedOperatorWithPinnedStatus, CartoBioOCUser } from '@agencebio/cartobio-types'
 import { getRecords } from '../../shared/parcellaires/parcellaires.service.js'
@@ -26,24 +24,12 @@ type OperatorAutocompleteResult = {
   numeroClient?: string
 }
 
-const getUserProfile = memo(getUserProfileById, { maxAge: 60 * 60 * 1000 })
-
-const { HTTPError } = gotModule.default
-
 async function serializeUser (userId: string | null, userRole: string | null): Promise<string | null> {
   if (userId === null) {
     return null
   }
 
-  try {
-    return JSON.stringify(await getUserProfile(Number(userId)))
-  } catch (error) {
-    if (error instanceof HTTPError && error.response.statusCode === 404) {
-      return JSON.stringify({ id: Number(userId), nom: 'Utilisateur supprimé', prenom: '', groups: [], mainGroup: { nom: userRole } })
-    }
-
-    throw error
-  }
+  return JSON.stringify(await getHistoryUser(userId, userRole))
 }
 
 async function withUser<T extends { user_id?: string | null; user_role?: string | null }> (record: T): Promise<OperatorRecordWithUser<T>> {

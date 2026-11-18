@@ -2,13 +2,15 @@ import * as cartobio from '../../shared/parcellaires/parcellaires.service.js'
 import { findValidAttestationProduction } from '../exports/exports.service.js'
 import { normalizeRecord } from '../../shared/outputs/record.js'
 import * as repository from './audits.repository.js'
-import { withTransaction } from '../../database/transaction.js'
+import { db } from '../../database/database.js'
 import { CertificationState, EventType } from '@agencebio/cartobio-types'
-import type { AgenceBioNormalizedOperator, CartoBioUser, OrganismeCertificateur, DeleteFeatureBody, FeatureInput, HistoryEntry, NormalizedRecord, RecordInfosBody } from '@agencebio/cartobio-types'
-import type { PoolClient } from 'pg'
+import type { AgenceBioNormalizedOperator, CartoBioUser, DBOperatorRecord, DBOperatorRecordWithParcelles, OrganismeCertificateur, DeleteFeatureBody, FeatureInput, HistoryEntry, NormalizedRecord, RecordInfosBody } from '@agencebio/cartobio-types'
+import { sql } from 'drizzle-orm'
+import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import { createNewEvent } from '../../shared/outputs/history.js'
 import { InvalidRequestApiError, ForbiddenApiError, NotFoundApiError, getErrorCode } from '../../shared/errors.js'
 import { getRandomFeatureId } from '../../shared/outputs/features.js'
+import { assertConversionNiveau } from './audits.utils.js'
 
 type FeatureId = string | number
 type OptionalOperator = AgenceBioNormalizedOperator | null | undefined
@@ -31,42 +33,29 @@ async function updateAuditRecordState ({ user, record, operator }: { user: Audit
   if (record.oc_id !== null && user.organismeCertificateur && record.oc_id !== user.organismeCertificateur.id) throw new ForbiddenApiError("vous n'êtes pas autorisé·e à modifier de ce parcellaire.")
 
   const { certification_state: state } = patch
-  const columns = ['updated_at']
-  const placeholders = ['$2']
-  const values: unknown[] = ['NOW()']
-  for (const [field, value] of Object.entries(patch)) {
-    columns.push(field)
-    placeholders.push(`$${columns.length + 1}`)
-    values.push(value)
-  }
+  const changes: Record<string, unknown> = { updated_at: sql`now()`, ...patch }
 
   if (record.oc_id === null) {
     const oc = getOc(user, operator)
     if (oc.id) {
-      columns.push('oc_id', 'oc_label')
-      placeholders.push(`$${columns.length}`, `$${columns.length + 1}`)
-      values.push(oc.id, oc.label)
+      changes.oc_id = oc.id
+      changes.oc_label = oc.label
     }
   }
+  let historyEntry: HistoryEntry | null = null
   if (state) {
-    columns.push('audit_history')
-    placeholders.push(`audit_history || $${columns.length + 1}::jsonb`)
-    values.push(createNewEvent(EventType.CERTIFICATION_STATE_CHANGE, { state }, { user, record }))
-    if (state === CertificationState.AUDITED && !columns.includes('audit_date')) {
-      columns.push('audit_date')
-      placeholders.push(`$${columns.length + 1}`)
-      values.push('NOW()')
+    historyEntry = createNewEvent(EventType.CERTIFICATION_STATE_CHANGE, { state }, { user, record })
+    if (state === CertificationState.AUDITED && !('audit_date' in changes)) {
+      changes.audit_date = sql`now()`
     }
-    if (state === CertificationState.CERTIFIED && !columns.includes('mixite')) {
-      columns.push('mixite')
-      placeholders.push(`$${columns.length + 1}`)
-      values.push(await repository.findMixite(record.record_id))
+    if (state === CertificationState.CERTIFIED && !('mixite' in changes)) {
+      changes.mixite = await repository.findMixite(record.record_id)
     }
   }
 
   let rows
   try {
-    rows = await repository.updateAuditRecord(record.record_id, columns, placeholders, values)
+    rows = await repository.updateAuditRecord(record.record_id, changes, historyEntry)
     if (user && String(user.mainGroup.id) === '4') rows[0].audit_notes = null
     if (state === CertificationState.CERTIFIED && record.certification_state !== CertificationState.CERTIFIED) {
       await cartobio.notifyCertificationComplete(record)
@@ -75,74 +64,82 @@ async function updateAuditRecordState ({ user, record, operator }: { user: Audit
     if (getErrorCode(error) === '23505') throw new InvalidRequestApiError("Un parcellaire ne peut pas avoir deux versions avec la même date d'audit.", { cause: error })
     throw error
   }
-  return cartobio.joinRecordParcelles(rows[0])
+  return joinRecordParcelles(rows[0])
 }
 
-async function updateOperator (client: PoolClient, record: NormalizedRecord, historyEntry: HistoryEntry | null, user: AuditUser | null, operator: OptionalOperator) {
-  const oc = getOc(user, operator)
-  return repository.setOperatorUpdatedAt(client, record.record_id, historyEntry, oc.id, oc.label)
+async function joinRecordParcelles (record: DBOperatorRecord): Promise<DBOperatorRecordWithParcelles> {
+  return cartobio.withHistoryUsers(await cartobio.joinRecordParcelles(record))
 }
-async function refreshMixiteIfCertified (client: PoolClient, record: NormalizedRecord): Promise<void> { if (record.certification_state === CertificationState.CERTIFIED) await repository.refreshMixite(client, record.record_id) }
+
+async function updateOperator (tx: NodePgDatabase, record: NormalizedRecord, historyEntry: HistoryEntry | null, user: AuditUser | null, operator: OptionalOperator) {
+  const oc = getOc(user, operator)
+  return repository.setOperatorUpdatedAt(tx, record.record_id, historyEntry, oc.id, oc.label)
+}
+async function refreshMixiteIfCertified (tx: NodePgDatabase, record: NormalizedRecord): Promise<void> { if (record.certification_state === CertificationState.CERTIFIED) await repository.refreshMixite(tx, record.record_id) }
 
 async function patchFeatureCollection ({ user, record, operator }: AuditContext, features: FeatureInput[]) {
+  assertConversionNiveau(record.certification_state, features, false)
   const historyEntry = createNewEvent(EventType.FEATURE_COLLECTION_UPDATE, { features }, { user, record })
-  const updatedRecord = await withTransaction(async client => {
-    const { rows } = await updateOperator(client, record, historyEntry, user, operator)
+  const updatedRecord = await db.transaction(async tx => {
+    const rows = await updateOperator(tx, record, historyEntry, user, operator)
     for (const feature of features) {
-      await repository.patchFeature(client, record.record_id, feature.id || getRandomFeatureId(), feature)
-      await refreshMixiteIfCertified(client, record)
+      await repository.patchFeature(tx, record.record_id, feature.id || getRandomFeatureId(), feature)
+      await refreshMixiteIfCertified(tx, record)
     }
     return rows[0]
   })
-  return cartobio.joinRecordParcelles(updatedRecord)
+  return joinRecordParcelles(updatedRecord)
 }
 
 async function updateFeature ({ featureId, user, record, operator }: AuditContext & { featureId: FeatureId }, { properties, geometry }: FeatureInput) {
   const matchingFeature = record.parcelles.features.find(({ id }) => id === String(featureId))
   if (!matchingFeature) throw new NotFoundApiError('Parcelle introuvable')
+  assertConversionNiveau(record.certification_state, [{ properties, geometry }], false)
   const historyEntry = createNewEvent(EventType.FEATURE_UPDATE, { features: [matchingFeature] }, { user, record })
-  const updatedRecord = await withTransaction(async client => {
-    const { rows } = await updateOperator(client, record, historyEntry, user, operator)
-    await repository.updateFeature(client, record.record_id, String(featureId), properties ?? {}, geometry)
-    await refreshMixiteIfCertified(client, record)
+  const updatedRecord = await db.transaction(async tx => {
+    const rows = await updateOperator(tx, record, historyEntry, user, operator)
+    await repository.updateFeature(tx, record.record_id, String(featureId), properties ?? {}, geometry)
+    await refreshMixiteIfCertified(tx, record)
     return rows[0]
   })
-  return cartobio.joinRecordParcelles(updatedRecord)
+  return joinRecordParcelles(updatedRecord)
 }
 
 async function deleteSingleFeature ({ featureId, user, record, operator }: { featureId: FeatureId; user: AuditUser; record: NormalizedRecord; operator?: OptionalOperator }, { reason }: DeleteFeatureBody) {
   const matchingFeature = record.parcelles.features.find(({ id }) => id === String(featureId))
   if (!matchingFeature) throw new NotFoundApiError('Parcelle introuvable')
   const historyEntry = createNewEvent(EventType.FEATURE_DELETE, { features: [matchingFeature], metadata: { reason, feature: matchingFeature } }, { user, record })
-  const updatedRecord = await withTransaction(async client => {
-    await repository.deleteFeature(client, record.record_id, String(featureId))
-    const { rows } = await updateOperator(client, record, historyEntry, user, operator)
+  const updatedRecord = await db.transaction(async tx => {
+    await repository.deleteFeature(tx, record.record_id, String(featureId))
+    const rows = await updateOperator(tx, record, historyEntry, user, operator)
     return rows[0]
   })
-  return cartobio.joinRecordParcelles(updatedRecord)
+  return joinRecordParcelles(updatedRecord)
 }
 
 async function addRecordFeature ({ user, record, operator }: AuditContext, feature: FeatureInput) {
+  assertConversionNiveau(record.certification_state, [feature], true)
   const historyEntry = createNewEvent(EventType.FEATURE_CREATE, { features: [feature], description: `Parcelle ${feature.properties?.cadastre} ajoutée` }, { user, record })
-  const updatedRecord = await withTransaction(async client => {
-    await repository.addFeature(client, record.record_id, Date.now(), feature)
-    const { rows } = await updateOperator(client, record, historyEntry, user, operator)
-    await refreshMixiteIfCertified(client, record)
+  const updatedRecord = await db.transaction(async tx => {
+    await repository.addFeature(tx, record.record_id, Date.now(), feature)
+    const rows = await updateOperator(tx, record, historyEntry, user, operator)
+    await refreshMixiteIfCertified(tx, record)
     return rows[0]
   })
-  return cartobio.joinRecordParcelles(updatedRecord)
+  return joinRecordParcelles(updatedRecord)
 }
 
 async function createFeaturesFromOther (user: AuditUser | null, record: NormalizedRecord, operator: OptionalOperator, features: FeatureInput[], from: FeatureId[]) {
+  assertConversionNiveau(record.certification_state, features, true)
   const historyEntry = createNewEvent(EventType.FEATURE_CREATE, { features, description: 'Parcelles ajoutées' }, { user, record })
-  const updatedRecord = await withTransaction(async client => {
-    await repository.softDeleteFeatures(client, record.record_id, from)
-    await repository.addFeaturesFromOther(client, record.record_id, features, from)
-    const { rows } = await updateOperator(client, record, historyEntry, user, operator)
-    await refreshMixiteIfCertified(client, record)
+  const updatedRecord = await db.transaction(async tx => {
+    await repository.softDeleteFeatures(tx, record.record_id, from)
+    await repository.addFeaturesFromOther(tx, record.record_id, features, from)
+    const rows = await updateOperator(tx, record, historyEntry, user, operator)
+    await refreshMixiteIfCertified(tx, record)
     return rows[0]
   })
-  return cartobio.joinRecordParcelles(updatedRecord)
+  return joinRecordParcelles(updatedRecord)
 }
 
 export { createOrUpdateOperatorRecord } from '../../shared/parcellaires/parcellaires.service.js'

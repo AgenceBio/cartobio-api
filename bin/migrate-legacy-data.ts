@@ -2,10 +2,12 @@
 
 import 'dotenv/config'
 import { join } from 'node:path'
+import { randomUUID } from 'node:crypto'
 import pg from 'pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { migrate } from 'drizzle-orm/node-postgres/migrator'
 import { ROOT_DIR } from '../src/shared/paths.js'
+import { annotationCodes } from '../src/database/validations/parcelles.js'
 
 type Row = Record<string, unknown>
 
@@ -31,8 +33,6 @@ const EVENT_TYPES: Record<string, string> = {
   FeatureDeletion: 'FEATURE_DELETE',
   FeatureUpdate: 'FEATURE_UPDATE'
 }
-
-const ANNOTATION_TYPES = ['DOWNGRADED', 'METADATA_STATE', 'REDUCED_CONVERSION_PERIOD', 'RISKY', 'SAMPLED', 'SURVEYED']
 
 const geometry = (column: string): string =>
   `encode(ST_AsEWKB(ST_Multi(ST_CollectionExtract(ST_SetSRID(${column}, 4326), 3))), 'hex')`
@@ -68,6 +68,14 @@ const cleanRow = (row: Row): Row => Object.fromEntries(Object.entries(row).map((
 
 const matches = (value: unknown, pattern: RegExp): string | null =>
   typeof value === 'string' && pattern.test(value) ? value : null
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+const uniqueUuid = (value: unknown, seen: Set<string>): string => {
+  const id = matches(value, UUID) && !seen.has(String(value)) ? String(value) : randomUUID()
+  seen.add(id)
+  return id
+}
 
 const STEPS: Step[] = [
   {
@@ -120,50 +128,55 @@ const STEPS: Step[] = [
   },
   {
     table: 'parcellaires_metadata',
-    extract: `SELECT record_id, coalesce(created_at, now()) AS created_at, metadata FROM ${RECORDS}`,
-    transform: ({ record_id: recordId, created_at: createdAt, metadata }) => {
+    extract: `SELECT record_id, metadata FROM ${RECORDS}`,
+    transform: ({ record_id: recordId, metadata }) => {
       const meta = cleanRow((metadata ?? {}) as Row)
       if (
-        [meta.source, meta.provenance, meta.campagne, meta.pacage, meta.anneeAssolement].every((value) => value == null)
+        [
+          meta.source,
+          meta.provenance,
+          meta.campagne,
+          meta.pacage,
+          meta.anneeAssolement,
+          meta.sourceLastUpdate,
+          meta.copy_of,
+          meta.warnings
+        ].every((value) => value == null)
       )
         return null
       return {
         record_id: recordId,
         source: meta.source,
-        source_updated_at: meta.sourceLastUpdate ?? createdAt,
+        source_updated_at: meta.sourceLastUpdate,
         provenance: meta.provenance,
         campagne: matches(String(meta.campagne ?? ''), /^\d{4}$/),
         numero_pacage: meta.pacage,
-        annee_assolement: matches(String(meta.anneeAssolement ?? ''), /^\d{4}$/)
+        annee_assolement: matches(String(meta.anneeAssolement ?? ''), /^\d{4}$/),
+        copy_of: meta.copy_of,
+        warnings: meta.warnings
       }
     }
   },
   {
     table: 'parcellaires_evenements',
-    extract: `SELECT record_id, certification_state, coalesce(created_at, now()) AS created_at, audit_history FROM ${RECORDS}`,
-    transform: ({
-      record_id: recordId,
-      certification_state: certificationState,
-      created_at: createdAt,
-      audit_history: history
-    }) => {
-      let etat: unknown = null
-      return ((history ?? []) as Row[]).map(cleanRow).flatMap((event) => {
+    extract: `SELECT record_id, coalesce(created_at, now()) AS created_at, audit_history FROM ${RECORDS}`,
+    transform: ({ record_id: recordId, created_at: createdAt, audit_history: history }) =>
+      ((history ?? []) as Row[]).map(cleanRow).flatMap((event) => {
         const type = EVENT_TYPES[String(event.type)]
         if (type === undefined) return []
-        etat = event.state ?? etat ?? certificationState ?? 'OPERATOR_DRAFT'
         const user = (event.user ?? {}) as Row
         return {
           record_id: recordId,
           type,
-          certification_etat: etat,
+          certification_etat: event.state,
           date: event.date ?? createdAt,
           user_id: user.id,
           user_role: (user.mainGroup as Row | undefined)?.nom,
-          parcelles_id: event.featureIds
+          parcelles_id: event.featureIds,
+          description: event.description,
+          metadata: event.metadata
         }
       })
-    }
   },
   {
     table: 'parcelles',
@@ -197,33 +210,39 @@ const STEPS: Step[] = [
   {
     table: 'parcelle_cultures',
     extract: `SELECT record_id, id, cultures FROM ${PARCELLES}`,
-    transform: ({ record_id: recordId, id, cultures }) =>
-      ((cultures ?? []) as Row[])
-        .map(cleanRow)
-        .filter((culture) => culture.CPF != null || culture.TYPE != null)
-        .map((culture) => ({
-          record_id: recordId,
-          parcelle_id: id,
-          cpf: culture.CPF,
-          code_culture_import: culture.TYPE,
-          surface: matches(String(culture.surface ?? '').replace(',', '.'), /^\d+(\.\d+)?$/),
-          unit: culture.unit,
-          variete: culture.variete,
-          date_semis: matches(culture.date_semis, /^\d{4}-\d{2}-\d{2}$/)
-        }))
+    transform: ({ record_id: recordId, id, cultures }) => {
+      const seen = new Set<string>()
+      return ((cultures ?? []) as Row[]).map(cleanRow).map((culture, position) => ({
+        id: culture.id,
+        record_id: recordId,
+        parcelle_id: id,
+        cpf: culture.CPF,
+        code_culture_import: culture.TYPE,
+        surface: matches(String(culture.surface ?? '').replace(',', '.'), /^\d+(\.\d+)?$/),
+        unit: culture.unit,
+        variete: culture.variete,
+        date_semis: matches(culture.date_semis, /^\d{4}-\d{2}-\d{2}$/),
+        commentaire: culture.commentaire,
+        position
+      }))
+    }
   },
   {
     table: 'parcelles_annotations',
-    extract: `SELECT record_id, id, updated_at::date::text AS updated_at, annotations FROM ${PARCELLES}`,
-    transform: ({ record_id: recordId, id, updated_at: updatedAt, annotations }) =>
-      ((annotations ?? []) as Row[])
-        .filter((annotation) => ANNOTATION_TYPES.includes(String(annotation.code)))
+    extract: `SELECT record_id, id, updated_at, annotations FROM ${PARCELLES}`,
+    transform: ({ record_id: recordId, id, updated_at: updatedAt, annotations }) => {
+      const seen = new Set<string>()
+      return ((annotations ?? []) as Row[])
+        .filter((annotation) => Object.hasOwn(annotationCodes, String(annotation.code)))
         .map((annotation) => ({
+          id: uniqueUuid(annotation.id, seen),
           record_id: recordId,
           parcelle_id: id,
-          type_annot: annotation.code,
-          created_at: matches(String(annotation.date ?? '').slice(0, 10), /^\d{4}-\d{2}-\d{2}$/) ?? updatedAt
+          type_annot: annotationCodes[String(annotation.code)],
+          created_at: annotation.date ?? updatedAt,
+          metadata: annotation.metadata
         }))
+    }
   },
   {
     table: 'attestations_production',

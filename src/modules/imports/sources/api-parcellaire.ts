@@ -10,9 +10,9 @@ import { getRandomFeatureId } from '../../../shared/outputs/features.js'
 import { normalizeEtatProduction } from '../../../shared/outputs/record.js'
 import { createOrUpdateOperatorRecord } from '../../../shared/parcellaires/parcellaires.service.js'
 import { parsePacDetailsFromComment, fetchOperatorByNumeroBio } from '../../../clients/agence-bio.client.js'
+import { db } from '../../../database/database.js'
 import * as repository from '../imports.repository.js'
 import type { ImportJobListRow } from '../imports.types.js'
-import { withTransaction } from '../../../database/transaction.js'
 import { importJobResultEnumSchema, importStatusEnumSchema } from '../../../database/validations/imports.js'
 import type { ImportStatus } from '../../../database/validations/imports.js'
 import { logger } from '../../../config/logger.js'
@@ -388,9 +388,9 @@ async function parcellaireValidItemToDb ({ record, numeroBio, warnings }: ValidI
     warning.push([numeroBio, warnings])
   }
 
-  await withTransaction(async (client): Promise<void> => {
+  await db.transaction(async (tx): Promise<void> => {
     try {
-      const { parcelles } = await createOrUpdateOperatorRecord(record, null, client)
+      const { parcelles } = await createOrUpdateOperatorRecord(record, null, tx)
       const parcellesCorrigees = parcelles
         .filter(f => f.statut_import_geom === 'CORRIGE')
         .map(f => f.id)
