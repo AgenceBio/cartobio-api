@@ -1,10 +1,14 @@
-import { createInsertSchema } from 'drizzle-orm/zod'
+import { createInsertSchema, createUpdateSchema } from 'drizzle-orm/zod'
+import { z } from 'zod'
 import {
   attestationsProduction,
   operateursConsultes,
   operateursEpingles,
   parcellesControles
 } from '../schema/activites.js'
+import { productionAttestationStatus } from '../schema/enums.js'
+
+export const productionAttestationStatusEnumSchema = z.enum(productionAttestationStatus.enumValues)
 
 export const createOperateurEpingleSchema = createInsertSchema(operateursEpingles, {
   numeroBio: (schema) => schema.int().positive(),
@@ -32,6 +36,12 @@ export const createAttestationProductionSchema = createInsertSchema(attestations
     type: true,
     status: true,
     path: true
+  })
+  .strict()
+
+export const updateAttestationProductionSchema = createUpdateSchema(attestationsProduction)
+  .pick({
+    status: true
   })
   .strict()
 

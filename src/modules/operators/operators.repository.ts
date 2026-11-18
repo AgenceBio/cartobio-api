@@ -54,7 +54,7 @@ const recordFields = {
   )`
 }
 
-async function getFilterData(
+async function findFilterData(
   operators: AgenceBioNormalizedOperator[],
   mixite = false
 ): Promise<AgenceBioNormalizedOperatorWithFilterData[]> {
@@ -73,11 +73,11 @@ async function getFilterData(
         >`JSON_AGG(JSON_BUILD_OBJECT('certification_state', ${parcellaires.certificationEtat}, 'annee_reference_controle', ${parcellaires.anneeReferenceControle}))`.as(
           'states'
         ),
-        list_oc_id: sql<number[]>`JSON_AGG(${parcellaires.ocId}::int)`.as('list_oc_id'),
+        list_oc_id: sql<number[]>`JSON_AGG(${parcellaires.ocId})`.as('list_oc_id'),
         max_audit_date: max(parcellaires.auditDate).as('max_audit_date')
       })
       .from(parcellaires)
-      .where(and(sql`${parcellaires.numeroBio} = ANY(${sql.param(ids)}::int[])`, isNull(parcellaires.deletedAt)))
+      .where(and(inArray(parcellaires.numeroBio, ids), isNull(parcellaires.deletedAt)))
       .groupBy(parcellaires.numeroBio)
   )
 
@@ -90,7 +90,7 @@ async function getFilterData(
       .from(parcellaires)
       .where(
         and(
-          sql`${parcellaires.numeroBio} = ANY(${sql.param(ids)}::int[])`,
+          inArray(parcellaires.numeroBio, ids),
           eq(parcellaires.certificationEtat, certificationEtatEnumSchema.enum.CERTIFIED),
           isNull(parcellaires.deletedAt)
         )
@@ -126,11 +126,11 @@ async function getFilterData(
       if (!row) return { ...operator, metadata: {} }
 
       const { metadata, ...record } = row
-      return { ...operator, metadata, ...record }
+      return { ...operator, metadata: metadata ?? {}, ...record }
     })
 }
 
-async function addRecordData(operateur: AgenceBioNormalizedOperator): Promise<OperatorWithRecordData> {
+async function findRecordData(operateur: AgenceBioNormalizedOperator): Promise<OperatorWithRecordData> {
   const [numeroBio] = numerosBioEntiers([operateur.numeroBio])
 
   if (numeroBio === undefined) {
@@ -209,18 +209,20 @@ async function findConsultedOperators(userId: number): Promise<number[]> {
   return rows.map((r) => r.numerobio)
 }
 
-async function pinOperator(numeroBio: NumeroBio, userId: number): Promise<void> {
+async function insertPinnedOperator(numeroBio: NumeroBio, userId: number): Promise<void> {
   await db
     .insert(operateursEpingles)
     .values(createOperateurEpingleSchema.parse({ numeroBio: Number(numeroBio), userId: String(userId) }))
     .onConflictDoNothing({ target: [operateursEpingles.numeroBio, operateursEpingles.userId] })
 }
-async function unpinOperator(numeroBio: NumeroBio, userId: number): Promise<void> {
+
+async function deletePinnedOperator(numeroBio: NumeroBio, userId: number): Promise<void> {
   await db
     .delete(operateursEpingles)
     .where(and(eq(operateursEpingles.numeroBio, Number(numeroBio)), eq(operateursEpingles.userId, String(userId))))
 }
-async function consultOperator(numeroBio: NumeroBio, userId: number): Promise<void> {
+
+async function upsertConsultedOperator(numeroBio: NumeroBio, userId: number): Promise<void> {
   await db
     .insert(operateursConsultes)
     .values(createOperateurConsulteSchema.parse({ numeroBio: Number(numeroBio), userId: String(userId) }))
@@ -229,6 +231,7 @@ async function consultOperator(numeroBio: NumeroBio, userId: number): Promise<vo
       set: { createdAt: sql`now()` }
     })
 }
+
 async function findImportPac(numeroBio: NumeroBio): Promise<ImportPacRow | null> {
   const [row] = await db
     .select({
@@ -244,12 +247,14 @@ async function findImportPac(numeroBio: NumeroBio): Promise<ImportPacRow | null>
 
   return row ?? null
 }
-async function hideImport(numeroBio: NumeroBio): Promise<void> {
+
+async function updateImportPacImported(numeroBio: NumeroBio): Promise<void> {
   await db
     .update(importPac)
     .set(updateImportPacSchema.parse({ imported: true }))
     .where(eq(importPac.numeroBio, String(numeroBio)))
 }
+
 async function findPinnedOperators(userId: number): Promise<number[]> {
   const rows = await db
     .select({ numerobio: operateursEpingles.numeroBio })
@@ -259,6 +264,7 @@ async function findPinnedOperators(userId: number): Promise<number[]> {
 
   return rows.map(({ numerobio }) => numerobio)
 }
+
 async function findDashboardStates(numeroBios: string[], anneeReferenceControle: number): Promise<DashboardStateRow[]> {
   const certifie = sql<boolean>`(${eq(parcellaires.certificationEtat, certificationEtatEnumSchema.enum.CERTIFIED)})`
 
@@ -283,14 +289,14 @@ async function findDashboardStates(numeroBios: string[], anneeReferenceControle:
     .groupBy(sql`1`)
 }
 export {
-  pinOperator,
-  unpinOperator,
-  consultOperator,
+  insertPinnedOperator,
+  deletePinnedOperator,
+  upsertConsultedOperator,
   findImportPac,
-  hideImport,
+  updateImportPacImported,
   findPinnedOperators,
   findDashboardStates,
   findConsultedOperators,
-  getFilterData,
-  addRecordData
+  findFilterData,
+  findRecordData
 }

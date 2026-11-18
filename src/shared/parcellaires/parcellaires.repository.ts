@@ -97,14 +97,14 @@ async function insertEvent(tx: NodePgDatabase, recordId: string, entry: HistoryE
 
 async function ensureOrganismeCertificateur(
   tx: NodePgDatabase,
-  ocId: number | string | null | undefined,
+  ocId: number | null | undefined,
   ocLabel: string | null | undefined
 ): Promise<void> {
   if (ocId == null) return
 
   await tx
     .insert(organismeCertificateur)
-    .values(createOrganismeCertificateurSchema.parse({ id: String(ocId), label: ocLabel || String(ocId) }))
+    .values(createOrganismeCertificateurSchema.parse({ id: ocId, label: ocLabel || String(ocId) }))
     .onConflictDoNothing()
 }
 
@@ -286,11 +286,7 @@ async function hasRecordForOc(numeroBio: string | number, ocId: number): Promise
     .select({ recordId: parcellaires.recordId })
     .from(parcellaires)
     .where(
-      and(
-        eq(parcellaires.numeroBio, Number(numeroBio)),
-        eq(parcellaires.ocId, String(ocId)),
-        isNull(parcellaires.deletedAt)
-      )
+      and(eq(parcellaires.numeroBio, Number(numeroBio)), eq(parcellaires.ocId, ocId), isNull(parcellaires.deletedAt))
     )
     .limit(1)
   return row !== undefined
@@ -483,7 +479,7 @@ async function markCertificationNotified(tx: NodePgDatabase, recordId: string): 
     .where(eq(parcellaires.recordId, recordId))
 }
 
-async function findRecord(recordId: string, tx: NodePgDatabase = db): Promise<DBOperatorRecord | null> {
+async function findRecord(tx: NodePgDatabase, recordId: string): Promise<DBOperatorRecord | null> {
   const [record] = await tx
     .select(recordColumns)
     .from(parcellaires)
@@ -513,7 +509,7 @@ async function upsertOperator(
           .pick({ numeroBio: true, ocId: true, certificationEtat: true, auditNotesCertif: true })
           .parse({
             numeroBio: Number(record.numerobio),
-            ocId: record.oc_id == null ? null : String(record.oc_id),
+            ocId: record.oc_id ?? null,
             certificationEtat: certificationState,
             auditNotesCertif: blankToNull(record.audit_notes)
           }),
@@ -522,13 +518,13 @@ async function upsertOperator(
         certificationDateFin: sql`nullif(${record.certification_date_fin ?? null}::text, '')::date`,
         auditDate,
         versionNom: sql`COALESCE(${blankToNull(record.version_name)}::text, 'Version créée le ' || to_char(now(), 'DD/MM/YYYY'))`,
-        anneeReferenceControle: sql`COALESCE(${anneeReferenceControle}, DATE_PART('year', COALESCE(${auditDate}, NOW())))`
+        anneeReferenceControle: sql`COALESCE(${anneeReferenceControle}, DATE_PART('year', COALESCE(${auditDate}, now())))`
       })
       .onConflictDoUpdate({
         target: [parcellaires.numeroBio, parcellaires.auditDate],
         targetWhere: sql`${parcellaires.deletedAt} IS NULL`,
         set: {
-          ocId: record.oc_id == null ? null : String(record.oc_id),
+          ocId: record.oc_id ?? null,
           updatedAt: sql`now()`,
           certificationEtat: sql`coalesce(${certificationState}::cartobio.certification_type, ${parcellaires.certificationEtat})`,
           certificationDateDebut: sql`nullif(coalesce(${record.certification_date_debut ?? null}::text, ${parcellaires.certificationDateDebut}::text), '')::date`,
@@ -544,7 +540,7 @@ async function upsertOperator(
   await upsertMetadata(tx, recordId, record.metadata)
   await insertEvent(tx, recordId, historyEntry)
 
-  const saved = await findRecord(recordId, tx)
+  const saved = await findRecord(tx, recordId)
   if (!saved) throw new Error(`Parcellaire ${recordId} introuvable après son enregistrement`)
   return saved
 }
@@ -621,7 +617,7 @@ async function deleteMissingParcelles(
     .where(and(eq(parcelles.recordId, recordId), ids.length > 0 ? notInArray(parcelles.id, ids) : undefined))
 }
 
-async function findMixite(recordId: string, tx: NodePgDatabase = db): Promise<string | null> {
+async function findMixite(tx: NodePgDatabase, recordId: string): Promise<string | null> {
   const [row] = await tx
     .select({
       mixite: sql<string | null>`CASE
@@ -650,7 +646,7 @@ async function findMixite(recordId: string, tx: NodePgDatabase = db): Promise<st
 async function updateMixite(tx: NodePgDatabase, recordId: string): Promise<void> {
   await tx
     .update(parcellaires)
-    .set(updateParcellaireSchema.parse({ mixite: await findMixite(recordId, tx) }))
+    .set(updateParcellaireSchema.parse({ mixite: await findMixite(tx, recordId) }))
     .where(eq(parcellaires.recordId, recordId))
 }
 
@@ -782,8 +778,8 @@ async function findRecordParcelles(
 }
 
 async function analyzeGeometries(
-  inputs: Array<{ geometry: Polygon; commune: string | null | undefined }>,
-  tx: NodePgDatabase = db
+  tx: NodePgDatabase,
+  inputs: Array<{ geometry: Polygon; commune: string | null | undefined }>
 ): Promise<GeometryAnalysis[]> {
   if (!inputs.length) return []
 

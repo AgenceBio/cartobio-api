@@ -4,7 +4,6 @@ import {
   importJobNotFoundResponseSchema,
   importJobStatusResponseSchema,
   importListResponseSchema,
-  importNotFoundResponseSchema,
   importReportSchema,
   importSummarySchema,
   inputApiRecordBodySchema,
@@ -162,7 +161,7 @@ export const importDetailsSchema = withSchema(protectedWithToken({ oc: true }), 
   response: {
     ...commonErrorResponses,
     200: importSummarySchema.meta({ description: 'Envoi et son résultat' }),
-    404: importNotFoundResponseSchema.meta({ description: 'Import introuvable pour cet OC' })
+    404: apiError('Import introuvable pour cet OC')
   }
 })
 export const certificationParcellairesSchema = withSchema(protectedWithToken({ oc: true }), {

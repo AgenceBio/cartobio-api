@@ -105,7 +105,7 @@ describe('GET /api/v3/tdb-api/*', () => {
       service.getTopAnomaliesGrouped,
       () => vi.mocked(service.getTopAnomaliesGrouped).mockResolvedValueOnce([]),
       [],
-      {}
+      { from: '2026-01-01', to: '2026-01-31' }
     ],
     [
       '/repet-ano',

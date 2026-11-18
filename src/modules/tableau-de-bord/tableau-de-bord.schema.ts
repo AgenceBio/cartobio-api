@@ -68,8 +68,12 @@ export const topAnomaliesSchema = withSchema(tableauDeBordRoute(), {
   operationId: 'getImportsTopAnomalies',
   tags: [TAGS.SUIVI_API_PARCELLAIRE],
   summary: 'Erreurs les plus fréquentes',
-  querystring: statsQuerySchema.pick(periode),
-  response: { ...commonErrorResponses, 200: topAnomaliesResponseSchema.meta({ description: 'Erreurs par code' }) }
+  querystring: statsQuerySchema.pick(periode).required(periode),
+  response: {
+    ...commonErrorResponses,
+    200: topAnomaliesResponseSchema.meta({ description: 'Erreurs par code' }),
+    400: apiError('Période `from` / `to` absente')
+  }
 })
 
 export const topAnomaliesGroupedSchema = withSchema(tableauDeBordRoute(), {
@@ -77,10 +81,11 @@ export const topAnomaliesGroupedSchema = withSchema(tableauDeBordRoute(), {
   tags: [TAGS.SUIVI_API_PARCELLAIRE],
   summary: 'Évolution des erreurs les plus fréquentes',
   description: 'Erreurs agrégées par jour ou par semaine selon la durée de la période.',
-  querystring: statsQuerySchema.pick(periode),
+  querystring: statsQuerySchema.pick(periode).required(periode),
   response: {
     ...commonErrorResponses,
-    200: topAnomaliesGroupedResponseSchema.meta({ description: "Séries d'erreurs par code" })
+    200: topAnomaliesGroupedResponseSchema.meta({ description: "Séries d'erreurs par code" }),
+    400: apiError('Période `from` / `to` absente')
   }
 })
 
@@ -89,7 +94,7 @@ export const repetitionsSchema = withSchema(tableauDeBordRoute(), {
   tags: [TAGS.SUIVI_API_PARCELLAIRE],
   summary: 'Envois répétés suspects',
   description: 'Parcellaires ayant au moins 4 envois consécutifs de même issue (tous acceptés ou tous refusés).',
-  querystring: statsQuerySchema.pick({ ...paginationRecherche, type: true }).required({ from: true, to: true }),
+  querystring: statsQuerySchema.pick({ ...paginationRecherche, type: true }).required(periode),
   response: {
     ...commonErrorResponses,
     200: repetitionsResponseSchema.meta({ description: "Page d'alertes, une par série" }),

@@ -2,7 +2,7 @@
   "type": "base",
   "version": "9",
   "dialect": "postgres",
-  "id": "5a106a53-40a8-4a97-9246-acd7c3fbcbee",
+  "id": "e8c01d84-8746-4a27-adfd-1ff7fd8574d1",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -711,7 +711,7 @@
       "reads": [
         "n|tbl|cartobio.territoires",
         "n|sch|cartobio",
-        "n|col|cartobio.territoires.geom"
+        "n|col|cartobio.territoires.geometry"
       ]
     },
     {
@@ -720,18 +720,18 @@
         "index",
         "cartobio",
         "parcellaires",
-        "parcellaires_numerobio_idx"
+        "parcellaires_numero_bio_idx"
       ],
       "writes": [
-        "s|idx|cartobio.parcellaires_numerobio_idx",
-        "n|idx|cartobio.parcellaires_numerobio_idx",
-        "e|idx|cartobio.parcellaires_numerobio_idx",
-        "n|rel|cartobio.parcellaires_numerobio_idx"
+        "s|idx|cartobio.parcellaires_numero_bio_idx",
+        "n|idx|cartobio.parcellaires_numero_bio_idx",
+        "e|idx|cartobio.parcellaires_numero_bio_idx",
+        "n|rel|cartobio.parcellaires_numero_bio_idx"
       ],
       "reads": [
         "n|tbl|cartobio.parcellaires",
         "n|sch|cartobio",
-        "n|col|cartobio.parcellaires.numerobio"
+        "n|col|cartobio.parcellaires.numero_bio"
       ]
     },
     {
@@ -760,18 +760,18 @@
         "index",
         "cartobio",
         "parcellaires",
-        "parcellaires_numerobio_audit_date_idx"
+        "parcellaires_numero_bio_audit_date_idx"
       ],
       "writes": [
-        "s|idx|cartobio.parcellaires_numerobio_audit_date_idx",
-        "n|idx|cartobio.parcellaires_numerobio_audit_date_idx",
-        "e|idx|cartobio.parcellaires_numerobio_audit_date_idx",
-        "n|rel|cartobio.parcellaires_numerobio_audit_date_idx"
+        "s|idx|cartobio.parcellaires_numero_bio_audit_date_idx",
+        "n|idx|cartobio.parcellaires_numero_bio_audit_date_idx",
+        "e|idx|cartobio.parcellaires_numero_bio_audit_date_idx",
+        "n|rel|cartobio.parcellaires_numero_bio_audit_date_idx"
       ],
       "reads": [
         "n|tbl|cartobio.parcellaires",
         "n|sch|cartobio",
-        "n|col|cartobio.parcellaires.numerobio",
+        "n|col|cartobio.parcellaires.numero_bio",
         "n|col|cartobio.parcellaires.audit_date"
       ]
     },
@@ -781,38 +781,19 @@
         "index",
         "cartobio",
         "parcellaires_evenements",
-        "parcellaires_evenements_record_id_idx"
+        "parcellaires_evenements_record_id_date_idx"
       ],
       "writes": [
-        "s|idx|cartobio.parcellaires_evenements_record_id_idx",
-        "n|idx|cartobio.parcellaires_evenements_record_id_idx",
-        "e|idx|cartobio.parcellaires_evenements_record_id_idx",
-        "n|rel|cartobio.parcellaires_evenements_record_id_idx"
+        "s|idx|cartobio.parcellaires_evenements_record_id_date_idx",
+        "n|idx|cartobio.parcellaires_evenements_record_id_date_idx",
+        "e|idx|cartobio.parcellaires_evenements_record_id_date_idx",
+        "n|rel|cartobio.parcellaires_evenements_record_id_date_idx"
       ],
       "reads": [
         "n|tbl|cartobio.parcellaires_evenements",
         "n|sch|cartobio",
-        "n|col|cartobio.parcellaires_evenements.record_id"
-      ]
-    },
-    {
-      "statementType": "create_index",
-      "statementTarget": [
-        "index",
-        "cartobio",
-        "parcelle_cultures",
-        "parcelle_cultures_record_id_idx"
-      ],
-      "writes": [
-        "s|idx|cartobio.parcelle_cultures_record_id_idx",
-        "n|idx|cartobio.parcelle_cultures_record_id_idx",
-        "e|idx|cartobio.parcelle_cultures_record_id_idx",
-        "n|rel|cartobio.parcelle_cultures_record_id_idx"
-      ],
-      "reads": [
-        "n|tbl|cartobio.parcelle_cultures",
-        "n|sch|cartobio",
-        "n|col|cartobio.parcelle_cultures.record_id"
+        "n|col|cartobio.parcellaires_evenements.record_id",
+        "n|col|cartobio.parcellaires_evenements.date"
       ]
     },
     {
@@ -853,26 +834,6 @@
         "n|tbl|cartobio.parcelle_cultures",
         "n|sch|cartobio",
         "n|col|cartobio.parcelle_cultures.cpf"
-      ]
-    },
-    {
-      "statementType": "create_index",
-      "statementTarget": [
-        "index",
-        "cartobio",
-        "parcelles",
-        "parcelles_record_id_idx"
-      ],
-      "writes": [
-        "s|idx|cartobio.parcelles_record_id_idx",
-        "n|idx|cartobio.parcelles_record_id_idx",
-        "e|idx|cartobio.parcelles_record_id_idx",
-        "n|rel|cartobio.parcelles_record_id_idx"
-      ],
-      "reads": [
-        "n|tbl|cartobio.parcelles",
-        "n|sch|cartobio",
-        "n|col|cartobio.parcelles.record_id"
       ]
     },
     {
@@ -940,26 +901,6 @@
       "statementTarget": [
         "index",
         "cartobio",
-        "parcelles_annotations",
-        "parcelles_annotations_record_id_idx"
-      ],
-      "writes": [
-        "s|idx|cartobio.parcelles_annotations_record_id_idx",
-        "n|idx|cartobio.parcelles_annotations_record_id_idx",
-        "e|idx|cartobio.parcelles_annotations_record_id_idx",
-        "n|rel|cartobio.parcelles_annotations_record_id_idx"
-      ],
-      "reads": [
-        "n|tbl|cartobio.parcelles_annotations",
-        "n|sch|cartobio",
-        "n|col|cartobio.parcelles_annotations.record_id"
-      ]
-    },
-    {
-      "statementType": "create_index",
-      "statementTarget": [
-        "index",
-        "cartobio",
         "attestations_production",
         "attestations_production_record_id_idx"
       ],
@@ -1002,20 +943,41 @@
         "index",
         "cartobio",
         "import_pac",
-        "import_pac_numerobio_pacage_siret_idx"
+        "import_pac_numero_bio_pacage_siret_idx"
       ],
       "writes": [
-        "s|idx|cartobio.import_pac_numerobio_pacage_siret_idx",
-        "n|idx|cartobio.import_pac_numerobio_pacage_siret_idx",
-        "e|idx|cartobio.import_pac_numerobio_pacage_siret_idx",
-        "n|rel|cartobio.import_pac_numerobio_pacage_siret_idx"
+        "s|idx|cartobio.import_pac_numero_bio_pacage_siret_idx",
+        "n|idx|cartobio.import_pac_numero_bio_pacage_siret_idx",
+        "e|idx|cartobio.import_pac_numero_bio_pacage_siret_idx",
+        "n|rel|cartobio.import_pac_numero_bio_pacage_siret_idx"
       ],
       "reads": [
         "n|tbl|cartobio.import_pac",
         "n|sch|cartobio",
-        "n|col|cartobio.import_pac.numerobio",
+        "n|col|cartobio.import_pac.numero_bio",
         "n|col|cartobio.import_pac.pacage",
         "n|col|cartobio.import_pac.siret"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "cartobio",
+        "parcellaire_import",
+        "parcellaire_import_organisme_created_at_idx"
+      ],
+      "writes": [
+        "s|idx|cartobio.parcellaire_import_organisme_created_at_idx",
+        "n|idx|cartobio.parcellaire_import_organisme_created_at_idx",
+        "e|idx|cartobio.parcellaire_import_organisme_created_at_idx",
+        "n|rel|cartobio.parcellaire_import_organisme_created_at_idx"
+      ],
+      "reads": [
+        "n|tbl|cartobio.parcellaire_import",
+        "n|sch|cartobio",
+        "n|col|cartobio.parcellaire_import.organisme_certificateur",
+        "n|col|cartobio.parcellaire_import.created_at"
       ]
     },
     {
@@ -1036,6 +998,26 @@
         "n|tbl|cartobio.parcellaire_import_logs",
         "n|sch|cartobio",
         "n|col|cartobio.parcellaire_import_logs.import_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "cartobio",
+        "parcellaire_import_payload",
+        "parcellaire_import_payload_import_id_idx"
+      ],
+      "writes": [
+        "s|idx|cartobio.parcellaire_import_payload_import_id_idx",
+        "n|idx|cartobio.parcellaire_import_payload_import_id_idx",
+        "e|idx|cartobio.parcellaire_import_payload_import_id_idx",
+        "n|rel|cartobio.parcellaire_import_payload_import_id_idx"
+      ],
+      "reads": [
+        "n|tbl|cartobio.parcellaire_import_payload",
+        "n|sch|cartobio",
+        "n|col|cartobio.parcellaire_import_payload.import_id"
       ]
     },
     {
@@ -1687,7 +1669,7 @@
       "schema": "cartobio",
       "table": "organisme_certificateur",
       "name": "id",
-      "type": "varchar(64)",
+      "type": "integer",
       "typeSchema": null,
       "notNull": true,
       "dimensions": 0,
@@ -1894,7 +1876,7 @@
     {
       "schema": "cartobio",
       "table": "territoires",
-      "name": "geom",
+      "name": "geometry",
       "type": "geometry(MultiPolygon,4326)",
       "typeSchema": null,
       "notNull": true,
@@ -1920,7 +1902,7 @@
     {
       "schema": "cartobio",
       "table": "parcellaires",
-      "name": "numerobio",
+      "name": "numero_bio",
       "type": "integer",
       "typeSchema": null,
       "notNull": true,
@@ -1934,7 +1916,7 @@
       "schema": "cartobio",
       "table": "parcellaires",
       "name": "oc_id",
-      "type": "varchar(64)",
+      "type": "integer",
       "typeSchema": null,
       "notNull": false,
       "dimensions": 0,
@@ -2973,7 +2955,7 @@
     {
       "schema": "cartobio",
       "table": "operateurs_consultes",
-      "name": "numerobio",
+      "name": "numero_bio",
       "type": "integer",
       "typeSchema": null,
       "notNull": true,
@@ -3012,7 +2994,7 @@
     {
       "schema": "cartobio",
       "table": "operateurs_epingles",
-      "name": "numerobio",
+      "name": "numero_bio",
       "type": "integer",
       "typeSchema": null,
       "notNull": true,
@@ -3116,7 +3098,7 @@
     {
       "schema": "cartobio",
       "table": "import_pac",
-      "name": "numerobio",
+      "name": "numero_bio",
       "type": "varchar",
       "typeSchema": null,
       "notNull": false,
@@ -3269,7 +3251,7 @@
       "schema": "cartobio",
       "table": "parcellaire_import",
       "name": "organisme_certificateur",
-      "type": "varchar(64)",
+      "type": "integer",
       "typeSchema": null,
       "notNull": true,
       "dimensions": 0,
@@ -3320,7 +3302,7 @@
     {
       "schema": "cartobio",
       "table": "parcellaire_import",
-      "name": "numerobio",
+      "name": "numero_bio",
       "type": "varchar",
       "typeSchema": null,
       "notNull": false,
@@ -3333,7 +3315,7 @@
     {
       "schema": "cartobio",
       "table": "parcellaire_import",
-      "name": "numeroclient",
+      "name": "numero_client",
       "type": "varchar",
       "typeSchema": null,
       "notNull": false,
@@ -3647,7 +3629,7 @@
       "nameExplicit": true,
       "columns": [
         {
-          "value": "geom",
+          "value": "geometry",
           "isExpression": false,
           "asc": true,
           "nullsFirst": false,
@@ -3664,11 +3646,11 @@
     {
       "schema": "cartobio",
       "table": "parcellaires",
-      "name": "parcellaires_numerobio_idx",
+      "name": "parcellaires_numero_bio_idx",
       "nameExplicit": true,
       "columns": [
         {
-          "value": "numerobio",
+          "value": "numero_bio",
           "isExpression": false,
           "asc": true,
           "nullsFirst": false,
@@ -3706,11 +3688,11 @@
     {
       "schema": "cartobio",
       "table": "parcellaires",
-      "name": "parcellaires_numerobio_audit_date_idx",
+      "name": "parcellaires_numero_bio_audit_date_idx",
       "nameExplicit": true,
       "columns": [
         {
-          "value": "numerobio",
+          "value": "numero_bio",
           "isExpression": false,
           "asc": true,
           "nullsFirst": false,
@@ -3734,7 +3716,7 @@
     {
       "schema": "cartobio",
       "table": "parcellaires_evenements",
-      "name": "parcellaires_evenements_record_id_idx",
+      "name": "parcellaires_evenements_record_id_date_idx",
       "nameExplicit": true,
       "columns": [
         {
@@ -3743,23 +3725,9 @@
           "asc": true,
           "nullsFirst": false,
           "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "entityType": "indexes"
-    },
-    {
-      "schema": "cartobio",
-      "table": "parcelle_cultures",
-      "name": "parcelle_cultures_record_id_idx",
-      "nameExplicit": true,
-      "columns": [
+        },
         {
-          "value": "record_id",
+          "value": "date",
           "isExpression": false,
           "asc": true,
           "nullsFirst": false,
@@ -3802,27 +3770,6 @@
       "columns": [
         {
           "value": "cpf",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "entityType": "indexes"
-    },
-    {
-      "schema": "cartobio",
-      "table": "parcelles",
-      "name": "parcelles_record_id_idx",
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "record_id",
           "isExpression": false,
           "asc": true,
           "nullsFirst": false,
@@ -3901,27 +3848,6 @@
     },
     {
       "schema": "cartobio",
-      "table": "parcelles_annotations",
-      "name": "parcelles_annotations_record_id_idx",
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "record_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "entityType": "indexes"
-    },
-    {
-      "schema": "cartobio",
       "table": "attestations_production",
       "name": "attestations_production_record_id_idx",
       "nameExplicit": true,
@@ -3972,11 +3898,11 @@
     {
       "schema": "cartobio",
       "table": "import_pac",
-      "name": "import_pac_numerobio_pacage_siret_idx",
+      "name": "import_pac_numero_bio_pacage_siret_idx",
       "nameExplicit": true,
       "columns": [
         {
-          "value": "numerobio",
+          "value": "numero_bio",
           "isExpression": false,
           "asc": true,
           "nullsFirst": false,
@@ -4006,8 +3932,57 @@
     },
     {
       "schema": "cartobio",
+      "table": "parcellaire_import",
+      "name": "parcellaire_import_organisme_created_at_idx",
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "organisme_certificateur",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "created_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "cartobio",
       "table": "parcellaire_import_logs",
       "name": "parcellaire_import_logs_import_id_idx",
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "import_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "cartobio",
+      "table": "parcellaire_import_payload",
+      "name": "parcellaire_import_payload_import_id_idx",
       "nameExplicit": true,
       "columns": [
         {
@@ -4347,7 +4322,7 @@
       "table": "operateurs_consultes",
       "name": "operateurs_consultes_pkey",
       "columns": [
-        "numerobio",
+        "numero_bio",
         "user_id"
       ],
       "nameExplicit": false,
@@ -4358,7 +4333,7 @@
       "table": "operateurs_epingles",
       "name": "operateurs_epingles_pkey",
       "columns": [
-        "numerobio",
+        "numero_bio",
         "user_id"
       ],
       "nameExplicit": false,

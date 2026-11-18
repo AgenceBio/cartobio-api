@@ -25,7 +25,7 @@ export async function loadParcellairesFixture(
     .values(
       data
         .filter((record) => record.oc_id != null)
-        .map((record) => ({ id: String(record.oc_id), label: record.oc_label }))
+        .map((record) => ({ id: Number(record.oc_id), label: record.oc_label }))
     )
     .onConflictDoNothing()
 
@@ -33,7 +33,7 @@ export async function loadParcellairesFixture(
     data.map((record, i) => ({
       recordId: record.record_id,
       numeroBio: Number(record.numerobio),
-      ocId: record.oc_id == null ? null : String(record.oc_id),
+      ocId: record.oc_id == null ? null : Number(record.oc_id),
       certificationEtat: record.certification_state as CertificationEtat,
       certificationDateDebut: record.certification_date_debut,
       certificationDateFin: record.certification_date_fin,
@@ -94,7 +94,7 @@ export async function loadRecordFixture(
       auditDate: record.audit_date as string | null,
       auditNotesCertif: record.audit_notes as string | null,
       auditDemandesOperateur: record.audit_demandes as string | null,
-      ocId: record.oc_id == null ? null : String(record.oc_id),
+      ocId: record.oc_id == null ? null : Number(record.oc_id),
       createdAt: sql`now()`,
       updatedAt: sql`now() + make_interval(mins => ${i})`,
       anneeReferenceControle: sql`COALESCE(${record.annee_reference_controle ?? null}::int, DATE_PART('year', now()))`

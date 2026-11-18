@@ -159,7 +159,7 @@ describe("contrôle d'accès des routes d'un parcellaire ou d'un opérateur", ()
 describe('isolation des imports entre organismes certificateurs', () => {
   const ocToken = 'jeton-oc-999'
 
-  async function insertJob(organismeCertificateur: string): Promise<number> {
+  async function insertJob(organismeCertificateur: number): Promise<number> {
     const [job] = await db
       .insert(parcellaireImport)
       .values({ organismeCertificateur, status: 'DONE', statutJob: 'VALID', endedAt: new Date() })
@@ -176,8 +176,8 @@ describe('isolation des imports entre organismes certificateurs', () => {
   })
 
   test("ne liste que les imports de l'organisme du jeton", async () => {
-    const propre = await insertJob('999')
-    const autre = await insertJob('1111')
+    const propre = await insertJob(999)
+    const autre = await insertJob(1111)
 
     const response = await request(app.server).get('/api/v3/import/parcellaire-imports').set('Authorization', ocToken)
 
@@ -190,8 +190,8 @@ describe('isolation des imports entre organismes certificateurs', () => {
   test.each(['/api/v3/import/parcellaire-imports/', '/api/v3/import/jobs/'])(
     "renvoie 404 sur l'import d'un autre organisme (%s:id)",
     async (prefix) => {
-      const autre = await insertJob('1111')
-      const propre = await insertJob('999')
+      const autre = await insertJob(1111)
+      const propre = await insertJob(999)
 
       const refuse = await request(app.server).get(`${prefix}${autre}`).set('Authorization', ocToken)
       const accepte = await request(app.server).get(`${prefix}${propre}`).set('Authorization', ocToken)

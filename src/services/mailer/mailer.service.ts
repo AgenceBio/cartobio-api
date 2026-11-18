@@ -1,6 +1,6 @@
 import type { SentMessageInfo } from 'nodemailer'
 import config from '../../config/env.js'
-import { getStatsByOrganisme } from './mailer.repository.js'
+import { findStatsByOrganisme } from './mailer.repository.js'
 import type { CertificationMailRecord } from './mailer.types.js'
 import { formatDateFr, getLastWeekDates, operatorRecordUrl, renderTemplate, sendMail } from './mailer.utils.js'
 
@@ -37,12 +37,12 @@ export async function sendCertificationCompleteModifie(
 }
 
 export async function sendRapportHebdo(
-  ocId: string,
+  ocId: number,
   recipientEmail: string,
   labelOc: string
 ): Promise<SentMessageInfo> {
   const { dateDebut, dateFin } = getLastWeekDates()
-  const stats = await getStatsByOrganisme(ocId, new Date(dateDebut), new Date(`${dateFin}T23:59:59`))
+  const stats = await findStatsByOrganisme(ocId, new Date(dateDebut), new Date(`${dateFin}T23:59:59`))
   const html = renderTemplate('RAPPORT_HEBDO_API', {
     date_debut: formatDateFr(dateDebut),
     date_fin: formatDateFr(dateFin),

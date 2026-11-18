@@ -4,7 +4,7 @@ import {
   filterOperatorForAutocomplete,
   sortRecord
 } from '../../src/shared/outputs/operator.js'
-import { getFilterData, addRecordData } from '../../src/modules/operators/operators.repository.js'
+import { findFilterData, findRecordData } from '../../src/modules/operators/operators.repository.js'
 import { db } from '../../src/database/database.js'
 import { parcellaires } from '../../src/database/schema/index.js'
 
@@ -165,7 +165,7 @@ describe('populateWithRecords()', () => {
       .insert(parcellaires)
       .values({ numeroBio: 34857, certificationEtat: 'OPERATOR_DRAFT', versionNom: 'v1', anneeReferenceControle: 2001 })
 
-    const result = await getFilterData(operators, false)
+    const result = await findFilterData(operators, false)
 
     expect(result).toMatchObject([
       {
@@ -178,7 +178,7 @@ describe('populateWithRecords()', () => {
         ]
       }
     ])
-    expect(await getFilterData(operators, true)).toMatchObject([
+    expect(await findFilterData(operators, true)).toMatchObject([
       {
         ...normalizedOperator,
         states: [
@@ -191,7 +191,7 @@ describe('populateWithRecords()', () => {
       }
     ])
 
-    const resultWithData = await Promise.all(result.map(async (res) => addRecordData(res)))
+    const resultWithData = await Promise.all(result.map(async (res) => findRecordData(res)))
 
     expect(resultWithData).toMatchObject([
       {
@@ -204,13 +204,13 @@ describe('populateWithRecords()', () => {
   })
 
   it('should deal with a database absentee (no record created yet)', async () => {
-    const result = await getFilterData(operators, undefined)
+    const result = await findFilterData(operators, undefined)
 
     return expect(result).toMatchObject([normalizedOperator])
   })
 
   it('should deal with an empty object', () => {
-    const result = getFilterData([], undefined)
+    const result = findFilterData([], undefined)
 
     return expect(result).resolves.toEqual([])
   })

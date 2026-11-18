@@ -6,7 +6,7 @@ export const territoires = cartobio.table(
   'territoires',
   {
     fid: varchar('fid', { length: 64 }).primaryKey(),
-    geometry: multiPolygon('geom').notNull()
+    geometry: multiPolygon('geometry').notNull()
   },
   (table) => [index('territoires_geometry_gix').using('gist', table.geometry)]
 )

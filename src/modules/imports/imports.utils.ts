@@ -6,6 +6,8 @@ import {
   parcellaires,
   parcellaireImport
 } from '../../database/schema/index.js'
+import { toIsoDateTime } from '@agencebio/cartobio-types'
+import type { ImportSummary } from '@agencebio/cartobio-types'
 import { isoDay, recordColumns } from '../../shared/parcellaires/parcellaires.utils.js'
 import type { ImportJobListRow, OperatorRecordFilters } from './imports.types.js'
 import config from '../../config/env.js'
@@ -40,7 +42,7 @@ export function operatorRecordConditions({ anneeAudit, statut, anneeReferenceCon
   }
 
   if (statut) {
-    conditions.push(sql`${parcellaires.certificationEtat}::text = ${statut}`)
+    conditions.push(eq(parcellaires.certificationEtat, statut))
   }
 
   if (anneeReferenceControle) {
@@ -58,4 +60,18 @@ export function pageUrl(url: string, params: Record<string, number | null>): str
     else searchParams.set(key, String(value))
   }
   return `${new URL(pathname, config.get('frontendUrl')).toString()}?${searchParams.toString()}`
+}
+
+export function normalizeJobReturn(row: ImportJobListRow): ImportSummary {
+  return {
+    jobId: row.jobid,
+    status: row.status,
+    createdAt: toIsoDateTime(row.created_at),
+    endedAt: row.ended_at ? toIsoDateTime(row.ended_at) : null,
+    numeroBio: row.numerobio,
+    numeroClient: row.numeroclient,
+    auditDate: row.audit_date,
+    result: row.result_job,
+    payload: row.payload
+  }
 }

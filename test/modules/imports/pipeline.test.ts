@@ -73,7 +73,7 @@ describe("pipeline d'import API", () => {
     const records = await db.select().from(parcellaires).where(eq(parcellaires.numeroBio, 99999))
     expect(records).toHaveLength(1)
     expect(records[0]).toMatchObject({
-      ocId: '1',
+      ocId: 1,
       auditDate: '2026-04-27',
       anneeReferenceControle: 2026,
       certificationEtat: 'CERTIFIED'

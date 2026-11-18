@@ -257,7 +257,7 @@ export const recordColumns = {
   certification_state: parcellaires.certificationEtat,
   created_at: isoTimestamp(parcellaires.createdAt),
   updated_at: isoTimestamp(parcellaires.updatedAt),
-  oc_id: sql<number | null>`${parcellaires.ocId}::int`,
+  oc_id: parcellaires.ocId,
   metadata: recordMetadata,
   audit_date: isoDay(parcellaires.auditDate),
   audit_history: auditHistory,

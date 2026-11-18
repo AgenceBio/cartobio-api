@@ -4,7 +4,7 @@ import { organismeCertificateur, parcellaireImport } from '../../database/schema
 import { importJobResultEnumSchema } from '../../database/validations/imports.js'
 import type { DestinataireRapport, StatsOrganisme } from './mailer.types.js'
 
-export async function getStatsByOrganisme(organisme: string, start: Date, end: Date): Promise<StatsOrganisme | null> {
+export async function findStatsByOrganisme(organisme: number, start: Date, end: Date): Promise<StatsOrganisme | null> {
   const [stats] = await db
     .select({
       organismeCertificateur: parcellaireImport.organismeCertificateur,
@@ -31,7 +31,7 @@ export async function getStatsByOrganisme(organisme: string, start: Date, end: D
   return stats ?? null
 }
 
-export async function getDestinatairesRapport(): Promise<DestinataireRapport[]> {
+export async function findDestinatairesRapport(): Promise<DestinataireRapport[]> {
   return db
     .select({
       id: organismeCertificateur.id,

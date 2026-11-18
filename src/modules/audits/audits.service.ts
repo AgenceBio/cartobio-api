@@ -36,16 +36,18 @@ type AuditContext = {
 }
 
 async function deleteRecord(record: NormalizedRecord): Promise<void> {
-  await repository.deleteRecord(record.record_id)
+  await repository.softDeleteRecord(record.record_id)
   await deleteRecordAttestations(record.record_id).catch((error: unknown): void =>
     logger.error({ err: error }, `Suppression des attestations du parcellaire ${record.record_id} en échec`)
   )
 }
+
 async function markFeatureControlled(recordId: string, id: FeatureId, userId: number): Promise<void> {
-  await repository.markFeatureControlled(recordId, id, userId)
+  await repository.insertParcelleControle(recordId, id, userId)
 }
+
 async function markFeatureUncontrolled(recordId: string, id: FeatureId, userId: number): Promise<void> {
-  await repository.markFeatureUncontrolled(recordId, id, userId)
+  await repository.deleteParcelleControle(recordId, id, userId)
 }
 
 function getOc(user: AuditUser | null, operator: OptionalOperator): { id: number | null; label: string | null } {
@@ -87,13 +89,15 @@ async function updateAuditRecordState(
       changes.audit_date = sql`now()`
     }
     if (state === CertificationState.CERTIFIED && !('mixite' in changes)) {
-      changes.mixite = await repository.findMixite(record.record_id)
+      changes.mixite = await repository.findMixite(db, record.record_id)
     }
   }
 
   let rows
   try {
-    rows = await repository.updateAuditRecord(record.record_id, changes, historyEntry, ifUnmodifiedSince)
+    rows = await db.transaction((tx) =>
+      repository.updateAuditRecord(tx, record.record_id, changes, historyEntry, ifUnmodifiedSince)
+    )
     if (state === CertificationState.CERTIFIED && record.certification_state !== CertificationState.CERTIFIED) {
       void cartobio.notifyCertificationComplete(record)
     }
@@ -122,6 +126,7 @@ async function updateOperator(
   const oc = getOc(user, operator)
   return repository.setOperatorUpdatedAt(tx, record.record_id, historyEntry, oc.id, oc.label, ifUnmodifiedSince)
 }
+
 async function refreshMixiteIfCertified(tx: NodePgDatabase, record: NormalizedRecord): Promise<void> {
   if (record.certification_state === CertificationState.CERTIFIED) await repository.updateMixite(tx, record.record_id)
 }
@@ -154,7 +159,7 @@ async function updateFeature(
   const historyEntry = createNewEvent(EventType.FEATURE_UPDATE, { features: [matchingFeature] }, { user, record })
   const updatedRecord = await db.transaction(async (tx) => {
     const rows = await updateOperator(tx, record, historyEntry, user, operator, ifUnmodifiedSince)
-    await repository.updateFeature(tx, record.record_id, String(featureId), properties ?? {}, geometry)
+    await repository.updateFeatureById(tx, record.record_id, String(featureId), properties ?? {}, geometry)
     await refreshMixiteIfCertified(tx, record)
     return firstRow(rows)
   })

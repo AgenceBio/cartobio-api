@@ -1,6 +1,6 @@
-import fs from 'fs'
+import fs from 'node:fs'
 import pdflib from 'pdf-lib'
-import path from 'path'
+import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { findPdfParcelles } from './exports.repository.js'
@@ -48,9 +48,6 @@ async function restrictNetwork(page: Page): Promise<void> {
   })
 }
 
-/**
- * Lancer le navigateur
- */
 async function launchStyleTab(browser: Browser, timeout = 30000): Promise<Page> {
   const page = await browser.newPage()
   await restrictNetwork(page)
@@ -102,9 +99,6 @@ async function launchStyleTab(browser: Browser, timeout = 30000): Promise<Page> 
   }
 }
 
-/**
- * Calculer le zoom optimal pour la parcelle
- */
 function getOptimalZoom(bboxWidth: number, bboxHeight: number, viewportWidth: number, viewportHeight: number): number {
   const WORLD_DIM = { width: 512, height: 512 }
   const ZOOM_MAX = 20
@@ -128,17 +122,10 @@ function getOptimalZoom(bboxWidth: number, bboxHeight: number, viewportWidth: nu
   return Math.min(zoomX, zoomY, ZOOM_MAX)
 }
 
-/**
- * Récupère toutes les parcelles d'un opérateur
- * Avec `pac`, uniquement les parcelles PAC (numéro d'îlot et de parcelle)
- */
 async function getAllParcelles(recordId: string, pac: boolean = false): Promise<Array<PdfParcelle>> {
   return findPdfParcelles(recordId, pac)
 }
 
-/**
- * Calcule la bounding box englobant toutes les parcelles
- */
 function calculateGlobalBoundingBox(parcelles: Array<PdfParcelle>): BoundingBox | null {
   if (parcelles.length === 0) return null
 
@@ -166,9 +153,6 @@ function calculateGlobalBoundingBox(parcelles: Array<PdfParcelle>): BoundingBox 
   }
 }
 
-/**
- * Dessine toutes les parcelles sur la carte
- */
 async function drawAllParcellesOnMap(
   page: Page,
   parcelles: Array<PdfParcelle>,
@@ -235,9 +219,6 @@ async function drawAllParcellesOnMap(
   return { buffer }
 }
 
-/**
- * Dessine toutes les parcelles avec une parcelle en surbrillance
- */
 async function drawParcelleHighlightOnMap(
   page: Page,
   parcelles: Array<PdfParcelle>,

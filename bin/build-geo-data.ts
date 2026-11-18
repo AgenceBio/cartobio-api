@@ -1,13 +1,15 @@
+#!/usr/bin/env node
+
 import { createHash } from 'node:crypto'
-import { createWriteStream } from 'fs'
+import { createWriteStream } from 'node:fs'
 import { promisify } from 'node:util'
 import { createGunzip } from 'node:zlib'
 import stream from 'node:stream'
-import { join } from 'path'
+import { join } from 'node:path'
 import { DATA_DIR } from '../src/shared/paths.js'
 import got from 'got'
 import JSONStream from 'jsonstream-next'
-import fs from 'fs'
+import fs from 'node:fs'
 import union from '@turf/union'
 import * as turf from '@turf/helpers'
 import type { Feature, FeatureCollection, MultiPolygon, Polygon } from 'geojson'
@@ -53,8 +55,8 @@ async function pipelineVerified(
     throw error
   }
 }
+
 async function fetchCommunesBoundaries(): Promise<void> {
-  // Skip if file already exists
   const outFile = join(generatedDataDirectory, 'communes.json')
   if (fs.existsSync(outFile)) {
     console.log('Commune boundaries file already exists, skipping')
@@ -89,7 +91,6 @@ function unionOf(regions: Region[]): Region {
 }
 
 async function fetchRegionsBoundaries(): Promise<void> {
-  // Skip if file already exists
   const files = ['metropole', 'antilles', 'guyane', 'reunion', 'mayotte']
   if (files.every((name) => fs.existsSync(join(generatedDataDirectory, `${name}.json`)))) {
     console.log('Region boundaries files already exist, skipping')
@@ -98,29 +99,23 @@ async function fetchRegionsBoundaries(): Promise<void> {
 
   const SOURCE = GEO_SOURCE + 'regions-100m.geojson'
 
-  // Get content
   const response = await got(SOURCE)
   assertSha256(createHash('sha256').update(response.rawBody).digest('hex'), REGIONS_SHA256, SOURCE)
   const content = response.body
 
-  // Parse content
   const regions: FeatureCollection<Polygon | MultiPolygon> = JSON.parse(content)
 
-  // Get metropole
   const metropoleCodes = ['11', '24', '27', '28', '32', '44', '52', '53', '75', '76', '84', '93', '94']
   const metropoleRegions = regions.features.filter(({ properties }) => metropoleCodes.includes(properties?.code))
   const metropole = unionOf(metropoleRegions)
 
-  // Get Antilles
   const antilles = unionOf([findRegion(regions, '01'), findRegion(regions, '02')])
 
-  // Get other droms
   const guyane = regions.features.find(({ properties }) => properties?.code === '03')
   const reunion = regions.features.find(({ properties }) => properties?.code === '04')
   const mayotte = regions.features.find(({ properties }) => properties?.code === '06')
 
   const outputs = { metropole, antilles, guyane, reunion, mayotte }
-  // Dump each file
   for (const [output, data] of Object.entries(outputs)) {
     console.log(`Writing ${output}.json`, data?.type)
     const outputFile = join(generatedDataDirectory, `${output}.json`)
@@ -129,7 +124,6 @@ async function fetchRegionsBoundaries(): Promise<void> {
 }
 
 async function fetchDepartementBoundaries(): Promise<void> {
-  // Skip if file already exists
   const outFile = join(referenceDataDirectory, 'departements.json')
   if (fs.existsSync(outFile)) {
     console.log('Departement boundaries file already exists, skipping')
@@ -150,10 +144,9 @@ async function fetchDepartementBoundaries(): Promise<void> {
 }
 
 async function fetchAtOnceRegionsBoundaries(): Promise<void> {
-  // Skip if file already exists
   const outFile = join(referenceDataDirectory, 'regions.json')
   if (fs.existsSync(outFile)) {
-    console.log('Departement boundaries file already exists, skipping')
+    console.log('Region boundaries file already exists, skipping')
     return
   }
 
@@ -193,9 +186,7 @@ async function fetchAtOnceRegionsBoundaries(): Promise<void> {
   ])
 }
 
-;(async function (): Promise<void> {
-  await fetchCommunesBoundaries()
-  await fetchRegionsBoundaries()
-  await fetchDepartementBoundaries()
-  await fetchAtOnceRegionsBoundaries()
-})()
+await fetchCommunesBoundaries()
+await fetchRegionsBoundaries()
+await fetchDepartementBoundaries()
+await fetchAtOnceRegionsBoundaries()

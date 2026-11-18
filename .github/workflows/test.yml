@@ -34,7 +34,7 @@ jobs:
           NOTIFICATIONS_AB_SSO_CLIENT_ID: 'test'
           NOTIFICATIONS_AB_SSO_CLIENT_SECRET: 'test'
           NOTIFICATIONS_AB_SSO_HOST: https://preprod-oauth.agencebio.org
-          TARGET_DATABASE_URL: postgresql://docker:docker@127.0.0.1:5432/cartobio
+          DATABASE_URL: postgresql://docker:docker@127.0.0.1:5432/cartobio
 
       - name: Coveralls
         uses: coverallsapp/github-action@v2

@@ -50,7 +50,7 @@ async function completeImportJob({
           status: importStatusEnumSchema.enum.DONE,
           ...(statutJob ? { statutJob } : {})
         }),
-        endedAt: sql`NOW()`
+        endedAt: sql`now()`
       })
       .where(eq(parcellaireImport.id, Number(jobId)))
       .returning({ id: parcellaireImport.id })
@@ -90,14 +90,14 @@ async function insertImportLog(
   )
 }
 
-async function createImportJob(organismeCertificateurId: number): Promise<number> {
+async function insertImportJob(organismeCertificateurId: number): Promise<number> {
   const { id } = firstRow(
     await db
       .insert(parcellaireImport)
       .values(
         createImportJobSchema.parse({
           status: importStatusEnumSchema.enum.CREATED,
-          organismeCertificateur: String(organismeCertificateurId)
+          organismeCertificateur: organismeCertificateurId
         })
       )
       .returning({ id: parcellaireImport.id })
@@ -157,7 +157,7 @@ async function updateImportJobResult(jobId: string | number, statutJob: ImportJo
     .where(eq(parcellaireImport.id, Number(jobId)))
 }
 
-async function failImportJob(jobId: string | number, result: { name: string; message: string }): Promise<void> {
+async function updateImportJobError(jobId: string | number, result: { name: string; message: string }): Promise<void> {
   await db
     .update(parcellaireImport)
     .set({
@@ -166,7 +166,7 @@ async function failImportJob(jobId: string | number, result: { name: string; mes
         statutJob: importJobResultEnumSchema.enum.ERROR,
         resultJob: result
       }),
-      endedAt: sql`NOW()`
+      endedAt: sql`now()`
     })
     .where(eq(parcellaireImport.id, Number(jobId)))
 }
@@ -180,12 +180,12 @@ async function failInterruptedImportJobs(): Promise<number> {
         statutJob: importJobResultEnumSchema.enum.ERROR,
         resultJob: { name: 'InterruptedJob', message: "Le traitement de l'import a été interrompu." }
       }),
-      endedAt: sql`NOW()`
+      endedAt: sql`now()`
     })
     .where(
       and(
         inArray(parcellaireImport.status, [importStatusEnumSchema.enum.CREATED, importStatusEnumSchema.enum.PENDING]),
-        lte(parcellaireImport.createdAt, sql`NOW() - interval '1 hour'`)
+        lte(parcellaireImport.createdAt, sql`now() - interval '1 hour'`)
       )
     )
   return rowCount ?? 0
@@ -203,12 +203,12 @@ async function findImportJob(id: string | number, organisme: number): Promise<Im
       created_at: parcellaireImport.createdAt
     })
     .from(parcellaireImport)
-    .where(and(eq(parcellaireImport.id, Number(id)), eq(parcellaireImport.organismeCertificateur, String(organisme))))
+    .where(and(eq(parcellaireImport.id, Number(id)), eq(parcellaireImport.organismeCertificateur, organisme)))
 
   return job ?? null
 }
 
-async function updateImportJobStatus(
+async function updateImportJobStatusResult(
   jobId: string | number,
   status: ImportStatus,
   result?: Record<string, unknown>
@@ -218,7 +218,7 @@ async function updateImportJobStatus(
     .set({
       ...updateImportJobSchema.parse({ status, resultJob: result ?? {} }),
       ...(status === importStatusEnumSchema.enum.DONE || status === importStatusEnumSchema.enum.ERROR
-        ? { endedAt: sql`NOW()` }
+        ? { endedAt: sql`now()` }
         : {})
     })
     .where(eq(parcellaireImport.id, Number(jobId)))
@@ -251,7 +251,7 @@ async function findImportList({
   }
 
   if (organisme) {
-    conditions.push(eq(parcellaireImport.organismeCertificateur, String(organisme)))
+    conditions.push(eq(parcellaireImport.organismeCertificateur, organisme))
   }
 
   if (to) {
@@ -303,7 +303,7 @@ async function findImportById(
   }
 
   const [row] = await query.where(
-    and(eq(parcellaireImport.id, Number(id)), eq(parcellaireImport.organismeCertificateur, String(organisme)))
+    and(eq(parcellaireImport.id, Number(id)), eq(parcellaireImport.organismeCertificateur, organisme))
   )
 
   return row ?? null
@@ -348,7 +348,7 @@ async function findOperatorLastRecords(
     .leftJoin(parcellairesMetadata, eq(parcellairesMetadata.recordId, parcellaires.recordId))
     .where(
       and(
-        eq(parcellaires.ocId, String(ocId)),
+        eq(parcellaires.ocId, ocId),
         isNull(parcellaires.deletedAt),
         ...operatorRecordConditions({ anneeAudit, statut, anneeReferenceControle })
       )
@@ -370,14 +370,14 @@ async function findOperatorLastRecords(
 export {
   completeImportJob,
   insertImportLog,
-  createImportJob,
+  insertImportJob,
   insertPayload,
   updateImportJobEtat,
   updateImportJobResult,
-  failImportJob,
+  updateImportJobError,
   failInterruptedImportJobs,
   findImportJob,
-  updateImportJobStatus,
+  updateImportJobStatusResult,
   findImportList,
   findImportById,
   findLastOperatorRecord,

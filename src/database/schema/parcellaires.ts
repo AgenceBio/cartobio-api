@@ -8,8 +8,8 @@ export const parcellaires = cartobio.table(
   'parcellaires',
   {
     recordId: uuid('record_id').primaryKey().defaultRandom(),
-    numeroBio: integer('numerobio').notNull(),
-    ocId: varchar('oc_id', { length: 64 }).references(() => organismeCertificateur.id),
+    numeroBio: integer('numero_bio').notNull(),
+    ocId: integer('oc_id').references(() => organismeCertificateur.id),
     certificationEtat: certificationType('certification_etat').notNull(),
     certificationDateDebut: date('certification_date_debut'),
     certificationDateFin: date('certification_date_fin'),
@@ -25,9 +25,9 @@ export const parcellaires = cartobio.table(
     deletedAt: timestamp('deleted_at', { withTimezone: true })
   },
   (table) => [
-    index('parcellaires_numerobio_idx').on(table.numeroBio),
+    index('parcellaires_numero_bio_idx').on(table.numeroBio),
     index('parcellaires_oc_id_idx').on(table.ocId),
-    uniqueIndex('parcellaires_numerobio_audit_date_idx')
+    uniqueIndex('parcellaires_numero_bio_audit_date_idx')
       .on(table.numeroBio, table.auditDate)
       .where(sql`${table.deletedAt} IS NULL`)
   ]

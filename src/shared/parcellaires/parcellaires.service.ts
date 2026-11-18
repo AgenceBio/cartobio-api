@@ -150,9 +150,6 @@ async function notifyCertificationComplete(record: Parameters<typeof sendCertifi
   }
 }
 
-/**
- * Load the parcelles of a previous record to allow data copy across records
- */
 async function loadPreviousFullData(
   tx: NodePgDatabase,
   context: { copyParcellesData?: boolean; previousRecordId?: string } | null,
@@ -180,13 +177,6 @@ async function loadPreviousFullData(
   return previousMap
 }
 
-/**
- * Normalize, validate and enrich a list of GeoJSON features before database insertion:
- * - populates multiple cultures
- * - fixes invalid geometries
- * - resolves commune code
- * - flags features as foreign (hors France)
- */
 async function prepareFeatures(
   features: Array<CartoBioFeatureInput>,
   tx: NodePgDatabase
@@ -196,8 +186,8 @@ async function prepareFeatures(
   )
   const withGeometry = prepared.filter((feature) => feature.geometry)
   const analyses = await repository.analyzeGeometries(
-    withGeometry.map((feature) => ({ geometry: feature.geometry as Polygon, commune: feature.properties.COMMUNE })),
-    tx
+    tx,
+    withGeometry.map((feature) => ({ geometry: feature.geometry as Polygon, commune: feature.properties.COMMUNE }))
   )
   const analysisByFeature = new Map(withGeometry.map((feature, index) => [feature, analyses[index]]))
 
@@ -226,10 +216,6 @@ async function prepareFeatures(
   })
 }
 
-/**
- * Merge data from a previous record into the prepared features (conversion_niveau, engagement_date, NOM, cultures)
- * No-op if context.copyParcellesData is falsy
- */
 function applyPreviousData(
   features: Array<CartoBioFeatureInput>,
   previousMap: Map<string | number, PreviousParcelle>,
@@ -264,9 +250,6 @@ function applyPreviousData(
   })
 }
 
-/**
- * Merge cultures from a previous record into new cultures, preserving varietes by CPF match
- */
 function mergeCulturesExact(
   newCultures: Array<CultureInput> = [],
   oldCultures: Array<CartoBioCulture> = []
@@ -288,6 +271,7 @@ function mergeCulturesExact(
     variete: c.variete || map.get(c.CPF) || ''
   }))
 }
+
 async function findHistoryUsers(entries: HistoryEntry[]): Promise<Map<string, CartoBioUser>> {
   const roles = new Map<string, string | null>()
   for (const { user } of entries) {
@@ -323,7 +307,7 @@ async function getRecords(numeroBio: string | number): Promise<NormalizedRecordS
 }
 
 async function getRecord(recordId: string, user: CartoBioUser | null = null): Promise<NormalizedRecord | null> {
-  const record = await repository.findRecord(recordId)
+  const record = await repository.findRecord(db, recordId)
   if (!record) return null
 
   const recordWithParcelles = await joinRecordParcelles(record, user?.id)

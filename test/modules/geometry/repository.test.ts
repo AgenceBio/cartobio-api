@@ -1,16 +1,12 @@
 import { loadParcellairesFixture } from '../../utils.js'
 import records from '../../fixtures/providers/records.json' with { type: 'json' }
-import { verifyGeometry } from '../../../src/modules/geometry/geometry.service.js'
+import { getGeometryEquals, verifyGeometry } from '../../../src/modules/geometry/geometry.service.js'
 import { sql } from 'drizzle-orm'
 import type { Polygon } from 'geojson'
 import { db } from '../../../src/database/database.js'
 import { parcellaires, parcelles } from '../../../src/database/schema/index.js'
 import { areaHa, wgs84FromGeoJSON } from '../../../src/database/postgis.js'
-import {
-  findGeometryEquals,
-  findParcelBorder,
-  findParcelBorderBetweenPoints
-} from '../../../src/modules/geometry/geometry.repository.js'
+import { findParcelBorder, findParcelBorderBetweenPoints } from '../../../src/modules/geometry/geometry.repository.js'
 
 describe('verifyGeometry', () => {
   beforeEach(async () => {
@@ -198,7 +194,7 @@ const areaM2 = async (geometry: unknown): Promise<number> => {
   return Number(result.rows[0]!.area)
 }
 
-describe('findGeometryEquals', () => {
+describe('getGeometryEquals', () => {
   const OLD = '00000000-0000-4000-8000-000000000001'
   const NEW = '00000000-0000-4000-8000-000000000002'
   const OTHER = '00000000-0000-4000-8000-000000000003'
@@ -239,11 +235,11 @@ describe('findGeometryEquals', () => {
     await insertRecord(OTHER, 2, '2024-06-01', [])
   })
 
-  const summarize = (result: Awaited<ReturnType<typeof findGeometryEquals>>) =>
+  const summarize = (result: Awaited<ReturnType<typeof getGeometryEquals>>) =>
     result[0]!.geojson.features.map(({ properties }) => properties as Record<string, unknown>)
 
   test('liste les parcelles modifiées, supprimées et ajoutées, sans les inchangées', async () => {
-    const result = await findGeometryEquals({ old: OLD, new: NEW })
+    const result = await getGeometryEquals({ old: OLD, new: NEW })
 
     expect(result[0]!.comparison_result).toBe('r1_old_r2_new')
     expect(summarize(result)).toEqual([
@@ -254,7 +250,7 @@ describe('findGeometryEquals', () => {
   })
 
   test("remet les parcellaires dans l'ordre chronologique", async () => {
-    const result = await findGeometryEquals({ old: NEW, new: OLD })
+    const result = await getGeometryEquals({ old: NEW, new: OLD })
 
     expect(result[0]!.comparison_result).toBe('r2_old_r1_new')
     expect(summarize(result).map(({ status, new_id }) => [status, new_id])).toEqual([
@@ -270,17 +266,17 @@ describe('findGeometryEquals', () => {
       .set({ deletedAt: sql`now()` })
       .where(sql`${parcelles.id} = 'q4'`)
 
-    const result = await findGeometryEquals({ old: OLD, new: NEW })
+    const result = await getGeometryEquals({ old: OLD, new: NEW })
 
     expect(summarize(result).map(({ status }) => status)).toEqual(['modified', 'deleted'])
   })
 
   test('ne compare pas les parcellaires de deux opérateurs différents', async () => {
-    expect(await findGeometryEquals({ old: OLD, new: OTHER })).toEqual([])
+    expect(await getGeometryEquals({ old: OLD, new: OTHER })).toEqual([])
   })
 
   test('ne compare pas un parcellaire inexistant', async () => {
-    expect(await findGeometryEquals({ old: OLD, new: '00000000-0000-4000-8000-000000000009' })).toEqual([])
+    expect(await getGeometryEquals({ old: OLD, new: '00000000-0000-4000-8000-000000000009' })).toEqual([])
   })
 })
 

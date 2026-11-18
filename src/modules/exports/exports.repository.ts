@@ -14,7 +14,11 @@ import type {
   AttestationsProductionsType,
   CartoBioCulture
 } from '@agencebio/cartobio-types'
-import { createAttestationProductionSchema } from '../../database/validations/activites.js'
+import {
+  createAttestationProductionSchema,
+  productionAttestationStatusEnumSchema,
+  updateAttestationProductionSchema
+} from '../../database/validations/activites.js'
 import { sansDateParDefaut, surfaceHa } from './exports.utils.js'
 import { isoDay, isoTimestamp } from '../../shared/parcellaires/parcellaires.utils.js'
 import type { AttestationProduction, ExportRow, PdfParcelle, PdfRecord } from './exports.types.js'
@@ -30,7 +34,7 @@ async function updateAttestationsProductions(
     .values(createAttestationProductionSchema.parse({ recordId, type, status, path }))
     .onConflictDoUpdate({
       target: [attestationsProduction.recordId, attestationsProduction.type],
-      set: { status, path, updatedAt: sql`CURRENT_TIMESTAMP` }
+      set: { status, path, updatedAt: sql`now()` }
     })
 }
 
@@ -46,7 +50,7 @@ async function findValidAttestationProduction(
       and(
         eq(attestationsProduction.recordId, recordId),
         gt(attestationsProduction.updatedAt, parcellaires.updatedAt),
-        eq(attestationsProduction.status, 'generated'),
+        eq(attestationsProduction.status, productionAttestationStatusEnumSchema.enum.generated),
         eq(attestationsProduction.type, type)
       )
     )
@@ -57,11 +61,14 @@ async function findValidAttestationProduction(
 async function failInterruptedAttestationsProductions(): Promise<number> {
   const { rowCount } = await db
     .update(attestationsProduction)
-    .set({ status: 'error', updatedAt: sql`CURRENT_TIMESTAMP` })
+    .set({
+      ...updateAttestationProductionSchema.parse({ status: productionAttestationStatusEnumSchema.enum.error }),
+      updatedAt: sql`now()`
+    })
     .where(
       and(
-        eq(attestationsProduction.status, 'started'),
-        lt(attestationsProduction.updatedAt, sql`CURRENT_TIMESTAMP - interval '1 hour'`)
+        eq(attestationsProduction.status, productionAttestationStatusEnumSchema.enum.started),
+        lt(attestationsProduction.updatedAt, sql`now() - interval '1 hour'`)
       )
     )
   return rowCount ?? 0
@@ -119,11 +126,7 @@ async function findExportRows(ocId: number, numeroBios: number[]): Promise<Expor
     .leftJoin(parcellairesMetadata, eq(parcellairesMetadata.recordId, parcellaires.recordId))
     .leftJoin(parcelles, and(eq(parcelles.recordId, parcellaires.recordId), isNull(parcelles.deletedAt)))
     .where(
-      and(
-        eq(parcellaires.ocId, String(ocId)),
-        inArray(parcellaires.numeroBio, numeroBios),
-        isNull(parcellaires.deletedAt)
-      )
+      and(eq(parcellaires.ocId, ocId), inArray(parcellaires.numeroBio, numeroBios), isNull(parcellaires.deletedAt))
     )
     .groupBy(parcellaires.recordId, parcellairesMetadata.recordId)
     .orderBy(asc(parcellaires.numeroBio))

@@ -56,7 +56,7 @@ try {
             geometry: multiPolygon(geometry)
           }))
         )
-        .onConflictDoUpdate({ target: territoires.fid, set: { geometry: sql`excluded.geom` } })
+        .onConflictDoUpdate({ target: territoires.fid, set: { geometry: sql`excluded.geometry` } })
     )
 
     const located: Array<Zone & { codeRegion: string }> = []

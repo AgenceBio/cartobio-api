@@ -6,9 +6,9 @@ import config from '../../../src/config/env.js'
 import { get } from '../../got-mock.js'
 import agencebioOperator from '../../fixtures/providers/agence-bio-operateur.json' with { type: 'json' }
 import parcellesJSON from '../../fixtures/providers/parcelles.json' with { type: 'json' }
-import { randomUUID } from 'crypto'
+import { randomUUID } from 'node:crypto'
 import { AttestationsProductionsStatus, AttestationsProductionsType } from '@agencebio/cartobio-types'
-import fs from 'fs'
+import fs from 'node:fs'
 import { asPdfDocument, buildCulture, buildPdfParcelle } from '../../factories.js'
 import type { PdfParcelle, PdfRecord } from '../../../src/modules/exports/exports.types.js'
 

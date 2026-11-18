@@ -45,7 +45,7 @@ async function addRecordData(operateur: AgenceBioNormalizedOperator): Promise<Ag
     user_id: userId,
     user_role: userRole,
     ...record
-  } = await repository.addRecordData(operateur)
+  } = await repository.findRecordData(operateur)
 
   if (record.record_id === undefined) {
     return record
@@ -59,15 +59,15 @@ async function addRecordData(operateur: AgenceBioNormalizedOperator): Promise<Ag
 }
 
 async function pinOperator(numeroBio: NumeroBio, userId: number): Promise<void> {
-  await repository.pinOperator(numeroBio, userId)
+  await repository.insertPinnedOperator(numeroBio, userId)
 }
 
 async function unpinOperator(numeroBio: NumeroBio, userId: number): Promise<void> {
-  await repository.unpinOperator(numeroBio, userId)
+  await repository.deletePinnedOperator(numeroBio, userId)
 }
 
 async function consultOperator(numeroBio: NumeroBio, userId: number): Promise<void> {
-  await repository.consultOperator(numeroBio, userId)
+  await repository.upsertConsultedOperator(numeroBio, userId)
 }
 
 async function getImportPAC(numeroBio: NumeroBio): Promise<ImportPacRow | null> {
@@ -75,7 +75,7 @@ async function getImportPAC(numeroBio: NumeroBio): Promise<ImportPacRow | null> 
 }
 
 async function hideImport(numeroBio: NumeroBio): Promise<void> {
-  await repository.hideImport(numeroBio)
+  await repository.updateImportPacImported(numeroBio)
 }
 
 const NOTIF_PRIORITY: Record<string, number> = {
@@ -342,7 +342,7 @@ async function getCustomersForAdmin({
 }: {
   input?: string
 }): Promise<AgenceBioNormalizedOperatorWithFilterData[]> {
-  return repository.getFilterData(await fetchOperatorsForAdmin(input), false)
+  return repository.findFilterData(await fetchOperatorsForAdmin(input), false)
 }
 
 async function getCustomersByOcWithRecords(
@@ -397,10 +397,10 @@ async function getCustomersByOcWithRecords(
   }
 
   if (filter.engagement && filter.engagement.length > 0) {
-    return repository.getFilterData(operators, true)
+    return repository.findFilterData(operators, true)
   }
 
-  return repository.getFilterData(operators, false)
+  return repository.findFilterData(operators, false)
 }
 
 async function getConsultedOperators(userId: number): Promise<number[]> {

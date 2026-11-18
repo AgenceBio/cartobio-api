@@ -15,14 +15,14 @@ export type CertificationMailRecord = {
 }
 
 export type StatsOrganisme = {
-  organismeCertificateur: string
+  organismeCertificateur: number
   totalRecu: number
   totalAcceptes: number
   totalRefuses: number
 }
 
 export type DestinataireRapport = {
-  id: string
+  id: number
   label: string
   email: string
 }

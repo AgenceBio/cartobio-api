@@ -1311,8 +1311,8 @@ describe('GET /api/v2/certification/parcellaires', () => {
   })
 
   test("it should only return this oc's parcellaire", async () => {
-    await drizzleDb.insert(organismeCertificateur).values({ id: '1', label: 'OC 1' }).onConflictDoNothing()
-    await drizzleDb.update(parcellaires).set({ ocId: '1' }).where(eq(parcellaires.numeroBio, 99999))
+    await drizzleDb.insert(organismeCertificateur).values({ id: 1, label: 'OC 1' }).onConflictDoNothing()
+    await drizzleDb.update(parcellaires).set({ ocId: 1 }).where(eq(parcellaires.numeroBio, 99999))
     const res = await request(app.server).get('/api/v2/certification/parcellaires').set('Authorization', fakeOcToken)
 
     expect(res.status).toBe(200)

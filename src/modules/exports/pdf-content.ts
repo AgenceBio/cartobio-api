@@ -1,4 +1,4 @@
-import fs from 'fs'
+import fs from 'node:fs'
 import {
   formatDate,
   getOptimalZoom,
@@ -10,7 +10,7 @@ import {
   drawAllParcellesOnMap,
   mergeAndAddFooter
 } from './pdf-utils.js'
-import path from 'path'
+import path from 'node:path'
 import puppeteer from 'puppeteer'
 import { fromCodeCpf } from '@agencebio/rosetta-cultures'
 import { ASSETS_DIR } from '../../shared/paths.js'
@@ -22,9 +22,6 @@ import type { MapImagesOptions, OperatorMapImages, PdfParcelle, PdfRecord } from
 import { logger } from '../../config/logger.js'
 import config from '../../config/env.js'
 
-/**
- * Génère une image de carte pour un opérateur et ses parcelles
- */
 async function generateOperatorMapImages(
   parcelles: PdfParcelle[],
   page: Page,
@@ -34,7 +31,6 @@ async function generateOperatorMapImages(
     const globalBbox = calculateGlobalBoundingBox(parcelles)
     if (!globalBbox) throw new Error('Aucune parcelle pour générer la carte du parcellaire')
 
-    // Paramètres par défaut
     const viewportWidth = options.width || 465
     const viewportHeight = options.height || 389
     const timeout = options.timeout || 30000
@@ -117,7 +113,7 @@ async function renderPdfContent(
   tmpPdf: (index: number) => string
 ): Promise<PDFDocument[]> {
   const browser = await puppeteer.launch({
-    executablePath: process.env.CHROME_BIN || undefined,
+    executablePath: config.get('attestationsProductions.chromeBin') || undefined,
     headless: true,
     args: ['--headless', '--hide-scrollbars', '--mute-audio', '--no-sandbox']
   })
@@ -262,7 +258,6 @@ async function renderPdfContent(
     .align-left{text-align:left;margin-top:2px;color:rgba(245,245,254,1);font-weight:bolder;}
     .title-grey{text-align:left;color:#777777}
     .block{display:grid;grid-template-columns:65% 35%;page-break-inside:avoid;break-inside:avoid;margin-bottom:30px;}
-    // .page{page-break-after:always;display:flex;flex-direction:column}.page:last-child{page-break-after:auto}
     .header{font-size:20px;font-weight:700;margin-bottom:10px;overflow-wrap: break-word;word-break: break-word;white-space: normal;  text-overflow: ellipsis;}.container{padding:10px}.info{font-size:13px;display:flex;margin-bottom:20px;margin-top:20px;justify-content:space-between}
     .info-block{flex:1}
     .table-container{margin-top:20px;margin-bottom:20px}

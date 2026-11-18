@@ -115,12 +115,30 @@ npm run db:reset
 
 Les écritures en base passent par les validateurs zod de [`src/database/validations`](src/database/validations).
 
+### Contours géographiques
+
+[`bin/build-geo-data.ts`](bin/build-geo-data.ts) (lancé par `npm run dev`, `npm start` et `npm test`) télécharge
+les contours administratifs depuis `etalab-datasets.geo.data.gouv.fr` et vérifie l'empreinte SHA-256 de chaque
+fichier avant de l'utiliser. Un fichier dont l'empreinte diffère est rejeté et le script échoue.
+
+Lors d'un changement de millésime (`GEO_SOURCE`) ou d'une mise à jour des fichiers source, il faut donc mettre à
+jour les constantes `*_SHA256` du script :
+
+```sh
+curl -sL https://etalab-datasets.geo.data.gouv.fr/contours-administratifs/2026/geojson/communes-50m.geojson.gz | sha256sum
+```
+
+Les fichiers déjà générés dans `data/generated` et `data/reference` ne sont pas retéléchargés : les supprimer pour
+forcer la mise à jour.
+
 ### Migration des données depuis l'ancienne base
 
 Les migrations `db-migrate` de [`database/old_migrations`](database/old_migrations) sont conservées à titre d'historique :
 elles servent uniquement à amener une ancienne base à jour avant d'en copier les données.
 
-`SOURCE_DATABASE_URL` désigne l'ancienne base, `TARGET_DATABASE_URL` la nouvelle.
+`SOURCE_DATABASE_URL` désigne l'ancienne base, `TARGET_DATABASE_URL` la nouvelle. Ces deux variables ne servent
+qu'au script de copie ; l'application et `npm run db:migrate` utilisent `DATABASE_URL`, qui doit donc pointer sur
+la même base que `TARGET_DATABASE_URL`.
 
 ```sh
 # 1. Mettre l'ancienne base à jour (si besoin)
@@ -161,6 +179,15 @@ GitHub Actions lance les tests (`.github/workflows/test.yml`), l'analyse CodeQL 
 `@agencebio/cartobio-types` (`.github/workflows/publish-types.yml`). La construction des images Docker et les
 déploiements sont assurés par la CI interne de l'Agence Bio.
 
+`npm start` applique les migrations drizzle avant de lancer l'API : lors d'un déploiement, ne démarrer qu'une seule
+instance à la fois pour éviter que deux migrations s'exécutent en parallèle.
+
+Variables à renseigner par environnement, en plus des secrets :
+
+- `DATABASE_URL` : base PostgreSQL/PostGIS de l'application ;
+- `CORS_ORIGINS` : origines autorisées à appeler l'API (par défaut l'origine de `FRONTEND_URL`,
+  plusieurs valeurs séparées par des virgules).
+
 Pour créer un tag :
 
 ```sh
@@ -197,7 +224,9 @@ L'application lit les variables définies dans un fichier `.env`.
 | `NODE_ENV`                                  | `dev`                                                                 | Environnement d'exécution de l'application (`dev`, `production`, `test`).                    |
 | `APP_ENVIRONMENT`                           | `development`                                                         | Environnement fonctionnel de l'application (`development`, `staging`, `production`, `test`). |
 | `FRONTEND_URL`                              | `https://cartobio.agencebio.org`                                      | URL de l'application frontend.                                                               |
-| `TARGET_DATABASE_URL`                       | `postgresql://docker:docker@localhost:25432/cartobio`                 | URL de connexion à la base de données PostgreSQL/PostGIS.                                    |
+| `CORS_ORIGINS`                              | origine de `FRONTEND_URL`                                             | Origines autorisées par CORS, séparées par des virgules (ignoré si `NODE_ENV=dev`).          |
+| `DATABASE_URL`                              | `postgresql://docker:docker@localhost:25432/cartobio`                 | URL de connexion à la base de données PostgreSQL/PostGIS.                                    |
+| `TARGET_DATABASE_URL`                       | ``                                                                    | URL de la nouvelle base, lue uniquement par `npm run db:migrate:data`.                       |
 | `SOURCE_DATABASE_URL`                       | ``                                                                    | URL de l'ancienne base, lue uniquement par `npm run db:migrate:data`.                        |
 | `CARTOBIO_JWT_SECRET`                       | ``                                                                    | Secret utilisé pour signer et vérifier les JSON Web Tokens (JWT).                            |
 | `DOUANES_BASE_URL`                          | `http://bdd-cartobio/ws`                                              | URL de base du service web des Douanes.                                                      |

@@ -34,10 +34,7 @@ function hasNotification(operator: AgenceBioNormalizedOperator): operator is Ope
   return operator.notifications != null
 }
 
-/**
- * Returns operators related to an OC
- */
-async function _getOperatorsByOc({ oc }: { oc: number }): Promise<AgenceBioNormalizedOperator[]> {
+async function _fetchOperatorsByOc({ oc }: { oc: number }): Promise<AgenceBioNormalizedOperator[]> {
   const limit = 10000
   const data = parseApiResponse(
     agenceBioOperateursPageSchema,
@@ -81,10 +78,7 @@ async function _getOperatorsByOc({ oc }: { oc: number }): Promise<AgenceBioNorma
   })
 }
 
-/**
- * Returs operators for admin profile
- */
-async function _getOperatorsForAdmin({ input = '' }: { input?: string }): Promise<AgenceBioNormalizedOperator[]> {
+async function _fetchOperatorsForAdmin({ input = '' }: { input?: string }): Promise<AgenceBioNormalizedOperator[]> {
   const limit = 10000
 
   type SearchParams = { nom?: string; numeroBio?: string; siret?: string; page?: number }
@@ -131,25 +125,16 @@ async function _getOperatorsForAdmin({ input = '' }: { input?: string }): Promis
     .map(normalizeOperator)
 }
 
-/**
- * Returns operators related to an OC, and eventual filters (numeroBio, or pacage)
- */
-const getOperatorsByOc = memo(_getOperatorsByOc, {
+const memoFetchOperatorsByOc = memo(_fetchOperatorsByOc, {
   cache: new ExpiryMap(10 * ONE_MINUTE),
   cacheKey: JSON.stringify
 })
 
-/**
- * Returns operators related to admin, and eventual filters (numeroBio, or pacage)
- */
-const getOperatorsForAdmin = memo(_getOperatorsForAdmin, {
+const memoFetchOperatorsForAdmin = memo(_fetchOperatorsForAdmin, {
   cache: new ExpiryMap(10 * ONE_MINUTE),
   cacheKey: JSON.stringify
 })
 
-/**
- * Returns operators for a given user
- */
 async function fetchUserOperators(userId: number): Promise<{ operators: AgenceBioNormalizedOperator[] }> {
   const data = parseApiList(
     agenceBioOperatorSchema,
@@ -167,11 +152,11 @@ async function fetchUserOperators(userId: number): Promise<{ operators: AgenceBi
 }
 
 async function fetchCustomersByOc(oc: number): Promise<OperatorWithNotification[]> {
-  return (await getOperatorsByOc({ oc })).filter(hasNotification)
+  return (await memoFetchOperatorsByOc({ oc })).filter(hasNotification)
 }
 
 async function fetchOperatorsForAdmin(input = ''): Promise<OperatorWithNotification[]> {
-  return (await getOperatorsForAdmin({ input })).filter(hasNotification)
+  return (await memoFetchOperatorsForAdmin({ input })).filter(hasNotification)
 }
 
 async function fetchOperatorByNumeroBio(numeroBio: string): Promise<AgenceBioNormalizedOperator> {

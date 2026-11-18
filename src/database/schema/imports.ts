@@ -19,14 +19,12 @@ export const parcellaireImport = cartobio.table(
   {
     id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
     status: importStatus('status').notNull().default('CREATED'),
-    organismeCertificateur: varchar('organisme_certificateur', {
-      length: 64
-    }).notNull(),
+    organismeCertificateur: integer('organisme_certificateur').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     startedAt: timestamp('started_at', { withTimezone: true }),
     endedAt: timestamp('ended_at', { withTimezone: true }),
-    numeroBio: varchar('numerobio'),
-    numeroClient: varchar('numeroclient'),
+    numeroBio: varchar('numero_bio'),
+    numeroClient: varchar('numero_client'),
     auditDate: date('audit_date'),
     resultJob: jsonb('result_job'),
     statutJob: importJobResult('statut_job'),
@@ -68,7 +66,7 @@ export const importPac = cartobio.table(
   'import_pac',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    numeroBio: varchar('numerobio'),
+    numeroBio: varchar('numero_bio'),
     pacage: varchar('pacage'),
     siret: varchar('siret', { length: 14 }),
     nbParcelles: integer('nb_parcelles'),
@@ -81,5 +79,5 @@ export const importPac = cartobio.table(
       .defaultNow()
       .$onUpdate(() => sql`now()`)
   },
-  (table) => [uniqueIndex('import_pac_numerobio_pacage_siret_idx').on(table.numeroBio, table.pacage, table.siret)]
+  (table) => [uniqueIndex('import_pac_numero_bio_pacage_siret_idx').on(table.numeroBio, table.pacage, table.siret)]
 )

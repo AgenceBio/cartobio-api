@@ -9,54 +9,44 @@ import { recordColumns } from '../src/shared/parcellaires/parcellaires.utils.js'
 import { sendCertificationCompleteModifie } from '../src/services/mailer/mailer.service.js'
 import { fetchEmailForNumeroBio } from '../src/clients/agence-bio.client.js'
 
-async function sendMail(): Promise<void> {
-  try {
-    const parcellaires = await db
-      .select({
-        record_id: recordColumns.record_id,
-        updated_at: parcellairesTable.updatedAt,
-        annee_reference_controle: recordColumns.annee_reference_controle,
-        numerobio: recordColumns.numerobio,
-        version_name: recordColumns.version_name
-      })
-      .from(parcellairesTable)
-      .where(
-        and(
-          eq(parcellairesTable.certificationEtat, certificationEtatEnumSchema.enum.CERTIFIED),
-          or(
-            gt(parcellairesTable.updatedAt, parcellairesTable.dateDerniereNotif),
-            and(
-              isNull(parcellairesTable.dateDerniereNotif),
-              gt(parcellairesTable.updatedAt, sql`now() - interval '7 days'`)
-            )
-          ),
-          isNull(parcellairesTable.deletedAt)
-        )
+try {
+  const parcellaires = await db
+    .select({
+      record_id: recordColumns.record_id,
+      updated_at: parcellairesTable.updatedAt,
+      annee_reference_controle: recordColumns.annee_reference_controle,
+      numerobio: recordColumns.numerobio,
+      version_name: recordColumns.version_name
+    })
+    .from(parcellairesTable)
+    .where(
+      and(
+        eq(parcellairesTable.certificationEtat, certificationEtatEnumSchema.enum.CERTIFIED),
+        or(
+          gt(parcellairesTable.updatedAt, parcellairesTable.dateDerniereNotif),
+          and(
+            isNull(parcellairesTable.dateDerniereNotif),
+            gt(parcellairesTable.updatedAt, sql`now() - interval '7 days'`)
+          )
+        ),
+        isNull(parcellairesTable.deletedAt)
       )
+    )
 
-    let errors = 0
-    for (const parcellaire of parcellaires) {
-      try {
-        const emails = await fetchEmailForNumeroBio(parcellaire.numerobio)
+  for (const parcellaire of parcellaires) {
+    try {
+      const emails = await fetchEmailForNumeroBio(parcellaire.numerobio)
 
-        for (const email of new Set(emails.utilisateurs.map((utilisateur) => utilisateur.email))) {
-          await sendCertificationCompleteModifie(parcellaire, email)
-        }
-
-        await markCertificationNotified(db, parcellaire.record_id)
-      } catch (err) {
-        errors++
-        console.error(`Erreur envoi notification pour le parcellaire ${parcellaire.record_id}:`, err)
+      for (const email of new Set(emails.utilisateurs.map((utilisateur) => utilisateur.email))) {
+        await sendCertificationCompleteModifie(parcellaire, email)
       }
+
+      await markCertificationNotified(db, parcellaire.record_id)
+    } catch (err) {
+      process.exitCode = 1
+      console.error(`Erreur envoi notification pour le parcellaire ${parcellaire.record_id}:`, err)
     }
-
-    process.exit(errors > 0 ? 1 : 0)
-  } catch (err) {
-    console.error('Erreur envoi notification:', err)
-    process.exit(1)
   }
+} finally {
+  await db.$client.end()
 }
-
-;(async function (): Promise<void> {
-  await sendMail()
-})()

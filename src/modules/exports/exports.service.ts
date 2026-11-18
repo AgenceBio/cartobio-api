@@ -60,7 +60,7 @@ function archivePdfs(paths: string[], operator: ArchiveOperator): string {
 }
 
 const pdfsInProgress = new Set<string>()
-const MAX_PDF_GENERATIONS = 10
+const MAX_PDF_GENERATIONS = 3
 const PDF_QUEUED = Number.POSITIVE_INFINITY
 let runningPdfGenerations = 0
 const pdfGenerationQueue: Array<() => void> = []
@@ -95,12 +95,13 @@ async function* generatePDF(
       await Promise.all(types.map((type) => repository.findValidAttestationProduction(recordId, type)))
     ).filter((production) => production !== null)
     const [production] = productions
-    if (production) {
+    const zipRecord = zip && productions.length === types.length ? await repository.findPdfRecord(recordId) : null
+    if (production && (!zip || zipRecord)) {
       try {
-        const document = zip
+        const document = zipRecord
           ? archivePdfs(
               productions.map(({ path }) => path),
-              { annee_reference_controle: '', numeroBio }
+              { annee_reference_controle: zipRecord.annee_reference_controle, numeroBio }
             )
           : await fs.promises.readFile(production.path, { encoding: 'base64' })
         yield 0

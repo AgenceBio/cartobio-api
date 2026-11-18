@@ -2,10 +2,10 @@ import { sql } from 'drizzle-orm'
 import { db } from '../../../src/database/database.js'
 import { importPac, parcellaires } from '../../../src/database/schema/index.js'
 import {
-  addRecordData,
+  findRecordData,
   findDashboardStates,
   findImportPac,
-  hideImport
+  updateImportPacImported
 } from '../../../src/modules/operators/operators.repository.js'
 import { buildOperator } from '../../factories.js'
 
@@ -45,7 +45,7 @@ describe('findDashboardStates', () => {
   })
 })
 
-describe('findImportPac / hideImport', () => {
+describe('findImportPac / updateImportPacImported', () => {
   beforeEach(async () => {
     await db.delete(importPac)
     await db.insert(importPac).values({ numeroBio: '99999', pacage: '012345678', nbParcelles: 3, size: 12.5 })
@@ -62,16 +62,16 @@ describe('findImportPac / hideImport', () => {
   })
 
   test("masque la notification d'import", async () => {
-    await hideImport(99999)
+    await updateImportPacImported(99999)
 
     expect(await findImportPac('99999')).toMatchObject({ imported: true })
   })
 })
 
-describe('addRecordData', () => {
+describe('findRecordData', () => {
   test('ne cherche pas de parcellaire pour un numéro bio non entier', async () => {
     const operator = buildOperator({ numeroBio: 'abc' })
 
-    expect(await addRecordData(operator)).toEqual({ ...operator, metadata: {} })
+    expect(await findRecordData(operator)).toEqual({ ...operator, metadata: {} })
   })
 })

@@ -36,6 +36,8 @@ export const agenceBioAdresseGeoSchema = z.looseObject({
  */
 export const agenceBioAdressesSchema = agenceBioAdresseGeoSchema.extend({
   active: z.boolean().nullish(),
+  lat: z.union([z.string(), z.number()]).nullish(),
+  long: z.union([z.string(), z.number()]).nullish(),
   lieu: z.string().nullish(),
   codePostal: z.string().nullish(),
   ville: z.string().nullish()

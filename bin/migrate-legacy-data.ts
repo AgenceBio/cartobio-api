@@ -2,9 +2,11 @@
 
 import 'dotenv/config'
 import { randomUUID } from 'node:crypto'
+import { writeFileSync } from 'node:fs'
 import pg from 'pg'
 import { annotationCodes, isAnnotationCode } from '../src/database/validations/parcelles.js'
 import { eventTypes } from '../src/shared/parcellaires/parcellaires.utils.js'
+import { scriptOutputPath } from '../src/shared/paths.js'
 
 type Row = Record<string, unknown>
 
@@ -90,14 +92,14 @@ const STEPS: Step[] = [
   },
   {
     table: 'territoires',
-    extract: `SELECT fid::text AS fid, ${geometry('geom')} AS geom FROM territoires WHERE geom IS NOT NULL`
+    extract: `SELECT fid::text AS fid, ${geometry('geom')} AS geometry FROM territoires WHERE geom IS NOT NULL`
   },
   {
     table: 'organisme_certificateur',
     extract: `
-      SELECT id::text AS id, label, emails AS email, active FROM organisme_certificateur
+      SELECT id, label, emails AS email, active FROM organisme_certificateur
       UNION ALL (
-        SELECT DISTINCT ON (oc_id) oc_id::text, coalesce(NULLIF(oc_label, ''), oc_id::text), NULL, true
+        SELECT DISTINCT ON (oc_id) oc_id, coalesce(NULLIF(oc_label, ''), oc_id::text), NULL, true
         FROM cartobio_operators
         WHERE oc_id IS NOT NULL AND oc_id NOT IN (SELECT id FROM organisme_certificateur)
         ORDER BY oc_id, updated_at DESC NULLS LAST
@@ -107,12 +109,12 @@ const STEPS: Step[] = [
   {
     table: 'parcellaires',
     extract: `
-      SELECT record_id, numerobio::int AS numerobio,
+      SELECT record_id, numerobio::int AS numero_bio,
         coalesce(oc_id, (
           SELECT o2.oc_id FROM cartobio_operators o2
           WHERE o2.numerobio = o.numerobio AND o2.oc_id IS NOT NULL
           ORDER BY o2.updated_at DESC NULLS LAST LIMIT 1
-        ))::text AS oc_id,
+        )) AS oc_id,
         certification_state AS certification_etat, certification_date_debut, certification_date_fin,
         audit_date, annee_reference_controle, audit_notes AS audit_notes_certif,
         audit_demandes AS audit_demandes_operateur, version_name AS version_nom, mixite,
@@ -267,7 +269,7 @@ const STEPS: Step[] = [
   },
   ...['consultes', 'epingles'].map((name): Step => ({
     table: `operateurs_${name}`,
-    extract: `SELECT numerobio::int AS numerobio, user_id::text AS user_id, coalesce(created_at, now()) AS created_at FROM operateurs_${name}`
+    extract: `SELECT numerobio::int AS numero_bio, user_id::text AS user_id, coalesce(created_at, now()) AS created_at FROM operateurs_${name}`
   })),
   {
     table: 'parcelles_controles',
@@ -280,10 +282,10 @@ const STEPS: Step[] = [
   {
     table: 'parcellaire_import',
     extract: `
-      SELECT id, status, organisme_certificateur,
+      SELECT id, status, organisme_certificateur::int AS organisme_certificateur,
         coalesce(created_at::timestamptz, now()) AS created_at,
         started_at::timestamptz AS started_at, ended_at::timestamptz AS ended_at,
-        numerobio, numeroclient, audit_date,
+        numerobio AS numero_bio, numeroclient AS numero_client, audit_date,
         result_job, statut_job::text AS statut_job, etat::text AS etat
       FROM parcellaire_import
     `
@@ -303,7 +305,7 @@ const STEPS: Step[] = [
   {
     table: 'import_pac',
     extract: `
-      SELECT numerobio, pacage, siret, nb_parcelles, size, record, imported,
+      SELECT numerobio AS numero_bio, pacage, siret, nb_parcelles, size, record, imported,
         coalesce(createdat::timestamptz, now()) AS created_at,
         coalesce(updatedat::timestamptz, createdat::timestamptz, now()) AS updated_at
       FROM import_pac_26
@@ -395,47 +397,68 @@ async function lossReport(source: pg.Client): Promise<Row[]> {
   )
 }
 
-async function main(): Promise<void> {
-  const sourceUrl = process.env.SOURCE_DATABASE_URL
-  const targetUrl = process.env.TARGET_DATABASE_URL
-  if (!sourceUrl || !targetUrl) throw new Error('SOURCE_DATABASE_URL et TARGET_DATABASE_URL sont obligatoires')
-
-  const source = new pg.Client({ connectionString: sourceUrl })
-  const target = new pg.Client({ connectionString: targetUrl, options: '-c search_path=cartobio,public' })
-  await source.connect()
-  await target.connect()
-
-  try {
-    if (process.argv.includes('--reset')) {
-      await target.query(`TRUNCATE ${STEPS.map(({ table }) => `"${table}"`).join(', ')} CASCADE`)
-    } else if ((await target.query('SELECT 1 FROM parcellaires LIMIT 1')).rowCount !== 0) {
-      throw new Error('La base cible contient déjà des données, relancer avec --reset pour la vider')
-    }
-
-    console.log('Copie des données…')
-    await source.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY')
-    await target.query('BEGIN')
-    console.table(await lossReport(source))
-    const report: Row[] = []
-    for (const step of STEPS) report.push(await run(source, target, step))
-    await target.query(
-      "SELECT setval(pg_get_serial_sequence('parcellaire_import', 'id'), coalesce(max(id), 0) + 1, false) FROM parcellaire_import"
-    )
-    await target.query('COMMIT')
-    await source.query('COMMIT')
-
-    console.table(report)
-  } catch (error) {
-    await target.query('ROLLBACK')
-    throw error
-  } finally {
-    await source.end()
-    await target.end()
-  }
+async function truncatedParcellesReport(source: pg.Client): Promise<string | null> {
+  const { rows } = await source.query<Row>(`
+    SELECT record_id, o.numerobio, p.id, ST_NumGeometries(polygons) AS polygones,
+      round((ST_Area(polygons::geography) / 10000)::numeric, 4) AS surface_totale_ha,
+      round((ST_Area(largest.polygon::geography) / 10000)::numeric, 4) AS surface_conservee_ha,
+      round(((ST_Area(polygons::geography) - ST_Area(largest.polygon::geography)) / 10000)::numeric, 4) AS surface_perdue_ha
+    FROM (SELECT p.*, ST_CollectionExtract(ST_SetSRID(p.geometry, 4326), 3) AS polygons FROM ${PARCELLES}) p
+    JOIN ${RECORDS} USING (record_id)
+    CROSS JOIN LATERAL (
+      SELECT part.geom AS polygon
+      FROM ST_Dump(p.polygons) part
+      ORDER BY ST_Area(part.geom::geography) DESC
+      LIMIT 1
+    ) largest
+    WHERE ST_NumGeometries(p.polygons) > 1
+    ORDER BY surface_perdue_ha DESC
+  `)
+  const [first] = rows
+  if (!first) return null
+  const file = scriptOutputPath('migration-parcelles-tronquees.csv')
+  const lines = [Object.keys(first), ...rows.map((row) => Object.values(row))].map((values) =>
+    values.map((value) => `"${String(value ?? '').replaceAll('"', '""')}"`).join(',')
+  )
+  writeFileSync(file, `${lines.join('\n')}\n`, { mode: 0o600 })
+  return file
 }
 
-main().catch((error: unknown): void => {
-  process.stdout.write('\n')
-  console.error(error)
-  process.exitCode = 1
-})
+const sourceUrl = process.env.SOURCE_DATABASE_URL
+const targetUrl = process.env.TARGET_DATABASE_URL
+if (!sourceUrl || !targetUrl) throw new Error('SOURCE_DATABASE_URL et TARGET_DATABASE_URL sont obligatoires')
+
+const source = new pg.Client({ connectionString: sourceUrl })
+const target = new pg.Client({ connectionString: targetUrl, options: '-c search_path=cartobio,public' })
+await source.connect()
+await target.connect()
+
+try {
+  if (process.argv.includes('--reset')) {
+    await target.query(`TRUNCATE ${STEPS.map(({ table }) => `"${table}"`).join(', ')} CASCADE`)
+  } else if ((await target.query('SELECT 1 FROM parcellaires LIMIT 1')).rowCount !== 0) {
+    throw new Error('La base cible contient déjà des données, relancer avec --reset pour la vider')
+  }
+
+  console.log('Copie des données…')
+  await source.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY')
+  await target.query('BEGIN')
+  console.table(await lossReport(source))
+  const truncatedFile = await truncatedParcellesReport(source)
+  if (truncatedFile) console.log(`Parcelles multi-polygones tronquées : ${truncatedFile}`)
+  const report: Row[] = []
+  for (const step of STEPS) report.push(await run(source, target, step))
+  await target.query(
+    "SELECT setval(pg_get_serial_sequence('parcellaire_import', 'id'), coalesce(max(id), 0) + 1, false) FROM parcellaire_import"
+  )
+  await target.query('COMMIT')
+  await source.query('COMMIT')
+
+  console.table(report)
+} catch (error) {
+  await target.query('ROLLBACK')
+  throw error
+} finally {
+  await source.end()
+  await target.end()
+}

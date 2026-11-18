@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { CertificationState } from '../enums.js'
 import { booleanQuery, opt, optionalString, textOrNumber } from './helpers.js'
 import {
   anyGeometrySchema,
@@ -33,7 +34,6 @@ export const importListQuerySchema = z.object({
   from: optionalIsoDateQuerySchema.meta({ description: "Date de début d'envoi incluse (ISO 8601)" }),
   to: optionalIsoDateQuerySchema.meta({ description: "Date de fin d'envoi incluse, jusqu'à 23:59:59 (ISO 8601)" }),
   withPayload: booleanQuery('Inclure le corps JSON envoyé'),
-  logs: optionalString('Non utilisé'),
   page: pageStringSchema.optional().meta({ description: 'Numéro de page, à partir de 1 (défaut 1)' }),
   limit: integerStringSchema
     .refine((limit) => Number(limit) <= 100)
@@ -43,8 +43,7 @@ export const importListQuerySchema = z.object({
 })
 
 export const importDetailsQuerySchema = z.object({
-  withPayload: booleanQuery('Inclure le corps JSON envoyé'),
-  logs: optionalString('Non utilisé')
+  withPayload: booleanQuery('Inclure le corps JSON envoyé')
 })
 
 export const certificationParcellairesQuerySchema = z.object({
@@ -54,13 +53,13 @@ export const certificationParcellairesQuerySchema = z.object({
     .meta({ description: 'Nombre de parcellaires par page (défaut 100, 1000 maximum)' }),
   start: integerStringSchema.optional().meta({ description: 'Décalage de pagination (défaut 0)' }),
   anneeAudit: optionalString("Année de la date d'audit"),
-  statut: optionalString('État du parcellaire (`OPERATOR_DRAFT`, `AUDITED`, `PENDING_CERTIFICATION`, `CERTIFIED`)'),
+  statut: z.enum(CertificationState).optional().meta({ description: 'État du parcellaire' }),
   anneeReferenceControle: integerStringSchema.optional().meta({ description: 'Année de référence du contrôle' })
 })
 
 export const certificationParcellaireQuerySchema = z.object({
   anneeAudit: optionalString("Année de la date d'audit"),
-  statut: optionalString('État du parcellaire (`OPERATOR_DRAFT`, `AUDITED`, `PENDING_CERTIFICATION`, `CERTIFIED`)')
+  statut: z.enum(CertificationState).optional().meta({ description: 'État du parcellaire' })
 })
 
 export const importedFeaturePropertiesSchema = z.looseObject({

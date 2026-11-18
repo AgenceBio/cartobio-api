@@ -37,7 +37,7 @@ async function insertJob(job: Partial<typeof parcellaireImport.$inferInsert> = {
   const { id } = (
     await db
       .insert(parcellaireImport)
-      .values({ organismeCertificateur: '1', ...job })
+      .values({ organismeCertificateur: 1, ...job })
       .returning({ id: parcellaireImport.id })
   )[0]!
 
@@ -942,7 +942,7 @@ describe('getImportList / getImportById', () => {
       createdAt: new Date('2026-01-15T20:00:00Z')
     })
     pending = await insertJob({ status: 'PENDING', numeroBio: '3', createdAt: new Date('2026-01-20T10:00:00Z') })
-    await insertJob({ status: 'DONE', organismeCertificateur: '2', createdAt: new Date('2026-01-12T10:00:00Z') })
+    await insertJob({ status: 'DONE', organismeCertificateur: 2, createdAt: new Date('2026-01-12T10:00:00Z') })
     await db.insert(parcellaireImportPayload).values({ id: 'p-done', importId: done, payload: { numeroBio: '1' } })
   })
 

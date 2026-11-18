@@ -16,7 +16,7 @@ import type { OrganismeCertificateur } from '@agencebio/cartobio-types'
 const [, , xlsxPath, ocId] = process.argv
 
 if (xlsxPath === undefined || ocId === undefined) {
-  console.error('Usage: node create-parcellaire-import-pac-xlsx.js <XLSX> <OC_ID>')
+  console.error('Usage: npm run job:parcellaire-xlsx -- <XLSX> <OC_ID>')
   process.exit(1)
 }
 
@@ -54,47 +54,49 @@ function readFirstSheetRows(filePath: string): Array<Record<string, string | und
   )
 }
 
-;(async (): Promise<void> => {
-  const rows = readFirstSheetRows(xlsxPath)
-  const codesBio = rows
-    .map((r) => r['Code bio'])
-    .filter(Boolean)
-    .map(String)
+const rows = readFirstSheetRows(xlsxPath)
+const codesBio = rows
+  .map((r) => r['Code bio'])
+  .filter(Boolean)
+  .map(String)
 
-  if (codesBio.length === 0) {
-    console.error('Aucun "Code bio" trouvé dans le fichier XLSX.')
-    process.exit(1)
-  }
+if (codesBio.length === 0) {
+  console.error('Aucun "Code bio" trouvé dans le fichier XLSX.')
+  process.exit(1)
+}
 
-  const operators = await fetchCustomersByOc(+ocId)
+const operators = await fetchCustomersByOc(+ocId)
 
-  const operatorOfOc = operators.find(
-    ({ organismeCertificateur }) => 'id' in organismeCertificateur && organismeCertificateur.id === +ocId
-  )
-  if (!operatorOfOc) {
-    console.warn("Aucun numerobio pour l'oc", ocId)
-    process.exit(0)
-  }
-  const oc = operatorOfOc.organismeCertificateur as OrganismeCertificateur
+const operatorOfOc = operators.find(
+  ({ organismeCertificateur }) => 'id' in organismeCertificateur && organismeCertificateur.id === +ocId
+)
+if (!operatorOfOc) {
+  console.warn("Aucun numerobio pour l'oc", ocId)
+  process.exit(0)
+}
+const oc = operatorOfOc.organismeCertificateur as OrganismeCertificateur
 
-  const operatorBioNumbers = new Set(operators.map((o) => o.numeroBio.toString()))
+const operatorBioNumbers = new Set(operators.map((o) => o.numeroBio.toString()))
 
-  const validCodesBio = codesBio.filter((nb) => operatorBioNumbers.has(nb))
-  const invalidCodesBio = codesBio.filter((nb) => !validCodesBio.includes(nb))
+const validCodesBio = codesBio.filter((nb) => operatorBioNumbers.has(nb))
+const invalidCodesBio = codesBio.filter((nb) => !validCodesBio.includes(nb))
 
-  if (validCodesBio.length > 0) {
-    console.log('Nombre de codes bios importées : ', validCodesBio.length)
-  }
+if (validCodesBio.length > 0) {
+  console.log('Nombre de codes bios importées : ', validCodesBio.length)
+}
 
-  if (invalidCodesBio.length > 0) {
-    console.warn('Codes bio ignorés (non trouvés chez cet OC):', invalidCodesBio.join(', '))
-  }
+if (invalidCodesBio.length > 0) {
+  console.warn('Codes bio ignorés (non trouvés chez cet OC):', invalidCodesBio.join(', '))
+}
 
-  if (validCodesBio.length === 0) {
-    console.error('Aucun code bio valide trouvé. Fin du script.')
-    process.exit(0)
-  }
+if (validCodesBio.length === 0) {
+  console.error('Aucun code bio valide trouvé. Fin du script.')
+  process.exit(0)
+}
 
+const progress = new cliProgress.SingleBar({ etaBuffer: 10000 }, cliProgress.Presets.rect)
+
+try {
   const parcellairesACreer = await db
     .select({ record: importPac.record, numerobio: sql<string>`${importPac.numeroBio}` })
     .from(importPac)
@@ -106,40 +108,35 @@ function readFirstSheetRows(filePath: string): Array<Record<string, string | und
     console.warn('Codes bio déjà importés :', parcellairesDejaImportes.join(', '))
   }
 
-  const progress = new cliProgress.SingleBar({ etaBuffer: 10000 }, cliProgress.Presets.rect)
   progress.start(parcellairesACreer.length, 0)
+  for (const parcelle of parcellairesACreer) {
+    const previousRecordId = await findLastAuditedRecordId(parcelle.numerobio)
 
-  try {
-    for (const parcelle of parcellairesACreer) {
-      const previousRecordId = await findLastAuditedRecordId(parcelle.numerobio)
-
-      const { id: ocIdNum, nom: ocLabel } = oc
-      const record = await createOrUpdateOperatorRecord(
-        { numerobio: parcelle.numerobio, oc_id: ocIdNum, oc_label: ocLabel, ...(parcelle.record as RecordInput) },
-        {
-          user: null,
-          copyParcellesData: previousRecordId != null,
-          previousRecordId: previousRecordId ?? undefined
-        }
-      )
-
-      if (record.numerobio !== parcelle.numerobio) {
-        console.error(
-          "Erreur d'import pour le numéro: %s, résultat: numéro bio: %s, parcellaire: %s",
-          parcelle.numerobio,
-          record.numerobio,
-          record.record_id
-        )
-        process.exit(1)
+    const { id: ocIdNum, nom: ocLabel } = oc
+    const record = await createOrUpdateOperatorRecord(
+      { numerobio: parcelle.numerobio, oc_id: ocIdNum, oc_label: ocLabel, ...(parcelle.record as RecordInput) },
+      {
+        user: null,
+        copyParcellesData: previousRecordId != null,
+        previousRecordId: previousRecordId ?? undefined
       }
+    )
 
-      await hideImport(parcelle.numerobio)
-      progress.increment()
+    if (record.numerobio !== parcelle.numerobio) {
+      console.error(
+        "Erreur d'import pour le numéro: %s, résultat: numéro bio: %s, parcellaire: %s",
+        parcelle.numerobio,
+        record.numerobio,
+        record.record_id
+      )
+      process.exitCode = 1
+      break
     }
-  } catch (error) {
-    console.error(error)
-    process.exit(1)
-  } finally {
-    progress.stop()
+
+    await hideImport(parcelle.numerobio)
+    progress.increment()
   }
-})()
+} finally {
+  progress.stop()
+  await db.$client.end()
+}

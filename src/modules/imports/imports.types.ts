@@ -1,5 +1,34 @@
-import type { ImportSummary, IsoDate } from '@agencebio/cartobio-types'
+import type {
+  ImportJobStatusResponse,
+  ImportLogCode,
+  ImportSummary,
+  InputApiRecordBody,
+  IsoDate,
+  RecordInfos
+} from '@agencebio/cartobio-types'
 import type { ImportStatus } from '../../database/validations/imports.js'
+import type { CertificationEtat } from '../../database/validations/parcellaires.js'
+import type { RecordInput } from '../../shared/parcellaires/parcellaires.types.js'
+
+export type ImportWarning = { numeroBio: string; message: string; code: ImportLogCode }
+
+export type ImportJobStatusResult = ImportJobStatusResponse | { status: 'error'; error: string }
+
+export type ValidItem = {
+  record: RecordInput & Pick<RecordInfos, 'numerobio'>
+  numeroBio: string
+  warnings: ImportWarning[]
+}
+
+export type RecordError = { message: string; code: ImportLogCode }
+
+export type FeatureError = RecordError & { idParcelle?: string | number | null; nomParcelle?: string | null }
+
+export type ErrorItem = FeatureError & { numeroBio?: string }
+
+export type ParsedRecord =
+  | (ValidItem & { json: InputApiRecordBody; errors?: undefined })
+  | { numeroBio: string; errors: FeatureError[]; json: InputApiRecordBody; record?: undefined; warnings?: undefined }
 
 export type ImportJobRow = {
   status: ImportStatus
@@ -43,7 +72,7 @@ export type ImportListFilters = {
 
 export type OperatorRecordFilters = {
   anneeAudit?: string | number | null
-  statut?: string | null
+  statut?: CertificationEtat | null
   anneeReferenceControle?: string | null
   limit?: number | null
   start?: number | null

@@ -191,9 +191,7 @@ export default async function importRoutes(fastify: FastifyInstance): Promise<vo
       organismeCertificateur: requireOrganismeCertificateur(request).id
     })
 
-    if (!result) {
-      return reply.status(404).send({ message: 'Import introuvable' })
-    }
+    if (!result) throw new NotFoundApiError('Import introuvable')
 
     return reply.send(result)
   })

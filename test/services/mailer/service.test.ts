@@ -1,5 +1,5 @@
 import config from '../../../src/config/env.js'
-import { getStatsByOrganisme } from '../../../src/services/mailer/mailer.repository.js'
+import { findStatsByOrganisme } from '../../../src/services/mailer/mailer.repository.js'
 import {
   sendCertificationComplete,
   sendCertificationCompleteModifie,
@@ -64,22 +64,22 @@ describe('sendRapportHebdo', () => {
   })
 
   test('interroge les statistiques de la semaine précédente complète', async () => {
-    vi.mocked(getStatsByOrganisme).mockResolvedValue(null)
+    vi.mocked(findStatsByOrganisme).mockResolvedValue(null)
 
-    await sendRapportHebdo('oc-1', 'oc@test.fr', 'Ecocert')
+    await sendRapportHebdo(1, 'oc@test.fr', 'Ecocert')
 
-    expect(getStatsByOrganisme).toHaveBeenCalledWith('oc-1', new Date('2026-10-26'), new Date('2026-11-01T23:59:59'))
+    expect(findStatsByOrganisme).toHaveBeenCalledWith(1, new Date('2026-10-26'), new Date('2026-11-01T23:59:59'))
   })
 
   test('affiche les compteurs, la période et le lien vers les imports', async () => {
-    vi.mocked(getStatsByOrganisme).mockResolvedValue({
-      organismeCertificateur: 'oc-1',
+    vi.mocked(findStatsByOrganisme).mockResolvedValue({
+      organismeCertificateur: 1,
       totalRecu: 17,
       totalAcceptes: 11,
       totalRefuses: 6
     })
 
-    await sendRapportHebdo('oc-1', 'oc@test.fr', 'Ecocert & Co')
+    await sendRapportHebdo(1, 'oc@test.fr', 'Ecocert & Co')
 
     const sent = lastSent()
     expect(sent.to).toBe('oc@test.fr')
@@ -95,9 +95,9 @@ describe('sendRapportHebdo', () => {
   })
 
   test("affiche des compteurs à zéro quand l'organisme n'a rien envoyé", async () => {
-    vi.mocked(getStatsByOrganisme).mockResolvedValue(null)
+    vi.mocked(findStatsByOrganisme).mockResolvedValue(null)
 
-    await sendRapportHebdo('oc-1', 'oc@test.fr', 'Ecocert')
+    await sendRapportHebdo(1, 'oc@test.fr', 'Ecocert')
 
     const { html } = lastSent()
     expect(html).toContain('Nombre d’objets envoyés : 0<')

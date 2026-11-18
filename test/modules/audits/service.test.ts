@@ -61,8 +61,8 @@ describe('updateAuditRecordState', () => {
 
     await updateAuditRecordState({ user: buildOcUser(), record }, { certification_state: CertificationState.CERTIFIED })
 
-    expect(mockedRepo.findMixite).toHaveBeenCalledWith(record.record_id)
-    expect(mockedRepo.updateAuditRecord.mock.calls[0]![1]).toMatchObject({ mixite: 'AB' })
+    expect(mockedRepo.findMixite).toHaveBeenCalledWith(db, record.record_id)
+    expect(mockedRepo.updateAuditRecord.mock.calls[0]![2]).toMatchObject({ mixite: 'AB' })
     expect(cartobio.notifyCertificationComplete).toHaveBeenCalledWith(record)
   })
 
@@ -87,8 +87,8 @@ describe('updateAuditRecordState', () => {
 
     await updateAuditRecordState({ user: buildOcUser(), record }, { audit_notes: 'note' })
 
-    expect(mockedRepo.updateAuditRecord.mock.calls[0]![1]).toMatchObject({ oc_id: 1, oc_label: "CartoBi'OC" })
-    expect(mockedRepo.updateAuditRecord.mock.calls[0]![2]).toBeNull()
+    expect(mockedRepo.updateAuditRecord.mock.calls[0]![2]).toMatchObject({ oc_id: 1, oc_label: "CartoBi'OC" })
+    expect(mockedRepo.updateAuditRecord.mock.calls[0]![3]).toBeNull()
   })
 
   test("se rabat sur l'OC de l'opérateur et ne remplace pas un OC existant", async () => {
@@ -96,10 +96,10 @@ describe('updateAuditRecordState', () => {
     const operator = buildOperator({ organismeCertificateur: { id: 7, nom: 'OC opérateur' } })
 
     await updateAuditRecordState({ user, record: buildNormalizedRecord({ oc_id: null }), operator }, {})
-    expect(mockedRepo.updateAuditRecord.mock.calls[0]![1]).toMatchObject({ oc_id: 7, oc_label: 'OC opérateur' })
+    expect(mockedRepo.updateAuditRecord.mock.calls[0]![2]).toMatchObject({ oc_id: 7, oc_label: 'OC opérateur' })
 
     await updateAuditRecordState({ user, record: buildNormalizedRecord({ oc_id: 3 }), operator }, {})
-    expect(mockedRepo.updateAuditRecord.mock.calls[1]![1]).not.toHaveProperty('oc_id')
+    expect(mockedRepo.updateAuditRecord.mock.calls[1]![2]).not.toHaveProperty('oc_id')
   })
 
   test("convertit un doublon de date d'audit en erreur 400", async () => {
@@ -129,7 +129,7 @@ describe('deleteRecord', () => {
     vi.mocked(deleteRecordAttestations).mockRejectedValue(new Error('S3 down'))
 
     await expect(deleteRecord(record)).resolves.toBeUndefined()
-    expect(mockedRepo.deleteRecord).toHaveBeenCalledWith(record.record_id)
+    expect(mockedRepo.softDeleteRecord).toHaveBeenCalledWith(record.record_id)
   })
 })
 

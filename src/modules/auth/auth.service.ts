@@ -5,6 +5,7 @@ import got, { HTTPError } from 'got'
 const { get } = got
 import { createDecoder, createVerifier } from 'fast-jwt'
 import config from '../../config/env.js'
+import { logger } from '../../config/logger.js'
 import * as repository from './auth.repository.js'
 import { notificationsTokenSchema, ssoAccessTokenSchema } from './auth.tokens.js'
 import { fetchOperatorByNumeroBio, fetchUserOperators } from '../../clients/agence-bio.client.js'
@@ -76,7 +77,8 @@ async function getHistoryUser(userId: string | number, userRole: string | null):
       return { id: Number(userId), nom: 'Utilisateur supprimé', prenom: '', groups: [], mainGroup: { nom: userRole } }
     }
 
-    throw error
+    logger.warn({ err: error, userId }, "Profil de l'historique indisponible")
+    return { id: Number(userId), nom: 'Utilisateur inconnu', prenom: '', groups: [], mainGroup: { nom: userRole } }
   }
 }
 

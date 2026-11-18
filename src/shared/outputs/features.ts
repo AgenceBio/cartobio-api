@@ -1,4 +1,4 @@
-import { randomInt, randomUUID } from 'crypto'
+import { randomInt, randomUUID } from 'node:crypto'
 import { fromCodePacStrict, fromCodeCpf } from '@agencebio/rosetta-cultures'
 import type { CartoBioFeature, CartoBioFeatureInput } from '@agencebio/cartobio-types'
 import type { DBParcelle } from '../parcellaires/parcellaires.types.js'

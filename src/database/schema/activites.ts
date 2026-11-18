@@ -40,7 +40,7 @@ export const attestationsProduction = cartobio.table(
 export const operateursConsultes = cartobio.table(
   'operateurs_consultes',
   {
-    numeroBio: integer('numerobio').notNull(),
+    numeroBio: integer('numero_bio').notNull(),
     userId: varchar('user_id', { length: 255 }).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
   },
@@ -50,7 +50,7 @@ export const operateursConsultes = cartobio.table(
 export const operateursEpingles = cartobio.table(
   'operateurs_epingles',
   {
-    numeroBio: integer('numerobio').notNull(),
+    numeroBio: integer('numero_bio').notNull(),
     userId: varchar('user_id', { length: 255 }).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
   },

@@ -1,9 +1,6 @@
 import { toIsoDateTime } from '@agencebio/cartobio-types'
-import {
-  getTableauErreursRepo,
-  getTopAnomaliesGroupedRepo,
-  getTopAnomaliesRepo
-} from '../../../src/modules/tableau-de-bord/tableau-de-bord.repository.js'
+import { findTableauErreurs } from '../../../src/modules/tableau-de-bord/tableau-de-bord.repository.js'
+import { getTopAnomaliesGrouped } from '../../../src/modules/tableau-de-bord/tableau-de-bord.service.js'
 import { db } from '../../../src/database/database.js'
 import { parcellaireImportLogs, parcellaireImport } from '../../../src/database/schema/index.js'
 
@@ -13,7 +10,7 @@ async function insertJob(job: Partial<typeof parcellaireImport.$inferInsert>): P
   const { id } = (
     await db
       .insert(parcellaireImport)
-      .values({ organismeCertificateur: String(organismeCertificateur), status: 'DONE', ...job })
+      .values({ organismeCertificateur, status: 'DONE', ...job })
       .returning({ id: parcellaireImport.id })
   )[0]!
 
@@ -58,7 +55,7 @@ describe('dashboard repository', () => {
       { importId: autreJobId, type: 'error', code: 'AUTRE', message: 'Autre job' }
     ])
 
-    await expect(getTableauErreursRepo({ page: 1, limit: 20, organismeCertificateur })).resolves.toEqual({
+    await expect(findTableauErreurs({ page: 1, limit: 20, organismeCertificateur })).resolves.toEqual({
       data: [
         {
           jobId,
@@ -84,17 +81,12 @@ describe('dashboard repository', () => {
   })
 
   it("ne remonte pas les jobs d'un autre organisme dans le tableau des erreurs", async () => {
-    await insertJob({ statutJob: 'REJECTED', organismeCertificateur: '8' })
+    await insertJob({ statutJob: 'REJECTED', organismeCertificateur: 8 })
 
-    await expect(getTableauErreursRepo({ page: 1, limit: 20, organismeCertificateur })).resolves.toEqual({
+    await expect(findTableauErreurs({ page: 1, limit: 20, organismeCertificateur })).resolves.toEqual({
       data: [],
       meta: { total: 0, page: 1, limit: 20 }
     })
-  })
-
-  it('retourne immédiatement une liste vide si la période des anomalies est incomplète', async () => {
-    await expect(getTopAnomaliesRepo({ from: '2026-01-01', organismeCertificateur })).resolves.toEqual([])
-    await expect(getTopAnomaliesGroupedRepo({ to: '2026-01-31', organismeCertificateur })).resolves.toEqual([])
   })
 
   it('agrège les anomalies groupées par période et conserve les périodes vides', async () => {
@@ -103,11 +95,10 @@ describe('dashboard repository', () => {
     await insertJob({ statutJob: 'VALID', createdAt })
     await insertErrors(await insertJob({ statutJob: 'REJECTED', createdAt }), ['E1', 'E1', 'E1', 'E2'])
 
-    const result = await getTopAnomaliesGroupedRepo({
-      from: '2026-01-01T00:00:00Z',
-      to: '2026-01-02T00:00:00Z',
+    const result = await getTopAnomaliesGrouped(
+      { from: '2026-01-01T00:00:00Z', to: '2026-01-02T00:00:00Z' },
       organismeCertificateur
-    })
+    )
 
     expect(result).toEqual([
       {

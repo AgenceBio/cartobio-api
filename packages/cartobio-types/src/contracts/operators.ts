@@ -107,6 +107,8 @@ export const operatorSchema = z.looseObject({
   adressesOperateurs: z
     .array(
       z.looseObject({
+        lat: textOrNumber('Latitude'),
+        long: textOrNumber('Longitude'),
         codeCommune: text('Code INSEE de la commune'),
         lieu: text('Adresse'),
         codePostal: text('Code postal'),

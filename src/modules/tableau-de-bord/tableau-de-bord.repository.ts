@@ -2,32 +2,34 @@ import { and, asc, count, desc, eq, exists, gte, ilike, inArray, lte, or, sql } 
 import type { SQL } from 'drizzle-orm'
 import { db, firstRow } from '../../database/database.js'
 import { parcellaireImportLogs, parcellaireImportPayload, parcellaireImport } from '../../database/schema/index.js'
-import { importJobResultEnumSchema, importStatusEnumSchema } from '../../database/validations/imports.js'
-import { getStreaksSuspectes } from './tableau-de-bord.utils.js'
+import {
+  importJobResultEnumSchema,
+  importLogTypeEnumSchema,
+  importStatusEnumSchema
+} from '../../database/validations/imports.js'
+import { getTruncate } from './tableau-de-bord.utils.js'
 import { toIsoDateTime } from '@agencebio/cartobio-types'
 import { isoDay, isoTimestamp } from '../../shared/parcellaires/parcellaires.utils.js'
 import type {
   GeneralKpiResponse,
   HistoriqueResponse,
-  RepetitionsResponse,
   TableauBilanResponse,
   TableauErreursResponse,
-  TopAnomaliesGroupedResponse,
   TopAnomaliesResponse
 } from '@agencebio/cartobio-types'
 import type {
-  AlerteSuspecte,
+  AnomaliesPeriodeRow,
   DateRange,
+  EnvoiParcellaire,
   ErrorDetail,
-  GroupeEnvois,
   HistoriqueParams,
   Numeric,
   PaginationParams,
-  PeriodeAnomalies
+  PeriodeObligatoire
 } from './tableau-de-bord.types.js'
 
 function organismeCondition(organismeCertificateur: number): SQL {
-  return eq(parcellaireImport.organismeCertificateur, String(organismeCertificateur))
+  return eq(parcellaireImport.organismeCertificateur, organismeCertificateur)
 }
 
 function periodConditions({ from, to }: Pick<DateRange, 'from' | 'to'>): SQL[] {
@@ -53,7 +55,7 @@ function rechercheCondition(recherche?: string): SQL | undefined {
   return or(ilike(parcellaireImport.numeroClient, motif), ilike(parcellaireImport.numeroBio, motif))
 }
 
-async function getErrorLogsByJobId(jobIds: number[]): Promise<Record<number, ErrorDetail[]>> {
+async function findErrorLogsByJobId(jobIds: number[]): Promise<Record<number, ErrorDetail[]>> {
   if (jobIds.length === 0) {
     return {}
   }
@@ -70,8 +72,8 @@ async function getErrorLogsByJobId(jobIds: number[]): Promise<Record<number, Err
     .from(parcellaireImportLogs)
     .where(
       and(
-        sql`${parcellaireImportLogs.importId} = ANY(${sql.param(jobIds)}::int[])`,
-        eq(parcellaireImportLogs.type, 'error')
+        inArray(parcellaireImportLogs.importId, jobIds),
+        eq(parcellaireImportLogs.type, importLogTypeEnumSchema.enum.error)
       )
     )
     .orderBy(asc(parcellaireImportLogs.id))
@@ -86,7 +88,7 @@ async function getErrorLogsByJobId(jobIds: number[]): Promise<Record<number, Err
   return logsByJobId
 }
 
-async function getGeneralKpi({ from, to, organismeCertificateur }: DateRange): Promise<GeneralKpiResponse['data']> {
+async function findGeneralKpi({ from, to, organismeCertificateur }: DateRange): Promise<GeneralKpiResponse['data']> {
   const [bilanRows, [anomalyRow]] = await Promise.all([
     db
       .select({
@@ -112,7 +114,7 @@ async function getGeneralKpi({ from, to, organismeCertificateur }: DateRange): P
       .innerJoin(parcellaireImport, eq(parcellaireImport.id, parcellaireImportLogs.importId))
       .where(
         and(
-          eq(parcellaireImportLogs.type, 'error'),
+          eq(parcellaireImportLogs.type, importLogTypeEnumSchema.enum.error),
           ...periodConditions({ from, to }),
           organismeCondition(organismeCertificateur)
         )
@@ -136,7 +138,7 @@ async function getGeneralKpi({ from, to, organismeCertificateur }: DateRange): P
   }
 }
 
-async function getTableauBilanRepo({
+async function findTableauBilan({
   from,
   to,
   organismeCertificateur,
@@ -187,7 +189,7 @@ async function getTableauBilanRepo({
   }
 }
 
-async function getTableauErreursRepo({
+async function findTableauErreurs({
   from,
   to,
   page,
@@ -210,7 +212,7 @@ async function getTableauErreursRepo({
             .where(
               and(
                 eq(parcellaireImportLogs.importId, parcellaireImport.id),
-                eq(parcellaireImportLogs.type, 'error'),
+                eq(parcellaireImportLogs.type, importLogTypeEnumSchema.enum.error),
                 inArray(parcellaireImportLogs.code, codes)
               )
             )
@@ -240,7 +242,7 @@ async function getTableauErreursRepo({
     db.$count(parcellaireImport, where)
   ])
 
-  const logsByJobId = await getErrorLogsByJobId(rows.map((row) => row.jobId))
+  const logsByJobId = await findErrorLogsByJobId(rows.map((row) => row.jobId))
 
   return {
     data: rows.map((row) => ({
@@ -255,7 +257,7 @@ async function getTableauErreursRepo({
   }
 }
 
-async function getHistoriqueSpecificParcellaireRepo({
+async function findHistoriqueParcellaire({
   numeroBio,
   numeroClient,
   auditDate,
@@ -282,7 +284,7 @@ async function getHistoriqueSpecificParcellaireRepo({
   const jobIds = rows.map((row) => row.jobId)
 
   const [logsByJobId, payloads] = await Promise.all([
-    getErrorLogsByJobId(jobIds),
+    findErrorLogsByJobId(jobIds),
     jobIds.length > 0
       ? db
           .select({
@@ -290,7 +292,7 @@ async function getHistoriqueSpecificParcellaireRepo({
             payload: parcellaireImportPayload.payload
           })
           .from(parcellaireImportPayload)
-          .where(sql`${parcellaireImportPayload.importId} = ANY(${sql.param(jobIds)}::int[])`)
+          .where(inArray(parcellaireImportPayload.importId, jobIds))
       : []
   ])
 
@@ -307,21 +309,11 @@ async function getHistoriqueSpecificParcellaireRepo({
   }))
 }
 
-function getTruncate(from: string, to: string): 'day' | 'week' {
-  const diffInDays = (new Date(to).getTime() - new Date(from).getTime()) / (1000 * 60 * 60 * 24)
-
-  return diffInDays <= 7 ? 'day' : 'week'
-}
-
-async function getTopAnomaliesRepo({
+async function findTopAnomalies({
   from,
   to,
   organismeCertificateur
-}: DateRange): Promise<TopAnomaliesResponse['data']> {
-  if (!from || !to) {
-    return []
-  }
-
+}: PeriodeObligatoire): Promise<TopAnomaliesResponse['data']> {
   const period =
     sql<Date>`date_trunc(${sql.raw(`'${getTruncate(from, to)}'`)}, ${parcellaireImport.createdAt})`.mapWith(
       parcellaireImport.createdAt
@@ -337,7 +329,7 @@ async function getTopAnomaliesRepo({
     .innerJoin(parcellaireImport, eq(parcellaireImport.id, parcellaireImportLogs.importId))
     .where(
       and(
-        eq(parcellaireImportLogs.type, 'error'),
+        eq(parcellaireImportLogs.type, importLogTypeEnumSchema.enum.error),
         ...periodConditions({ from, to }),
         organismeCondition(organismeCertificateur)
       )
@@ -348,15 +340,11 @@ async function getTopAnomaliesRepo({
   return rows.map((row) => ({ ...row, period: toIsoDateTime(row.period) }))
 }
 
-async function getTopAnomaliesGroupedRepo({
+async function findTopAnomaliesGrouped({
   from,
   to,
   organismeCertificateur
-}: DateRange): Promise<TopAnomaliesGroupedResponse> {
-  if (!from || !to) {
-    return []
-  }
-
+}: PeriodeObligatoire): Promise<AnomaliesPeriodeRow[]> {
   const truncate = getTruncate(from, to)
   const unit = sql.raw(`'${truncate}'`)
   const interval = sql.raw(truncate === 'day' ? "'1 day'" : "'1 week'")
@@ -401,7 +389,7 @@ async function getTopAnomaliesGroupedRepo({
       .innerJoin(parcellaireImport, eq(parcellaireImport.id, parcellaireImportLogs.importId))
       .where(
         and(
-          eq(parcellaireImportLogs.type, 'error'),
+          eq(parcellaireImportLogs.type, importLogTypeEnumSchema.enum.error),
           ...periodConditions({ from, to }),
           organismeCondition(organismeCertificateur)
         )
@@ -411,7 +399,7 @@ async function getTopAnomaliesGroupedRepo({
 
   const errorCount = sql<number>`COALESCE(${errorStats.count}, 0)`.mapWith(Number)
 
-  const rows = await db
+  return db
     .with(periodsCte, importStats, errorStats)
     .select({
       period: periodsCte.period,
@@ -424,47 +412,14 @@ async function getTopAnomaliesGroupedRepo({
     .leftJoin(importStats, eq(importStats.period, periodsCte.period))
     .leftJoin(errorStats, eq(errorStats.period, periodsCte.period))
     .orderBy(asc(periodsCte.period), desc(errorCount))
-
-  const periods = new Map<string, PeriodeAnomalies>()
-
-  for (const row of rows) {
-    const key = toIsoDateTime(new Date(row.period))
-
-    let currentPeriod = periods.get(key)
-
-    if (!currentPeriod) {
-      currentPeriod = {
-        period: key,
-        accepted: row.accepted,
-        refused: row.refused,
-        errorCount: 0,
-        errors: []
-      }
-      periods.set(key, currentPeriod)
-    }
-
-    if (row.code) {
-      currentPeriod.errors.push({
-        code: row.code,
-        count: row.errorCount
-      })
-
-      currentPeriod.errorCount += row.errorCount
-    }
-  }
-
-  return Array.from(periods.values())
 }
 
-async function getEnvoisSuspectsRepo({
+async function findEnvois({
   from,
   to,
-  page,
-  limit,
   recherche,
-  type,
   organismeCertificateur
-}: PaginationParams): Promise<RepetitionsResponse> {
+}: PeriodeObligatoire & Pick<PaginationParams, 'recherche'>): Promise<EnvoiParcellaire[]> {
   const rows = await db
     .select({
       jobId: parcellaireImport.id,
@@ -486,69 +441,17 @@ async function getEnvoisSuspectsRepo({
       asc(parcellaireImport.createdAt)
     )
 
-  const logsByJobId = await getErrorLogsByJobId(rows.map((row) => row.jobId))
+  const logsByJobId = await findErrorLogsByJobId(rows.map((row) => row.jobId))
 
-  const groupes = new Map<string, GroupeEnvois>()
-
-  for (const row of rows) {
-    const key = `${row.numeroBio}|${row.numeroClient}|${row.auditDate}`
-
-    let groupe = groupes.get(key)
-
-    if (!groupe) {
-      groupe = {
-        numeroBio: row.numeroBio,
-        numeroClient: row.numeroClient,
-        auditDate: row.auditDate,
-        envois: []
-      }
-      groupes.set(key, groupe)
-    }
-
-    groupe.envois.push({
-      jobId: row.jobId,
-      statut: row.statut,
-      etat: row.etat,
-      createdAt: row.createdAt,
-      erreurs: logsByJobId[row.jobId] ?? []
-    })
-  }
-
-  const alertes: AlerteSuspecte[] = []
-
-  for (const groupe of groupes.values()) {
-    for (const streak of getStreaksSuspectes(groupe.envois)) {
-      alertes.push({
-        numeroBio: groupe.numeroBio,
-        numeroClient: groupe.numeroClient,
-        auditDate: groupe.auditDate,
-        type: streak.type,
-        envois: streak.envois
-      })
-    }
-  }
-
-  const alertesFiltrees = type ? alertes.filter((alerte) => alerte.type === type) : alertes
-
-  const total = alertesFiltrees.length
-  const offset = (page - 1) * limit
-
-  return {
-    data: alertesFiltrees.slice(offset, offset + limit),
-    meta: {
-      total,
-      page,
-      limit
-    }
-  }
+  return rows.map((row) => ({ ...row, erreurs: logsByJobId[row.jobId] ?? [] }))
 }
 
 export {
-  getGeneralKpi,
-  getTableauBilanRepo,
-  getTableauErreursRepo,
-  getHistoriqueSpecificParcellaireRepo,
-  getTopAnomaliesRepo,
-  getTopAnomaliesGroupedRepo,
-  getEnvoisSuspectsRepo
+  findGeneralKpi,
+  findTableauBilan,
+  findTableauErreurs,
+  findHistoriqueParcellaire,
+  findTopAnomalies,
+  findTopAnomaliesGrouped,
+  findEnvois
 }

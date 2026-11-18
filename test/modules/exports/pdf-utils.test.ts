@@ -11,7 +11,7 @@ import {
   drawAllParcellesOnMap,
   mergeAndAddFooter
 } from '../../../src/modules/exports/pdf-utils.js'
-import fs from 'fs'
+import fs from 'node:fs'
 import pdflib from 'pdf-lib'
 import { findPdfParcelles } from '../../../src/modules/exports/exports.repository.js'
 import type { MapDrawOptions } from '../../../src/modules/exports/exports.types.js'

@@ -54,6 +54,7 @@ interface AppConfig {
   }
   attestationsProductions: {
     directory: string
+    chromeBin: string
   }
   mail: {
     mailUrl: string
@@ -77,7 +78,7 @@ const config = convict<AppConfig>({
     env: 'FRONTEND_URL'
   },
   corsOrigins: {
-    default: ['https://cartobio.agencebio.org'],
+    default: [],
     format: Array,
     env: 'CORS_ORIGINS'
   },
@@ -85,7 +86,7 @@ const config = convict<AppConfig>({
     sensitive: true,
     default: 'postgresql://docker:docker@localhost:25432/cartobio',
     format: 'pg-url',
-    env: 'TARGET_DATABASE_URL'
+    env: 'DATABASE_URL'
   },
   testDatabaseName: {
     sensitive: true,
@@ -234,6 +235,10 @@ const config = convict<AppConfig>({
     directory: {
       default: join(ROOT_DIR, 'storage/pdf'),
       env: 'ATTESTATIONS_PRODUCTIONS_DIRECTORY'
+    },
+    chromeBin: {
+      default: '',
+      env: 'CHROME_BIN'
     }
   },
   mail: {

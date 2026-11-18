@@ -5,6 +5,7 @@ import type {
   GeometryEqualsResponse
 } from '@agencebio/cartobio-types'
 import * as repository from './geometry.repository.js'
+import { compareParcellaires, feature, label } from './geometry.utils.js'
 import { InvalidRequestApiError } from '../../shared/errors.js'
 
 async function verifyGeometry(
@@ -31,8 +32,57 @@ async function verifyGeometry(
   }
 }
 
-function getGeometryEquals(input: GeometryEqualsBody['payload']): Promise<GeometryEqualsResponse> {
-  return repository.findGeometryEquals(input)
+async function getGeometryEquals(input: GeometryEqualsBody['payload']): Promise<GeometryEqualsResponse> {
+  const records = await repository.findParcellairesComparables([input.old, input.new])
+
+  const r1 = records.find(({ recordId }) => recordId === input.old)
+  const r2 = records.find(({ recordId }) => recordId === input.new)
+
+  if (!r1 || !r2 || r1.numeroBio !== r2.numeroBio) return []
+
+  const comparisonResult = compareParcellaires(r1, r2)
+  const [oldRecordId, newRecordId] =
+    comparisonResult === 'r1_old_r2_new' ? [input.old, input.new] : [input.new, input.old]
+
+  const { modified, deleted, added } = await repository.findParcellesComparees(oldRecordId, newRecordId)
+
+  return [
+    {
+      comparison_result: comparisonResult,
+      geojson: {
+        type: 'FeatureCollection',
+        features: [
+          ...modified.map(({ geometry, ancienne, nouvelle }) =>
+            feature(geometry, {
+              status: 'modified',
+              new_id: nouvelle.id,
+              old_id: ancienne.id,
+              label: label(nouvelle),
+              old_label: label(ancienne)
+            })
+          ),
+          ...deleted.map(({ geometry, ...parcelle }) =>
+            feature(geometry, {
+              status: 'deleted',
+              new_id: null,
+              old_id: parcelle.id,
+              label: label(parcelle),
+              old_label: null
+            })
+          ),
+          ...added.map(({ geometry, ...parcelle }) =>
+            feature(geometry, {
+              status: 'added',
+              new_id: parcelle.id,
+              old_id: null,
+              label: label(parcelle),
+              old_label: null
+            })
+          )
+        ]
+      }
+    }
+  ]
 }
 
 async function calculateParcelBorder(

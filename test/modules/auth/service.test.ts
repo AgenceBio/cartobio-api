@@ -221,10 +221,16 @@ describe('getHistoryUser', () => {
     })
   })
 
-  test('propage les autres erreurs', async () => {
+  test('retourne un utilisateur inconnu pour les autres erreurs', async () => {
     const serverError = Object.assign(new HTTPError(), { response: { statusCode: 500 } })
     get.mockReturnValue({ json: () => Promise.reject(serverError) })
 
-    await expect(getHistoryUser(500, null)).rejects.toBe(serverError)
+    expect(await getHistoryUser(500, null)).toEqual({
+      id: 500,
+      nom: 'Utilisateur inconnu',
+      prenom: '',
+      groups: [],
+      mainGroup: { nom: null }
+    })
   })
 })

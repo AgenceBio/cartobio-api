@@ -5,14 +5,14 @@ import type { Position } from 'geojson'
 import { db } from '../../database/database.js'
 import { asGeoJSON, asWgs84GeoJSON, fromGeoJSON, makeValid, webMercator } from '../../database/postgis.js'
 import { parcellaires, parcelles } from '../../database/schema/index.js'
-import { compareParcellaires, feature, label } from './geometry.utils.js'
 import type {
   GeometryConflict,
   GeometryConflictStatus,
   GeometryCorrection,
-  GeometryEquals,
   ParcelBorder,
-  ParcelleColumnKey
+  ParcellaireComparable,
+  ParcelleColumnKey,
+  ParcellesComparees
 } from './geometry.types.js'
 
 const ancienne = alias(parcelles, 'ancienne')
@@ -70,11 +70,8 @@ async function findGeometryCorrections(
     .where(and(eq(parcelles.recordId, recordId), inArray(parcelles.id, ids)))
 }
 
-/**
- * Vérifie que deux géométries sont de même géométrie spacial
- */
-async function findGeometryEquals(input: { old: string; new: string }): Promise<GeometryEquals[]> {
-  const records = await db
+async function findParcellairesComparables(recordIds: string[]): Promise<ParcellaireComparable[]> {
+  return db
     .select({
       recordId: parcellaires.recordId,
       numeroBio: parcellaires.numeroBio,
@@ -83,17 +80,10 @@ async function findGeometryEquals(input: { old: string; new: string }): Promise<
       createdAt: parcellaires.createdAt
     })
     .from(parcellaires)
-    .where(inArray(parcellaires.recordId, [input.old, input.new]))
+    .where(inArray(parcellaires.recordId, recordIds))
+}
 
-  const r1 = records.find(({ recordId }) => recordId === input.old)
-  const r2 = records.find(({ recordId }) => recordId === input.new)
-
-  if (!r1 || !r2 || r1.numeroBio !== r2.numeroBio) return []
-
-  const comparisonResult = compareParcellaires(r1, r2)
-  const [oldRecordId, newRecordId] =
-    comparisonResult === 'r1_old_r2_new' ? [input.old, input.new] : [input.new, input.old]
-
+async function findParcellesComparees(oldRecordId: string, newRecordId: string): Promise<ParcellesComparees> {
   const recouvrement = (
     geometry: AnyColumn,
     autre: AnyColumn
@@ -160,43 +150,7 @@ async function findGeometryEquals(input: { old: string; new: string }): Promise<
       )
   ])
 
-  return [
-    {
-      comparison_result: comparisonResult,
-      geojson: {
-        type: 'FeatureCollection',
-        features: [
-          ...modified.map(({ geometry, ancienne, nouvelle }) =>
-            feature(geometry, {
-              status: 'modified',
-              new_id: nouvelle.id,
-              old_id: ancienne.id,
-              label: label(nouvelle),
-              old_label: label(ancienne)
-            })
-          ),
-          ...deleted.map(({ geometry, ...parcelle }) =>
-            feature(geometry, {
-              status: 'deleted',
-              new_id: null,
-              old_id: parcelle.id,
-              label: label(parcelle),
-              old_label: null
-            })
-          ),
-          ...added.map(({ geometry, ...parcelle }) =>
-            feature(geometry, {
-              status: 'added',
-              new_id: parcelle.id,
-              old_id: null,
-              label: label(parcelle),
-              old_label: null
-            })
-          )
-        ]
-      }
-    }
-  ]
+  return { modified, deleted, added }
 }
 
 async function findParcelBorder(geometry: unknown, distance: number): Promise<ParcelBorder | undefined> {
@@ -288,7 +242,8 @@ async function findParcelBorderBetweenPoints(
 export {
   findGeometryConflicts,
   findGeometryCorrections,
-  findGeometryEquals,
+  findParcellairesComparables,
+  findParcellesComparees,
   findParcelBorder,
   findParcelBorderBetweenPoints
 }

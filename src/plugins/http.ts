@@ -6,8 +6,14 @@ import formBody from '@fastify/formbody'
 import config from '../config/env.js'
 
 async function httpPlugin(app: FastifyInstance): Promise<void> {
+  const corsOrigins = config.get('corsOrigins')
   await app.register(cors, {
-    origin: config.get('env') === 'dev' ? true : config.get('corsOrigins'),
+    origin:
+      config.get('env') === 'dev'
+        ? true
+        : corsOrigins.length > 0
+          ? corsOrigins
+          : [new URL(config.get('frontendUrl')).origin],
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'],
     allowedHeaders: [
       'Origin',

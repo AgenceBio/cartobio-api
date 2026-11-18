@@ -27,13 +27,14 @@ import type { AuditRecordChanges } from './audits.types.js'
 
 type FeatureId = string | number
 
-async function deleteRecord(recordId: string): Promise<void> {
+async function softDeleteRecord(recordId: string): Promise<void> {
   await db
     .update(parcellaires)
     .set({ deletedAt: sql`now()` })
     .where(eq(parcellaires.recordId, recordId))
 }
-async function markFeatureControlled(recordId: string, id: FeatureId, userId: number): Promise<void> {
+
+async function insertParcelleControle(recordId: string, id: FeatureId, userId: number): Promise<void> {
   await db
     .insert(parcellesControles)
     .values(createParcelleControleSchema.parse({ recordId, parcelleId: String(id), userId: String(userId) }))
@@ -41,7 +42,8 @@ async function markFeatureControlled(recordId: string, id: FeatureId, userId: nu
       target: [parcellesControles.recordId, parcellesControles.parcelleId, parcellesControles.userId]
     })
 }
-async function markFeatureUncontrolled(recordId: string, id: FeatureId, userId: number): Promise<void> {
+
+async function deleteParcelleControle(recordId: string, id: FeatureId, userId: number): Promise<void> {
   await db
     .delete(parcellesControles)
     .where(
@@ -52,7 +54,9 @@ async function markFeatureUncontrolled(recordId: string, id: FeatureId, userId: 
       )
     )
 }
+
 async function updateAuditRecord(
+  tx: NodePgDatabase,
   recordId: string,
   changes: AuditRecordChanges,
   historyEntry: HistoryEntry | null,
@@ -67,28 +71,27 @@ async function updateAuditRecord(
     const isBlank = value != null && blankToNull(value) === null
     if (isBlank && column === 'versionNom') continue
     if (value instanceof SQL) set[column] = value
-    else values[column] = isBlank ? null : column === 'ocId' && value != null ? String(value) : (value ?? null)
+    else values[column] = isBlank ? null : (value ?? null)
   }
   if (Object.keys(values).length > 0) {
     for (const [column, value] of Object.entries(updateParcellaireSchema.parse(values))) set[column] = sql`${value}`
   }
 
-  return db.transaction(async (tx) => {
-    if (changes.oc_id != null) {
-      await ensureOrganismeCertificateur(tx, changes.oc_id, changes.oc_label)
-    }
-    assertUnmodified(
-      await tx
-        .update(parcellaires)
-        .set(set)
-        .where(and(eq(parcellaires.recordId, recordId), unmodifiedSinceCondition(ifUnmodifiedSince)))
-        .returning({ recordId: parcellaires.recordId })
-    )
-    await insertEvent(tx, recordId, historyEntry)
-    const record = await findRecord(recordId, tx)
-    return record ? [record] : []
-  })
+  if (changes.oc_id != null) {
+    await ensureOrganismeCertificateur(tx, changes.oc_id, changes.oc_label)
+  }
+  assertUnmodified(
+    await tx
+      .update(parcellaires)
+      .set(set)
+      .where(and(eq(parcellaires.recordId, recordId), unmodifiedSinceCondition(ifUnmodifiedSince)))
+      .returning({ recordId: parcellaires.recordId })
+  )
+  await insertEvent(tx, recordId, historyEntry)
+  const record = await findRecord(tx, recordId)
+  return record ? [record] : []
 }
+
 async function setOperatorUpdatedAt(
   tx: NodePgDatabase,
   recordId: string,
@@ -108,15 +111,16 @@ async function setOperatorUpdatedAt(
     .update(parcellaires)
     .set({
       updatedAt: sql`now()`,
-      ocId: sql`coalesce(${parcellaires.ocId}, ${ocId === null ? null : String(ocId)})`
+      ocId: sql`coalesce(${parcellaires.ocId}, ${ocId})`
     })
     .where(and(eq(parcellaires.recordId, recordId), unmodifiedSinceCondition(ifUnmodifiedSince)))
     .returning({ recordId: parcellaires.recordId })
   if (current) assertUnmodified(updated)
   if (current) await insertEvent(tx, recordId, historyEntry)
-  const record = await findRecord(recordId, tx)
+  const record = await findRecord(tx, recordId)
   return record ? [record] : []
 }
+
 async function patchFeature(
   tx: NodePgDatabase,
   recordId: string,
@@ -134,7 +138,8 @@ async function patchFeature(
     await upsertAnnotations(tx, recordId, String(featureId), properties.annotations)
   }
 }
-async function updateFeature(
+
+async function updateFeatureById(
   tx: NodePgDatabase,
   recordId: string,
   featureId: FeatureId,
@@ -154,9 +159,11 @@ async function updateFeature(
     await upsertAnnotations(tx, recordId, String(featureId), properties.annotations)
   }
 }
+
 async function deleteFeature(tx: NodePgDatabase, recordId: string, featureId: FeatureId): Promise<void> {
   await tx.delete(parcelles).where(and(eq(parcelles.recordId, recordId), eq(parcelles.id, String(featureId))))
 }
+
 async function insertFeature(
   tx: NodePgDatabase,
   recordId: string,
@@ -180,15 +187,18 @@ async function insertFeature(
   await upsertCultures(tx, recordId, String(id), properties.cultures ?? [])
   await upsertAnnotations(tx, recordId, String(id), properties.annotations ?? [])
 }
+
 async function addFeature(tx: NodePgDatabase, recordId: string, id: FeatureId, feature: FeatureInput): Promise<void> {
   await insertFeature(tx, recordId, id, feature, null)
 }
+
 async function softDeleteFeatures(tx: NodePgDatabase, recordId: string, featureIds: FeatureId[]): Promise<void> {
   await tx
     .update(parcelles)
     .set({ deletedAt: sql`now()` })
     .where(and(eq(parcelles.recordId, recordId), inArray(parcelles.id, featureIds.map(String))))
 }
+
 async function addFeaturesFromOther(
   tx: NodePgDatabase,
   recordId: string,
@@ -201,14 +211,14 @@ async function addFeaturesFromOther(
 }
 
 export {
-  deleteRecord,
-  markFeatureControlled,
-  markFeatureUncontrolled,
+  softDeleteRecord,
+  insertParcelleControle,
+  deleteParcelleControle,
   findMixite,
   updateAuditRecord,
   setOperatorUpdatedAt,
   patchFeature,
-  updateFeature,
+  updateFeatureById,
   deleteFeature,
   addFeature,
   softDeleteFeatures,

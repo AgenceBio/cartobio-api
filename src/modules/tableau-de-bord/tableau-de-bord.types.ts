@@ -17,6 +17,8 @@ export type DateRange = {
   organismeCertificateur: number
 }
 
+export type PeriodeObligatoire = Required<DateRange>
+
 export type PaginationParams = DateRange & {
   page: number
   limit: number
@@ -63,6 +65,16 @@ export type GroupeEnvois = {
   numeroClient: string | null
   auditDate: IsoDate | null
   envois: EnvoiSuspect[]
+}
+
+export type EnvoiParcellaire = EnvoiSuspect & Omit<GroupeEnvois, 'envois'>
+
+export type AnomaliesPeriodeRow = {
+  period: Date
+  accepted: number
+  refused: number
+  code: string | null
+  errorCount: number
 }
 
 export type AlerteSuspecte = GroupeEnvois & {

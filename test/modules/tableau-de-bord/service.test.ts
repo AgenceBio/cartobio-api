@@ -3,20 +3,19 @@ import * as repository from '../../../src/modules/tableau-de-bord/tableau-de-bor
 import {
   getGeneralKpi,
   getHistoriqueSpecificParcellaire,
-  getRepetErreurs,
   getTableauBilan,
   getTableauErreurs,
   getTopAnomalies
 } from '../../../src/modules/tableau-de-bord/tableau-de-bord.service.js'
 
 vi.mock('../../../src/modules/tableau-de-bord/tableau-de-bord.repository.js', () => ({
-  getGeneralKpi: vi.fn(),
-  getTableauBilanRepo: vi.fn(),
-  getTableauErreursRepo: vi.fn(),
-  getHistoriqueSpecificParcellaireRepo: vi.fn(),
-  getTopAnomaliesRepo: vi.fn(),
-  getTopAnomaliesGroupedRepo: vi.fn(),
-  getEnvoisSuspectsRepo: vi.fn()
+  findGeneralKpi: vi.fn(),
+  findTableauBilan: vi.fn(),
+  findTableauErreurs: vi.fn(),
+  findHistoriqueParcellaire: vi.fn(),
+  findTopAnomalies: vi.fn(),
+  findTopAnomaliesGrouped: vi.fn(),
+  findEnvois: vi.fn()
 }))
 
 const mockedRepo = vi.mocked(repository)
@@ -28,7 +27,7 @@ describe('dashboard service', () => {
 
   it('normalise les filtres et la pagination du tableau', async () => {
     const data = { data: [], meta: { total: 0, page: 2, limit: 50 } }
-    mockedRepo.getTableauBilanRepo.mockResolvedValue(data)
+    mockedRepo.findTableauBilan.mockResolvedValue(data)
 
     const result = await getTableauBilan(
       {
@@ -43,7 +42,7 @@ describe('dashboard service', () => {
       999
     )
 
-    expect(mockedRepo.getTableauBilanRepo).toHaveBeenCalledWith({
+    expect(mockedRepo.findTableauBilan).toHaveBeenCalledWith({
       from: '2026-01-01',
       to: '2026-01-31',
       page: 2,
@@ -58,14 +57,14 @@ describe('dashboard service', () => {
   })
 
   it('applique les valeurs de pagination par défaut', async () => {
-    mockedRepo.getTableauBilanRepo.mockResolvedValue({
+    mockedRepo.findTableauBilan.mockResolvedValue({
       data: [],
       meta: { total: 0, page: 1, limit: 20 }
     })
 
     await getTableauBilan({}, 999)
 
-    expect(mockedRepo.getTableauBilanRepo).toHaveBeenCalledWith({
+    expect(mockedRepo.findTableauBilan).toHaveBeenCalledWith({
       from: undefined,
       to: undefined,
       page: 1,
@@ -85,11 +84,11 @@ describe('dashboard service', () => {
       totalRejetes: 2,
       anomaliePlusFrequente: null
     }
-    mockedRepo.getGeneralKpi.mockResolvedValue(kpi)
+    mockedRepo.findGeneralKpi.mockResolvedValue(kpi)
 
     const result = await getGeneralKpi({ from: '2026-01-01', to: '2026-01-31' }, 999)
 
-    expect(mockedRepo.getGeneralKpi).toHaveBeenCalledWith({
+    expect(mockedRepo.findGeneralKpi).toHaveBeenCalledWith({
       from: '2026-01-01',
       to: '2026-01-31',
       organismeCertificateur: 999
@@ -99,11 +98,11 @@ describe('dashboard service', () => {
 
   it('transmet les filtres du tableau des erreurs', async () => {
     const data = { data: [], meta: { total: 0, page: 1, limit: 20 } }
-    mockedRepo.getTableauErreursRepo.mockResolvedValue(data)
+    mockedRepo.findTableauErreurs.mockResolvedValue(data)
 
     const result = await getTableauErreurs({ from: '2026-02-01', recherche: 'ABC' }, 999)
 
-    expect(mockedRepo.getTableauErreursRepo).toHaveBeenCalledWith({
+    expect(mockedRepo.findTableauErreurs).toHaveBeenCalledWith({
       from: '2026-02-01',
       to: undefined,
       page: 1,
@@ -115,7 +114,7 @@ describe('dashboard service', () => {
   })
 
   it('transmet les critères de l’historique parcellaire', async () => {
-    mockedRepo.getHistoriqueSpecificParcellaireRepo.mockResolvedValue([])
+    mockedRepo.findHistoriqueParcellaire.mockResolvedValue([])
 
     const result = await getHistoriqueSpecificParcellaire(
       {
@@ -126,7 +125,7 @@ describe('dashboard service', () => {
       999
     )
 
-    expect(mockedRepo.getHistoriqueSpecificParcellaireRepo).toHaveBeenCalledWith({
+    expect(mockedRepo.findHistoriqueParcellaire).toHaveBeenCalledWith({
       numeroBio: 'BIO-1',
       numeroClient: 'CLIENT-1',
       auditDate: '2026-03-01',
@@ -137,11 +136,11 @@ describe('dashboard service', () => {
 
   it('transmet la période des top anomalies', async () => {
     const data = [{ period: toIsoDateTime(new Date('2026-01-01')), code: 'E1', count: 2 }]
-    mockedRepo.getTopAnomaliesRepo.mockResolvedValue(data)
+    mockedRepo.findTopAnomalies.mockResolvedValue(data)
 
     const result = await getTopAnomalies({ from: '2026-01-01', to: '2026-01-07' }, 999)
 
-    expect(mockedRepo.getTopAnomaliesRepo).toHaveBeenCalledWith({
+    expect(mockedRepo.findTopAnomalies).toHaveBeenCalledWith({
       from: '2026-01-01',
       to: '2026-01-07',
       organismeCertificateur: 999
@@ -149,32 +148,19 @@ describe('dashboard service', () => {
     expect(result).toEqual(data)
   })
 
-  it("exige au moins un critère pour l'historique parcellaire", async () => {
-    await expect(getHistoriqueSpecificParcellaire({}, 999)).rejects.toMatchObject({ statusCode: 400 })
-    expect(mockedRepo.getHistoriqueSpecificParcellaireRepo).not.toHaveBeenCalled()
-  })
-
   it('découpe une liste de codes séparés par des virgules', async () => {
-    mockedRepo.getTableauErreursRepo.mockResolvedValue({ data: [], meta: { total: 0, page: 1, limit: 20 } })
+    mockedRepo.findTableauErreurs.mockResolvedValue({ data: [], meta: { total: 0, page: 1, limit: 20 } })
 
     await getTableauErreurs({ codes: ' E1, ,E2 ' }, 999)
 
-    expect(mockedRepo.getTableauErreursRepo).toHaveBeenCalledWith(expect.objectContaining({ codes: ['E1', 'E2'] }))
+    expect(mockedRepo.findTableauErreurs).toHaveBeenCalledWith(expect.objectContaining({ codes: ['E1', 'E2'] }))
   })
 
   it("n'envoie pas de filtre de codes vide", async () => {
-    mockedRepo.getTableauErreursRepo.mockResolvedValue({ data: [], meta: { total: 0, page: 1, limit: 20 } })
+    mockedRepo.findTableauErreurs.mockResolvedValue({ data: [], meta: { total: 0, page: 1, limit: 20 } })
 
     await getTableauErreurs({ codes: ' , ' }, 999)
 
-    expect(mockedRepo.getTableauErreursRepo).toHaveBeenCalledWith(expect.objectContaining({ codes: undefined }))
-  })
-
-  it('exige une période pour les envois répétés', async () => {
-    await expect(getRepetErreurs({ from: '2026-01-01' }, 999)).rejects.toMatchObject({
-      statusCode: 400,
-      message: 'La période (from et to) est obligatoire.'
-    })
-    expect(mockedRepo.getEnvoisSuspectsRepo).not.toHaveBeenCalled()
+    expect(mockedRepo.findTableauErreurs).toHaveBeenCalledWith(expect.objectContaining({ codes: undefined }))
   })
 })

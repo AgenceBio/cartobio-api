@@ -1,29 +1,26 @@
 #!/usr/bin/env node
 
+import { db } from '../src/database/database.js'
 import { sendRapportHebdo } from '../src/services/mailer/mailer.service.js'
-import { getDestinatairesRapport } from '../src/services/mailer/mailer.repository.js'
+import { findDestinatairesRapport } from '../src/services/mailer/mailer.repository.js'
 
-async function sendMail(): Promise<void> {
-  const ocList = await getDestinatairesRapport()
+try {
+  const ocList = await findDestinatairesRapport()
 
   if (!ocList.length) {
     console.error('Aucun organisme certificateur')
-    process.exit(1)
+    process.exitCode = 1
   }
 
-  let errors = 0
   for (const oc of ocList) {
     try {
       await sendRapportHebdo(oc.id, oc.email, oc.label)
       console.log(`Rapport envoyé à l'OC ${oc.id}`)
     } catch (err) {
-      errors++
+      process.exitCode = 1
       console.error(`Erreur envoi rapport à l'OC ${oc.id}:`, err)
     }
   }
-  process.exit(errors > 0 ? 1 : 0)
+} finally {
+  await db.$client.end()
 }
-
-;(async function (): Promise<void> {
-  await sendMail()
-})()

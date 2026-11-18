@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import fs from 'fs'
+import fs from 'node:fs'
 import cliProgress from 'cli-progress'
 
 import { and, eq, inArray, sql } from 'drizzle-orm'
@@ -17,38 +17,40 @@ import type { OrganismeCertificateur } from '@agencebio/cartobio-types'
 const [, , ocId] = process.argv
 
 if (ocId === undefined) {
-  console.error('Usage: node create-parcellaire-import-pac-for-oc.js <OC_ID>')
+  console.error('Usage: npm run job:parcellaire-pac-oc -- <OC_ID>')
   process.exit(1)
 }
 
-;(async (): Promise<void> => {
-  const operators = await fetchCustomersByOc(+ocId)
-  console.log("Nombre d'opérateurs retournés par l'api: %d", operators.length)
-  if (operators.length === 0) {
-    console.warn("Aucun numerobio pour l'oc", ocId)
-    process.exit(0)
-  }
+const operators = await fetchCustomersByOc(+ocId)
+console.log("Nombre d'opérateurs retournés par l'api: %d", operators.length)
+if (operators.length === 0) {
+  console.warn("Aucun numerobio pour l'oc", ocId)
+  process.exit(0)
+}
 
-  const operatorsEngages = operators.filter((o) => {
-    const notification = o.notifications
-    return notification.etatCertification === 'ENGAGEE' && notification.organismeCertificateurId === +ocId
-  })
+const operatorsEngages = operators.filter((o) => {
+  const notification = o.notifications
+  return notification.etatCertification === 'ENGAGEE' && notification.organismeCertificateurId === +ocId
+})
 
-  const [firstOperatorEngage] = operatorsEngages
-  if (!firstOperatorEngage) {
-    console.warn("Aucun opérateur ENGAGE pour l'oc", ocId)
-    process.exit(0)
-  }
-  const oc = firstOperatorEngage.organismeCertificateur as OrganismeCertificateur
+const [firstOperatorEngage] = operatorsEngages
+if (!firstOperatorEngage) {
+  console.warn("Aucun opérateur ENGAGE pour l'oc", ocId)
+  process.exit(0)
+}
+const oc = firstOperatorEngage.organismeCertificateur as OrganismeCertificateur
 
-  console.log("Nombre d'opérateurs ENGAGE pour cet OC: %d", operatorsEngages.length)
+console.log("Nombre d'opérateurs ENGAGE pour cet OC: %d", operatorsEngages.length)
 
-  fs.writeFileSync(
-    scriptOutputPath('numeros-bios-engages.txt'),
-    JSON.stringify(operatorsEngages.map((o) => o.numeroBio)),
-    { mode: 0o600 }
-  )
+fs.writeFileSync(
+  scriptOutputPath('numeros-bios-engages.txt'),
+  JSON.stringify(operatorsEngages.map((o) => o.numeroBio)),
+  { mode: 0o600 }
+)
 
+const progress = new cliProgress.SingleBar({ etaBuffer: 10000 }, cliProgress.Presets.rect)
+let nbImportes = 0
+try {
   const parcellairesACreer = await db
     .select({ record: importPac.record, numerobio: sql<string>`${importPac.numeroBio}` })
     .from(importPac)
@@ -62,38 +64,33 @@ if (ocId === undefined) {
       )
     )
 
-  const progress = new cliProgress.SingleBar({ etaBuffer: 10000 }, cliProgress.Presets.rect)
   progress.start(parcellairesACreer.length, 0)
-  let nbImportes = 0
-  try {
-    for (const parcelle of parcellairesACreer) {
-      const previousRecordId = await findLastAuditedRecordId(parcelle.numerobio)
+  for (const parcelle of parcellairesACreer) {
+    const previousRecordId = await findLastAuditedRecordId(parcelle.numerobio)
 
-      const { id: ocId, nom: ocLabel } = oc
-      const record = await createOrUpdateOperatorRecord(
-        { numerobio: parcelle.numerobio, oc_id: ocId, oc_label: ocLabel, ...(parcelle.record as RecordInput) },
-        { user: null, copyParcellesData: previousRecordId != null, previousRecordId: previousRecordId ?? undefined }
+    const { id: ocId, nom: ocLabel } = oc
+    const record = await createOrUpdateOperatorRecord(
+      { numerobio: parcelle.numerobio, oc_id: ocId, oc_label: ocLabel, ...(parcelle.record as RecordInput) },
+      { user: null, copyParcellesData: previousRecordId != null, previousRecordId: previousRecordId ?? undefined }
+    )
+
+    if (record.numerobio !== parcelle.numerobio) {
+      console.error(
+        "Une erreur s'est produite pour l'import du numéro: %s, résultat: numéro bio: %s, parcellaire; %s ",
+        parcelle.numerobio,
+        record.numerobio,
+        record.record_id
       )
-
-      if (record.numerobio !== parcelle.numerobio) {
-        console.error(
-          "Une erreur s'est produite pour l'import du numéro: %s, résultat: numéro bio: %s, parcellaire; %s ",
-          parcelle.numerobio,
-          record.numerobio,
-          record.record_id
-        )
-        process.exit(1)
-      }
-
-      await hideImport(parcelle.numerobio)
-      nbImportes++
-      progress.increment()
+      process.exitCode = 1
+      break
     }
-  } catch (error) {
-    console.error(error)
-    process.exit(1)
-  } finally {
-    progress.stop()
-    console.log('Nombre de parcellaires réellement importés: %d', nbImportes)
+
+    await hideImport(parcelle.numerobio)
+    nbImportes++
+    progress.increment()
   }
-})()
+} finally {
+  progress.stop()
+  console.log('Nombre de parcellaires réellement importés: %d', nbImportes)
+  await db.$client.end()
+}

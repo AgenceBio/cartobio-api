@@ -44,7 +44,7 @@ Chaque appel transmet **un seul parcellaire** : le corps de la requête est un o
 Conséquences :
 
 - le statut `207 Multi-Status` n'est plus renvoyé : le parcellaire est soit accepté (`202`), soit refusé (`400`) ;
-- un corps qui n'est pas un objet JSON contenant un tableau `parcelles` est refusé en `400` avant la création du job ;
+- un corps qui n'est pas un objet JSON contenant un tableau `parcelles` est refusé en `400` ; un job est tout de même créé (statut en erreur) pour tracer l'envoi et son `jobId` est renvoyé ;
 - la taille du corps de la requête est limitée à 50 Mo (au-delà : `413 Payload Too Large`).
 
 ### Authentification
@@ -111,7 +111,7 @@ Chaque entrée de `listeProblemes` :
 | `code`      | string | code d'erreur (voir tableau des cas d'erreur)                       |
 | `message`   | string | message d'erreur détaillé                                           |
 
-> `listeProblemes` est peuplé lors de la **validation initiale**, avant la création du job. Il ne contient que des anomalies de type `erreur` empêchant le traitement d'un opérateur. Les `warning` n'apparaissent pas ici — ils sont disponibles uniquement dans le résultat du job (`GET /api/v3/import/jobs/:id`).
+> `listeProblemes` est peuplé lors de la **validation initiale**, avant le traitement asynchrone du job. Il ne contient que des anomalies de type `erreur` empêchant le traitement d'un opérateur. Les `warning` n'apparaissent pas ici — ils sont disponibles uniquement dans le résultat du job (`GET /api/v3/import/jobs/:id`).
 
 ```json
 {

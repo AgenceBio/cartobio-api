@@ -127,7 +127,9 @@ function normalizeOperator(operator: AgenceBioOperator): AgenceBioNormalizedOper
     organismeCertificateur,
     adressesOperateurs: adresses
       .filter(({ active }) => active)
-      .map(({ codeCommune, lieu, codePostal, ville }) => ({
+      .map(({ lat, long, codeCommune, lieu, codePostal, ville }) => ({
+        lat,
+        long,
         codeCommune,
         lieu,
         codePostal,
@@ -207,6 +209,7 @@ function getNotification(notifications: AgenceBioNotification[]): AgenceBioNotif
     return lastNotification
   } else return null
 }
+
 function applyOperatorTextSearch(record: AgenceBioNormalizedOperator, input?: string): boolean {
   const recordNom = record.nom
     ? record.nom

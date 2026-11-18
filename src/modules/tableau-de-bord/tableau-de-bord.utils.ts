@@ -44,4 +44,10 @@ function getStreaksSuspectes<T extends { statut: string | null }>(envois: T[]): 
   return streaks
 }
 
-export { getStreaksSuspectes }
+function getTruncate(from: string, to: string): 'day' | 'week' {
+  const diffInDays = (new Date(to).getTime() - new Date(from).getTime()) / (1000 * 60 * 60 * 24)
+
+  return diffInDays <= 7 ? 'day' : 'week'
+}
+
+export { getStreaksSuspectes, getTruncate }

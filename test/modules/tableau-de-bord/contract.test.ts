@@ -21,7 +21,7 @@ const createdAt = new Date('2026-03-10T10:00:00Z')
 async function insertJob(job: Partial<typeof parcellaireImport.$inferInsert>): Promise<number> {
   const [row] = await db
     .insert(parcellaireImport)
-    .values({ organismeCertificateur: '999', status: 'DONE', createdAt, endedAt: createdAt, ...job })
+    .values({ organismeCertificateur: 999, status: 'DONE', createdAt, endedAt: createdAt, ...job })
     .returning({ id: parcellaireImport.id })
   return row!.id
 }
