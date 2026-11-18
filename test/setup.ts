@@ -1,11 +1,37 @@
 import pg from 'pg'
+import { drizzle } from 'drizzle-orm/node-postgres'
+import { migrate } from 'drizzle-orm/node-postgres/migrator'
 import config from '../src/config/env.js'
 import DBMigrate from 'db-migrate'
 import { initTerritoires } from './init-territoires.js'
 
 const { Client } = pg
 
+async function setupDrizzleTestDatabase (testDatabaseName: string): Promise<void> {
+  const url = new URL(config.get('drizzleDatabaseUrl'))
+
+  const client = new Client({ connectionString: url.toString() })
+  await client.connect()
+  const { rows } = await client.query('SELECT 1 FROM pg_database WHERE datname = $1', [testDatabaseName])
+  if (!rows.length) await client.query(`CREATE DATABASE ${testDatabaseName}`)
+  await client.end()
+
+  url.pathname = `/${testDatabaseName}`
+  const testClient = new Client({ connectionString: url.toString() })
+  await testClient.connect()
+  try {
+    await testClient.query('CREATE EXTENSION IF NOT EXISTS postgis')
+    await testClient.query('DROP SCHEMA IF EXISTS cartobio CASCADE')
+    await testClient.query('DROP SCHEMA IF EXISTS drizzle CASCADE')
+    await migrate(drizzle({ client: testClient }), { migrationsFolder: 'database/drizzle', migrationsTable: 'journal' })
+  } finally {
+    await testClient.end()
+  }
+}
+
 export default async function () {
+  await setupDrizzleTestDatabase(config.get('testDatabaseName'))
+
   const connectionString = config.get('databaseUrl')
   const testDatabaseName = config.get('testDatabaseName')
 

@@ -1,8 +1,49 @@
-import db from '../src/database/database.js'
+import { sql } from 'drizzle-orm'
+import db, { db as drizzleDb } from '../src/database/database.js'
+import * as schema from '../src/database/schema/index.js'
 import records from './fixtures/providers/records.json' with { type: 'json' }
 import parcelles from './fixtures/providers/parcelles.json' with { type: 'json' }
 
 type FixtureRecord = Partial<Record<keyof (typeof records)[number], unknown>>
+type CertificationEtat = (typeof schema.parcellaires.certificationEtat.enumValues)[number]
+type ConversionNiveau = (typeof schema.conversionNiveau.enumValues)[number]
+
+export async function loadParcellairesFixture (data: typeof records = records): Promise<void> {
+  await drizzleDb
+    .insert(schema.organismeCertificateur)
+    .values(data.map((record) => ({ id: String(record.oc_id), label: record.oc_label })))
+    .onConflictDoNothing()
+
+  await drizzleDb.insert(schema.parcellaires).values(data.map((record, i) => ({
+    recordId: record.record_id,
+    numeroBio: Number(record.numerobio),
+    ocId: String(record.oc_id),
+    certificationEtat: record.certification_state as CertificationEtat,
+    certificationDateDebut: record.certification_date_debut,
+    certificationDateFin: record.certification_date_fin,
+    auditDate: record.audit_date,
+    anneeReferenceControle: record.annee_reference_controle,
+    auditNotesCertif: record.audit_notes,
+    auditDemandesOperateur: record.audit_demandes,
+    versionNom: record.version_name,
+    createdAt: sql`now() + make_interval(mins => ${i})`
+  })))
+
+  await drizzleDb.insert(schema.parcelles).values(data.flatMap((record) => parcelles.map((parcelle) => {
+    const geometry = sql`ST_GeomFromGeoJSON(${JSON.stringify(parcelle.geometry)})`
+
+    return {
+      recordId: record.record_id,
+      id: parcelle.id,
+      geometry,
+      surfaceHa: sql`ST_Area(${geometry}::geography) / 10000`,
+      conversionNiveau: parcelle.conversion_niveau as ConversionNiveau | null,
+      engagementDate: parcelle.engagement_date,
+      numeroIlotPac: parcelle.numero_ilot_pac ? Number(parcelle.numero_ilot_pac) : null,
+      numeroParcellesPac: parcelle.numero_parcelle_pac ? Number(parcelle.numero_parcelle_pac) : null
+    }
+  })))
+}
 
 export async function loadRecordFixture (data: FixtureRecord[] = records, pinnedRecords: Array<string | number> = [], userId = 1) {
   await db.query('TRUNCATE TABLE cartobio_parcelles')

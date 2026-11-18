@@ -20,7 +20,7 @@ import { polygon } from "./types.js";
 export const parcelles = cartobio.table(
   "parcelles",
   {
-    id: text("id"),
+    id: text("id").notNull(),
     recordId: uuid("record_id")
       .notNull()
       .references(() => parcellaires.recordId, { onDelete: "cascade" }),

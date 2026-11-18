@@ -1,9 +1,16 @@
 import validator from 'validator'
-import db from '../src/database/database.js'
+import pool, { db } from '../src/database/database.js'
 import type { Mock } from 'vitest'
+import type { Client, QueryConfig } from 'pg'
 
-const client = db as unknown as {
+const client = pool as unknown as {
   query: Mock
+  _connect: () => Promise<void>
+  _end: () => Promise<void>
+}
+
+const drizzleClient = db.$client as unknown as {
+  _query: (text: string) => Promise<unknown>
   _connect: () => Promise<void>
   _end: () => Promise<void>
 }
@@ -95,6 +102,17 @@ vi.mock('../src/database/database.js', async () => {
 
   const _clientRelease = vi.fn()
 
+  const { drizzle } = await import('drizzle-orm/node-postgres')
+  const drizzleUrl = new URL(config.get('drizzleDatabaseUrl'))
+  drizzleUrl.pathname = `/${testDatabaseName}`
+  const drizzleClient = new pg.Client({ connectionString: drizzleUrl.toString() })
+
+  function transactionStatement (text: string): string | undefined {
+    if (/^begin\b/i.test(text)) return 'SAVEPOINT drizzle_test'
+    if (/^commit$/i.test(text)) return 'RELEASE SAVEPOINT drizzle_test'
+    if (/^rollback$/i.test(text)) return 'ROLLBACK TO SAVEPOINT drizzle_test'
+  }
+
   return {
     default: {
       query: vi.fn(client.query.bind(client)),
@@ -108,27 +126,36 @@ vi.mock('../src/database/database.js', async () => {
       _clientQuery: _clientQuery,
       _clientRelease: _clientRelease
     },
-    db: {
-      $client: {
-        end: vi.fn(async (): Promise<void> => {})
-      }
-    }
+    db: drizzle({
+      client: {
+        query: (queryConfig: QueryConfig, values?: unknown[]) => {
+          const statement = transactionStatement(queryConfig.text.trim())
+          return statement ? drizzleClient.query(statement) : drizzleClient.query(queryConfig, values)
+        },
+        end: vi.fn(async (): Promise<void> => {}),
+        _query: (text: string) => drizzleClient.query(text),
+        _connect: drizzleClient.connect.bind(drizzleClient),
+        _end: drizzleClient.end.bind(drizzleClient)
+      } as unknown as Client
+    })
   }
 })
 
 beforeAll(async () => {
-  await client._connect()
+  await Promise.all([client._connect(), drizzleClient._connect()])
 })
 
 beforeEach(async () => {
+  await drizzleClient._query('BEGIN')
   await client.query('BEGIN')
   client.query.mockClear()
 })
 
 afterEach(async () => {
   await client.query('ROLLBACK')
+  await drizzleClient._query('ROLLBACK')
 })
 
 afterAll(async () => {
-  await client._end()
+  await Promise.all([client._end(), drizzleClient._end()])
 })

@@ -1,19 +1,6 @@
-import { addGeometryBodySchema, addGeometryResponseSchema, borderCutBodySchema, borderCutResponseSchema, geometryEqualsBodySchema, geometryEqualsResponseSchema, recordIdParamsSchema, rpgBodySchema, rpgResponseSchema } from '@agencebio/cartobio-types'
+import { addGeometryBodySchema, addGeometryResponseSchema, borderCutBodySchema, borderCutResponseSchema, geometryEqualsBodySchema, geometryEqualsResponseSchema, recordIdParamsSchema } from '@agencebio/cartobio-types'
 import { apiError, commonErrorResponses, describedResponse, mergeSchemas, operatorFromRecordId, protectedWithToken, TAGS, withSchema } from '../../shared/routes.js'
 import { enforceOperatorAccess } from '../../shared/middlewares.js'
-
-export const rpgSchema = withSchema(protectedWithToken(), {
-  operationId: 'findRpgParcelle',
-  tags: [TAGS.GEOMETRIE],
-  summary: 'Trouver une parcelle du RPG bio',
-  description: 'Parcelle RPG bio de même surface et code culture recouvrant le plus l\'emprise cliquée.',
-  body: rpgBodySchema,
-  response: {
-    ...commonErrorResponses,
-    200: rpgResponseSchema.meta({ description: 'Parcelle RPG bio' }),
-    404: describedResponse('Aucune parcelle RPG ne correspond (corps vide)')
-  }
-})
 
 export const borderCutSchema = withSchema(protectedWithToken(), {
   operationId: 'cutParcelleBorder',

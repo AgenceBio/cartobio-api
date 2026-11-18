@@ -20,33 +20,20 @@ async function verifyGeometry (inputGeomGeoJSON: unknown, recordId: string, id: 
   }
 }
 
-async function getRpg (extent: number[], surface: number, codeCulture: string) {
-  return (await repository.findRpg(extent, surface, codeCulture))[0] ?? null
-}
-
 function getGeometryEquals (input: { old: string; new: string }) {
   return repository.findGeometryEquals(input)
 }
 
-async function calculateParcelBorder (geometry: string, distance: number, allBorder: boolean, isInverted: boolean, startBorderPoint?: number[], endBorderPoint?: number[]) {
-  if (!allBorder && (!startBorderPoint || !endBorderPoint)) {
+async function calculateParcelBorder (geometry: unknown, distance: number, allBorder: boolean, isInverted: boolean, startBorderPoint?: number[], endBorderPoint?: number[]) {
+  if (allBorder) {
+    return repository.findParcelBorder(geometry, distance)
+  }
+
+  if (!startBorderPoint || !endBorderPoint) {
     throw new Error('Les deux points sont requis')
   }
 
-  const result = await repository.findParcelBorder(
-    geometry,
-    distance,
-    allBorder,
-    isInverted,
-    startBorderPoint,
-    endBorderPoint
-  )
-  if (!result) throw new Error('Aucun résultat retourné par la requête')
-
-  return {
-    parcelleSansBordure: result.parcelle_sans_bordure,
-    bordure: result.bordure
-  }
+  return repository.findParcelBorderBetweenPoints(geometry, distance, startBorderPoint, endBorderPoint, isInverted)
 }
 
-export { getRpg, verifyGeometry, getGeometryEquals, calculateParcelBorder }
+export { verifyGeometry, getGeometryEquals, calculateParcelBorder }

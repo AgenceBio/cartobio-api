@@ -1,473 +1,263 @@
-import pool from '../../database/database.js'
-import type { FeatureCollection, Geometry } from 'geojson'
+import { and, desc, eq, inArray, isNull, ne, notExists, sql } from 'drizzle-orm'
+import type { AnyColumn, SQL, SQLWrapper } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/pg-core'
+import type { FeatureCollection, Position } from 'geojson'
+import { db } from '../../database/database.js'
+import { asGeoJSON, asWgs84GeoJSON, fromGeoJSON, makeValid, webMercator } from '../../database/postgis.js'
+import { parcellaires, parcelles } from '../../database/schema/index.js'
+import { compareParcellaires, feature, label } from './geometry.utils.js'
+import type { ComparisonResult } from './geometry.utils.js'
 
 type GeometryConflictStatus = 'inclusion' | 'overlap' | 'ok'
 
-async function findGeometryConflicts (inputGeomGeoJSON: unknown, recordId: string, id: string | number = ''): Promise<Array<{ id: string; status: GeometryConflictStatus }>> {
+const ancienne = alias(parcelles, 'ancienne')
+const nouvelle = alias(parcelles, 'nouvelle')
+
+function parcellesActives (table: typeof ancienne | typeof nouvelle, recordId: string): SQL | undefined {
+  return and(eq(table.recordId, recordId), isNull(table.deletedAt))
+}
+
+function parcelleColumns (table: typeof ancienne | typeof nouvelle) {
+  return {
+    id: table.id,
+    numeroIlotPac: table.numeroIlotPac,
+    numeroParcellesPac: table.numeroParcellesPac,
+    name: table.name
+  }
+}
+
+async function findGeometryConflicts (inputGeomGeoJSON: unknown, recordId: string, id: string | number = '') {
+  const input = fromGeoJSON(inputGeomGeoJSON)
+
   /** L'area n'est pas a 0 a cause des imprécision du front, et des segments frontières */
-  const query = `
-    WITH input AS (
-      SELECT ST_GeomFromGeoJSON($1) AS geometry
-    )
-    SELECT
-      p.id,
-      ST_Area(ST_Intersection(i.geometry, p.geometry)),
-      CASE
-        WHEN ST_Contains(i.geometry, p.geometry) OR ST_Within(i.geometry, p.geometry) THEN 'inclusion'
-        WHEN ST_Intersects(i.geometry, p.geometry) AND ST_Area(ST_Intersection(i.geometry, p.geometry)) > 0.000000000001 THEN 'overlap'
+  return db
+    .select({
+      id: parcelles.id,
+      status: sql<GeometryConflictStatus>`CASE
+        WHEN ST_Contains(${input}, ${parcelles.geometry}) OR ST_Within(${input}, ${parcelles.geometry}) THEN 'inclusion'
+        WHEN ST_Intersects(${input}, ${parcelles.geometry}) AND ST_Area(ST_Intersection(${input}, ${parcelles.geometry})) > 0.000000000001 THEN 'overlap'
         ELSE 'ok'
-      END AS status
-    FROM cartobio_parcelles p, input i
-    WHERE p.record_id = $2
-    AND p.id != $3
-    AND p.deleted_at IS NULL
-  `
-
-  const res = await pool.query<{ id: string; status: GeometryConflictStatus }>(query, [
-    JSON.stringify(inputGeomGeoJSON),
-    recordId,
-    id
-  ])
-
-  return res.rows
+      END`
+    })
+    .from(parcelles)
+    .where(and(
+      eq(parcelles.recordId, recordId),
+      ne(parcelles.id, String(id)),
+      isNull(parcelles.deletedAt)
+    ))
 }
 
 async function findGeometryCorrections (inputGeomGeoJSON: unknown, recordId: string, ids: string[]) {
+  const input = fromGeoJSON(inputGeomGeoJSON)
 
-  const correctionQuery = `
-    WITH input AS (
-      SELECT ST_GeomFromGeoJSON($1) AS geometry
-    )
-    SELECT
-      p.id,
-      ST_AsGeoJSON(ST_Difference(i.geometry, p.geometry))::json AS new_minus_intersection,
-      ST_AsGeoJSON(ST_Difference(p.geometry, i.geometry))::json AS existing_minus_intersection,
-      ST_AsGeoJSON(ST_Intersection(p.geometry, i.geometry))::json AS intersection
-    FROM cartobio_parcelles p, input i
-      WHERE p.record_id = $2
-      AND p.id = ANY($3)
-  `
-
-  const correctionRes = await pool.query<{ id: string; new_minus_intersection: Geometry | null; existing_minus_intersection: Geometry | null; intersection: Geometry | null }>(correctionQuery, [
-    JSON.stringify(inputGeomGeoJSON),
-      recordId,
-      ids
-  ])
-
-  return correctionRes.rows
-}
-
-async function findRpg (extent: number[], surface: number, codeCulture: string) {
-  const { rows } = await pool.query<{ fid: number; geom: Geometry }>(
-    `
-    SELECT rpg_bio.fid, ST_AsGeoJSON(ST_SetSRID(rpg_bio.geom, 3857))::json as geom
-    FROM rpg_bio
-    WHERE ST_Intersects(ST_MakeEnvelope($1, $2, $3, $4, 3857), ST_SetSRID(rpg_bio.geom, 3857))
-    AND surf_adm = $5
-    AND code_cultu = $6
-    ORDER BY ST_Area(ST_Intersection(ST_MakeEnvelope($1, $2, $3, $4, 3857), ST_SetSRID(rpg_bio.geom, 3857))) DESC
-    LIMIT 1
-    `,
-    [extent[0], extent[1], extent[2], extent[3], surface, codeCulture]
-  )
-
-  return rows
+  return db
+    .select({
+      id: parcelles.id,
+      new_minus_intersection: asGeoJSON(sql`ST_Difference(${input}, ${parcelles.geometry})`),
+      existing_minus_intersection: asGeoJSON(sql`ST_Difference(${parcelles.geometry}, ${input})`),
+      intersection: asGeoJSON(sql`ST_Intersection(${parcelles.geometry}, ${input})`)
+    })
+    .from(parcelles)
+    .where(and(eq(parcelles.recordId, recordId), inArray(parcelles.id, ids)))
 }
 
 /**
  * Vérifie que deux géométries sont de même géométrie spacial
  */
-async function findGeometryEquals (input: { old: string; new: string }) {
-  const { rows } = await pool.query<{ comparison_result: string; geojson: FeatureCollection }>(
-    /* sql */
-    `
-WITH date_comparison AS (
-  SELECT
-    r1.record_id as record1_id,
-    r2.record_id as record2_id,
-    r1.audit_date as audit_date_1,
-    r2.audit_date as audit_date_2,
-    r1.annee_reference_controle as annee_ref_1,
-    r2.annee_reference_controle as annee_ref_2,
-    CASE
-        WHEN r1.audit_date IS NOT NULL AND r2.audit_date IS NOT NULL THEN
-            CASE
-                WHEN r1.audit_date < r2.audit_date THEN 'r1_old_r2_new'
-                WHEN r1.audit_date > r2.audit_date THEN 'r2_old_r1_new'
-                ELSE
-                    CASE
-                        WHEN r1.created_at < r2.created_at THEN 'r1_old_r2_new'
-                        ELSE 'r2_old_r1_new'
-                    END
-            END
-        WHEN r1.audit_date IS NOT NULL AND r2.audit_date IS NULL THEN
-            CASE
-                WHEN extract(year from r1.audit_date) < COALESCE(r2.annee_reference_controle, 9999) THEN 'r1_old_r2_new'
-                WHEN extract(year from r1.audit_date) > COALESCE(r2.annee_reference_controle, 9999) THEN 'r2_old_r1_new'
-                ELSE
-                    CASE
-                        WHEN r1.created_at < r2.created_at THEN 'r1_old_r2_new'
-                        ELSE 'r2_old_r1_new'
-                    END
-            END
-        WHEN r1.audit_date IS NULL AND r2.audit_date IS NOT NULL THEN
-            CASE
-                WHEN COALESCE(r1.annee_reference_controle, 0) < extract(year from r2.audit_date) THEN 'r1_old_r2_new'
-                WHEN COALESCE(r1.annee_reference_controle, 0) > extract(year from r2.audit_date) THEN 'r2_old_r1_new'
-                ELSE -- années égales
-                    CASE
-                        WHEN r1.created_at < r2.created_at THEN 'r1_old_r2_new'
-                        ELSE 'r2_old_r1_new'
-                    END
-            END
-        ELSE
-            CASE
-                WHEN COALESCE(r1.annee_reference_controle, 0) < COALESCE(r2.annee_reference_controle, 0) THEN 'r1_old_r2_new'
-                WHEN COALESCE(r1.annee_reference_controle, 0) > COALESCE(r2.annee_reference_controle, 0) THEN 'r2_old_r1_new'
-                ELSE
-                    CASE
-                        WHEN r1.created_at < r2.created_at THEN 'r1_old_r2_new'
-                        ELSE 'r2_old_r1_new'
-                    END
-            END
-    END as comparison_result
-FROM
-    (SELECT record_id, audit_date, annee_reference_controle, created_at
-     FROM cartobio_operators WHERE record_id = $1) r1
-CROSS JOIN
-    (SELECT record_id, audit_date, annee_reference_controle, created_at
-     FROM cartobio_operators WHERE record_id = $2) r2
-),
-records_info AS (
-  SELECT
-    comparison_result,
-    CASE WHEN comparison_result = 'r1_old_r2_new' THEN $1 ELSE $2 END as old_record_id,
-    CASE WHEN comparison_result = 'r1_old_r2_new' THEN $2 ELSE $1 END as new_record_id
-  FROM date_comparison
-),
-old AS (
-  SELECT
-    cp.id,
-    cp.geometry,
-    CASE
-      WHEN cp.numero_ilot_pac IS NOT NULL THEN
-        'Ilot ' || cp.numero_ilot_pac || ' Parcelle ' || COALESCE(cp.numero_parcelle_pac::text, '?')
-      ELSE
-        COALESCE(cp.name, 'Parcelle')
-    END as label
-  FROM cartobio_parcelles cp
-  CROSS JOIN records_info ri
-  WHERE cp.record_id = ri.old_record_id
-    AND cp.geometry IS NOT NULL
-    AND cp.deleted_at IS NULL
+async function findGeometryEquals (input: { old: string; new: string }): Promise<Array<{ comparison_result: ComparisonResult; geojson: FeatureCollection }>> {
+  const records = await db
+    .select({
+      recordId: parcellaires.recordId,
+      auditDate: parcellaires.auditDate,
+      anneeReferenceControle: parcellaires.anneeReferenceControle,
+      createdAt: parcellaires.createdAt
+    })
+    .from(parcellaires)
+    .where(inArray(parcellaires.recordId, [input.old, input.new]))
 
-),
-new AS (
-  SELECT
-    cp.id,
-    cp.geometry,
-    CASE
-        WHEN cp.numero_ilot_pac IS NOT NULL THEN
-        'Ilot ' || cp.numero_ilot_pac || ' Parcelle ' || COALESCE(cp.numero_parcelle_pac::text, '?')
-      ELSE
-        COALESCE(cp.name, 'Parcelle')
-    END as label
-  FROM cartobio_parcelles cp
-  CROSS JOIN records_info ri
-  WHERE cp.record_id = ri.new_record_id
-    AND cp.geometry IS NOT NULL
-    AND cp.deleted_at IS NULL
+  const r1 = records.find(({ recordId }) => recordId === input.old)
+  const r2 = records.find(({ recordId }) => recordId === input.new)
 
-),
-deleted AS (
-  SELECT
-    o.geometry,
-    'deleted' AS status,
-    o.id as old_id,
-    o.label as label,
-    NULL as old_label
-  FROM old o
-  WHERE NOT EXISTS (
-    SELECT 1
-    FROM new n
-    WHERE
-    ST_Intersects(
-            ST_MakeValid(n.geometry),
-            ST_MakeValid(o.geometry)
-          )
-      AND ST_Area(ST_Intersection(
-            ST_MakeValid(n.geometry),
-            ST_MakeValid(o.geometry)
-          )) / ST_Area(ST_MakeValid(o.geometry)) > 0.1
-  )
-),
-added AS (
-  SELECT
-    n.geometry,
-    'added' AS status,
-    n.id as new_id,
-    n.label as label,
-    NULL as old_label
-  FROM new n
-  WHERE NOT EXISTS (
-    SELECT 1
-    FROM old o
-    WHERE
- ST_Intersects(
-            ST_MakeValid(o.geometry),
-            ST_MakeValid(n.geometry)
-          )
-      AND ST_Area(ST_Intersection(
-            ST_MakeValid(o.geometry),
-            ST_MakeValid(n.geometry)
-          )) / ST_Area(ST_MakeValid(n.geometry)) > 0.1
-  )
-),
-modified AS (
-  SELECT DISTINCT ON (n.id)
-    n.geometry,
-    'modified' AS status,
-    n.id as new_id,
-    o.id as old_id,
-    n.label as label,
-    o.label as old_label
-  FROM old o
-  JOIN new n ON ST_Intersects(
-                  ST_MakeValid(o.geometry),
-                  ST_MakeValid(n.geometry)
-                )
-    AND ST_Area(ST_Intersection(
-          ST_MakeValid(o.geometry),
-          ST_MakeValid(n.geometry)
-        )) > 0.00000001
-  WHERE
-  NOT ST_Equals(
-    ST_ReducePrecision(ST_MakeValid(n.geometry), 0.0001),
-    ST_ReducePrecision(ST_MakeValid(o.geometry), 0.0001)
-  )
-  ORDER BY n.id, ST_Area(ST_Intersection(
-    ST_MakeValid(o.geometry),
-    ST_MakeValid(n.geometry)
-  )) DESC
-),
-all_changes AS (
-  SELECT geometry, status, new_id, old_id, label, old_label FROM modified
-  UNION ALL
-  SELECT geometry, status, NULL as new_id, old_id, label, old_label FROM deleted
-  UNION ALL
-  SELECT geometry, status, new_id, NULL as old_id, label, old_label FROM added
-)
-SELECT
-  ri.comparison_result,
-  CASE
-    WHEN COUNT(ac.*) = 0 THEN
-      jsonb_build_object(
-        'type', 'FeatureCollection',
-        'features', '[]'::jsonb
-      )
-    ELSE
-      jsonb_build_object(
-        'type', 'FeatureCollection',
-        'features', jsonb_agg(
-          jsonb_build_object(
-            'type', 'Feature',
-            'properties', jsonb_build_object('status', ac.status,'new_id',ac.new_id, 'old_id', ac.old_id, 'label', ac.label, 'old_label', ac.old_label),
-            'geometry', ST_AsGeoJSON(ac.geometry)::jsonb
-          )
+  if (!r1 || !r2) return []
+
+  const comparisonResult = compareParcellaires(r1, r2)
+  const [oldRecordId, newRecordId] = comparisonResult === 'r1_old_r2_new'
+    ? [input.old, input.new]
+    : [input.new, input.old]
+
+  const recouvrement = (geometry: AnyColumn, autre: AnyColumn): SQL => sql`ST_Intersects(${makeValid(autre)}, ${makeValid(geometry)})
+    AND ST_Area(ST_Intersection(${makeValid(autre)}, ${makeValid(geometry)})) / ST_Area(${makeValid(geometry)}) > 0.1`
+
+  const intersectionArea = sql`ST_Area(ST_Intersection(${makeValid(ancienne.geometry)}, ${makeValid(nouvelle.geometry)}))`
+
+  const [modified, deleted, added] = await Promise.all([
+    db
+      .selectDistinctOn([nouvelle.id], {
+        geometry: asGeoJSON(nouvelle.geometry),
+        ancienne: parcelleColumns(ancienne),
+        nouvelle: parcelleColumns(nouvelle)
+      })
+      .from(ancienne)
+      .innerJoin(nouvelle, and(
+        sql`ST_Intersects(${makeValid(ancienne.geometry)}, ${makeValid(nouvelle.geometry)})`,
+        sql`${intersectionArea} > 0.00000001`
+      ))
+      .where(and(
+        parcellesActives(ancienne, oldRecordId),
+        parcellesActives(nouvelle, newRecordId),
+        sql`NOT ST_Equals(
+          ST_ReducePrecision(${makeValid(nouvelle.geometry)}, 0.0001),
+          ST_ReducePrecision(${makeValid(ancienne.geometry)}, 0.0001)
+        )`
+      ))
+      .orderBy(nouvelle.id, desc(intersectionArea)),
+
+    db
+      .select({ geometry: asGeoJSON(ancienne.geometry), ...parcelleColumns(ancienne) })
+      .from(ancienne)
+      .where(and(
+        parcellesActives(ancienne, oldRecordId),
+        notExists(
+          db
+            .select({ id: nouvelle.id })
+            .from(nouvelle)
+            .where(and(parcellesActives(nouvelle, newRecordId), recouvrement(ancienne.geometry, nouvelle.geometry)))
         )
-      )
-  END AS geojson
-FROM records_info ri
-LEFT JOIN all_changes ac ON TRUE
-GROUP BY ri.comparison_result;
-    `,
-    [input.old, input.new]
-  )
-  return rows
+      )),
+
+    db
+      .select({ geometry: asGeoJSON(nouvelle.geometry), ...parcelleColumns(nouvelle) })
+      .from(nouvelle)
+      .where(and(
+        parcellesActives(nouvelle, newRecordId),
+        notExists(
+          db
+            .select({ id: ancienne.id })
+            .from(ancienne)
+            .where(and(parcellesActives(ancienne, oldRecordId), recouvrement(nouvelle.geometry, ancienne.geometry)))
+        )
+      ))
+  ])
+
+  return [{
+    comparison_result: comparisonResult,
+    geojson: {
+      type: 'FeatureCollection',
+      features: [
+        ...modified.map(({ geometry, ancienne, nouvelle }) => feature(geometry, {
+          status: 'modified',
+          new_id: nouvelle.id,
+          old_id: ancienne.id,
+          label: label(nouvelle),
+          old_label: label(ancienne)
+        })),
+        ...deleted.map(({ geometry, ...parcelle }) => feature(geometry, {
+          status: 'deleted',
+          new_id: null,
+          old_id: parcelle.id,
+          label: label(parcelle),
+          old_label: null
+        })),
+        ...added.map(({ geometry, ...parcelle }) => feature(geometry, {
+          status: 'added',
+          new_id: parcelle.id,
+          old_id: null,
+          label: label(parcelle),
+          old_label: null
+        }))
+      ]
+    }
+  }]
 }
 
-/**
- * Couper la bordure d'une parcelle avec PostGIS
- * @param geometry Géométrie GeoJSON sérialisée de la parcelle en EPSG:4326
- * @param distance Distance de la bordure en mètres
- * @param allBorder Si true, retourne toute la bordure, sinon bordure entre 2 points
- * @param isInverted Si true, inverse le côté de la bordure
- * @param startBorderPoint Point de début [lng, lat]
- * @param endBorderPoint Point de fin [lng, lat]
- */
-async function findParcelBorder (
-  geometry: string,
-  distance: number,
-  allBorder: boolean,
-  isInverted: boolean,
-  startBorderPoint?: number[],
-  endBorderPoint?: number[]
-): Promise<{ parcelle_sans_bordure: unknown; bordure: unknown } | null> {
-  let query: string
+async function findParcelBorder (geometry: unknown, distance: number) {
+  const parcelle = db
+    .$with('parcelle', { geom: sql`geom`.as('geom') })
+    .as(sql`SELECT ${webMercator(fromGeoJSON(geometry))} AS geom`)
 
-  if (allBorder) {
-    query = `
-        WITH parcelle AS (
-          SELECT ST_SetSRID(ST_GeomFromGeoJSON($1), 4326) AS geom
-        ),
-        parcelle_3857 AS (
-          SELECT ST_Transform(geom, 3857) AS geom FROM parcelle
-        ),
-        parcelle_agrandie AS (
-          SELECT ST_Buffer(geom, 0.01) AS geom FROM parcelle_3857
-        ),
-        parcelle_sans_bordure AS (
-          SELECT ST_Buffer(geom, -($2 + 0.01)) AS geom FROM parcelle_agrandie
-        ),
-        bordure_3857 AS (
-          SELECT ST_Difference(pa.geom, psb.geom) AS geom
-          FROM parcelle_agrandie pa, parcelle_sans_bordure psb
-        ),
-        bordure AS (
-          SELECT ST_Transform(geom, 4326) AS geom FROM bordure_3857
-        ),
-        sans_bordure_3857 AS (
-          SELECT ST_Difference(p.geom, b.geom) AS geom
-          FROM parcelle_3857 p, bordure_3857 b
-        ),
-        sans_bordure AS (
-          SELECT ST_Transform(geom, 4326) AS geom FROM sans_bordure_3857
-        )
+  const bordure = db
+    .$with('bordure', { geom: sql`geom`.as('geom') })
+    .as(sql`
+      SELECT ST_Difference(agrandie, ST_Buffer(agrandie, ${-(distance + 0.01)})) AS geom
+      FROM (SELECT ST_Buffer(${parcelle.geom}, 0.01) AS agrandie FROM ${parcelle}) AS parcelle_agrandie
+    `)
+
+  const [result] = await db
+    .with(parcelle, bordure)
+    .select({
+      parcelleSansBordure: asWgs84GeoJSON(sql`ST_Difference(${parcelle.geom}, ${bordure.geom})`),
+      bordure: asWgs84GeoJSON(bordure.geom)
+    })
+    .from(parcelle)
+    .crossJoin(bordure)
+
+  return result
+}
+
+async function findParcelBorderBetweenPoints (geometry: unknown, distance: number, start: Position, end: Position, isInverted: boolean) {
+  const parcelle = db
+    .$with('parcelle', { geom: sql`geom`.as('geom') })
+    .as(sql`SELECT ${webMercator(fromGeoJSON(geometry))} AS geom`)
+
+  const contour = db
+    .$with('contour', { ligne: sql`ligne`.as('ligne') })
+    .as(sql`SELECT ST_ExteriorRing(${parcelle.geom}) AS ligne FROM ${parcelle}`)
+
+  const positions = db
+    .$with('positions', {
+      ligne: sql`ligne`.as('ligne'),
+      debut: sql`debut`.as('debut'),
+      fin: sql`fin`.as('fin')
+    })
+    .as(sql`
+      SELECT ligne, LEAST(a, b) AS debut, GREATEST(a, b) AS fin
+      FROM (
         SELECT
-          ST_AsGeoJSON(sb.geom)::json AS parcelle_sans_bordure,
-          ST_AsGeoJSON(b.geom)::json AS bordure
-        FROM sans_bordure sb, bordure b
-      `
+          ${contour.ligne} AS ligne,
+          ST_LineLocatePoint(${contour.ligne}, ${webMercator(sql`ST_MakePoint(${start[0]}, ${start[1]})`)}) AS a,
+          ST_LineLocatePoint(${contour.ligne}, ${webMercator(sql`ST_MakePoint(${end[0]}, ${end[1]})`)}) AS b
+        FROM ${contour}
+      ) AS points
+    `)
 
-    const result = await pool.query(query, [geometry, distance])
+  const sousLigne = (from: SQLWrapper, to: SQLWrapper): SQL => sql`ST_LineSubstring(${positions.ligne}, ${from}, ${to})`
+  const versFin = sousLigne(positions.fin, sql`1.0`)
+  const depuisDebut = sousLigne(sql`0.0`, positions.debut)
 
-    return result.rows[0] ?? null
-  } else {
-    query = `
-WITH parcelle AS (
-  SELECT ST_Transform(
-    ST_SetSRID(ST_GeomFromGeoJSON($1), 4326),
-    3857
-  ) AS geom
-),
+  const arc = isInverted
+    ? sql`CASE
+        WHEN ${positions.debut} < 0.001 THEN ${versFin}
+        WHEN ${positions.fin} > 0.999 THEN ${depuisDebut}
+        ELSE ST_LineMerge(ST_Union(${versFin}, ${depuisDebut}))
+      END`
+    : sousLigne(positions.debut, positions.fin)
 
-contour AS (
-  SELECT ST_ExteriorRing(geom) AS geom
-  FROM parcelle
-),
+  const bande = db
+    .$with('bande', { geom: sql`geom`.as('geom') })
+    .as(sql`
+      SELECT ST_Buffer(${arc}, ${Math.abs(distance)}, 'endcap=square join=round quad_segs=8') AS geom
+      FROM ${positions}
+      WHERE ST_Length(${positions.ligne}) > 0
+    `)
 
-points AS (
-  SELECT
-    ST_Transform(ST_SetSRID(ST_MakePoint($3, $4), 4326), 3857) AS s,
-    ST_Transform(ST_SetSRID(ST_MakePoint($5, $6), 4326), 3857) AS e
-),
+  const [result] = await db
+    .with(parcelle, contour, positions, bande)
+    .select({
+      parcelleSansBordure: asWgs84GeoJSON(sql`COALESCE(ST_Difference(${parcelle.geom}, ${bande.geom}), ${parcelle.geom})`),
+      bordure: asWgs84GeoJSON(sql`CASE
+        WHEN ST_Intersects(${bande.geom}, ${parcelle.geom}) THEN ST_MakeValid(ST_Intersection(${bande.geom}, ${parcelle.geom}))
+      END`)
+    })
+    .from(parcelle)
+    .leftJoin(bande, sql`true`)
 
-points_proches AS (
-  SELECT
-    ST_ClosestPoint(c.geom, p.s) AS start_point,
-    ST_ClosestPoint(c.geom, p.e) AS end_point,
-    c.geom AS contour
-  FROM contour c, points p
-),
-
-pos AS (
-  SELECT
-    ST_LineLocatePoint(contour, start_point) AS sp,
-    ST_LineLocatePoint(contour, end_point) AS ep,
-    contour
-  FROM points_proches
-),
-
-arc AS (
-  SELECT
-    CASE
-      WHEN $7 = 0 THEN
-        ST_LineSubstring(contour, LEAST(sp, ep), GREATEST(sp, ep))
-      ELSE
-        CASE
-          WHEN LEAST(sp, ep) < 0.001 THEN
-            ST_LineSubstring(contour, GREATEST(sp, ep), 1.0)
-          WHEN GREATEST(sp, ep) > 0.999 THEN
-            ST_LineSubstring(contour, 0.0, LEAST(sp, ep))
-          ELSE
-            ST_LineMerge(
-              ST_Union(
-                ST_LineSubstring(contour, GREATEST(sp, ep), 1.0),
-                ST_LineSubstring(contour, 0.0, LEAST(sp, ep))
-              )
-            )
-        END
-    END AS geom
-  FROM pos
-  WHERE ST_Length(contour) > 0
-),
-
-arc_buffer AS (
-  SELECT
-    ST_Buffer(
-      geom,
-      ABS($2::float),
-      'endcap=square join=round quad_segs=8'
-    ) AS geom
-  FROM arc
-  WHERE geom IS NOT NULL
-),
-
-bordure_3857 AS (
-  SELECT
-    ST_Intersection(ab.geom, p.geom) AS geom
-  FROM arc_buffer ab, parcelle p
-  WHERE ST_Intersects(ab.geom, p.geom)
-),
-
-bordure_valide AS (
-  SELECT
-    CASE
-      WHEN ST_IsValid(geom) THEN geom
-      ELSE ST_MakeValid(geom)
-    END AS geom
-  FROM bordure_3857
-  WHERE geom IS NOT NULL
-),
-
-sans_bordure AS (
-  SELECT
-    COALESCE(
-      ST_Difference(p.geom, b.geom),
-      p.geom
-    ) AS geom
-  FROM parcelle p
-  LEFT JOIN arc_buffer b ON true
-)
-
-SELECT
-  ST_AsGeoJSON(ST_Transform(sb.geom, 4326))::json AS parcelle_sans_bordure,
-  COALESCE(
-    ST_AsGeoJSON(ST_Transform(b.geom, 4326))::json,
-    NULL
-  ) AS bordure
-FROM sans_bordure sb
-LEFT JOIN bordure_valide b ON true;
-`
-
-    const result = await pool.query(query, [
-      geometry,
-      distance,
-      startBorderPoint?.[0],
-      startBorderPoint?.[1],
-      endBorderPoint?.[0],
-      endBorderPoint?.[1],
-      isInverted ? 1 : 0
-    ])
-
-    return result.rows[0] ?? null
-  }
+  return result
 }
 
 export {
-  findRpg,
   findGeometryConflicts,
   findGeometryCorrections,
   findGeometryEquals,
-  findParcelBorder
+  findParcelBorder,
+  findParcelBorderBetweenPoints
 }

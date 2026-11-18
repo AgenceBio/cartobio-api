@@ -3,76 +3,72 @@ import {
   getTopAnomaliesGroupedRepo,
   getTopAnomaliesRepo
 } from '../../../src/modules/tableau-de-bord/tableau-de-bord.repository.js'
+import { db } from '../../../src/database/database.js'
+import { parcellaireImportLogs, parcellairesImport } from '../../../src/database/schema/index.js'
 
-const { results, executed, db } = vi.hoisted(() => {
-  const results: unknown[] = []
-  const executed = vi.fn()
+const organismeCertificateur = 7
 
-  const builder = (): unknown => new Proxy(() => {}, {
-    get: (_, key) => key === 'then'
-      ? (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) => {
-          executed()
-          return Promise.resolve(results.shift()).then(resolve, reject)
-        }
-      : builder,
-    apply: builder
-  })
+async function insertJob (job: Partial<typeof parcellairesImport.$inferInsert>): Promise<number> {
+  const [{ id }] = await db
+    .insert(parcellairesImport)
+    .values({ organismeCertificateur: String(organismeCertificateur), status: 'DONE', ...job })
+    .returning({ id: parcellairesImport.id })
 
-  const db = new Proxy({}, { get: (_, key) => key === 'then' ? undefined : builder })
+  return id
+}
 
-  return { results, executed, db }
-})
-
-vi.mock('../../../src/database/database.js', () => ({ default: {}, db }))
+async function insertErrors (importId: number, codes: string[]): Promise<void> {
+  await db.insert(parcellaireImportLogs).values(codes.map((code) => ({
+    importId,
+    type: 'error' as const,
+    code,
+    message: `Erreur ${code}`
+  })))
+}
 
 describe('dashboard repository', () => {
-  beforeEach(() => {
-    results.length = 0
-    executed.mockClear()
-  })
-
   it('attache les logs au bon job dans le tableau des erreurs', async () => {
-    results.push(
-      [
-        {
-          jobId: 7,
-          statut: 'REJECTED',
-          etat: 'ERROR',
-          numeroBio: 'BIO-7',
-          numeroClient: 'CLIENT-7',
-          auditDate: '2026-01-02',
-          createdAt: '2026-01-02T10:00:00Z'
-        }
-      ],
-      1,
-      [
-        {
-          importId: 7,
-          numeroBio: 'BIO-7',
-          parcelleId: 9,
-          parcelleName: 'P1',
-          code: 'PARCELLE_INVALIDE',
-          message: 'Parcelle inconnue'
-        }
-      ]
-    )
+    const createdAt = new Date('2026-01-02T10:00:00Z')
+    const jobId = await insertJob({
+      statutJob: 'REJECTED',
+      etat: 'UNKNOWN',
+      numeroBio: 'BIO-7',
+      numeroClient: 'CLIENT-7',
+      auditDate: '2026-01-02',
+      createdAt
+    })
+    const autreJobId = await insertJob({ statutJob: 'VALID', createdAt })
+
+    await db.insert(parcellaireImportLogs).values([
+      {
+        importId: jobId,
+        type: 'error',
+        numeroBio: 'BIO-7',
+        parcelleId: '9',
+        parcelleName: 'P1',
+        code: 'PARCELLE_INVALIDE',
+        message: 'Parcelle inconnue'
+      },
+      { importId: jobId, type: 'warning', code: 'AVERTISSEMENT', message: 'Avertissement' },
+      { importId: autreJobId, type: 'error', code: 'AUTRE', message: 'Autre job' }
+    ])
 
     await expect(
-      getTableauErreursRepo({ page: 1, limit: 20 })
+      getTableauErreursRepo({ page: 1, limit: 20, organismeCertificateur })
     ).resolves.toEqual({
       data: [
         {
-          jobId: 7,
+          jobId,
           statut: 'REJECTED',
-          etat: 'ERROR',
+          etat: 'UNKNOWN',
           numeroBio: 'BIO-7',
           numeroClient: 'CLIENT-7',
           auditDate: '2026-01-02',
-          createdAt: '2026-01-02T10:00:00Z',
+          createdAt,
           details: [
             {
               numeroBio: 'BIO-7',
-              parcelleId: 9,
+              parcelleId: '9',
               parcelleName: 'P1',
               code: 'PARCELLE_INVALIDE',
               message: 'Parcelle inconnue'
@@ -82,21 +78,17 @@ describe('dashboard repository', () => {
       ],
       meta: { total: 1, page: 1, limit: 20 }
     })
-
-    expect(executed).toHaveBeenCalledTimes(3)
   })
 
-  it('ne demande pas les logs lorsque le tableau des erreurs est vide', async () => {
-    results.push([], 0)
+  it('ne remonte pas les jobs d\'un autre organisme dans le tableau des erreurs', async () => {
+    await insertJob({ statutJob: 'REJECTED', organismeCertificateur: '8' })
 
     await expect(
-      getTableauErreursRepo({ page: 1, limit: 20 })
+      getTableauErreursRepo({ page: 1, limit: 20, organismeCertificateur })
     ).resolves.toEqual({
       data: [],
       meta: { total: 0, page: 1, limit: 20 }
     })
-
-    expect(executed).toHaveBeenCalledTimes(2)
   })
 
   it('retourne immédiatement une liste vide si la période des anomalies est incomplète', async () => {
@@ -106,31 +98,23 @@ describe('dashboard repository', () => {
     await expect(
       getTopAnomaliesGroupedRepo({ to: '2026-01-31' })
     ).resolves.toEqual([])
-    expect(executed).not.toHaveBeenCalled()
   })
 
   it('agrège les anomalies groupées par période et conserve les périodes vides', async () => {
-    const period = new Date('2026-01-01T00:00:00.000Z')
-    results.push([
-      { period, accepted: 2, refused: 1, code: 'E1', errorCount: 3 },
-      { period, accepted: 2, refused: 1, code: 'E2', errorCount: 1 },
-      {
-        period: new Date('2026-01-02T00:00:00.000Z'),
-        accepted: 0,
-        refused: 0,
-        code: null,
-        errorCount: 0
-      }
-    ])
+    const createdAt = new Date('2026-01-01T12:00:00Z')
+    await insertJob({ statutJob: 'VALID', createdAt })
+    await insertJob({ statutJob: 'VALID', createdAt })
+    await insertErrors(await insertJob({ statutJob: 'REJECTED', createdAt }), ['E1', 'E1', 'E1', 'E2'])
 
     const result = await getTopAnomaliesGroupedRepo({
-      from: '2026-01-01',
-      to: '2026-01-02'
+      from: '2026-01-01T00:00:00Z',
+      to: '2026-01-02T00:00:00Z',
+      organismeCertificateur
     })
 
     expect(result).toEqual([
       {
-        period,
+        period: new Date('2026-01-01T00:00:00.000Z'),
         accepted: 2,
         refused: 1,
         errorCount: 4,

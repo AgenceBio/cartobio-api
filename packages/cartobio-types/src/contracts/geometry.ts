@@ -1,12 +1,6 @@
 import { z } from 'zod'
 import { anyGeometrySchema, bboxSchema, geometrySchema, positionSchema } from './common.js'
 
-export const rpgBodySchema = z.object({
-  extent: z.tuple([z.number(), z.number(), z.number(), z.number()]).meta({ description: 'Emprise [minx, miny, maxx, maxy] en EPSG:3857' }),
-  surface: z.number().meta({ description: 'Surface administrative de la parcelle RPG recherchée' }),
-  codeCulture: z.string().meta({ description: 'Code culture PAC de la parcelle RPG recherchée' })
-})
-
 export const borderCutBodySchema = z.object({
   geometry: geometrySchema,
   distance: z.number().meta({ description: 'Largeur de la bordure, en mètres' }),
@@ -33,11 +27,6 @@ export const addGeometryBodySchema = z.object({
       id: z.union([z.string(), z.number()]).optional().meta({ description: 'Parcelle en cours d\'édition, exclue de la détection' })
     }).optional()
   }).meta({ description: 'Feature GeoJSON à vérifier' })
-})
-
-export const rpgResponseSchema = z.object({
-  fid: z.number().meta({ description: 'Identifiant de la parcelle dans le RPG bio' }),
-  geom: anyGeometrySchema.meta({ description: 'Géométrie en EPSG:3857' })
 })
 
 export const borderCutResponseSchema = z.object({
@@ -77,7 +66,6 @@ export const addGeometryResponseSchema = z.object({
   corrections: z.array(correctionSchema).optional().meta({ description: 'Corrections proposées en cas de chevauchement' })
 })
 
-export type RpgBody = z.infer<typeof rpgBodySchema>
 export type BorderCutBody = z.infer<typeof borderCutBodySchema>
 export type GeometryEqualsBody = z.infer<typeof geometryEqualsBodySchema>
 export type AddGeometryBody = z.infer<typeof addGeometryBodySchema>
