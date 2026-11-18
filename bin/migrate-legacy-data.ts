@@ -17,7 +17,10 @@ interface Step {
   table: string
   extract: string
   transform?: (row: Row) => Row | Row[] | null
+  parentKey?: { column: string; childColumn: string }
 }
+
+const skippedParents = new Map<string, Set<string>>()
 
 const raw = (value: string): string => value
 pg.types.setTypeParser(pg.types.builtins.DATE, raw)
@@ -130,7 +133,8 @@ const STEPS: Step[] = [
     transform: (record) => ({
       ...record,
       certification_etat: record.certification_etat ?? 'OPERATOR_DRAFT'
-    })
+    }),
+    parentKey: { column: 'record_id', childColumn: 'record_id' }
   },
   {
     table: 'parcellaires_metadata',
@@ -294,7 +298,8 @@ const STEPS: Step[] = [
         numerobio AS numero_bio, numeroclient AS numero_client, audit_date,
         result_job, statut_job::text AS statut_job, etat::text AS etat
       FROM parcellaire_import
-    `
+    `,
+    parentKey: { column: 'id', childColumn: 'import_id' }
   },
   {
     table: 'parcellaire_import_logs',
@@ -333,16 +338,27 @@ function progress(table: string, done: number, total: number): void {
   )
 }
 
-async function load(target: Db, table: string, rows: Row[]): Promise<void> {
+async function load(target: Db, step: Step, rows: Row[]): Promise<number> {
   const [first] = rows
-  if (!first) return
+  if (!first) return 0
   const columns = Object.keys(first)
     .map((column) => `"${column}"`)
     .join(', ')
-  await target.execute(
-    sql`INSERT INTO ${sql.identifier(table)} (${sql.raw(columns)}) SELECT ${sql.raw(columns)} FROM json_populate_recordset(null::${sql.identifier(table)}, ${JSON.stringify(rows)})`
+  const key = step.parentKey
+  const result = await target.execute<Row>(
+    sql`INSERT INTO ${sql.identifier(step.table)} (${sql.raw(columns)}) SELECT ${sql.raw(columns)} FROM json_populate_recordset(null::${sql.identifier(step.table)}, ${JSON.stringify(rows)}) ON CONFLICT DO NOTHING ${key ? sql`RETURNING ${sql.identifier(key.column)}` : sql``}`
   )
+  if (key) {
+    const inserted = new Set(result.rows.map((row) => String(row[key.column])))
+    const skipped = skippedParents.get(key.childColumn) ?? new Set<string>()
+    for (const row of rows) if (!inserted.has(String(row[key.column]))) skipped.add(String(row[key.column]))
+    skippedParents.set(key.childColumn, skipped)
+  }
+  return result.rowCount ?? 0
 }
+
+const hasSkippedParent = (row: Row): boolean =>
+  [...skippedParents].some(([column, values]) => column in row && values.has(String(row[column])))
 
 async function run(source: Db, target: Db, step: Step): Promise<Row> {
   const start = Date.now()
@@ -361,9 +377,9 @@ async function run(source: Db, target: Db, step: Step): Promise<Row> {
       .map(cleanRow)
       .flatMap((row): Row[] => [(step.transform ? step.transform(row) : row) ?? []].flat())
       .map(cleanRow)
-    await load(target, step.table, transformed)
+      .filter((row) => !hasSkippedParent(row))
     read += rows.length
-    written += transformed.length
+    written += await load(target, step, transformed)
     progress(step.table, read, total)
   }
   await source.execute('CLOSE extract')
@@ -447,8 +463,6 @@ await target.$client.connect()
 try {
   if (process.argv.includes('--reset')) {
     await target.execute(`TRUNCATE ${STEPS.map(({ table }) => `"${table}"`).join(', ')} CASCADE`)
-  } else if ((await target.execute<Row>('SELECT 1 FROM parcellaires LIMIT 1')).rowCount !== 0) {
-    throw new Error('La base cible contient déjà des données, relancer avec --reset pour la vider')
   }
 
   console.log('Copie des données…')
